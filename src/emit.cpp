@@ -331,23 +331,72 @@ Type *Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   return Type::INVALID_TYPE;
 }
 
+void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments) {
+  auto symbol = ctx.get_symbol(callee);
+
+  if (symbol && symbol.get()->is_function()) {
+    auto sym = symbol.get();
+    auto declaration = sym->function.declaration;
+
+    if (!declaration) {
+      arguments->accept(this);
+      return;
+    }
+
+    auto params = declaration->params;
+    auto args_ct = arguments->arguments.size();
+    auto params_ct = params->params.size();
+
+    code << "(";
+
+    auto is_varargs = params->is_varargs;
+    for (size_t param_index = 0; param_index < params_ct; ++param_index) {
+      const auto &param = params->params[param_index];
+
+      if (param_index < args_ct) {
+        arguments->arguments[param_index]->accept(this);
+      } else if (param->normal.default_value) {
+        param->normal.default_value.get()->accept(this);
+      }
+
+      if (param_index != params_ct - 1 || (is_varargs && args_ct > params_ct)) {
+        code << ",";
+      }
+    }
+
+    if (is_varargs && args_ct > params_ct) {
+      for (size_t arg_index = params_ct; arg_index < args_ct; ++arg_index) {
+        arguments->arguments[arg_index]->accept(this);
+        if (arg_index != args_ct - 1) {
+          code << ",";
+        }
+      }
+    }
+
+    code << ")";
+    return;
+  }
+
+  arguments->accept(this);
+}
+
 void Emitter::visit(ASTCall *node) {
   std::vector<Type *> generic_args;
   if (node->has_generics()) {
     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
 
-  auto resolved_func_type = node->function->resolved_type;
+  auto resolved_func_type = node->callee->resolved_type;
 
-  if (node->function->get_node_type() == AST_NODE_PATH && resolved_func_type &&
+  if (node->callee->get_node_type() == AST_NODE_PATH && resolved_func_type &&
       resolved_func_type->is_kind(TYPE_CHOICE)) {
     // Creating a choice type's tuple-variant, such as Option!<T>::Some(10), etc.
-    emit_choice_tuple_variant_instantiation((ASTPath *)node->function, node->arguments);
+    emit_choice_tuple_variant_instantiation((ASTPath *)node->callee, node->arguments);
   } else {
     // normal function call, or a static method.
-    node->function->accept(this);
+    node->callee->accept(this);
     code << mangled_type_args(generic_args);
-    node->arguments->accept(this);
+    emit_arguments_with_defaults(node->callee, node->arguments);
   }
 }
 
@@ -745,7 +794,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
   auto name = info->scope->full_name();
 
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
+  if (HAS_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED) || node->is_fwd_decl) {
     // We don't care about extern here.
     code << indent() << type_tag << " " << name << " " << name << ";\n";
     return;
@@ -1087,7 +1136,8 @@ void Emitter::visit(ASTInitializerList *node) {
       }
 
     } break;
-    default: break;
+    default:
+      break;
   }
   code << "}";
   return;
@@ -1260,7 +1310,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   } else if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     if (type->is_kind(TYPE_STRUCT)) {
       auto flags = type->info->as<StructTypeInfo>()->flags;
-      if (HAS_FLAG(flags, STRUCT_FLAG_FORWARD_DECLARED)) {
+      if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
         ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
       } else {
         ss << ".size = 0, "; // non sized type
@@ -2094,7 +2144,7 @@ void Emitter::visit(ASTModule *node) {}
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
   if (symbol->is_local() ||
-      (symbol->is_function() && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
+      (symbol->is_function() && symbol->function.declaration && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
     return symbol->name.get_str();
   }
 

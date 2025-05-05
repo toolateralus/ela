@@ -503,18 +503,18 @@ struct ASTArguments : ASTNode {
 };
 
 struct ASTCall : ASTExpr {
-  ASTExpr *function;
+  ASTExpr *callee;
   ASTArguments *arguments;
 
   bool has_generics() {
-    if (auto path = dynamic_cast<ASTPath *>(function)) {
+    if (auto path = dynamic_cast<ASTPath *>(callee)) {
       return path->get_last_segments_generics() != nullptr;
     }
     return false;
   }
 
   Nullable<std::vector<ASTExpr *>> get_generic_arguments() {
-    if (auto path = dynamic_cast<ASTPath *>(function)) {
+    if (auto path = dynamic_cast<ASTPath *>(callee)) {
       return path->get_last_segments_generics();
     }
     return nullptr;

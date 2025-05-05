@@ -111,7 +111,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     if (type != Type::INVALID_TYPE && type != Type::UNRESOLVED_GENERIC) {
       if (type->is_kind(TYPE_STRUCT)) {
         auto info = (type->info->as<StructTypeInfo>());
-        if (DOESNT_HAVE_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED)) {
+        if (DOESNT_HAVE_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED)) {
           throw_error("Redefinition of struct", node->source_range);
         }
       } else {
@@ -161,13 +161,13 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   }
 
   if (node->is_fwd_decl && type_just_created) {
-    info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
+    info->flags |= STRUCT_IS_FORWARD_DECLARED;
   } else {
-    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
+    info->flags &= ~STRUCT_IS_FORWARD_DECLARED;
   }
 
   // if this is a forward declaration, exit out.
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
+  if (HAS_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED) || node->is_fwd_decl) {
     return;
   }
 
@@ -836,7 +836,7 @@ void Typer::compiler_mock_associated_function_call_visit_impl(Type *left_type, c
   path.push_segment(left_type->basename);
   path.push_segment(method_name);
 
-  call.function = &path;
+  call.callee = &path;
   call.accept(this);
 }
 
@@ -888,7 +888,6 @@ bool is_const_pointer(ASTNode *node) {
 
   return false;
 }
-
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable,
                                         bool is_deinit_call) {
   auto old_type = expected_type;
@@ -902,20 +901,27 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
         if (arg_index < args_ct) {
+          // Argument provided, type-check it
           expected_type = param->resolved_type;
           node->arguments[arg_index]->accept(this);
 
           assert_types_can_cast_or_equal(
               node->arguments[arg_index], param->resolved_type, node->arguments[arg_index]->source_range,
               std::format("unexpected argument type.. parameter #{} of function",
-                          arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+                          arg_index + 1)); // +1 here to make it 1-based indexing for user. more intuitive
 
+        } else if (param->normal.default_value) {
+          // No argument provided, use the default value
+          expected_type = param->resolved_type;
+          param->normal.default_value.get()->accept(this); // Type-check the default value
         } else {
+          // No argument provided and no default value, throw an error
           std::stringstream ss;
           ss << "Too few arguments to function. Expected:\n  fn(";
           for (auto param : params->params) {
             if (param->tag == ASTParamDecl::Normal) {
-              ss << param->normal.name.get_str() << ": " << param->normal.type->resolved_type->to_string() << ", ";
+              ss << param->normal.name.get_str() << ": " << param->normal.type->resolved_type->to_string();
+              ss << ", ";
             } else {
               ss << (param->self.is_pointer ? "*" : "") << "self, ";
             }
@@ -931,11 +937,13 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         }
       } else {
         if (!params->is_varargs) {
+          // Too many arguments
           std::stringstream ss;
           ss << "Too many arguments to function. Expected:\n  fn(";
           for (auto param : params->params) {
             if (param->tag == ASTParamDecl::Normal) {
-              ss << param->normal.name.get_str() << ": " << param->normal.type->resolved_type->to_string() << ", ";
+              ss << param->normal.name.get_str() << ": " << param->normal.type->resolved_type->to_string();
+              ss << ", ";
             } else {
               ss << (param->self.is_pointer ? "*" : "") << "self, ";
             }
@@ -1698,8 +1706,8 @@ void Typer::visit(ASTCall *node) {
   ASTFunctionDeclaration *func_decl = nullptr;
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
-  node->function->accept(this);
-  auto symbol = ctx.get_symbol(node->function).get();
+  node->callee->accept(this);
+  auto symbol = ctx.get_symbol(node->callee).get();
 
   if (symbol && symbol->is_function()) {
     if (!type) {
@@ -1731,7 +1739,7 @@ void Typer::visit(ASTCall *node) {
       type = func_decl->resolved_type;
 
       // Why did I have to add this, when refactoring the type system??
-      node->function->resolved_type = func_decl->resolved_type;
+      node->callee->resolved_type = func_decl->resolved_type;
     }
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
@@ -1752,7 +1760,7 @@ void Typer::visit(ASTCall *node) {
     node->resolved_type = symbol->type.choice.get()->resolved_type;
     return;
   } else {
-    type = node->function->resolved_type;
+    type = node->callee->resolved_type;
   }
 
   if (!type) {

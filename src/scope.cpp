@@ -3,6 +3,23 @@
 #include "core.hpp"
 #include "type.hpp"
 
+void get_varargs_handlers(Context *c) {
+  auto scope = c->root_scope;
+
+  auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
+  va_list_type->info->as<StructTypeInfo>()->flags |= STRUCT_IS_FORWARD_DECLARED;
+  scope->insert_type(va_list_type, "va_list", TYPE_STRUCT, nullptr);
+  
+  FunctionTypeInfo func_type_info;
+  func_type_info.is_varargs = true;
+  func_type_info.return_type = void_type();
+
+  auto va_func_type = global_find_function_type_id(func_type_info, {});
+
+  scope->insert_function("va_start", va_func_type, nullptr);
+  scope->insert_function("va_end", va_func_type, nullptr);
+}
+
 Context::Context() {
   scope = create_child(nullptr);
   root_scope = scope;
@@ -20,6 +37,8 @@ Context::Context() {
 #elif defined(__FreeBSD__)
   scope->defines().insert("PLATFORM_FREEBSD");
 #endif
+
+  get_varargs_handlers(this);
 
   if (compile_command.has_flag("freestanding"))
     Scope::defines().insert("FREESTANDING");
@@ -53,11 +72,10 @@ void Scope::erase(const InternedString &name) {
 bool Symbol::is_generic_function() const {
   if (!is_function())
     return false;
-  
+
   auto declaration = this->function.declaration;
 
-  if (declaration->generic_parameters.size() != 0 || 
-      declaration->generic_arguments.size() != 0  ||
+  if (declaration->generic_parameters.size() != 0 || declaration->generic_arguments.size() != 0 ||
       declaration->generic_instantiations.size() != 0) {
     return true;
   }

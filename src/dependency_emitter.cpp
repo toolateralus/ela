@@ -331,7 +331,7 @@ void DependencyEmitter::visit(ASTPath *node) {
         symbol->variable.declaration.get()->accept(this);
         symbol->variable.declaration.get()->accept(emitter);
       }
-    } else if (symbol->is_function()) {
+    } else if (symbol->is_function() && symbol->function.declaration) {
       // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
     } else if (symbol->is_type()) {
@@ -356,7 +356,7 @@ void DependencyEmitter::visit(ASTType_Of *node) {
 
 void DependencyEmitter::visit(ASTCall *node) {
   node->arguments->accept(this);
-  node->function->accept(this);
+  node->callee->accept(this);
 }
 
 void DependencyEmitter::visit(ASTArguments *node) {

@@ -82,7 +82,7 @@ enum FunctionInstanceFlags : size_t {
 };
 
 enum StructTypeFlags {
-  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
+  STRUCT_IS_FORWARD_DECLARED = 1 << 0,
   STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
   STRUCT_FLAG_IS_UNION = 1 << 2,
 };

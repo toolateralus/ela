@@ -101,6 +101,7 @@ static constexpr auto BOILERPLATE_C_CODE = R"__(
   typedef signed char s8;
   typedef unsigned char u8;
   #include <stddef.h>
+  #include <stdarg.h>
 
   // I don't think we need any of these includes anymore.
   #if USE_STD_LIB

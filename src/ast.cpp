@@ -746,7 +746,7 @@ ASTExpr *Parser::parse_postfix() {
          peek().type == TType::As) {
     if (peek().type == TType::LParen) {
       NODE_ALLOC(ASTCall, call, range, _, this);
-      call->function = left;
+      call->callee = left;
       call->arguments = parse_arguments();
       left = call;
     } else if (peek().type == TType::Dot) {
@@ -1899,14 +1899,6 @@ ASTParamsDecl *Parser::parse_parameters() {
 
       params->has_self = true;
 
-      if (peek().type == TType::Assign) {
-        if (param->tag == ASTParamDecl::Self) {
-          throw_error("self parameters cannot have a default value.", param->source_range);
-        }
-        eat();
-        param->normal.default_value = parse_expr();
-      }
-
       params->params.push_back(param);
 
       if (peek().type != TType::RParen) {
@@ -1930,8 +1922,11 @@ ASTParamsDecl *Parser::parse_parameters() {
     param->normal.name = name;
 
     if (peek().type == TType::Assign) {
-      end_node(nullptr, range);
-      throw_error("Ela does not support default parameters.", range);
+      if (param->tag == ASTParamDecl::Self) {
+        throw_error("self parameters cannot have a default value.", param->source_range);
+      }
+      eat();
+      param->normal.default_value = parse_expr();
     }
 
     params->params.push_back(param);

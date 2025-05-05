@@ -469,6 +469,11 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   type->base_type = base_type;
   type->set_ext(extensions);
   type->set_base(name);
+
+  if (!info) {
+    info = type_info_alloc<StructTypeInfo>();
+  }
+
   type->set_info(info);
 
   if (extensions.is_pointer() && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
