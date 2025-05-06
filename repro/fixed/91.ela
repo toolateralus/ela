@@ -1,6 +1,6 @@
 alias fun :: fn* (s32, s32) -> s32;
 
-#foreign fn fun_return_fun() -> fun;
+extern fn fun_return_fun() -> fun;
 
 fn main() { 
 
