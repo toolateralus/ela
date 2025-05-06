@@ -109,7 +109,7 @@ impl SequenceChannel {
         _x : f32 = x + 150 + ((self.check_buttons.length as f32 * 40.0) as f32) + 2;
         self.check_buttons.push(.{
           value:      false,
-          rectangle:       .{x: _x, y: y, width: 36, height: 36},
+          rectangle:  .{x: _x, y: y, width: 36, height: 36},
           style:      self.style,
           text:       None(),
           allow_hold: true,
