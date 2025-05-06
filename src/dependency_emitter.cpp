@@ -354,7 +354,7 @@ void DependencyEmitter::visit(ASTPath *node) {
 
 void DependencyEmitter::visit(ASTLiteral *node) {}
 
-void DependencyEmitter::visit(ASTType *node) { declare_type(node->resolved_type); }
+void DependencyEmitter::visit(ASTType *node) { define_type(node->resolved_type); }
 
 void DependencyEmitter::visit(ASTType_Of *node) {
   node->target->accept(this);
