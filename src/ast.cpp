@@ -1349,11 +1349,9 @@ ASTStatement *Parser::parse_statement() {
     expect(TType::Semi);
 
     auto symbol = ctx.scope->lookup(module_name);
-
-    // Import a module that's been defined by a 'module ... {}' statement.
-    // this is somewhat problematic because these arent really yet.
+    
     if (symbol && symbol->is_module()) {
-      // printf("importing existing module %s\n", module_name.get_str().c_str());
+      printf("importing existing module %s\n", module_name.get_str().c_str());
       import->scope = ((ASTModule *)symbol->module.declaration)->scope;
       return import;
     }

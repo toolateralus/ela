@@ -2,9 +2,9 @@
 ; 
 
 #test fn test_malloc() {
-  mut ptr: *const s32 = malloc(4);
+  mut ptr: *const s32 = std::c::malloc(4);
   assert("malloc'd pointer was null", ptr != null);
-  free(ptr);
+  std::c::free(ptr);
   ptr = null;
   assert("freed ptr and set to null was not == null", ptr == null);
 }

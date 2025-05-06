@@ -140,12 +140,12 @@ struct Array {
 
 #test fn test_referencing_pointer() {
   mut node: Node;
-  node.next = malloc(sizeof(Node));
+  node.next = std::c::malloc(sizeof(Node));
   mut other: Node;
   node.next.next = &mut other;
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
-  free(node.next);
+  std::c::free(node.next);
 }
 
 #test fn test_cast() {

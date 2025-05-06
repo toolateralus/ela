@@ -57,7 +57,7 @@ struct DeferCleanup {
 // in the defer block. which is absolutely expected behaviour.
 fn defer_cleanup_routine(mut c: *mut DeferCleanup) -> u64 {
   defer {
-    free(c.ptr);
+    std::c::free(c.ptr);
     c.ptr = null;
   }
   assert("defer cleanup got null input", c.ptr != null);
@@ -65,7 +65,7 @@ fn defer_cleanup_routine(mut c: *mut DeferCleanup) -> u64 {
 }
 
 #test fn test_defer_cleanup_routine() {
-  ptr := malloc(8);
+  ptr := std::c::malloc(8);
   mut cleanup := DeferCleanup .{
     ptr: ptr
   };

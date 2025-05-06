@@ -6,7 +6,7 @@ using std::string;
 using std::stringstream;
 
 
-static std::set<std::string> reserved = {"auto",   "break",  "case",    "const",    "continue", "default",  "do",
+static std::set<std::string> reserved = {"auto",   "break",  "case",    "const",    "continue", "default",  "do", "char",
                                          "double", "else",   "enum",    "extern",   "float",    "for",      "goto",
                                          "if",     "int",    "long",    "register", "return",   "short",    "signed",
                                          "struct", "switch", "typedef", "union",    "unsigned", "volatile", "while"};

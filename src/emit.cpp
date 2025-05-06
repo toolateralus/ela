@@ -676,6 +676,14 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   auto symbol = scope->lookup(node->name);
+
+  if (!symbol) {
+    // ! TODO: fix this.
+    // right now when we search for a symbol from in a module this just crashes.
+    return;
+  }
+
+
   auto decl = symbol->function.declaration;
   if (decl->is_declared || decl->is_emitted) {
     return;

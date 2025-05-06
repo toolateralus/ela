@@ -308,16 +308,21 @@ fn update_particle(particle: *mut Particle) -> bool {
     scale := lerp(smoke_particle_init_scale.x * 0.15, smoke_particle_init_scale.x, t);
     delta := time - particle.spawn_time;
     particle.color.a = clamp(particle.color.a - 12, 0, 255);
+
     if delta > particle.lifetime {
       return t < 0.1 && particle.color.a == 0;
     }
+
     particle.scale = .{x: scale, y: scale};
+
   } else if  particle.kind == ParticleKind::Fire {
+
     particle.scale.x *= 0.95;
     particle.scale.y *= 0.95;
     if particle.color.a > 0 {
       particle.color.a /= 2;
     }
+    
   }
   return true;
 }
@@ -533,17 +538,20 @@ fn update_game() {
       mut style := jiggly_text_style;
       style.foreground = Color::lerp(GREEN, CYAN, 0.5);
       style.font_size = 18;
-      style.jiggle_intensity = 2;
-      style.jiggle_rate = 10;
+
+      const jiggle_intensity := 2;
+      const jiggle_rate := 10;
 
       mut text := format("Round: %...", (v,), FormatOptions::default());
       text_w := measure_jiggly_text(text, style) / 4.0;
-      jiggly_text(text, get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 0.0}), style);
+      mut center := get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 0.0});
+      jiggly_text(text, center, style, jiggle_intensity, jiggle_rate);
       text.deinit();
 
       v = round_base_num_enemies_to_advance * round_index;
       text = format("Requires % enemies to pass.", (v,), FormatOptions::default());
-      jiggly_text(text, get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 24}), style);
+      center = get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 24});
+      jiggly_text(text, center, style, jiggle_intensity, jiggle_rate);
       text.deinit();
     } else {
       misses_this_round = 0;
@@ -589,10 +597,14 @@ fn update_game() {
 
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
     for i in 0..fabs(character.horizontal_velocity * smoke_particle_density) as s64 {
-      make_particle(ParticleKind::Smoke, .{
-        x: character.rect.x - 10,
-        y: character.rect.y + (character.rect.height / 3),
-      }, player_smoke_color);
+      make_particle(
+        ParticleKind::Smoke, 
+        .{
+          x: character.rect.x - 10,
+          y: character.rect.y + (character.rect.height / 3),
+        }, 
+        player_smoke_color
+      );
     }
   }
 
@@ -602,7 +614,7 @@ fn update_game() {
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
 
   if IsKeyPressed(KeyboardKey::KEY_SPACE) && bullet_routine.count == 0 {
-    bullet_routine.count = bullet_max_burst;
+    bullet_routine.count = 1;
   }
 
   mut dead_bullets: List!<u64>;
@@ -832,7 +844,7 @@ fn draw_main_menu() {
     round_failed = false;
   }
 
-  rect : Rectangle = .{
+  rect := Rectangle.{
     x: screen_width / 7,
     y: screen_height / 10,
     width: screen_width / 2,
@@ -855,18 +867,18 @@ fn draw_main_menu() {
     style.font_size = 12;
 
     style.foreground = CYAN;
-    style.jiggle_intensity = 3.0;
-    style.jiggle_rate = 1.0;
+    const jiggle_intensity := 3.0;
+    const jiggle_rate := 1.0;
     mut text := qformat("reached round %,", (round_index,));
-    jiggly_text(text, rect, style);
+    jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
     text.deinit();
     rect.y += 64;
     text = qformat("% targets taken down", (targets_destroyed,));
-    jiggly_text(text, rect, style);
+    jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
     text.deinit();
     rect.y += 64;
     text = qformat("scored % points", (score,));
-    jiggly_text(text, rect, style);
+    jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
     text.deinit();
   }
 }
@@ -876,7 +888,6 @@ fn draw_game_menu() {
   height : f32 = 48 / 3;
 
   mut style := button_style;
-  style.use_jiggly_text = false;
   swap_rect := Rectangle .{x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height};
 
   if button("swap music", swap_rect, style) {
@@ -890,7 +901,6 @@ fn draw_game_menu() {
   }
 
   style = button_style;
-  style.use_jiggly_text = false;
   mute_rect := Rectangle .{x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height};
 
   if button("mute music", mute_rect, style) {

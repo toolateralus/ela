@@ -12,7 +12,7 @@ impl JsonValueDeleter {
 
   fn destroy(*mut self) {
     for val in self.vals {
-      free(val);
+      std::c::free(val);
     }
   }
 }
