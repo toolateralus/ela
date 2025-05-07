@@ -1242,6 +1242,11 @@ void Typer::visit(ASTProgram *node) {
 
 void Typer::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
+    for (auto param : node->generic_parameters) {
+      if (param.default_value) {
+        param.default_value->accept(this);
+      }
+    }
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_CHOICE, node);
     return;
   }
@@ -1282,6 +1287,11 @@ void Typer::visit(ASTLambda *node) {
 
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
+    for (auto param : node->generic_parameters) {
+      if (param.default_value) {
+        param.default_value->accept(this);
+      }
+    }
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_STRUCT, node);
   } else {
     visit_struct_declaration(node, false);
@@ -1328,6 +1338,11 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   if (!node->generic_parameters.empty()) {
     // TODO: actually generate a signature for a generic function so that you can compare them
+    for (auto param : node->generic_parameters) {
+      if (param.default_value) {
+        param.default_value->accept(this);
+      }
+    }
     ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC, node);
     return;
   }
@@ -2696,6 +2711,11 @@ void Typer::visit(ASTCast *node) {
 
 void Typer::visit(ASTTraitDeclaration *node) {
   if (!node->generic_parameters.empty()) {
+    for (auto param : node->generic_parameters) {
+      if (param.default_value) {
+        param.default_value->accept(this);
+      }
+    }
     ctx.scope->create_trait_type(node->name, node->scope, {}, node);
   } else {
     visit_trait_declaration(node, false);
