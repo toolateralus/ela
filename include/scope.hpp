@@ -76,11 +76,11 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, ASTNode *decl,
+  static Symbol create_variable(const InternedString &name, Type *type, ASTExpr *initial_value, ASTNode *decl,
                                 Mutability mutability) {
     Symbol symbol;
     symbol.name = name;
-    symbol.type_id = type_id;
+    symbol.type_id = type;
     symbol.flags = SYMBOL_IS_VARIABLE;
     symbol.variable.initial_value = initial_value;
     symbol.variable.declaration = decl;
@@ -88,23 +88,23 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
+  static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration,
                                 SymbolFlags flags) {
     Symbol symbol;
-    symbol.type_id = type_id;
+    symbol.type_id = type;
     symbol.name = name;
     symbol.flags = flags;
     symbol.function.declaration = declaration;
     return symbol;
   }
 
-  static Symbol create_type(Type *type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+  static Symbol create_type(Type *type, const InternedString &name, TypeKind kind, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.kind = kind;
     symbol.type.declaration = declaration;
-    symbol.type_id = type_id;
+    symbol.type_id = type;
     return symbol;
   }
 
@@ -199,30 +199,32 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-
   Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
-    auto id = global_create_tagged_union_type(name, scope, {});
-    auto sym = Symbol::create_type(id, name, TYPE_CHOICE, (ASTNode *)declaration);
+    auto type = global_create_tagged_union_type(name, scope, {});
+    auto sym = Symbol::create_type(type, name, TYPE_CHOICE, (ASTNode *)declaration);
+    type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    return id;
+    return type;
   }
 
   Type *create_trait_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
-                              ASTTraitDeclaration *declaration) {
-    auto id = global_create_trait_type(name, scope, generic_args);
-    auto sym = Symbol::create_type(id, name, TYPE_TRAIT, (ASTNode *)declaration);
+                          ASTTraitDeclaration *declaration) {
+    auto type = global_create_trait_type(name, scope, generic_args);
+    auto sym = Symbol::create_type(type, name, TYPE_TRAIT, (ASTNode *)declaration);
+    type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    return id;
+    return type;
   }
 
   Type *create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
-    auto id = global_create_struct_type(name, scope);
-    auto sym = Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto type = global_create_struct_type(name, scope);
+    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
+    type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    return id;
+    return type;
   }
 
   void create_type_alias(const InternedString &name, Type *type_id, TypeKind kind, ASTNode *declaring_node) {
@@ -247,11 +249,11 @@ struct Scope {
   }
 
   Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
-    auto id = global_create_enum_type(name, scope, flags);
-    auto sym = Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto type = global_create_enum_type(name, scope, flags);
+    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    return id;
+    return type;
   }
 
   void create_module(const InternedString &name, ASTModule *declaration) {
@@ -261,13 +263,13 @@ struct Scope {
   }
 
   Type *create_tuple_type(const std::vector<Type *> &types) {
-    auto id = global_create_tuple_type(types);
+    auto type = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    auto sym = Symbol::create_type(id, name, TYPE_STRUCT, nullptr);
+    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, nullptr);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    return id;
+    return type;
   }
 
   Type *find_type_id(const InternedString &name, const TypeExtensions &ext) {
