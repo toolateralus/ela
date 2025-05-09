@@ -5,6 +5,7 @@ import signal
 import sys
 import time
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def signal_handler(sig, frame):
     print("\033[1;34m --testing cancelled-- \033[0m")
@@ -25,46 +26,57 @@ def run_test(test_file):
     print(f"\033[1;33mRunning test: {test_file}\033[0m")
     start_time = time.time_ns()
 
-    result = subprocess.run(["ela", test_file, "--test"])
+    result = subprocess.run(["ela", test_file, "--test"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       
     end_time = time.time_ns()
     if result.returncode == 0:
         compile_time = (end_time - start_time) // 1000000
-        compile_times.append(compile_time)
-        test_files.append(test_file)
         global total_compile_time
         total_compile_time += compile_time
-        run_result = subprocess.run([f"./{test_file[:-4]}"])
+        run_result = subprocess.run([f"./{test_file[:-4]}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if run_result.returncode == 0:
-            passed_tests.append(test_file)
+            return ("passed", test_file, compile_time)
         elif run_result.returncode < 0:  # Abnormal termination (e.g., segfault)
             signal_name = signal.Signals(-run_result.returncode).name
             print(f"\033[1;31mTest {test_file} failed with signal: {signal_name}\033[0m")
-            failed_tests.append(f"{test_file} (signal: {signal_name})")
+            return ("failed", f"{test_file} (signal: {signal_name})", compile_time)
         else:
             print(f"\033[1;31mTest {test_file} failed with return code: {run_result.returncode}\033[0m")
-            failed_tests.append(test_file)
-            
-        if os.path.isfile(test_file[:-4]):
-            os.remove(test_file[:-4])
+            return ("failed", test_file, compile_time)
     else:
         print(f"\033[1;31mCompilation failed for {test_file}\033[0m")
-        failed_tests.append(test_file)
+        return ("failed", test_file, 0)
 
 def main():
+    global total_compile_time
     if len(sys.argv) > 1 and sys.argv[1] != "--time":
         test_file = f"{sys.argv[1]}.ela"
         if os.path.isfile(test_file):
-            run_test(test_file)
+            result, test_file, compile_time = run_test(test_file)
+            if result == "passed":
+                passed_tests.append(test_file)
+            else:
+                failed_tests.append(test_file)
             sys.exit(0)
         else:
             print(f"\033[1;31mTest file {test_file} does not exist\033[0m")
             sys.exit(1)
 
-    for test_file in os.listdir('.'):
-        if test_file.endswith('.ela'):
-            run_test(test_file)
+    # Collect all test files
+    test_files = [f for f in os.listdir('.') if f.endswith('.ela')]
 
+    # Run tests in parallel
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(run_test, test_file): test_file for test_file in test_files}
+        for future in as_completed(futures):
+            result, test_file, compile_time = future.result()
+            if result == "passed":
+                passed_tests.append(test_file)
+                compile_times.append(compile_time)
+            else:
+                failed_tests.append(test_file)
+
+    # Print compile times if requested
     if len(sys.argv) > 1 and sys.argv[1] == "--time":
         for i, compile_time in enumerate(compile_times):
             print(f"\033[1;36m\033[1m{test_files[i]}\033[0m took \033[1;32m\033[1m{compile_time}ms\033[0m")

@@ -2887,7 +2887,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
+      for (auto &part: path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -2945,7 +2945,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
+      for (auto &part: path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -3149,7 +3149,7 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   Type *previous_type = nullptr;
-  for (auto &segment in node->segments) {
+  for (auto &segment: node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     if (!symbol) {

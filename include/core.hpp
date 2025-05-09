@@ -11,7 +11,6 @@
 
 #define MB(n) (n * 1024 * 1024)
 #define GB(n) (n * 1024 * 1024 * 1024)
-#define in : // ! TODO: REMOVE ME
 // simple pointer wrapper that expresses intent about whether a pointer is optional or not
 // without a nasty allocating wrapper like std::optional (which is also annoying to type)
 template <class T>
