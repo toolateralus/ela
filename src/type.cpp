@@ -483,6 +483,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     } else {
       type->traits.push_back(is_mut_pointer_trait());
     }
+    if (base_type->is_kind(TYPE_FUNCTION)) {
+      type->traits.push_back(is_fn_ptr_trait());
+    }
   }
 
   /*
@@ -862,6 +865,16 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
     i++;
   }
   return s;
+}
+
+Type *is_fn_ptr_trait() {
+  static Type *id = global_create_trait_type("IsFnPtr", create_child(nullptr), {});
+  return id;
+}
+
+Type *is_fn_trait() {
+  static Type *id = global_create_trait_type("IsFn", create_child(nullptr), {});
+  return id;
 }
 
 Type *is_tuple_trait() {

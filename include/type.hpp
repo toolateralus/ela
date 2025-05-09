@@ -265,6 +265,8 @@ Type *u64_type();
 Type *f64_type();
 Type *f32_type();
 
+Type *is_fn_trait();
+Type *is_fn_ptr_trait();
 Type *is_tuple_trait();
 Type *is_array_trait();
 Type *is_pointer_trait();
@@ -342,6 +344,11 @@ struct Type {
     if (kind == TYPE_TUPLE) {
       traits.push_back(is_tuple_trait());
     }
+
+    if (kind == TYPE_FUNCTION) {
+      traits.push_back(is_fn_trait());
+    }
+
   }
 
   /*

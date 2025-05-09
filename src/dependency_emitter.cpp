@@ -8,6 +8,16 @@
 
 void DependencyEmitter::declare_type(Type *type) {
   auto extensions = type->extensions.extensions;
+
+  // TODO:
+  // ! @Cooper-Pilot
+  /* 
+    function pointers were acting weird so i just did this ish.
+  */
+  if (type->is_kind(TYPE_FUNCTION)) {
+    return define_type(type);
+  }
+
   for (auto ext : extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter->forward_decl_type(type);

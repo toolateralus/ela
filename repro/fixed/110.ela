@@ -1,5 +1,0 @@
-fn main() {
-  // x: (u32, u32); // have to do this to not have emit errors.
-  type := typeof((u32, u32));
-}
-  

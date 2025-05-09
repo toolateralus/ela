@@ -18,6 +18,7 @@ void get_varargs_handlers(Context *c) {
 
   scope->insert_function("va_start", va_func_type, nullptr);
   scope->insert_function("va_end", va_func_type, nullptr);
+  scope->insert_function("va_copy", va_func_type, nullptr);
 }
 
 Context::Context() {

@@ -1385,6 +1385,9 @@ ASTStatement *Parser::parse_statement() {
     module->scope = ctx.scope;
     while (peek().type != TType::RCurly) {
       module->statements.push_back(parse_statement());
+      if (peek().type == TType::Semi) {
+        eat();
+      }
     }
     ctx.set_scope(old_scope);
     expect(TType::RCurly);

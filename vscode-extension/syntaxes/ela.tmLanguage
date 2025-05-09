@@ -152,7 +152,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch|dyn)\b</string>
+					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch|dyn|module|extern)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
@@ -170,7 +170,7 @@
         </dict>
 				<dict>
 					<key>match</key>
-					<string>\b(null|нулевой|true|правда|неверим|false)\b</string>
+					<string>\b(null|нулевой|true|правда|неверим|false|va_start|va_end|va_copy)\b</string>
 					<key>name</key>
 					<string>constant.language.ela</string>
 				</dict>
@@ -243,7 +243,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(u8|u16|u32|u64)\b</string>
+					<string>\b(u8|u16|u32|u64|char|va_list)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>

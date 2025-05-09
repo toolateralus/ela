@@ -256,7 +256,7 @@ fn random_vector2_scalar(max: f32) -> Vector2 {
 }
 
 fn make_particle(kind: s32, position: Vector2, tint: Color) {
-  particle: *mut Particle = malloc(sizeof(Particle));
+  particle: *mut Particle = std::c::malloc(sizeof(Particle));
   particle.kind = kind;
 
   if kind == ParticleKind::Smoke {
@@ -468,10 +468,10 @@ fn draw_game() {
     WHITE
   );
 
-  sprintf(format_buffer,  "Score:            %d"c, score);
+  std::c::sprintf(format_buffer,  "Score:            %d"c, score);
   DrawText(format_buffer, 0, 0, 24, ui_text_color);
 
-  sprintf(format_buffer,  "Count:            %d"c, targets_destroyed);
+  std::c::sprintf(format_buffer,  "Count:            %d"c, targets_destroyed);
   DrawText(format_buffer, 0, 30, 24, ui_text_color);
 
   if ui_text_color.a > 0 {
