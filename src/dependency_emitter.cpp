@@ -597,7 +597,10 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPatternMatch *node) {}
+void DependencyEmitter::visit(ASTPatternMatch *node) {
+  node->object->accept(this);
+  node->target_type_path->accept(this);
+}
 
 void DependencyEmitter::visit(ASTMethodCall *node) {
   node->arguments->accept(this);

@@ -459,7 +459,6 @@ struct ASTGenericParameter {
   ASTType *default_value = nullptr;
 };
 
-
 struct ASTDeclaration;
 
 struct GenericInstance {

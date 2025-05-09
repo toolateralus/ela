@@ -698,8 +698,6 @@ ASTExpr *Parser::parse_unary() {
 
     auto expr = parse_unary();
 
-    // TODO: make a more comprehensive rvalue evaluator.
-    // We need to use it later for self* method calls
     auto is_rvalue =
         expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
 
