@@ -49,7 +49,7 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
 }
 
 #test fn test_tuple_ptr () {
-  ptr : *mut (s32, s32) = malloc(32);
+  ptr : *mut (s32, s32) = std::c::malloc(32);
   *ptr = (10, 10);
   {
     a, b := *ptr; 
@@ -63,7 +63,7 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
     assert("mallocing into tuple array failed", a == 10 && b == 10);
   }   
 
-  free(ptr);
+  std::c::free(ptr);
 }
 
 #test fn test_tuple_destructure_with_ptr() {

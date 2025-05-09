@@ -9,6 +9,7 @@
 #include "builder.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "strings.hpp"
@@ -676,6 +677,13 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   auto symbol = scope->lookup(node->name);
+
+  if (!symbol) {
+    // ! TODO: fix this.
+    // right now when we search for a symbol from in a module this just crashes.
+    return;
+  }
+
   auto decl = symbol->function.declaration;
   if (decl->is_declared || decl->is_emitted) {
     return;
@@ -1062,66 +1070,32 @@ void Emitter::visit(ASTInitializerList *node) {
   }
 
   if (node->tag == ASTInitializerList::INIT_LIST_EMPTY) {
-    return emit_default_construction(type);
-  }
-
-  code << "{";
-  switch (node->tag) {
-    case ASTInitializerList::INIT_LIST_NAMED: {
-      newline();
-      indent_level++;
-      const auto size = node->key_values.size();
-      for (int i = 0; i < node->key_values.size(); ++i) {
-        const auto &[key, value] = node->key_values[i];
-        emit_line_directive(value);
-        code << indent() << '.' << key.get_str() << " = ";
-
-        auto type = value->resolved_type;
-
-        if (type->is_kind(TYPE_CHOICE) && value->get_node_type() == AST_NODE_PATH) {
-          auto path = (ASTPath *)value;
-          if (path->length() > 1) {
-            emit_choice_marker_variant_instantiation(type, path);
-          } else
-            goto NORMAL;
-        } else {
-        NORMAL:
-          code << "(" << to_cpp_string(type) << ")";
-          value->accept(this);
-        }
-        if (i != size - 1) {
-          code << ",\n";
+    emit_default_construction(type);
+  } else if (node->tag == ASTInitializerList::INIT_LIST_NAMED) {
+    emit_default_construction(node->resolved_type, node->key_values);
+  } else if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
+    code << "{";
+    if (type->basename.get_str().starts_with("InitList$")) {
+      auto element_type = type->generic_args[0];
+      code << " .data = ";
+      code << "(" << to_cpp_string(element_type) << "[]) {";
+      for (const auto &expr : node->values) {
+        expr->accept(this);
+        if (expr != node->values.back()) {
+          code << ", ";
         }
       }
-      indent_level--;
-    } break;
-    case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (type->basename.get_str().starts_with("InitList$")) {
-        auto element_type = type->generic_args[0];
-        code << " .data = ";
-        code << "(" << to_cpp_string(element_type) << "[]) {";
-        for (const auto &expr : node->values) {
-          expr->accept(this);
-          if (expr != node->values.back()) {
-            code << ", ";
-          }
-        }
-        code << "}, .length = " << std::to_string(node->values.size());
-      } else {
-        for (const auto &expr : node->values) {
-          expr->accept(this);
-          if (expr != node->values.back()) {
-            code << ", ";
-          }
+      code << "}, .length = " << std::to_string(node->values.size());
+    } else {
+      for (const auto &expr : node->values) {
+        expr->accept(this);
+        if (expr != node->values.back()) {
+          code << ", ";
         }
       }
-
-    } break;
-    default:
-      break;
+    }
+    code << "}";
   }
-  code << "}";
-  return;
 }
 
 void Emitter::visit(ASTRange *node) {
@@ -1634,7 +1608,8 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 
   // !! For some reason compiling freestanding this just becomes a big problem for extern functions?
   if (!sym) {
-    // !! throw_error(std::format("internal compiler error: should_emit_function got a null symbol? function={}", node->name), node->source_range);
+    // !! throw_error(std::format("internal compiler error: should_emit_function got a null symbol? function={}",
+    // node->name), node->source_range);
     return true;
   }
 
@@ -2359,6 +2334,9 @@ void Emitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitiali
 
 void Emitter::visit(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
+  if (!symbol) {
+    throw_error("internal compiler error: failed to emit path symbol.", node->source_range);
+  }
   code << emit_symbol(symbol.get());
 }
 
@@ -2620,16 +2598,58 @@ void Emitter::visit(ASTSwitch *node) {
   }
 }
 
-void Emitter::emit_default_construction(Type *type) {
+void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
   bool emitted_default = false;
+
+  if (type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions() &&
+      HAS_FLAG(type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
+    code << "{}";
+    return;
+  }
+
   code << "{";
+
   for (auto &member : type->info->members) {
-    if (member.default_value) {
+    ASTExpr *initializer = nullptr;
+    size_t value_index = 0;
+    for (auto &[key, value] in values) {
+      if (key == member.name) {
+        initializer = value;
+        break;
+      }
+      value_index++;
+    }
+
+    if (initializer) {
+      newline();
+      emit_line_directive(initializer);
+      indent_level++;
+      code << indent() << '.' << member.name.get_str() << " = ";
+      auto type = initializer->resolved_type;
+
+      if (type->is_kind(TYPE_CHOICE) && initializer->get_node_type() == AST_NODE_PATH) {
+        auto path = (ASTPath *)initializer;
+        if (path->length() > 1) {
+          emit_choice_marker_variant_instantiation(type, path);
+        } else
+          goto NORMAL;
+      } else {
+      NORMAL:
+        code << "(" << to_cpp_string(type) << ")";
+        initializer->accept(this);
+      }
+      code << ",";
+    } else if (member.default_value) {
       emitted_default = true;
       code << "\n";
       auto value = member.default_value.get();
       code << "." << member.name.get_str() << " = ";
       value->accept(this);
+      code << ",";
+    } else if (member.type->is_kind(TYPE_STRUCT) && member.type->extensions.has_no_extensions() &&
+               DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
+      code << "." << member.name.get_str() << " = ";
+      emit_default_construction(member.type);
       code << ",";
     }
   }

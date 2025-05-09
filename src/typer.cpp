@@ -613,7 +613,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
                 node->source_range);
   }
 
-  node->scope->name = std::to_string(node->target->resolved_type->uid) + "impl";
+  node->scope->name = "$" + std::to_string(node->target->resolved_type->uid) + "impl";
 
   auto target_ty = node->target->resolved_type;
   if (!target_ty) {

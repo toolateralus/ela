@@ -9,15 +9,12 @@ struct AltOption!<T> {
 }
 
 impl!<T> Format for AltOption!<T> {
-  fn format(*const self, builder: *mut StringBuilder, mut options: FormatOptions) {
-    if options.enum_parent_name {
-      old := options.quote_strings;
-      options.quote_strings = false;
+  fn format(*const self, formatter: *mut Formatter) {
+    if formatter.options.enum_parent_name {
       // ! Here, when we use #self, we get StringBuilder. Very odd.
-      builder.appendf("%::", (typeof(#self).name,), options);
-      options.quote_strings = old;
+      formatter.writer.appendf("%::", (typeof(#self).name,), formatter.options.unquoted());
     }
-    builder.appendf("Some(%)", (self.t, ), options);
+    formatter.writer.appendf("Some(%)", (self.t, ), formatter.options);
   }
 }
 

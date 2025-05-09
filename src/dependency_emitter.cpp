@@ -8,6 +8,16 @@
 
 void DependencyEmitter::declare_type(Type *type) {
   auto extensions = type->extensions.extensions;
+
+  // TODO:
+  // ! @Cooper-Pilot
+  /* 
+    function pointers were acting weird so i just did this ish.
+  */
+  if (type->is_kind(TYPE_FUNCTION)) {
+    return define_type(type);
+  }
+
   for (auto ext : extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter->forward_decl_type(type);
@@ -162,7 +172,7 @@ void DependencyEmitter::visit(ASTProgram *node) {
     main_sym->function.declaration->accept(this);
   } else {
     // For non-main (library/freestanding) programs we have to force visit everything.
-    for (const auto &stmt: node->statements) {
+    for (const auto &stmt : node->statements) {
       stmt->accept(this);
     }
   }
@@ -232,7 +242,12 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTParamDecl *node) { declare_type(node->resolved_type); }
+void DependencyEmitter::visit(ASTParamDecl *node) {
+  declare_type(node->resolved_type);
+  if (node->tag == ASTParamDecl::Normal && node->normal.default_value) {
+    node->normal.default_value.get()->accept(this);
+  }
+}
 
 void DependencyEmitter::visit(ASTVariable *node) {
   node->type->accept(this);

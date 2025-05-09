@@ -1,4 +1,4 @@
-import fmt::printlnf;
+import fmt::*;
 
 struct V2 {
   x: f32, y: f32
@@ -9,7 +9,7 @@ fn returns_tuple() -> (s32, s32) {
   // return type, we don't unset it when inferring arguments, and since 
   // the argument is a tuple type, it assumes that it's type checking against
   // (s32, s32) when it needs to just drop that notion and re-do it.
-  printlnf("%, %", (V2.{x: 100.0, y: 100.0}, 100.0));
+  fmt::printlnf("%, %", (V2.{x: 100.0, y: 100.0}, 100.0));
 
   // where .{} argument doens't clear the expected type for the parameter, and
   // it assumes it's expected type is a pointer, 

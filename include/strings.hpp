@@ -126,6 +126,5 @@ static constexpr auto BOILERPLATE_C_CODE = R"__(
       #endif
       test->function();
     }
-
   #endif
   )__";

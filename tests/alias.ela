@@ -7,10 +7,10 @@
 
 #test fn test_ptr_alias() {
   alias int_ptr :: *mut s32;
-  p: *mut s32 = malloc(sizeof(s32));
+  p: *mut s32 = std::c::malloc(sizeof(s32));
   other: int_ptr  = p;
   assert("alias failed to equal pointed to type field.", p == other);
-  free(p);
+  std::c::free(p);
 }
 
 fn Funky() -> s32 {

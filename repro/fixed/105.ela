@@ -19,7 +19,6 @@ impl!<T> List!<T> {
   }
 }
 
-
 /* 
   for some reason, if we don't use self.data[idx] when swapping,
   we get a *stack smashing detected*

@@ -2,7 +2,7 @@ struct Struct {
   fd: s32
 }
 
-#foreign fn read(fd: s32, buffer: *const void, len: s32) -> s32;
+extern fn read(fd: s32, buffer: *const void, len: s32) -> s32;
 
 // This works because the CT interpreter doesn't care about type checking,
 // it just evaluates the expression and infers the type.

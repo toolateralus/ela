@@ -95,7 +95,7 @@
   }
 
   n = 0;
-  mut arr : *mut List!<s8> = malloc(sizeof(List!<s8>)); 
+  mut arr : *mut List!<s8> = std::c::malloc(sizeof(List!<s8>)); 
   *arr = .{};
   for i in 0..4 {
     arr.push(i as s8);
@@ -105,7 +105,7 @@
     assert("", n == v);
     ++n;
   }
-  free(arr);
+  std::c::free(arr);
 }
 
 #test fn test_range_based_for_loop_exclusive() {

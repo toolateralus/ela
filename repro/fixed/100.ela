@@ -1,0 +1,19 @@
+
+import raylib::{
+  InitWindow,
+  ClearBackground,
+  WindowShouldClose,
+  BeginDrawing,
+  EndDrawing,
+  WHITE,
+};
+
+fn main() {
+  InitWindow(800, 600, "Hello, World!"c);
+  while !WindowShouldClose() {
+    BeginDrawing();
+      ClearBackground(WHITE); 
+    EndDrawing();
+    break;
+  }
+}

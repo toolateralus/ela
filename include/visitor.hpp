@@ -264,7 +264,7 @@ struct Emitter : VisitorBase {
   void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
   void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments);
-  
+
   std::string to_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
@@ -276,7 +276,7 @@ struct Emitter : VisitorBase {
   inline void space() { code << ' '; }
 
   void emit_arguments_no_parens(ASTArguments *args);
-  void emit_default_construction(Type *type);
+  void emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> initialized_values = {});
 
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_extern_function(ASTFunctionDeclaration *node);
