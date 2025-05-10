@@ -3222,7 +3222,7 @@ void Typer::visit_path_for_call(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   Type *previous_type = nullptr;
-  for (auto &segment in node->segments) {
+  for (auto &segment : node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     if (!symbol) {
