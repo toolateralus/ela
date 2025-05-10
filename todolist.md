@@ -3,10 +3,6 @@
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
-#### Drop trait / "destructors"
-
-#### Fix any type and add ability to do implicit casting routine stuff.
-
 #### instead of just # stuff BEGINNING statements, we should be using them as attributes
 
 such as
@@ -84,27 +80,8 @@ main :: fn() @entry {
 }
 ```
 
-#### Tagged unions. Half implemented, just need to tidy up and really flesh it out.
-
-```rust
-  Tagged :: enum(union) {
-    #shared { 
-      // this data would be available to all of the variants.
-      // kind of like a macro style mixin.
-      // struct declaration semantics.
-      source_location: Source_Location,
-      resolved_type: u64,
-    }
-    A(s32),
-    B(s32, s32),
-    C{x: s32, y: s32}
-  }
-
-```
-
 # features
-  - tagged unions (half started)
-  - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
+- fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
 
 ## out-of-language features
 - config file/ project. So we can organize submodules, add compilation commands & library paths, source ela libraries, etc.

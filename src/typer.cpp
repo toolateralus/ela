@@ -1500,21 +1500,6 @@ void Typer::visit(ASTParamDecl *node) {
 
     auto type = id;
 
-    // TODO: remove me, I think this arbitrary constraint was purely due to C++ constraints.
-    // if (type->extensions.is_fixed_sized_array()) {
-    //   throw_warning(WarningDownCastFixedArrayParam,
-    //                 "using a fixed array as a function parameter: note, this "
-    //                 "casts the length information off and gets passed as as "
-    //                 "pointer. Consider using a dynamic array",
-    //                 node->source_range);
-    //   // cast off the fixed size array and add a pointer to it,
-    //   // for s8[] to s8*
-    //   {
-    //     auto element = type->get_element_type();
-    //     node->resolved_type = element->take_pointer_to(CONST);
-    //   }
-    // }
-
     auto old_ty = expected_type;
     expected_type = id;
     Defer _defer([&] { expected_type = old_ty; });
@@ -2885,10 +2870,6 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
       type_info.params_len = parameters.size();
       type_info.return_type = return_type;
 
-      // ! TODO: @Cooper-Pilot Why do i have to call back into the dependency emitter here, even though the dependency
-      // emitter ! Tries to resolve each of the parameter and return types of every method in the freaking dang
-      // Trait??? ! This is a last ditch effort hack so I can just continue writing the rest of the stuff like
-      // calling dyn's.
       auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
       dyn_info->methods.push_back({name.get_str(), function_type});
       dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
@@ -2915,7 +2896,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
+      for (auto &part: path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -2973,7 +2954,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
+      for (auto &part: path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -3177,7 +3158,7 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   Type *previous_type = nullptr;
-  for (auto &segment in node->segments) {
+  for (auto &segment: node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     if (!symbol) {

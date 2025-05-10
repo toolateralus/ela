@@ -2612,7 +2612,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
   for (auto &member : type->info->members) {
     ASTExpr *initializer = nullptr;
     size_t value_index = 0;
-    for (auto &[key, value] in values) {
+    for (auto &[key, value]: values) {
       if (key == member.name) {
         initializer = value;
         break;

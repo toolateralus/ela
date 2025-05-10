@@ -316,7 +316,7 @@ void DependencyEmitter::visit(ASTPath *node) {
 
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &seg in node->segments) {
+  for (auto &seg: node->segments) {
     auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
@@ -597,7 +597,10 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPatternMatch *node) {}
+void DependencyEmitter::visit(ASTPatternMatch *node) {
+  node->object->accept(this);
+  node->target_type_path->accept(this);
+}
 
 void DependencyEmitter::visit(ASTMethodCall *node) {
   node->arguments->accept(this);

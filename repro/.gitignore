@@ -1,6 +1,7 @@
 *
 !*.gitignore
 !*.ela
+!*.py
 !*.sh
 !fixed
 !counter
