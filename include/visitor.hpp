@@ -80,6 +80,7 @@ struct Typer : VisitorBase {
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
+  void visit_path_for_call(ASTPath *node);
 
   /*
     TODO:

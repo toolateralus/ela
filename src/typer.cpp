@@ -1721,7 +1721,15 @@ void Typer::visit(ASTCall *node) {
   ASTFunctionDeclaration *func_decl = nullptr;
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
-  node->callee->accept(this);
+  //
+  // We have to use a custom path visitor for calls due to the fact that visit(ASTPath *) will try to instantiate
+  // a generic function when it's partially defined and doesn't allow the call to try to fill out the rest of
+  // the generic args through inference.
+  if (node->callee->get_node_type() == AST_NODE_PATH) {
+    visit_path_for_call((ASTPath *)node->callee);
+  } else {
+    node->callee->accept(this);
+  }
   auto symbol = ctx.get_symbol(node->callee).get();
 
   if (symbol && symbol->is_function()) {
@@ -3207,6 +3215,77 @@ void Typer::visit(ASTPath *node) {
       }
       segment.resolved_type = instantiation->resolved_type;
 
+    } else {
+      if (symbol->is_module()) {
+        scope = symbol->module.declaration->scope;
+      } else if (symbol->is_type()) {
+        if (symbol->type_id == Type::UNRESOLVED_GENERIC) {
+          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+        }
+        previous_type = symbol->type_id;
+        scope = previous_type->info->scope;
+      }
+      segment.resolved_type = symbol->type_id;
+    }
+    if (!scope && index < node->segments.size() - 1) {
+      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
+                  node->source_range);
+    }
+    index++;
+  }
+
+  node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
+}
+
+void Typer::visit_path_for_call(ASTPath *node) {
+  Scope *scope = ctx.scope;
+  auto index = 0;
+  Type *previous_type = nullptr;
+  for (auto &segment in node->segments) {
+    auto &ident = segment.identifier;
+    auto symbol = scope->lookup(ident);
+    if (!symbol) {
+      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+    }
+    scope = nullptr;
+
+    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
+      /* we need to return the parent type here? but we need to maintain the variant. hmm. */
+      node->resolved_type = previous_type;
+      auto symbol = previous_type->info->scope->lookup(segment.identifier);
+      if (!symbol) {
+        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
+                                previous_type->to_string()),
+                    node->source_range);
+      }
+      return;
+    }
+
+    if (!segment.generic_arguments.empty()) {
+      std::vector<Type *> generic_args;
+      for (auto &arg : segment.generic_arguments) {
+        arg->accept(this);
+        generic_args.push_back(arg->resolved_type);
+      }
+      ASTDeclaration *decl;
+      if (symbol->is_type()) {
+        decl = (ASTDeclaration *)symbol->type.declaration.get();
+      } else if (symbol->is_function()) {
+        decl = symbol->function.declaration;
+      } else {
+        throw_error("use of generic arguments only for types and functions currently.", node->source_range);
+      }
+      if (index == node->segments.size() - 1 && generic_args.size() != decl->generic_parameters.size()) {
+        // dont try to instantiate unresolved generic function for calls so that call can handle it
+        return;
+      }
+      auto instantiation = visit_generic(decl, generic_args, node->source_range);
+      if (symbol->is_type()) {
+        auto type = instantiation->resolved_type;
+        scope = type->info->scope;
+        previous_type = type;
+      }
+      segment.resolved_type = instantiation->resolved_type;
     } else {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
