@@ -40,3 +40,12 @@ struct My_Struct {
   generic_fn!<Other>();
   b := a.dont();
 }
+
+fn default_generic!<T = s32>() -> f32 {
+  return 1234.56 as T;
+}
+
+#test fn test_default_generics() {
+  assert_eq("default generic error", default_generic(), 1234.0);
+  assert_eq("default generic error", default_generic!<f32>(), 1234.56);
+}

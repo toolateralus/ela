@@ -74,7 +74,7 @@ struct Typer : VisitorBase {
   bool in_call = false;
   Type *expected_type = Type::INVALID_TYPE;
 
-  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> args, SourceRange source_range);
+  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
@@ -104,7 +104,7 @@ struct Typer : VisitorBase {
     return init_id;
   }
 
-  Type *find_generic_type_of(const InternedString &base, const std::vector<Type *> &generic_args,
+  Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                              const SourceRange &source_range);
 
   void visit(ASTMethodCall *node) override;
