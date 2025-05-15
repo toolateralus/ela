@@ -430,7 +430,7 @@ void Typer::visit(ASTWhere *node) {
   }
 }
 
-Type *Typer::find_generic_type_of(const InternedString &base, const std::vector<Type *> &generic_args,
+Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                                   const SourceRange &source_range) {
   ASTStatement *instantiation = nullptr;
   auto symbol = ctx.scope->lookup(base);
@@ -1023,13 +1023,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
   if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
     if (arguments->arguments.empty() && func->generic_parameters.size() == 1) {
-      if (!type_is_valid(expected_type)) {
-        throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so "
-                    "none can be substituted.",
-                    source_range);
-      }
-
-      if (func->return_type->kind == ASTType::NORMAL) {
+      if (func->return_type->kind == ASTType::NORMAL && type_is_valid(expected_type)) {
         auto return_ty_path = func->return_type->normal.path;
         /*
           TODO: we need to do a better job of checking whether the return type name
@@ -1133,13 +1127,27 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       }
     }
   }
-
-  return (ASTFunctionDeclaration *)visit_generic(func, get_generic_arg_types(*generic_args), source_range);
+  auto resolved_generic_args = get_generic_arg_types(*generic_args);
+  auto instantiation = (ASTFunctionDeclaration *)visit_generic(func, resolved_generic_args, source_range);
+  if (generic_args->size() != resolved_generic_args.size()) {
+    generic_args->resize(resolved_generic_args.size());
+  }
+  auto generic_arg = generic_args->begin();
+  for (auto resolved_generic_arg : resolved_generic_args) {
+    if (*generic_arg == nullptr) {
+      auto type = ast_alloc<ASTType>();
+      type->source_range = source_range;
+      type->resolved_type = resolved_generic_arg;
+      *generic_arg = type;
+    }
+    generic_arg++;
+  }
+  return instantiation;
 }
 
 // #undef USE_GENERIC_PANIC_HANDLER
 
-ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> args, SourceRange source_range) {
+ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range) {
 #ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
   set_panic_handler(generic_instantiation_panic_handler);
@@ -1147,15 +1155,24 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Typ
   Defer defer_1([] { reset_panic_handler(); });
   if (_setjmp(data.save_state) == 0) {
 #endif
-    if (definition->generic_parameters.size() != args.size()) {
-      if (definition->generic_parameters.size() > args.size()) {
-        throw_error(std::format("too few generic arguments. expected {}, got {}", definition->generic_parameters.size(),
-                                args.size()),
-                    definition->source_range);
-      } else {
-        throw_error(std::format("too many generic arguments. expected {}, got {}",
-                                definition->generic_parameters.size(), args.size()),
-                    definition->source_range);
+    if (definition->generic_parameters.size() < args.size()) {
+      throw_error(std::format("too many generic arguments. expected {}, got {}", definition->generic_parameters.size(),
+                              args.size()),
+                  definition->source_range);
+    } else if (definition->generic_parameters.size() > args.size()) {
+      args.resize(definition->generic_parameters.size(), nullptr);
+      auto arg = args.begin();
+      for (auto param : definition->generic_parameters) {
+        if (*arg == nullptr) {
+          if (param.default_value) {
+            *arg = param.default_value->resolved_type;
+          } else {
+            throw_error(std::format("too few generic arguments. expected {}, got {}",
+                                    definition->generic_parameters.size(), args.size()),
+                        definition->source_range);
+          }
+        }
+        arg++;
       }
     }
     auto instantiation = find_generic_instance(definition->generic_instantiations, args);
@@ -1752,7 +1769,6 @@ void Typer::visit(ASTCall *node) {
 
       // Why did I have to add this, when refactoring the type system??
       node->callee->resolved_type = func_decl->resolved_type;
-
     }
 
   } else if (symbol && symbol->is_type()) {
@@ -2896,7 +2912,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part: path->segments) {
+      for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -2954,7 +2970,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part: path->segments) {
+      for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -3158,7 +3174,7 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   Type *previous_type = nullptr;
-  for (auto &segment: node->segments) {
+  for (auto &segment : node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     if (!symbol) {
