@@ -97,3 +97,29 @@ fn choice_as_param(math: Math) {
 #test fn test_choice_as_param() {
   choice_as_param(Math::Vector2.{x: 0, y: 0});
 }
+
+#test fn complex_types() {
+  choice ArrayAndFunctionPtrTest {
+    Struct {
+      f: f32[3]
+    },
+    FnPtr {
+      f: fn * ()
+    }
+  }
+  mut c: ArrayAndFunctionPtrTest = ArrayAndFunctionPtrTest::Struct.{f: .[4.0, 1.0, 2.0]}
+
+  if c is ArrayAndFunctionPtrTest::Struct.{f: f} {
+    std::c::printf("%f\n"c, f[0]);
+  } else {
+    assert("failed to get array", false);
+  }
+
+  c = ArrayAndFunctionPtrTest::FnPtr.{f: fn() { std::c::printf("Hello, From a function pointer.\n"c); }};
+
+  if c is ArrayAndFunctionPtrTest::FnPtr.{f: f} {
+    f();
+  } else {
+    assert("failed to get fn ptr", false);
+  }
+}

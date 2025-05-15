@@ -133,12 +133,8 @@ enum WarningFlags {
   WarningNone = 0,
   WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
   WarningInaccessibleDeclaration = 1 << 1,        // --Wno-inaccessible-decl
-  WarningEmptyStringInterpolation = 1 << 2,       // --Wno-empty-string-interp
-  WarningNonNullDeletedPointer = 1 << 3,          // --Wno-non-null-deleted
-  WarningAmbigousVariants = 1 << 4,               // --Wno-amiguous-variant
-  WarningSwitchBreak = 1 << 5,                    // --Wno-switch-break
-  WarningDownCastFixedArrayParam = 1 << 6,        // --Wno-array-param
-  WarningIgnoreAll = 1 << 7,                      // --Wignore-all
+  WarningSwitchBreak = 1 << 2,                    // --Wno-switch-break
+  WarningIgnoreAll = 1 << 3,                      // --Wignore-all
 };
 
 extern int ignored_warnings;

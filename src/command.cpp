@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "error.hpp"
 #include "strings.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -139,7 +140,11 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
   std::string init_string = "";
   for (size_t i = 1; i < args.size(); ++i) {
     std::string arg = args[i];
-    if (arg == "run" || arg == "r") {
+
+    if (arg == "help" || arg == "h") {
+      printf("\033[1;0;1m%s\033[0m\n", HELP_STRING);
+      exit(0);
+    } else if (arg == "run" || arg == "r") {
       run_on_finished = true;
     } else if (arg == "build" || arg == "b") {
       default_input_path = "main.ela";
@@ -230,20 +235,8 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     if (has_flag("Wno-inaccessible-decl")) {
       ignored_warnings |= WarningInaccessibleDeclaration;
     }
-    if (has_flag("Wno-empty-string-interp")) {
-      ignored_warnings |= WarningEmptyStringInterpolation;
-    }
-    if (has_flag("Wno-non-null-deleted")) {
-      ignored_warnings |= WarningNonNullDeletedPointer;
-    }
-    if (has_flag("Wno-ambiguous-variant")) {
-      ignored_warnings |= WarningAmbigousVariants;
-    }
     if (has_flag("Wno-switch-break")) {
       ignored_warnings |= WarningSwitchBreak;
-    }
-    if (has_flag("Wno-array-param")) {
-      ignored_warnings |= WarningDownCastFixedArrayParam;
     }
   }
 }

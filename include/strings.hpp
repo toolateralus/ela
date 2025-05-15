@@ -1,17 +1,37 @@
 #pragma once
 
 constexpr auto HELP_STRING = R"_(
-Ela compiler:
-   compile a file: `ela <filename.ela>`
-   compile & run a 'main.ela' in current directory: `ela run`
-   initialize a 'main.ela' file in current directory: `ela init`
+  compile a file: `ela <filename.ela>` | 'ela' (compiles main.ela in current directory by default)
+  compile & run a 'main.ela' in current directory: `ela run` | 'ela r'
+  compile & run a 'test.ela' in current directory: 'ela test' | 'ela t'
 
-   Available flags:
-   --release     Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
-   --no-compile  Transpile to C++ but don't invoke the clang++ compiler automatically.
-   --s           Don't delete the `.c` file used to transpile.
-   --metrics     Write performance metrics to stdout.
-   --test        Only emit functions marked `#test` and bootstrap the default test runner. You still have to run the binary to run the tests.
+  Both 'run' and 'test' can take the filename optionally.
+  example:
+  'ela r my_main.ela'
+  'ela t my_tests.ela'
+
+  initialize a 'main.ela' file in current directory: `ela init`
+  Available 'init' args:
+    raylib -- a boilerplate raylib program.
+
+  Available flags:
+    --release          Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
+    --no-compile       Transpile to C++ but don't invoke the clang++ compiler automatically.
+    --nl               Compile in debug mode, but with no 'line info'. this, often paired with --s, will allow you to debug the output C code.
+    --freestanding     Compile without the C Standard Library. equivalent to '--nostdlib & --ffreestanding' for GCC/Clang.
+    --nostdlib         Compile without Ela's standard library. Note, this includes many types such as List!<T>,Slice!<T>,str/String, etc. We don't have a "Core" seperated from the stdlib.
+    --s                "Save" and don't delete the `.c` file used to transpile
+    --metrics          Write performance metrics to stdout.
+    --x                Print the command used to compile the outputted C code.
+    --test             Only emit functions marked `#test` and bootstrap the default test runner. You still have to run the binary to run the tests.
+
+  Warning Exclusions:
+    "--Wignore-all"                   Ignore all warnings.
+    "--Wno-arrow-operator"            Ignore warnings about overloading -> operator, since it's not used as an operator. for C++ programmers.
+    "--Wno-inaccessible-decl"         Ignore warnings about declarations that cannot be used.
+    "--Wno-switch-break"              Ignore warnings about not needing break within switch statements.
+  
+  In the future, we'll just have a json file to do this configuration in a simpler way (while maintaining this older version)
 )_";
 
 constexpr auto RAYLIB_INIT_CODE = R"__(
@@ -47,7 +67,7 @@ fn main () {
 )__";
 
 constexpr auto MAIN_INIT_CODE = R"__(
-import fmt;
+import fmt::*;
 
 fn main() {
   hellos := List!<str>::init(.[
@@ -68,11 +88,10 @@ fn main() {
   defer hellos.deinit();
 
   for hello in hellos {
-    fmt::println(hello);
+    println(hello);
   }
 }
 )__";
-
 
 static constexpr auto TESTING_BOILERPLATE = R"__(
 #ifdef TESTING

@@ -64,15 +64,20 @@ ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
   }
   return new_node;
 }
+
 ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = copy(node);
   if (new_node->tag == ASTParamDecl::Normal) {
     new_node->normal.type = static_cast<ASTType *>(copy_node(node->normal.type));
+    if (node->normal.default_value) {
+      new_node->normal.default_value = (ASTType *)copy_node(node->normal.default_value.get());
+    }
   } else {
     new_node->self.is_pointer = node->self.is_pointer;
   }
   return new_node;
 }
+
 ASTVariable *ASTCopier::copy_variable(ASTVariable *node) {
   auto new_node = copy(node);
   if (node->type)
@@ -246,11 +251,18 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   if (node->where_clause) {
     new_node->where_clause = (ASTWhere *)copy_node(node->where_clause.get());
   }
+  
   for (auto &member : node->members) {
-    new_node->members.push_back({.is_bitfield = member.is_bitfield,
+
+    auto new_member = ASTStructMember{.is_bitfield = member.is_bitfield,
                                  .bitsize = member.bitsize,
                                  .name = member.name,
-                                 .type = static_cast<ASTType *>(copy_node(member.type))});
+                                 .type = static_cast<ASTType *>(copy_node(member.type))};
+
+    if (member.default_value) {
+      new_member.default_value = (ASTExpr*)copy_node(member.default_value.get());
+    }
+    new_node->members.push_back(new_member);
   }
   new_node->subtypes.clear();
   for (auto subtype : node->subtypes) {

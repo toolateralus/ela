@@ -1180,7 +1180,15 @@ void Emitter::visit(ASTDestructure *node) {
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   std::stringstream tss;
-  auto sym_name = emit_symbol(ctx.scope->lookup(name));
+
+  std::string sym_name;
+
+  if (auto sym = ctx.scope->local_lookup(name)) {
+    sym_name = emit_symbol(ctx.scope->lookup(name));
+  } else {
+    sym_name = name;
+  }
+
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = sym_name;
     auto &ext = type->extensions;
@@ -1753,7 +1761,10 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
       auto subtype_name = name + "$" + variant_name;
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
-        code << to_cpp_string(field->resolved_type) << " " << field->name.get_str() << ";\n";
+
+        code << get_declaration_type_signature_and_identifier(field->name.get_str(), field->resolved_type) << ";\n";
+        // code << to_cpp_string(field->resolved_type) << " " << field->name.get_str() << ";\n";
+
       }
       code << "} " << subtype_name << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
@@ -2430,7 +2441,16 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
     auto info = variant_type->info->as<StructTypeInfo>();
     for (StructPattern::Part &part : pattern->struct_pattern.parts) {
       auto type = part.resolved_type;
-      code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+
+      /* 
+        Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
+      */
+      if (type->extensions.is_fixed_sized_array()) {
+        // mut doesn't really matter here.
+        type = type->get_element_type()->take_pointer_to(MUT);
+      }
+      
+      code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
       if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
         code << "&";
       };
@@ -2450,7 +2470,13 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
     auto index = 0;
     for (TuplePattern::Part &part : pattern->tuple_pattern.parts) {
       auto type = part.resolved_type;
-      code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+
+      if (type->extensions.is_fixed_sized_array()) {
+        // mut doesn't really matter here.
+        type = type->get_element_type()->take_pointer_to(MUT);
+      }
+
+      code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
       if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
         code << "&";
       }

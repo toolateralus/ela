@@ -4,6 +4,7 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "ast.hpp"
+#include <variant>
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
