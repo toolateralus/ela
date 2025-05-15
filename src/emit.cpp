@@ -1761,10 +1761,8 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
       auto subtype_name = name + "$" + variant_name;
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
-
         code << get_declaration_type_signature_and_identifier(field->name.get_str(), field->resolved_type) << ";\n";
         // code << to_cpp_string(field->resolved_type) << " " << field->name.get_str() << ";\n";
-
       }
       code << "} " << subtype_name << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
@@ -2442,14 +2440,14 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
     for (StructPattern::Part &part : pattern->struct_pattern.parts) {
       auto type = part.resolved_type;
 
-      /* 
+      /*
         Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
       */
       if (type->extensions.is_fixed_sized_array()) {
         // mut doesn't really matter here.
         type = type->get_element_type()->take_pointer_to(MUT);
       }
-      
+
       code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
       if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
         code << "&";
@@ -2471,6 +2469,9 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
     for (TuplePattern::Part &part : pattern->tuple_pattern.parts) {
       auto type = part.resolved_type;
 
+      /*
+        Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
+      */
       if (type->extensions.is_fixed_sized_array()) {
         // mut doesn't really matter here.
         type = type->get_element_type()->take_pointer_to(MUT);
@@ -2525,7 +2526,15 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
       auto info = variant_type->info->as<StructTypeInfo>();
       for (StructPattern::Part &part : pattern->struct_pattern.parts) {
         auto type = part.resolved_type;
-        code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+        /*
+          Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
+        */
+        if (type->extensions.is_fixed_sized_array()) {
+          // mut doesn't really matter here.
+          type = type->get_element_type()->take_pointer_to(MUT);
+        }
+
+        code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
         if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
           code << "&";
         };
@@ -2543,7 +2552,15 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
       auto index = 0;
       for (TuplePattern::Part &part : pattern->tuple_pattern.parts) {
         auto type = part.resolved_type;
-        code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+        /*
+          Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
+        */
+        if (type->extensions.is_fixed_sized_array()) {
+          // mut doesn't really matter here.
+          type = type->get_element_type()->take_pointer_to(MUT);
+        }
+
+        code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
         if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
           code << "&";
         }
@@ -2638,7 +2655,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
   for (auto &member : type->info->members) {
     ASTExpr *initializer = nullptr;
     size_t value_index = 0;
-    for (auto &[key, value]: values) {
+    for (auto &[key, value] : values) {
       if (key == member.name) {
         initializer = value;
         break;

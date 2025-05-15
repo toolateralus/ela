@@ -551,8 +551,10 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
         variant.tuple->accept(this);
         break;
       case ASTChoiceVariant::STRUCT:
-        for (const auto &decl : variant.struct_declarations)
-          decl->accept(this);
+      for (const auto &decl : variant.struct_declarations) {
+          declare_type(decl->resolved_type);
+          // decl->accept(this);
+        }
         break;
     }
   }
