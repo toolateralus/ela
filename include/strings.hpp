@@ -95,10 +95,10 @@ fn main() {
 
 static constexpr auto TESTING_BOILERPLATE = R"__(
 #ifdef TESTING
-  #define __TEST_RUNNER_MAIN\
+  #define ___MAIN___\
     for (int i = 0; i < sizeof(tests) / sizeof($ela_test); i++) { $ela_test_run(&tests[i]); }
 #else 
-  #define __TEST_RUNNER_MAIN\
+  #define ___MAIN___\
     __ela_main_();
 #endif
   )__";

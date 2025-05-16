@@ -88,10 +88,12 @@ int CompileCommand::compile() {
   if (!has_flag("no-compile")) {
     std::string extra_flags = c_flags;
 
-    if (has_flag("release"))
+    if (has_flag("release")) {
       extra_flags += " -O3 ";
-    else
+    }
+    else {
       extra_flags += " -g ";
+    }
 
     static std::string ignored_warnings = "-w";
 
@@ -106,6 +108,7 @@ int CompileCommand::compile() {
     cpp.begin();
     result = system(compilation_string.c_str());
     cpp.end("invoking `clang` C compiler and `lld` linker");
+    
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);
     }

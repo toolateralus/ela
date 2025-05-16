@@ -64,22 +64,16 @@
   assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
-
-#test fn for_loop_2() {
-  for i in 0..10 {
-    i = i;
+#test fn empty_for_loops() {
+  for i in 0..0 {
   }
-  for i in 0..10 {
-    i = i;
+  for i in 0..0 {
   }
 
   mut array: List!<s32>;
-
   for k in array {
-    k = k;
   }
   for k in array.iter_mut() {
-    k = k;
   }
 }
 

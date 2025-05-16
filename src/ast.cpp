@@ -582,10 +582,10 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             eat();
             if (peek().type == TType::Mut) {
               eat();
-              part.semantic = PTR_MUT;
+              part.semantic = PTRN_MTCH_PTR_MUT;
             } else {
               expect(TType::Const);
-              part.semantic = PTR_CONST;
+              part.semantic = PTR_MTCH_PTR_CONST;
             }
           }
 
@@ -614,10 +614,10 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             eat();
             if (peek().type == TType::Mut) {
               eat();
-              part.semantic = PTR_MUT;
+              part.semantic = PTRN_MTCH_PTR_MUT;
             } else {
               expect(TType::Const);
-              part.semantic = PTR_CONST;
+              part.semantic = PTR_MTCH_PTR_CONST;
             }
           }
 
@@ -978,10 +978,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTR_MUT;
+                  part.semantic = PTRN_MTCH_PTR_MUT;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_CONST;
+                  part.semantic = PTR_MTCH_PTR_CONST;
                 }
               }
 
@@ -1010,10 +1010,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTR_MUT;
+                  part.semantic = PTRN_MTCH_PTR_MUT;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_CONST;
+                  part.semantic = PTR_MTCH_PTR_CONST;
                 }
               }
 

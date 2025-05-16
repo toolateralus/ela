@@ -160,22 +160,14 @@ void Emitter::visit(ASTFor *node) {
       break;
   }
 
+  code << '\n';
   emit_line_directive(node);
-  code << indent() << "while (1) {\n";
-  indent_level++;
-
-  // get the Option!<T> from next().
-  emit_line_directive(node);
-  code << indent() << "auto $next = ";
+  code << '\n';
+  code << indent() << "for (auto $next = ";
   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator);\n";
-
-  // end condition
-  emit_line_directive(node);
-
-  /// TODO: we should use a ASTPatternMatch here so that the compiler isn't completely tied to the Option!<T>
-  /// implementation, For example, I changed the order of the type (switch Some and None) and every for loop was broken.
-  /// It would be more reliable to just use a stack allocated ASTPatternMatch to emit here.
-  code << indent() << "if ($next.index == 0) break;\n";
+  code << "$next.index != 0; ";
+  code << "$next = ";
+  code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator)) {\n";
 
   auto identifier_type_str = to_cpp_string(node->identifier_type);
 
@@ -996,7 +988,7 @@ int main (int argc, char** argv) {{
   /* reflection system */
   {}
   /* call user main, or dispatch tests, depending on the build type. */
-  __TEST_RUNNER_MAIN;
+  ___MAIN___;
   /* deinitialize command line args. */
   {}
 }}
@@ -2449,7 +2441,7 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
       }
 
       code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
-      if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+      if (part.semantic != PTRN_MTCH_PTR_NONE) {
         code << "&";
       };
       code << "(";
@@ -2478,7 +2470,7 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
       }
 
       code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
-      if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+      if (part.semantic != PTRN_MTCH_PTR_NONE) {
         code << "&";
       }
       code << "(";
@@ -2524,7 +2516,7 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
     // Copy pasting this is annoying.
     if (variant_type->is_kind(TYPE_STRUCT)) {
       auto info = variant_type->info->as<StructTypeInfo>();
-      for (StructPattern::Part &part : pattern->struct_pattern.parts) {
+      for (const StructPattern::Part &part : pattern->struct_pattern.parts) {
         auto type = part.resolved_type;
         /*
           Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
@@ -2535,7 +2527,7 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
         }
 
         code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
-        if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+        if (part.semantic != PTRN_MTCH_PTR_NONE) {
           code << "&";
         };
         code << "(" << target_temp_identifier;
@@ -2561,7 +2553,7 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
         }
 
         code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
-        if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+        if (part.semantic != PTRN_MTCH_PTR_NONE) {
           code << "&";
         }
         code << "(" << target_temp_identifier;

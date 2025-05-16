@@ -1598,7 +1598,7 @@ void Typer::visit(ASTFor *node) {
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     auto iden = node->left.identifier;
-    ctx.scope->insert_variable(iden, iter_ty, nullptr, MUT);
+    ctx.scope->insert_variable(iden, iter_ty, nullptr, CONST);
     ctx.scope->local_lookup(iden)->flags |= SYMBOL_IS_LOCAL;
   } else {
     auto type = iter_ty;
@@ -3128,9 +3128,9 @@ void Typer::visit(ASTPatternMatch *node) {
         }
 
         auto type_id = symbol->type_id;
-        if (part.semantic == PTR_CONST) {
+        if (part.semantic == PTR_MTCH_PTR_CONST) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
-        } else if (part.semantic == PTR_MUT) {
+        } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
         }
 
@@ -3155,9 +3155,9 @@ void Typer::visit(ASTPatternMatch *node) {
       auto index = 0;
       for (auto &part : node->tuple_pattern.parts) {
         auto type_id = info->types[index];
-        if (part.semantic == PTR_CONST) {
+        if (part.semantic == PTR_MTCH_PTR_CONST) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
-        } else if (part.semantic == PTR_MUT) {
+        } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
         }
         part.resolved_type = type_id;

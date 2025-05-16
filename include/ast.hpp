@@ -857,13 +857,13 @@ struct ASTWhere : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-enum PatternMatchPointerSemantic { PTR_NONE, PTR_MUT, PTR_CONST };
+enum PatternMatchPointerSemantic { PTRN_MTCH_PTR_NONE, PTRN_MTCH_PTR_MUT, PTR_MTCH_PTR_CONST };
 
 struct TuplePattern {
   struct Part {
     Mutability mutability = CONST;
     InternedString var_name;
-    PatternMatchPointerSemantic semantic;
+    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;
@@ -874,7 +874,7 @@ struct StructPattern {
     InternedString field_name;
     InternedString var_name;
     Mutability mutability = CONST;
-    PatternMatchPointerSemantic semantic;
+    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;
