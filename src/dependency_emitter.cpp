@@ -68,16 +68,16 @@ void DependencyEmitter::define_type(Type *type) {
           auto declaration = sym.function.declaration;
           for (auto param : declaration->params->params) {
             if (type_is_valid(param->resolved_type)) {
-              define_type(param->resolved_type);
+              declare_type(param->resolved_type);
             }
           }
           auto return_type = declaration->return_type->resolved_type;
           if (type_is_valid(return_type)) {
-            define_type(return_type);
+            declare_type(return_type);
           }
         }
       }
-      define_type(info->trait_type);
+      declare_type(info->trait_type);
       emitter->emit_dyn_dispatch_object(info->trait_type, type);
     } break;
     case TYPE_TRAIT:
@@ -553,7 +553,6 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
       case ASTChoiceVariant::STRUCT:
       for (const auto &decl : variant.struct_declarations) {
           declare_type(decl->resolved_type);
-          // decl->accept(this);
         }
         break;
     }
