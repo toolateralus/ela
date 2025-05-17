@@ -245,6 +245,9 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
 void DependencyEmitter::visit(ASTParamDecl *node) {
   declare_type(node->resolved_type);
   if (node->tag == ASTParamDecl::Normal && node->normal.default_value) {
+    /* 
+      TODO: i have no idea why but this is all corrupted when you provide an arg when theres a default value.
+    */
     node->normal.default_value.get()->accept(this);
   }
 }
