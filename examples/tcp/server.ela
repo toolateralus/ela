@@ -44,23 +44,19 @@ fn main() {
   mut buff: u8[80];
 
   while {
-    std::c::memset(buff, 0, 80);
     length := read(clientfd, buff, 80);
-
     if length == 0 {
-      panic("failed to read from client");
+      println("client disconnected");
+      break;
     }
+    std::printf("%s\n", buff);
 
-    printlnf("From client: %, Type a message to client:", (str.{data: buff, length: length},));
-
-    std::c::memset(buff, 0, 80);
     read_string(buff, 80);
-    write(clientfd, buff, 80);
-
     if std::c::strncmp(buff, "exit"c, 4) == 0 {
       println("Exiting...");
       break;
     }
+    write(clientfd, buff, 80);
   }
 
   close(sockfd);
