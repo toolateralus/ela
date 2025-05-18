@@ -1,55 +1,45 @@
-import net;
-;
+import fmt::*;
+import net::*;
 
-PORT : u16 = 8080
+fn main() {
+  port: u16 = 8080;
+  sockfd: s32 = socket(AF_INET, __socket_type::SOCK_STREAM, 0);
 
-// Function designed for chat between client and server.
-// sockfd: socket file descriptor.
-chatting :: fn(sockfd: s32) { 
-  buffer : u8[80];
-
-  while true {
-    memset(buffer, 0, 80);
-    printf("Enter message : ");
-
-    n: s32;
-    while n < 80 && (buffer[n++] = getu8()) != '\n' {}
-    
-    write(sockfd, buffer, 80);
-
-    memset(buffer, 0, 80);
-
-    read(sockfd, buffer, 80);
-
-    println($"From Server : {buffer as u8*}");
-
-    if ((strncmp(buffer, "exit", 4)) == 0) {
-      println("Client Exit...");
-      break;
-    }
-  }
-}
-
-main :: fn() {
-  sockfd : s32 = socket(AF_INET, SocketType::Stream, 0);
-  if (sockfd == -1) {
-    panic("socket creation failed...");
+  if sockfd == -1 {
+    panic("failed to create socket");
   } else {
-    println("Socket successfully created..");
+    println("client socket created");
   }
 
-  servaddr: sockaddr_in;
-  servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-  servaddr.sin_port = htons(PORT);
-  servaddr_ptr : sockaddr* = &servaddr;
+  servaddr: sockaddr_in = .{
+    sin_family: AF_INET as u16,
+    sin_addr: .{
+      s_addr: inet_addr("127.0.0.1"c),
+    },
+    sin_port: htons(port),
+  };
 
-  if connect(sockfd, servaddr_ptr, sizeof(servaddr)) != 0 {
-    panic("onnection with the server failed...");
+  if connect(sockfd, (&const servaddr) as *const void, sizeof(sockaddr_in) as u32) != 0 {
+    panic("unable to connect to the server");
   } else {
-    println("onnected to the server..");
+    println("connected.");
   }
 
-  chatting(sockfd);
+  mut buff: u8[80];
+  while {
+    std::c::memset(buff, 0, 80);
+
+    mut n: s32;
+    while n < 80 && (buff[n++]= std::c::getchar()) != '\n' {}
+
+    write(sockfd, buff, 80);
+    std::c::memset(buff, 0, 80);
+    read(sockfd, buff, 80);
+    println(str.{
+      data: buff,
+      length: 80
+    });
+  }
+
   close(sockfd);
 }

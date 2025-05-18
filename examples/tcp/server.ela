@@ -1,71 +1,69 @@
+import fmt::*;
+import net::*;
 
-;
-import net;
+fn main() {
+  port: u16 = 8080;
+  sockfd := socket(AF_INET, __socket_type::SOCK_STREAM, 0);
 
-PORT : u16 = 8080;
+  optval: s32 = 1;
+  setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (&const optval) as *const void, sizeof(s32) as u32);
 
-chatting :: fn(connfd: s32) {
-  buff : u8[80];
-  while true {
+  if sockfd == -1 {
+    panic("socket failed to open");
+  } else {
+    println("socket opened");
+  }
+
+  servaddr: sockaddr_in = .{
+    sin_family: AF_INET as u16,
+    sin_addr: .{
+      s_addr: htonl(INADDR_ANY),
+    },
+    sin_port: htons(port),
+  };
+
+  result := bind(sockfd, (&const servaddr) as *const void, sizeof(sockaddr_in) as u32);
+
+  if result != 0 {
+    panic("failed to bind socket to server address");
+  } else {
+    println("socket bound");
+  }
+
+  if listen(sockfd, 5) {
+    panic("failed to listen");
+  } else {
+    println("server listening");
+  }
+
+  mut len: u32;
+  mut client: sockaddr_in;
+  clientfd := accept(sockfd, (&mut client) as *mut void, &mut len);
+
+  mut buff: u8[80];
+
+  while {
+    std::c::memset(buff, 0, 80);
+    length := read(clientfd, buff, 80);
+
+    if length == 0 {
+      panic("failed to read from client");
+    }
+
+    printlnf("From client: %, Type a message to client:", (str.{data: buff, length: length},));
+
+    mut n: s32;
+    while n < 80 && (buff[n++]= std::c::getchar()) != '\n' {}
+
     memset(buff, 0, 80);
-    read(connfd, buff, 80);
-    println($"From client: {buff as u8*}   To client : ");
-    memset(buff, 0, 80);
-    n: s32;
-    while n < 80 && ((buff[n++] = getu8()) != '\n') {}
-    write(connfd, buff, 80);
-    if (strncmp("exit", buff as u8*, 4) == 0) {
-      printf("Server Exit...\n");
+    write(clientfd, buff, 80);
+
+    if std::c::strncmp(buff, "exit"c, 4) == 0 {
+      println("Exiting...");
       break;
     }
   }
-}
-
-main :: fn() -> s32 {
-  sockfd : s32 = socket(AF_INET, SocketType::Stream, 0);
-
-  if sockfd == -1 {
-    panic("socket creation failed...\n");
-  } else {
-    println("Socket successfully created..\n");
-  }
-  
-  servaddr : sockaddr_in;
-  servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-  servaddr.sin_port = htons(PORT);
-
-  addr : sockaddr* = &servaddr;
-  result := bind(sockfd, addr, sizeof(sockaddr_in));
-
-  if (result != 0) {
-    panic("socket bind failed...");
-  } else {
-    println("Socket successfully bound..");
-  }
-
-  if listen(sockfd, 5) != 0 {
-    panic("Listen failed...");
-  } else {
-    println("Server listening..");
-  }
-
-  len: socklen_t  = sizeof(sockaddr_in);
-
-  cli: sockaddr_in;
-
-  cliaddr : sockaddr* = &cli;
-  connfd: s32 = accept(sockfd, cliaddr, &len);
-
-  if connfd < 0 {
-    panic("server accept failed...");
-  } else {
-    println("server accept the client...");
-  }
-
-  chatting(connfd);
 
   close(sockfd);
-
-  return 0;
+  close(clientfd);
 }
