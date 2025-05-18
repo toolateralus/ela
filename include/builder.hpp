@@ -6,23 +6,26 @@
 
 
 struct StringBuilder {
-  const size_t block_length = 8192 * 12;
+  constexpr static size_t block_length = 8192 * 12;
   struct Block {
-    char *data;
-    size_t length;
-    Block *next;
+    char *data = nullptr;
+    size_t length = 0;
+    Block *next = nullptr;
 
-    Block(size_t block_length)
+    explicit Block(size_t block_length)
         : data(static_cast<char *>(std::calloc(block_length, sizeof(char)))), length(0), next(nullptr) {
     }
 
     ~Block() {
+      length = 0;
       if (data) {
         std::free(data);
       }
       if (next) {
         delete next;
       }
+      data = nullptr;
+      next = nullptr;
     }
   };
 
@@ -31,9 +34,65 @@ struct StringBuilder {
 
   inline StringBuilder() : root(new Block(block_length)), current(root) {}
 
-  inline StringBuilder(size_t size) : root(new Block(size)), current(root), block_length(size) {}
-
   inline ~StringBuilder() { delete root; }
+
+  // Copy constructor
+  StringBuilder(const StringBuilder& other)
+      : root(new Block(block_length)), current(root) {
+    Block* src = other.root;
+    Block* dst = root;
+    while (src) {
+      if (src != other.root) {
+        dst->next = new Block(block_length);
+        dst = dst->next;
+      }
+      std::memcpy(dst->data, src->data, src->length);
+      dst->length = src->length;
+      src = src->next;
+    }
+    // Set current to the last block
+    current = dst;
+  }
+
+  // Move constructor
+  StringBuilder(StringBuilder&& other) noexcept
+      : root(other.root), current(other.current) {
+    other.root = nullptr;
+    other.current = nullptr;
+  }
+
+  // Copy assignment
+  StringBuilder& operator=(const StringBuilder& other) {
+    if (this != &other) {
+      delete root;
+      root = new Block(block_length);
+      Block* src = other.root;
+      Block* dst = root;
+      while (src) {
+        if (src != other.root) {
+          dst->next = new Block(block_length);
+          dst = dst->next;
+        }
+        std::memcpy(dst->data, src->data, src->length);
+        dst->length = src->length;
+        src = src->next;
+      }
+      current = dst;
+    }
+    return *this;
+  }
+
+  // Move assignment
+  StringBuilder& operator=(StringBuilder&& other) noexcept {
+    if (this != &other) {
+      delete root;
+      root = other.root;
+      current = other.current;
+      other.root = nullptr;
+      other.current = nullptr;
+    }
+    return *this;
+  }
 
   inline StringBuilder &operator<<(const std::string &str) {
     size_t str_len = str.length();

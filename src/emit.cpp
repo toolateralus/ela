@@ -66,7 +66,7 @@ void Emitter::forward_decl_type(Type *type) {
       if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
         kw = "typedef union ";
       }
-      code << kw << to_cpp_string(type) << " " << to_cpp_string(type) << ";\n";
+      code << kw << type_to_string(type) << " " << type_to_string(type) << ";\n";
     } break;
     case TYPE_DYN: {
       dep_emitter->define_type(type);
@@ -145,16 +145,16 @@ void Emitter::visit(ASTFor *node) {
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE:
       emit_line_directive(node);
-      code << indent() << to_cpp_string(iterable_type) << " $iterable = ";
+      code << indent() << type_to_string(iterable_type) << " $iterable = ";
       node->right->accept(this);
       code << ";\n";
       emit_line_directive(node);
-      code << indent() << to_cpp_string(iterator_type)
+      code << indent() << type_to_string(iterator_type)
            << " $iterator = " << emit_symbol(iterable_scope->local_lookup("iter")) << "(&$iterable);\n";
       break;
     case ASTFor::ITERATOR:
       emit_line_directive(node);
-      code << indent() << to_cpp_string(iterator_type) << " $iterator = ";
+      code << indent() << type_to_string(iterator_type) << " $iterator = ";
       node->right->accept(this);
       code << ";\n";
       break;
@@ -169,7 +169,7 @@ void Emitter::visit(ASTFor *node) {
   code << "$next = ";
   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator)) {\n";
 
-  auto identifier_type_str = to_cpp_string(node->identifier_type);
+  auto identifier_type_str = type_to_string(node->identifier_type);
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     emit_line_directive(node);
@@ -280,7 +280,7 @@ void Emitter::visit(ASTType *node) {
     type = global_find_type_id(enum_info->underlying_type, type->extensions);
   }
 
-  auto type_string = to_cpp_string(type);
+  auto type_string = type_to_string(type);
 
   code << type_string;
   return;
@@ -422,7 +422,7 @@ size_t calculate_actual_length(const std::string_view &str_view) {
 }
 
 void Emitter::visit(ASTLiteral *node) {
-  auto type = to_cpp_string(node->resolved_type);
+  auto type = type_to_string(node->resolved_type);
   std::string output;
   switch (node->tag) {
     case ASTLiteral::Null:
@@ -460,7 +460,7 @@ void Emitter::visit(ASTLiteral *node) {
 
 void Emitter::visit(ASTUnaryExpr *node) {
   if (node->op == TType::Sub) {
-    auto type = to_cpp_string(node->operand->resolved_type);
+    auto type = type_to_string(node->operand->resolved_type);
     code << '(' << type << ')';
   }
 
@@ -498,7 +498,7 @@ void Emitter::visit(ASTBinExpr *node) {
     cf_expr_return_register = &str;
 
     emit_line_directive(node);
-    code << indent() << to_cpp_string(type) << " " << str << ";\n";
+    code << indent() << type_to_string(type) << " " << str << ";\n";
 
     code << indent();
     node->right->accept(this);
@@ -550,31 +550,17 @@ void Emitter::visit(ASTVariable *node) {
   } else {
     node->is_emitted = true;
   }
+
   emit_line_directive(node);
   auto name = emit_symbol(ctx.scope->lookup(node->name));
 
-  // Emit switch / if expressions.
-  if (node->value &&
-      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
-    auto old = std::move(cf_expr_return_register);
-    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
-    auto type = node->resolved_type;
-    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
-    cf_expr_return_register = &str;
-
-    code << indent() << to_cpp_string(type) << " " << str << ";\n";
-    node->value.get()->accept(this);
-    emit_line_directive(node);
-    code << indent() << to_cpp_string(node->type->resolved_type) << " " << name << " = " << str << ";\n";
-    return;
-  }
+  const bool is_global_variable = !node->is_local;
 
   if (node->type->resolved_type == Type::INVALID_TYPE) {
     throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
   auto type = node->type->resolved_type;
-
   auto symbol = ctx.scope->local_lookup(node->name);
 
   auto handle_initialization = [&]() {
@@ -583,11 +569,11 @@ void Emitter::visit(ASTVariable *node) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
       auto type = node->type->resolved_type;
+      code << " = ";
       if (type->is_kind(TYPE_STRUCT)) {
-        code << " = ";
-        emit_default_construction(node->type->resolved_type);
+        emit_default_construction(type);
       } else {
-        code << "= {0}";
+        code << "(" << type_to_string(type) << ")" << "{0}";
       }
     }
     code << ";\n";
@@ -603,15 +589,33 @@ void Emitter::visit(ASTVariable *node) {
     code << "static ";
   }
   if (node->is_constexpr) {
-    code << "static constexpr ";
+    code << " "; // ! TEMPORARILY DISABLED, FOR GLOBAL INITIALIZATION. NEED TO FIGURE OUT A BETTER SOLUTION.
   }
 
+  // Emit switch / if expressions.
+  if (!is_global_variable && node->value &&
+      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = node->resolved_type;
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    code << indent() << type_to_string(type) << " " << str << ";\n";
+    node->value.get()->accept(this);
+    emit_line_directive(node);
+    code << indent() << type_to_string(node->type->resolved_type) << " " << name << " = " << str << ";\n";
+    return;
+  }
+
+  // This will work fine if global
   if (type->is_kind(TYPE_FUNCTION)) {
     code << get_declaration_type_signature_and_identifier(name, type);
     handle_initialization();
     return;
   }
 
+  // this obviously cannot be a global variable; bitfields only ever appear in structs & unions.
   if (node->is_bitfield) {
     node->type->accept(this);
     space();
@@ -622,32 +626,78 @@ void Emitter::visit(ASTVariable *node) {
     return;
   }
 
-  if (type->extensions.is_fixed_sized_array()) {
-    code << get_declaration_type_signature_and_identifier(name, type);
-    if (node->value.is_not_null()) {
-      code << " = ";
-      node->value.get()->accept(this);
-    } else if (emit_default_init) {
-      code << " = {0}";
+  if (is_global_variable && !node->is_extern) {
+
+    // Emit the 'forward declaration' or whatever.
+
+    if (type->extensions.is_fixed_sized_array()) {
+      code << get_declaration_type_signature_and_identifier(name, type);
+    } else {
+      node->type->accept(this);
     }
-    code << ";\n";
-    return;
-  }
+    space();
+    code << name;
+    semicolon();
 
-  node->type->accept(this);
-  space();
-  code << name;
-  space();
+    auto old_code = std::move(code);
+    code = std::move(global_initializer_builder);
+    Defer _([&]{
+      global_initializer_builder = std::move(code);
+      code = std::move(old_code);
+      code << "\n";
+    });
+    // Now, we emit the initialization logic into the global ini builder.
+    code << name;
 
-  // TODO: it's not ideal to have this special case all over the place.
-  if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
-    auto value = (ASTPath *)node->value.get();
-    code << " = ";
-    emit_choice_marker_variant_instantiation(type, value);
-    code << ";\n";
+    if (type->extensions.is_fixed_sized_array()) {
+      if (node->value.is_not_null()) {
+        code << " = ";
+        node->value.get()->accept(this);
+      } else if (emit_default_init) {
+        code << " = {0}"; // I think this is wholly unneccesary. I think a global, non-initialized array will be zeroed in modern C.
+      }
+      code << ";\n";
+      return;
+    }
+  
+    // TODO: it's not ideal to have this special case all over the place.
+    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
+      auto value = (ASTPath *)node->value.get();
+      code << " = ";
+      emit_choice_marker_variant_instantiation(type, value);
+      code << ";\n";
+    } else {
+      handle_initialization();
+    }
   } else {
-    handle_initialization();
+    if (type->extensions.is_fixed_sized_array()) {
+      code << get_declaration_type_signature_and_identifier(name, type);
+      if (node->value.is_not_null()) {
+        code << " = ";
+        node->value.get()->accept(this);
+      } else if (emit_default_init) {
+        code << " = {0}";
+      }
+      code << ";\n";
+      return;
+    }
+  
+    node->type->accept(this);
+    space();
+    code << name;
+    space();
+    
+    // TODO: it's not ideal to have this special case all over the place.
+    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
+      auto value = (ASTPath *)node->value.get();
+      code << " = ";
+      emit_choice_marker_variant_instantiation(type, value);
+      code << ";\n";
+    } else {
+      handle_initialization();
+    }
   }
+
   return;
 }
 
@@ -697,7 +747,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
     auto depth = returns->extensions.extensions.size();
     auto extensions = std::string(depth, '*');
 
-    code << to_cpp_string(return_function_type->return_type) << "(" << extensions << name;
+    code << type_to_string(return_function_type->return_type) << "(" << extensions << name;
     node->params->accept(this);
     code << ")";
   } else {
@@ -733,11 +783,11 @@ void Emitter::emit_extern_function(ASTFunctionDeclaration *node) {
   auto returns = node->return_type->resolved_type;
   if (returns->is_kind(TYPE_FUNCTION)) {
     auto return_function_type = static_cast<FunctionTypeInfo *>(returns->info);
-    code << to_cpp_string(return_function_type->return_type) << "(*" << node->name.get_str();
+    code << type_to_string(return_function_type->return_type) << "(*" << node->name.get_str();
     emit_params();
     code << ")";
   } else {
-    code << to_cpp_string(returns);
+    code << type_to_string(returns);
     space();
     code << " " + node->name.get_str();
     emit_params();
@@ -884,7 +934,7 @@ void Emitter::visit(ASTParamDecl *node) {
       code << ' ' << node->normal.name.get_str();
     }
   } else if (node->tag == ASTParamDecl::Self) {
-    code << to_cpp_string(type) << " self";
+    code << type_to_string(type) << " self";
   }
 
   return;
@@ -947,7 +997,7 @@ void $deinit_type(Type *type) {
 }
 )_";
 
-    StringBuilder builder(1024);
+    StringBuilder builder;
     for (auto type : reflected_upon_types) {
       builder << std::format("  $deinit_type(_type_info.data[{}]);\n", type);
     }
@@ -985,7 +1035,9 @@ void $deinit_type(Type *type) {
 int main (int argc, char** argv) {{
   /* initialize command line args. */
   {}(argc, argv);
-  /* reflection system */
+  /* run the global initializers */
+  ela_run_global_initializers();
+  /* reflection system. we do this after the global initializers because _type_info is defined in the stdlib, and a global initializer sets it to {{}} */
   {}
   /* call user main, or dispatch tests, depending on the build type. */
   ___MAIN___;
@@ -994,8 +1046,13 @@ int main (int argc, char** argv) {{
 }}
 )_";
 
-    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
-                        reflection_deinitialization);
+    const auto global_init = global_initializer_builder.str();
+    code << "void ela_run_global_initializers() {\n";
+    code << global_init;
+    code << "}\n";
+
+    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")),
+                        reflection_initialization, reflection_deinitialization);
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().
@@ -1052,7 +1109,7 @@ void Emitter::visit(ASTInitializerList *node) {
   auto type = node->resolved_type;
 
   if (!type->extensions.is_fixed_sized_array()) {
-    code << "(" + to_cpp_string(type) + ")";
+    code << "(" + type_to_string(type) + ")";
   }
 
   if (node->target_type.is_not_null() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH &&
@@ -1070,7 +1127,7 @@ void Emitter::visit(ASTInitializerList *node) {
     if (type->basename.get_str().starts_with("InitList$")) {
       auto element_type = type->generic_args[0];
       code << " .data = ";
-      code << "(" << to_cpp_string(element_type) << "[]) {";
+      code << "(" << type_to_string(element_type) << "[]) {";
       for (const auto &expr : node->values) {
         expr->accept(this);
         if (expr != node->values.back()) {
@@ -1091,7 +1148,7 @@ void Emitter::visit(ASTInitializerList *node) {
 }
 
 void Emitter::visit(ASTRange *node) {
-  code << "(" << to_cpp_string(node->resolved_type) << ") {";
+  code << "(" << type_to_string(node->resolved_type) << ") {";
   code << ".begin = ";
   node->left->accept(this);
   code << ", .end = ";
@@ -1102,7 +1159,7 @@ void Emitter::visit(ASTRange *node) {
 
 void Emitter::visit(ASTTuple *node) {
   auto type = node->resolved_type;
-  auto name = "(" + to_cpp_string(type) + ")";
+  auto name = "(" + type_to_string(type) + ")";
   code << name << " {";
   for (int i = 0; i < node->values.size(); ++i) {
     auto &value = node->values[i];
@@ -1127,7 +1184,7 @@ void Emitter::visit(ASTDestructure *node) {
   // declare a temporary variable referring to the right, so we can avoid re-evaluating the expression if it's a literal
   // or function call. this probably needs work.
   {
-    code << to_cpp_string(type) << " " << identifier << " = ";
+    code << type_to_string(type) << " " << identifier << " = ";
     node->right->accept(this);
     code << ";\n";
   }
@@ -1187,7 +1244,7 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
     return get_function_pointer_type_string(type, &identifier);
   }
 
-  std::string base_type_str = to_cpp_string(type->base_type == Type::INVALID_TYPE ? type : type->base_type);
+  std::string base_type_str = type_to_string(type->base_type == Type::INVALID_TYPE ? type : type->base_type);
   std::string identifier = sym_name;
 
   for (const auto &ext : type->extensions.extensions) {
@@ -1229,7 +1286,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   auto info = (type->info->as<FunctionTypeInfo>());
   auto return_type = info->return_type;
 
-  ss << to_cpp_string(return_type) << "(" << type_prefix;
+  ss << type_to_string(return_type) << "(" << type_prefix;
 
   if (identifier) {
     ss << *identifier.get();
@@ -1244,7 +1301,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
       ss << "void*";
     } else {
       auto type = info->parameter_types[i];
-      ss << to_cpp_string(type);
+      ss << type_to_string(type);
     }
 
     if (i != info->params_len - 1) {
@@ -1266,23 +1323,23 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     if (type->is_kind(TYPE_STRUCT)) {
       auto flags = type->info->as<StructTypeInfo>()->flags;
       if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
-        ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+        ss << std::format(".size = sizeof({}), ", type_to_string(type));
       } else {
         ss << ".size = 0, "; // non sized type
       }
     } else {
-      ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+      ss << std::format(".size = sizeof({}), ", type_to_string(type));
     }
 
     if (parent_type->is_kind(TYPE_TUPLE)) {
       ss << std::format(
           ".offset = offsetof({}, {})",
-          to_cpp_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
+          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
           "$" + name);
     } else {
       ss << std::format(
           ".offset = offsetof({}, {})",
-          to_cpp_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
+          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
     }
   }
 
@@ -1382,7 +1439,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     if (type->extensions.is_pointer()) {
       ss << ".size = sizeof(void*), ";
     } else {
-      ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+      ss << ".size = sizeof(" << type_to_string(type) << "), ";
     }
   }
 
@@ -1627,7 +1684,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   return true;
 }
 
-std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
+std::string Emitter::type_to_string(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
   ss << base;
   for (const auto ext : extensions.extensions) {
@@ -1644,22 +1701,22 @@ std::string Emitter::get_cpp_scalar_type(Type *id) {
   auto type = id;
   std::string name = "";
 
-  return to_cpp_string(type);
+  return type_to_string(type);
 
   if (type->extensions.has_no_extensions()) {
     return name;
   }
 
-  return to_cpp_string(type->extensions, name);
+  return type_to_string(type->extensions, name);
 }
 
-std::string Emitter::to_cpp_string(Type *type) {
+std::string Emitter::type_to_string(Type *type) {
   auto output = std::string{};
   switch (type->kind) {
     case TYPE_DYN: {
       auto info = type->info->as<DynTypeInfo>();
-      output = "dyn$" + to_cpp_string(info->trait_type);
-      output = to_cpp_string(type->extensions, output);
+      output = "dyn$" + type_to_string(info->trait_type);
+      output = type_to_string(type->extensions, output);
     } break;
     case TYPE_FUNCTION:
       return get_function_pointer_type_string(type);
@@ -1668,7 +1725,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     case TYPE_STRUCT:
     case TYPE_TRAIT:
     case TYPE_CHOICE: {
-      output = to_cpp_string(type->extensions, type->info->scope->full_name());
+      output = type_to_string(type->extensions, type->info->scope->full_name());
       break;
     }
     case TYPE_TUPLE: {
@@ -1680,7 +1737,7 @@ std::string Emitter::to_cpp_string(Type *type) {
           output += "$";
         }
       }
-      output = to_cpp_string(type->extensions, output);
+      output = type_to_string(type->extensions, output);
       break;
     }
   }
@@ -1713,7 +1770,7 @@ void Emitter::visit(ASTImpl *node) {
 }
 
 void Emitter::visit(ASTCast *node) {
-  auto type_string = to_cpp_string(node->target_type->resolved_type);
+  auto type_string = type_to_string(node->target_type->resolved_type);
   code << "(" << type_string << ")";
   node->expression->accept(this);
   return;
@@ -1828,7 +1885,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       auto depth = returns->extensions.extensions.size();
       auto extensions = std::string(depth, '*');
 
-      code << to_cpp_string(return_function_type->return_type) << "(" << extensions << name;
+      code << type_to_string(return_function_type->return_type) << "(" << extensions << name;
       node->params->accept(this);
       code << ")";
     } else {
@@ -1930,13 +1987,13 @@ void Emitter::visit(ASTReturn *node) {
     cf_expr_return_register = &str;
 
     emit_line_directive(node);
-    code << indent() << to_cpp_string(type) << " " << str << ";\n";
+    code << indent() << type_to_string(type) << " " << str << ";\n";
     node->expression.get()->accept(this);
 
     if (emitting_function_with_defer ||
         (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
       emit_line_directive(node);
-      code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      code << indent() << type_to_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
       emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
       emit_line_directive(node);
       code << indent() << "return " << defer_return_value_key << ";\n";
@@ -1957,7 +2014,7 @@ void Emitter::visit(ASTReturn *node) {
         auto path = (ASTPath *)node->expression.get();
         emit_choice_marker_variant_instantiation(type, path);
       } else {
-        code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = ";
+        code << indent() << type_to_string(type) << " " << defer_return_value_key << " = ";
         node->expression.get()->accept(this);
       }
       code << ";\n";
@@ -2052,7 +2109,7 @@ void Emitter::emit_tuple(Type *type) {
   } else {
     type->tuple_is_emitted = true;
   }
-  auto name = to_cpp_string(type);
+  auto name = type_to_string(type);
 
   code << "typedef struct " << name << " {\n";
   indent_level++;
@@ -2063,7 +2120,7 @@ void Emitter::emit_tuple(Type *type) {
       auto name = "$" + std::to_string(i);
       code << indent() << get_function_pointer_type_string(type, &name, false) << ";\n";
     } else {
-      code << indent() << to_cpp_string(type) << " $" << std::to_string(i) << ";\n";
+      code << indent() << type_to_string(type) << " $" << std::to_string(i) << ";\n";
     }
   }
   indent_level--;
@@ -2126,7 +2183,7 @@ void Emitter::visit(ASTDyn_Of *node) {
     return;
   }
 
-  code << "(" << to_cpp_string(node->resolved_type) << ") {\n";
+  code << "(" << type_to_string(node->resolved_type) << ") {\n";
   indent();
   code << ".instance = (void*)";
   node->object->accept(this);
@@ -2166,7 +2223,7 @@ void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
     this->dep_emitter->define_type(function_type);
   }
 
-  auto name = to_cpp_string(dyn_ty);
+  auto name = type_to_string(dyn_ty);
   code << "typedef struct " << name << "{\n";
   code << "void *instance;\n";
   for (auto [name, type] : methods_to_emit) {
@@ -2240,7 +2297,7 @@ void Emitter::visit(ASTMethodCall *node) {
       // We can use this to our advantage to fix the hackiness associated with switch returning expressions
       // and also add a system for if/else/else if chains that return values. this is pretty freaking cool
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
-        code << "({ static " << to_cpp_string(base_type) << " __temp; __temp = ";
+        code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
         node->callee->base->accept(this);
         code << "; &__temp; })";
       } else {
@@ -2287,7 +2344,7 @@ void Emitter::emit_choice_marker_variant_instantiation(Type *type, ASTPath *valu
   }
   if (variant_type == void_type()) {
     const auto index = info->get_variant_index(last_segment.identifier);
-    const auto type_string = to_cpp_string(type);
+    const auto type_string = type_to_string(type);
     code << " (" << type_string << ") { .index = " << index << "}";
   }
 }
@@ -2298,7 +2355,7 @@ void Emitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArgument
   const auto last_segment = path->segments.back();
   const auto variant_name = last_segment.identifier;
   const auto variant_type = info->get_variant_type(variant_name);
-  const auto type_string = to_cpp_string(choice_type);
+  const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
   code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
@@ -2319,7 +2376,7 @@ void Emitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitiali
   const auto last_segment = path->segments.back();
   const auto variant_name = last_segment.identifier;
   const auto variant_type = info->get_variant_type(variant_name);
-  const auto type_string = to_cpp_string(choice_type);
+  const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
   code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
@@ -2635,7 +2692,8 @@ void Emitter::visit(ASTSwitch *node) {
 
 void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
   bool emitted_default = false;
-
+  parenthesized(type_to_string(type));
+  
   if (type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions() &&
       HAS_FLAG(type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
     code << "{}";
@@ -2670,7 +2728,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
           goto NORMAL;
       } else {
       NORMAL:
-        code << "(" << to_cpp_string(type) << ")";
+        code << "(" << type_to_string(type) << ")";
         initializer->accept(this);
       }
       code << ",";
@@ -2698,7 +2756,6 @@ void Emitter::emit_arguments_no_parens(ASTArguments *node) {
     }
 
     auto argument = node->arguments[i];
-
     auto type = argument->resolved_type;
 
     /*

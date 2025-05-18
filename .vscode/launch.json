@@ -25,7 +25,9 @@
       "cwd": "${fileDirname}",
       "args": [
         "${file}",
-        "--test"
+        "--test",
+        "--s",
+        "--nl"
       ],
       "env": {
         // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"

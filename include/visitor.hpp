@@ -201,6 +201,7 @@ struct DependencyEmitter;
 struct Emitter : VisitorBase {
   std::vector<InternedString> type_info_strings{};
   std::unordered_set<int> reflected_upon_types;
+  StringBuilder global_initializer_builder;
   DependencyEmitter *dep_emitter;
 
   static constexpr const char *defer_return_value_key = "$defer$return$value";
@@ -275,6 +276,9 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { code << '\n' << indent(); }
   inline void semicolon() { code << ";"; }
   inline void space() { code << ' '; }
+  inline void parenthesized(const std::string &s) {
+    code << '(' << s << ')';
+  }
 
   void emit_arguments_no_parens(ASTArguments *args);
   void emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> initialized_values = {});
@@ -283,8 +287,8 @@ struct Emitter : VisitorBase {
   void emit_extern_function(ASTFunctionDeclaration *node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
-  std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
-  std::string to_cpp_string(Type *type);
+  std::string type_to_string(const TypeExtensions &ext, const std::string &base);
+  std::string type_to_string(Type *type);
   std::string get_cpp_scalar_type(Type *id);
 
   std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);

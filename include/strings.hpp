@@ -119,6 +119,9 @@ static constexpr auto BOILERPLATE_C_CODE = R"__(
 
   typedef signed char s8;
   typedef unsigned char u8;
+
+  void ela_run_global_initializers();
+
   #include <stddef.h>
   #include <stdarg.h>
 
