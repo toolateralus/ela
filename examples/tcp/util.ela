@@ -1,0 +1,7 @@
+fn read_string(buffer: *mut u8, buffer_length: u32) -> u32 {
+  std::c::memset(buffer, 0, buffer_length);
+  mut n: u32;
+  while n < buffer_length && (buffer[n++]= std::c::getchar()) != '\n' {}
+  buffer[n] = '\0';
+  return n-1; // don't include the newline.
+}

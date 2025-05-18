@@ -1,5 +1,6 @@
 import fmt::*;
 import net::*;
+import util::*;
 
 fn main() {
   port: u16 = 8080;
@@ -11,10 +12,15 @@ fn main() {
     println("client socket created");
   }
 
+  mut ip_string: u8[128];
+  println("Enter an IP to connect to.");
+  len := read_string(ip_string, 128);
+
+  printlnf("connecting to: %", (str.{data: ip_string, length: len},));
   servaddr: sockaddr_in = .{
     sin_family: AF_INET as u16,
     sin_addr: .{
-      s_addr: inet_addr("127.0.0.1"c),
+      s_addr: inet_addr(ip_string),
     },
     sin_port: htons(port),
   };

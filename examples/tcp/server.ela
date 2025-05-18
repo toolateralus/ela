@@ -1,5 +1,6 @@
 import fmt::*;
 import net::*;
+import util::*;
 
 fn main() {
   port: u16 = 8080;
@@ -52,10 +53,8 @@ fn main() {
 
     printlnf("From client: %, Type a message to client:", (str.{data: buff, length: length},));
 
-    mut n: s32;
-    while n < 80 && (buff[n++]= std::c::getchar()) != '\n' {}
-
-    memset(buff, 0, 80);
+    std::c::memset(buff, 0, 80);
+    read_string(buff, 80);
     write(clientfd, buff, 80);
 
     if std::c::strncmp(buff, "exit"c, 4) == 0 {
