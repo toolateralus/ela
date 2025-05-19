@@ -332,7 +332,10 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
       if (arg_index < args_ct) {
         arguments->arguments[arg_index++]->accept(this);
       } else if (param->normal.default_value) {
+        auto old_scope = ctx.scope;
+        ctx.scope = declaration->scope;
         param->normal.default_value.get()->accept(this);
+        ctx.scope = old_scope;
       }
     }
 

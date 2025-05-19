@@ -146,7 +146,7 @@ struct Typer : VisitorBase {
 
   Type *get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self,
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function, Nullable<ASTExpr> self,
                                    bool is_deinit_call);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,

@@ -195,7 +195,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr, MUT);
 
     if (decl.default_value) {
+      auto old_expected_type = expected_type;
+      expected_type = decl.type->resolved_type;
       decl.default_value.get()->accept(this);
+      expected_type = old_expected_type;
     }
 
     info->members.push_back({
@@ -888,8 +891,8 @@ bool is_const_pointer(ASTNode *node) {
 
   return false;
 }
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable,
-                                        bool is_deinit_call) {
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
+                                        Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
@@ -911,9 +914,12 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
                           arg_index + 1)); // +1 here to make it 1-based indexing for user. more intuitive
 
         } else if (param->normal.default_value) {
+          auto old_scope = ctx.scope;
+          ctx.scope = function->scope;
           // No argument provided, use the default value
           expected_type = param->resolved_type;
           param->normal.default_value.get()->accept(this); // Type-check the default value
+          ctx.scope = old_scope;
         } else {
           // No argument provided and no default value, throw an error
           std::stringstream ss;
@@ -1806,7 +1812,7 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    type_check_args_from_params(node->arguments, func_decl->params, nullptr, func_decl->name == "deinit");
+    type_check_args_from_params(node->arguments, func_decl->params, func_decl, nullptr, func_decl->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -3077,7 +3083,8 @@ void Typer::visit(ASTMethodCall *node) {
     if (!func_decl->params->has_self) {
       throw_error("Calling static methods with instance not allowed", node->source_range);
     }
-    type_check_args_from_params(node->arguments, func_decl->params, node->callee->base, func_sym->name == "deinit");
+    type_check_args_from_params(node->arguments, func_decl->params, func_decl, node->callee->base,
+                                func_sym->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
