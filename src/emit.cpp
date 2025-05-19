@@ -2195,20 +2195,17 @@ void Emitter::visit(ASTDyn_Of *node) {
   code << ",\n";
 
   // ugliest code ever freaking written.
-  auto trait_scope = node->resolved_type->info->as<DynTypeInfo>()->trait_type->info->scope;
+  auto dyn_info = node->resolved_type->info->as<DynTypeInfo>();
 
   auto object_scope_bare = node->object->resolved_type->get_element_type();
   auto object_scope = object_scope_bare->info->scope;
 
-  for (auto [name, sym] : trait_scope->symbols) {
-    if (sym.is_function() && !sym.is_generic_function()) {
-      indent();
-      code << "." << name.get_str() << " = ";
-      auto symbol = object_scope->local_lookup(name);
-      auto type = global_find_type_id(symbol->type_id, {{{TYPE_EXT_POINTER_MUT}}});
-      auto typestring = get_function_pointer_type_string(type, nullptr, true);
-      code << "(" << typestring << ")" << emit_symbol(symbol) << ",\n";
-    }
+  for (auto &[name, method_type] : dyn_info->methods) {
+    indent();
+    code << "." << name.get_str() << " = ";
+    auto symbol = object_scope->local_lookup(name);
+    auto typestring = get_function_pointer_type_string(method_type, nullptr, true);
+    code << "(" << typestring << ")" << emit_symbol(symbol) << ",\n";
   }
 
   code << "}";

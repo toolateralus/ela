@@ -592,12 +592,16 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   node->object->accept(this);
   auto element_type = node->object->resolved_type->get_element_type();
   auto element_scope = element_type->info->scope;
-  auto trait_scope = node->trait_type->resolved_type->info->scope;
-  for (auto [name, trait_sym] : trait_scope->symbols) {
-    if (!trait_sym.is_function() || trait_sym.is_generic_function()) {
-      continue;
+  for (auto [name, _] : node->resolved_type->info->as<DynTypeInfo>()->methods) {
+    auto sym = element_scope->local_lookup(name);
+    if (!sym) {
+      throw_error(std::format("Internal compiler error: couldn't find method {} in dynof({})", name, element_type->to_string()), node->source_range);
     }
-    auto decl = element_scope->local_lookup(name)->function.declaration;
+    if (!sym->is_function() || sym->is_generic_function()) {
+      printf("%d\n", sym->flags);
+      throw_error(std::format("Internal compiler error: {} is not a valid method in dynof", name), node->source_range);
+    }
+    auto decl = sym->function.declaration;
     decl->accept(this);
   }
 }

@@ -5,7 +5,6 @@
 #include <format>
 #include <iostream>
 #include <linux/limits.h>
-#include <ostream>
 #include <ranges>
 #include <sstream>
 #include <string>
@@ -573,6 +572,43 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     if (decl_node && decl_node->where_clause) {
       ctx.set_scope(decl_node->scope);
       decl_node->where_clause.get()->accept(this);
+
+      /*
+        @Cooper-Pilot
+        TODO:
+        FEATURE:
+        * when we use a where clause and have a trait bounds on a trait declaration,
+
+        such as:
+        trait X where #self: Y {
+
+        }
+
+        * X should have access to Y's methods when used in a trait object (dyn X)
+
+        such as:
+        {
+          mut x: TypeThatImplementsX;
+          trait_obj := dynof(x, X);
+          trait_obj.method_from_y();
+        }
+
+        * Right now this isn't possible. This kind of 'forwarding' is especially useful for trait objects that
+        * need to call deinit() or other common methods.
+
+        * if you tried to do a default like
+
+        trait X where #self Deinit {
+          fn deinit(*mut self) {
+            self.deinit();
+          }
+        }
+
+        * You get a redefinition error.
+
+        Right now, you're limited to doing some hack to get a function pointer to the deinit then calling it,
+        and I don't even know if that's possible.
+      */
       ctx.set_scope(node->scope);
     }
   }
@@ -748,10 +784,6 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   }
 
   node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
-
-  // if (node->where_clause) {
-  // node->where_clause.get()->accept(this);
-  // }
 
   type->declaring_node = node;
   node->resolved_type = type;
@@ -2763,7 +2795,6 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto dyn_info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo();
   dyn_info->trait_type = trait_type;
 
-
   // TODO: * determine whether 'dyn' should actually be in the type name itself. *
   auto ty = global_create_type(TYPE_DYN, trait_name, dyn_info);
 
@@ -2776,69 +2807,112 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   auto trait_info = trait_type->info->as<TraitTypeInfo>();
 
-  for (auto [name, sym] : trait_info->scope->symbols) {
-    if (sym.is_function() && !sym.is_generic_function()) {
-      auto declaration = sym.function.declaration;
-
-      std::vector<Type *> parameters;
-
-      bool has_self = false;
-      for (auto param : declaration->params->params) {
-        if (param->tag == ASTParamDecl::Self) {
-          if (param->self.is_pointer) {
-            parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
-          } else {
-            throw_error("cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
-                        "parameter, as we don't know the type of the 'self' at compile time definitively.",
-                        range);
-          }
-          has_self = true;
+  const auto insert_function = [&](const InternedString &name, const Symbol &sym, ASTFunctionDeclaration *declaration) {
+    std::vector<Type *> parameters;
+    bool has_self = false;
+    for (auto param : declaration->params->params) {
+      if (param->tag == ASTParamDecl::Self) {
+        if (param->self.is_pointer) {
+          parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
         } else {
-          if (!has_self) {
-            throw_error(
-                "'dyn' can only be used with traits that do not have any associated functions, e.g functions "
-                "that\n"
-                "do not take a '*mut self', nor a '*const self' (in the case of 'dyn' self must always be a pointer)",
-                range);
+          throw_error("cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
+                      "parameter, as we don't know the type of the 'self' at compile time definitively.",
+                      range);
+        }
+        has_self = true;
+      } else {
+        if (!has_self) {
+          throw_error(
+              "'dyn' can only be used with traits that do not have any associated functions, e.g functions "
+              "that\n"
+              "do not take a '*mut self', nor a '*const self' (in the case of 'dyn' self must always be a pointer)",
+              range);
+        }
+
+        param->accept(typer);
+        // There's an exception here for trait typed parameters.
+        auto parameter_type = param->resolved_type;
+        if (parameter_type->is_kind(TYPE_TRAIT)) {
+          throw_error("you cannot take a 'dyn' of an trait that uses other traits as parameter constraints.\n"
+                      "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
+                      range);
+        }
+
+        parameters.push_back(param->resolved_type);
+      }
+    }
+
+    if (declaration->return_type->kind == ASTType::SELF) {
+      throw_error("just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
+                  "because we would have to return it as a type erased *const void. return the concrete type.",
+                  range);
+    }
+
+    declaration->return_type->accept(typer);
+    auto return_type = declaration->return_type->resolved_type;
+
+    FunctionTypeInfo type_info;
+    memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(Type *));
+    type_info.params_len = parameters.size();
+    type_info.return_type = return_type;
+
+    auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
+    dyn_info->methods.push_back({name.get_str(), function_type/* , declaration */});
+    dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
+  };
+
+  for (const auto &[name, sym] : trait_info->scope->symbols) {
+    if (sym.is_function() && !sym.is_generic_function()) {
+      insert_function(name, sym, sym.function.declaration);
+    }
+  };
+
+  if (trait_type->declaring_node) {
+    auto declaration = (ASTTraitDeclaration *)trait_type->declaring_node.get();
+    if (declaration->where_clause) {
+      auto where = declaration->where_clause.get();
+      for (const auto &constraint : where->constraints) {
+        
+        constraint.first->accept(typer);
+        constraint.second->accept(typer);
+
+        if (!type_is_valid(constraint.first->resolved_type) || !type_is_valid(constraint.second->resolved_type)) {
+          continue;
+        }
+
+        if  (constraint.first->get_node_type() != AST_NODE_TYPE) {
+          continue;
+        }
+        auto type = (ASTType *)constraint.first;
+        if (type->kind != ASTType::SELF) {
+          continue;
+        }
+        if (!constraint.second->resolved_type->is_kind(TYPE_TRAIT)) {
+          continue;
+        }
+
+        auto right_ty_info = constraint.second->resolved_type->info->as<TraitTypeInfo>();
+
+        for (const auto &[name, sym] : right_ty_info->scope->symbols) {
+          if (!sym.is_function() || sym.is_generic_function()) {
+            continue;
           }
 
-          param->accept(typer);
-          // There's an exception here for trait typed parameters.
-          auto parameter_type = param->resolved_type;
-          if (parameter_type->is_kind(TYPE_TRAIT)) {
-            throw_error("you cannot take a 'dyn' of an trait that uses other traits as parameter constraints.\n"
-                        "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
-                        range);
+          auto declaration = sym.function.declaration;
+
+          // Only dyn applicable trait bounds methods are taken. this is far more selective than the other process.
+          if (!declaration || !declaration->params->has_self || !declaration->params->params[0]->self.is_pointer) {
+            continue;
           }
 
-          parameters.push_back(param->resolved_type);
+          insert_function(name, sym, declaration);
         }
       }
-
-      if (declaration->return_type->kind == ASTType::SELF) {
-        throw_error(
-            "just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
-            "because we would have to return it as a type erased *const void. return the concrete type.",
-            range);
-      }
-
-      declaration->return_type->accept(typer);
-      auto return_type = declaration->return_type->resolved_type;
-
-      FunctionTypeInfo type_info;
-      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(Type *));
-      type_info.params_len = parameters.size();
-      type_info.return_type = return_type;
-
-      auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
-      dyn_info->methods.push_back({name.get_str(), function_type});
-      dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
     }
   }
 
   auto sym = Symbol::create_type(ty, trait_name, TYPE_DYN, nullptr);
   sym.scope = this; // TODO: we have to fit this in modules or some stuff.
-
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }
@@ -3327,6 +3401,7 @@ void Typer::visit(ASTWhere *node) {
     }
   }
 }
+
 void Typer::visit(ASTWhereStatement *node) {
   const auto visit_where_clause_no_error = [&](ASTWhere *where) -> bool {
     for (auto &constraint : where->constraints) {
