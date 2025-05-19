@@ -630,7 +630,6 @@ void Emitter::visit(ASTVariable *node) {
   }
 
   if (is_global_variable && !node->is_extern) {
-
     // Emit the 'forward declaration' or whatever.
 
     if (type->extensions.is_fixed_sized_array()) {
@@ -644,7 +643,7 @@ void Emitter::visit(ASTVariable *node) {
 
     auto old_code = std::move(code);
     code = std::move(global_initializer_builder);
-    Defer _([&]{
+    Defer _([&] {
       global_initializer_builder = std::move(code);
       code = std::move(old_code);
       code << "\n";
@@ -657,14 +656,16 @@ void Emitter::visit(ASTVariable *node) {
         code << " = ";
         node->value.get()->accept(this);
       } else if (emit_default_init) {
-        code << " = {0}"; // I think this is wholly unneccesary. I think a global, non-initialized array will be zeroed in modern C.
+        code << " = {0}"; // I think this is wholly unneccesary. I think a global, non-initialized array will be zeroed
+                          // in modern C.
       }
       code << ";\n";
       return;
     }
-  
+
     // TODO: it's not ideal to have this special case all over the place.
-    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
+    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() &&
+        node->value.get()->get_node_type() == AST_NODE_PATH) {
       auto value = (ASTPath *)node->value.get();
       code << " = ";
       emit_choice_marker_variant_instantiation(type, value);
@@ -684,14 +685,15 @@ void Emitter::visit(ASTVariable *node) {
       code << ";\n";
       return;
     }
-  
+
     node->type->accept(this);
     space();
     code << name;
     space();
-    
+
     // TODO: it's not ideal to have this special case all over the place.
-    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
+    if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() &&
+        node->value.get()->get_node_type() == AST_NODE_PATH) {
       auto value = (ASTPath *)node->value.get();
       code << " = ";
       emit_choice_marker_variant_instantiation(type, value);
@@ -1054,8 +1056,8 @@ int main (int argc, char** argv) {{
     code << global_init;
     code << "}\n";
 
-    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")),
-                        reflection_initialization, reflection_deinitialization);
+    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
+                        reflection_deinitialization);
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().
@@ -2696,7 +2698,7 @@ void Emitter::visit(ASTSwitch *node) {
 void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
   bool emitted_default = false;
   parenthesized(type_to_string(type));
-  
+
   if (type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions() &&
       HAS_FLAG(type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
     code << "{}";
@@ -2770,5 +2772,24 @@ void Emitter::emit_arguments_no_parens(ASTArguments *node) {
     } else {
       node->arguments[i]->accept(this);
     }
+  }
+}
+
+void Emitter::visit(ASTWhereStatement *node) {
+  if (node->should_compile) {
+    node->block->accept(this);
+    return;
+  }
+  if (node->branch.is_null())
+    return;
+
+  auto branch = node->branch.get();
+  if (branch->condition.is_not_null()) {
+    branch->condition.get()->accept(this);
+    return;
+  }
+  if (branch->block.is_not_null()) {
+    branch->block.get()->accept(this);
+    return;
   }
 }

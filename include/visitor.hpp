@@ -16,6 +16,7 @@ struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *noop) { return; }
 
+  virtual void visit(ASTWhereStatement*) = 0;
   virtual void visit(ASTPath *node) = 0;
   virtual void visit(ASTMethodCall *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
@@ -107,6 +108,7 @@ struct Typer : VisitorBase {
   Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                              const SourceRange &source_range);
 
+  void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
   void visit(ASTPath *node) override;
@@ -180,7 +182,9 @@ struct Typer : VisitorBase {
   void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
+
   bool visit_where_predicate(Type *type, ASTExpr *node);
+  bool visit_where_predicate_throws(Type *type, ASTExpr *node);
 
   InternedString type_name(ASTExpr *node);
 };
@@ -300,7 +304,7 @@ struct Emitter : VisitorBase {
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   Type *get_expr_left_type_sr_dot(ASTNode *node);
-
+  void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
   void visit(ASTPath *node) override;
@@ -376,6 +380,7 @@ struct DependencyEmitter : VisitorBase {
 
   void define_type(Type *type_id);
   void declare_type(Type *type_id);
+  void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPath *node) override;
   void visit(ASTPatternMatch *node) override;

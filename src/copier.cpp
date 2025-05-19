@@ -65,8 +65,9 @@ ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
   return new_node;
 }
 
-/* 
-  ! When passing an argument to a generic function that has a default parameter in that position, we get junk values out and it crashes.
+/*
+  ! When passing an argument to a generic function that has a default parameter in that position, we get junk values out
+  and it crashes.
 */
 ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = copy(node);
@@ -370,9 +371,28 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
   }
   return new_node;
 }
+
+// TODO: make sure this is correct.
+ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
+  ASTWhereStatement *new_node = copy(node);
+  new_node->where = (ASTWhere*)copy_node(node->where);
+  if (node->branch) {
+    auto branch = node->branch.get();
+    if (branch->condition.is_not_null()) {
+      new_node->branch.get()->condition = (ASTWhereStatement*)copy_node(branch->condition.get());
+    }
+    if (branch->block.is_not_null()) {
+      new_node->branch.get()->block = (ASTBlock*)copy_node(branch->block.get());
+    }
+  }
+  return new_node;
+}
+
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   const auto type = node->get_node_type();
   switch (type) {
+    case AST_NODE_WHERE_STATEMENT:
+      return copy_where_statement((ASTWhereStatement *)node);
     case AST_NODE_WHERE:
       return copy_where(static_cast<ASTWhere *>(node));
     case AST_NODE_CAST:

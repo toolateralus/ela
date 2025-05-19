@@ -1,0 +1,32 @@
+import fmt::*;
+
+struct Widget!<Label> {
+  label: Option!<Label>
+}
+
+impl!<Label> Widget!<Label> {
+  fn printme(*mut self) {
+    where self.label.unwrap(): Deinit {
+      if self.label is Option!<Label>::Some(vb) {
+        fmt::println(self.label.unwrap());
+      }
+      fmt::println("was a Deinitable");
+    } else where self.label.unwrap(): str {
+      fmt::printlnf("Was a str :: %", (self.label.unwrap(),));
+    } else {
+      fmt::println("was neither a str nor deinitable");
+    }
+  }
+}
+
+fn main() {
+  mut widget: Widget!<f32>;
+  mut formatter: s32;
+
+  // ! For some reason when the generic type for Widget in this where is different (certain types) 
+  // ! than the one for the actual widget,
+  // ! It crashes because the path for println has a generic argument that's just null and empty???
+  where widget: Widget!<s64> {
+    widget.printme();
+  }
+}

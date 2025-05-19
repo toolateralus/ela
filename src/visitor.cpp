@@ -31,6 +31,7 @@ void ASTLiteral::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTMethodCall::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamsDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTWhereStatement::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTFunctionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTuple::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTCall::accept(VisitorBase *visitor) { visitor->visit(this); }

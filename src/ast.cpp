@@ -1290,6 +1290,10 @@ ASTStatement *Parser::parse_statement() {
     return statment;
   }
 
+  if (tok.type == TType::Where) {
+    return parse_where_statement();
+  }
+
   // * '#' Directives.
   if (tok.type == TType::Directive) {
     auto range = begin_node();
@@ -1347,7 +1351,7 @@ ASTStatement *Parser::parse_statement() {
     expect(TType::Semi);
 
     auto symbol = ctx.scope->lookup(module_name);
-    
+
     if (symbol && symbol->is_module()) {
       printf("importing existing module %s\n", module_name.get_str().c_str());
       import->scope = ((ASTModule *)symbol->module.declaration)->scope;
@@ -1721,7 +1725,7 @@ ASTDestructure *Parser::parse_destructure() {
 
   // * This lambda is just to prevent having to copy paste this.
 
-  /*  
+  /*
     TODO:
     The semantics for this, and the for loop *pointer semantic* need to be clarified.
     It doesn't make sense, it's too subtle, sometimes its completely useless, etc.
@@ -2147,11 +2151,67 @@ ASTWhere *Parser::parse_where_clause() {
     }
     return {type, condition};
   };
+
+  // Used to reduce repitition of this large(ish) function
   expect(TType::Where);
   constraints.push_back(parse_constraint());
   while (peek().type == TType::Comma) {
     eat();
     constraints.push_back(parse_constraint());
+  }
+  return node;
+}
+
+ASTWhereStatement *Parser::parse_where_statement() {
+  const auto parse_clause = [&]() -> ASTWhere * {
+    NODE_ALLOC(ASTWhere, node, range, _, this);
+    std::vector<Constraint> &constraints = node->constraints;
+    
+    const auto parse_constraint = [&] -> Constraint {
+      ASTExpr *expression = parse_expr();
+      expect(TType::Colon);
+      ASTExpr *condition = parse_type();
+
+      while (peek().type == TType::And || peek().type == TType::Or) {
+        NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+        binexpr->op = eat().type;
+        binexpr->right = parse_type();
+        binexpr->left = condition;
+        condition = (ASTExpr *)binexpr;
+      }
+
+      return Constraint { expression, condition };
+    };
+
+    constraints.push_back(parse_constraint());
+    while (peek().type == TType::Comma) {
+      eat();
+      constraints.push_back(parse_constraint());
+    }
+    return node;
+  };
+
+  const auto parse_branch = [&]() -> WhereBranch * {
+    expect(TType::Else);
+    WhereBranch *branch = (WhereBranch *)ast_arena.allocate(sizeof(WhereBranch));
+    if (peek().type == TType::Where) {
+      branch->condition = parse_where_statement();
+    } else {
+      branch->block = parse_block();
+    }
+    return branch;
+  };
+
+  NODE_ALLOC(ASTWhereStatement, node, range, _, this);
+  expect(TType::Where);
+  node->where = parse_clause();
+  node->block = parse_block();
+  if (peek().type == TType::LogicalNot) {
+    node->negative = true;
+    eat();
+  }
+  if (peek().type == TType::Else) {
+    node->branch = parse_branch();
   }
   return node;
 }

@@ -72,6 +72,8 @@ enum ASTNodeType {
   AST_NODE_WHERE,
   AST_NODE_PATTERN_MATCH,
   AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
+
+  AST_NODE_WHERE_STATEMENT,
 };
 
 enum BlockFlags {
@@ -669,7 +671,7 @@ struct ASTStructDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   InternedString name;
   Scope *scope;
-  
+
   bool is_fwd_decl = false;
   bool is_union = false;
   bool is_anonymous = false;
@@ -845,7 +847,9 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-using Constraint = std::pair<ASTType *, ASTExpr *>;
+// The first value is the target type.
+// The second value is the condition/constraint being applied.
+using Constraint = std::pair<ASTExpr *, ASTExpr *>;
 struct ASTWhere : ASTExpr {
   // instead of just having one, we can have several.
   /*
@@ -952,6 +956,42 @@ struct ASTPatternMatch : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+struct WhereBranch;
+struct ASTWhereStatement: ASTStatement {
+  /*
+    Allow for negative checks for early returns.
+    where! $Type: $Trait {
+      return;
+    }
+  */
+  bool negative = false;
+
+  // The actual clause.
+  ASTWhere *where;
+
+  // the actual block to be executed.
+  ASTBlock *block;
+
+  // for caching the success/failure of the where.
+  bool should_compile = false;
+
+  // if this has any else clauses, this will be occupied.
+  Nullable<WhereBranch> branch;
+
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_WHERE_STATEMENT;
+  }
+
+  virtual void accept(VisitorBase *visitor) override;
+};
+
+struct WhereBranch {
+  // If this has a else where, this will be the occupied field.
+  Nullable<ASTWhereStatement> condition;
+  // if this is just an else {} this will be the occupied field.
+  Nullable<ASTBlock> block;
+};
+
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
@@ -1018,7 +1058,10 @@ struct Parser {
   ASTPath *parse_path();
   ASTExpr *parse_primary();
   ASTImpl *parse_impl();
+
   ASTWhere *parse_where_clause();
+  ASTWhereStatement *parse_where_statement();
+
   ASTType *parse_type();
   ASTDefer *parse_defer();
 

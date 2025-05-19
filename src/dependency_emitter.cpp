@@ -11,7 +11,7 @@ void DependencyEmitter::declare_type(Type *type) {
 
   // TODO:
   // ! @Cooper-Pilot
-  /* 
+  /*
     function pointers were acting weird so i just did this ish.
   */
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -245,7 +245,7 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
 void DependencyEmitter::visit(ASTParamDecl *node) {
   declare_type(node->resolved_type);
   if (node->tag == ASTParamDecl::Normal && node->normal.default_value) {
-    /* 
+    /*
       TODO: i have no idea why but this is all corrupted when you provide an arg when theres a default value.
     */
     node->normal.default_value.get()->accept(this);
@@ -319,7 +319,7 @@ void DependencyEmitter::visit(ASTPath *node) {
 
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &seg: node->segments) {
+  for (auto &seg : node->segments) {
     auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
@@ -554,7 +554,7 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
         variant.tuple->accept(this);
         break;
       case ASTChoiceVariant::STRUCT:
-      for (const auto &decl : variant.struct_declarations) {
+        for (const auto &decl : variant.struct_declarations) {
           declare_type(decl->resolved_type);
         }
         break;
@@ -623,5 +623,24 @@ void DependencyEmitter::visit(ASTMethodCall *node) {
       decl->accept(this);
       return;
     }
+  }
+}
+
+void DependencyEmitter::visit(ASTWhereStatement *node) {
+  if (node->should_compile) {
+    node->block->accept(this);
+    return;
+  }
+  if (node->branch.is_null())
+    return;
+
+  auto branch = node->branch.get();
+  if (branch->condition.is_not_null()) {
+    branch->condition.get()->accept(this);
+    return;
+  }
+  if (branch->block.is_not_null()) {
+    branch->block.get()->accept(this);
+    return;
   }
 }

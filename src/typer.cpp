@@ -364,75 +364,6 @@ Type *Typer::get_self_type() {
   return Type::INVALID_TYPE;
 }
 
-std::string print_where_predicate(ASTExpr *predicate) {
-  switch (predicate->get_node_type()) {
-    case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op;
-      if (op == TType::And) {
-        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
-      } else if (op == TType::Or) {
-        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
-      } else {
-        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
-                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
-                    bin->source_range);
-      }
-    } break;
-    case AST_NODE_TYPE: {
-      return predicate->resolved_type->to_string();
-    } break;
-    default:
-      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
-  }
-  return "";
-}
-
-bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
-  switch (predicate->get_node_type()) {
-    case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op;
-      if (op == TType::And) {
-        return visit_where_predicate(target_type, bin->left) && visit_where_predicate(target_type, bin->right);
-      } else if (op == TType::Or) {
-        return visit_where_predicate(target_type, bin->left) || visit_where_predicate(target_type, bin->right);
-        return true;
-      } else {
-        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
-                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
-                    bin->source_range);
-      }
-    } break;
-    case AST_NODE_TYPE: {
-      // make sure the type is fixed up.
-      predicate->accept(this);
-      // return whether this type implements this trait or not.
-      // also can be used to assert whether it's equal to the type provided or not.
-      return std::ranges::find(target_type->traits, predicate->resolved_type) != target_type->traits.end() ||
-             target_type == predicate->resolved_type;
-    } break;
-    default:
-      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
-  }
-  return false;
-}
-
-void Typer::visit(ASTWhere *node) {
-  for (auto &constraint : node->constraints) {
-    auto [target_type, predicate] = constraint;
-    target_type->accept(this);
-    auto type = target_type->resolved_type;
-    auto satisfied = visit_where_predicate(type, predicate);
-
-    if (!satisfied) {
-      throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(predicate),
-                              get_unmangled_name(type)),
-                  node->source_range);
-    }
-  }
-}
-
 Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                                   const SourceRange &source_range) {
   ASTStatement *instantiation = nullptr;
@@ -1035,13 +966,16 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
           TODO: we need to do a better job of checking whether the return type name
 
           * matches the generic parameter it's trying to infer.
-          * we shouldn't restrict the path length nor use a simple string comparison here.
+          * we shouldn't restrict the path length nor should we be using a simple string comparison here.
         */
         if (return_ty_path->length() == 1 &&
             (func->generic_parameters[0].identifier == return_ty_path->segments[0].identifier)) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = source_range;
+          if (!type_is_valid(type->resolved_type)) {
+            throw_error("INTERNAL COMPILER ERROR: Invalid type during inference", type->source_range);
+          }
           generic_args->push_back(type);
         }
       }
@@ -1123,11 +1057,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       for (auto i = 0; i < generics.size(); ++i) {
         auto type = ast_alloc<ASTType>();
         type->source_range = source_range;
-
         if (!type_is_valid(inferred_generics[i])) {
           throw_error("failed in inferring type argument from function argument list", arguments->source_range);
         }
-
         type->resolved_type = inferred_generics[i];
         generic_args->push_back(type);
       }
@@ -1144,6 +1076,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       auto type = ast_alloc<ASTType>();
       type->source_range = source_range;
       type->resolved_type = resolved_generic_arg;
+      if (!type_is_valid(type->resolved_type)) {
+        throw_error("INTERNAL COMPILER ERROR: Invalid type during inference", type->source_range);
+      }
       *generic_arg = type;
     }
     generic_arg++;
@@ -3310,4 +3245,122 @@ void Typer::visit_path_for_call(ASTPath *node) {
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
+}
+
+std::string print_where_predicate(ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr *>(predicate);
+      auto op = bin->op;
+      if (op == TType::And) {
+        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
+      } else if (op == TType::Or) {
+        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
+      } else {
+        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+                    bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      return predicate->resolved_type->to_string();
+    } break;
+    default:
+      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
+  }
+  return "";
+}
+
+bool Typer::visit_where_predicate_throws(Type *target_type, ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr *>(predicate);
+      auto op = bin->op;
+      if (op == TType::And) {
+        return visit_where_predicate(target_type, bin->left) && visit_where_predicate(target_type, bin->right);
+      } else if (op == TType::Or) {
+        return visit_where_predicate(target_type, bin->left) || visit_where_predicate(target_type, bin->right);
+        return true;
+      } else {
+        throw std::pair(
+            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+            bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      // make sure the type is fixed up.
+      predicate->accept(this);
+      // return whether this type implements this trait or not.
+      // also can be used to assert whether it's equal to the type provided or not.
+      return std::ranges::find(target_type->traits, predicate->resolved_type) != target_type->traits.end() ||
+             target_type == predicate->resolved_type;
+    } break;
+    default:
+      throw std::pair("Invalid node in 'where' clause predicate", predicate->source_range);
+  }
+}
+
+bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
+  try {
+    return visit_where_predicate_throws(target_type, predicate);
+  } catch (const std::pair<const char *, SourceRange> &error) {
+    throw_error(error.first, error.second);
+    return false;
+  }
+}
+
+void Typer::visit(ASTWhere *node) {
+  for (auto &constraint : node->constraints) {
+    auto [target_type, predicate] = constraint;
+    target_type->accept(this);
+    auto type = target_type->resolved_type;
+    auto satisfied = visit_where_predicate(type, predicate);
+
+    if (!satisfied) {
+      throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(predicate),
+                              get_unmangled_name(type)),
+                  node->source_range);
+    }
+  }
+}
+void Typer::visit(ASTWhereStatement *node) {
+  const auto visit_where_clause_no_error = [&](ASTWhere *where) -> bool {
+    for (auto &constraint : where->constraints) {
+      auto [target_type, predicate] = constraint;
+      target_type->accept(this);
+      auto type = target_type->resolved_type;
+      try {
+        return visit_where_predicate_throws(type, predicate);
+      } catch (const std::pair<const char *, SourceRange> &error) {
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const auto visit_branch = [&](WhereBranch *branch) -> ControlFlow {
+    if (branch->condition.is_not_null()) {
+      branch->condition.get()->accept(this);
+      return branch->condition.get()->control_flow;
+    } else {
+      branch->block.get()->accept(this);
+      return branch->block.get()->control_flow;
+    }
+  };
+
+  auto value = visit_where_clause_no_error(node->where);
+  node->should_compile = value;
+
+  auto &control_flow = node->control_flow;
+  if (value) {
+    node->block->accept(this);
+    control_flow = node->block->control_flow;
+  } else if (node->branch.is_not_null()) {
+    auto branch = node->branch.get();
+    control_flow = visit_branch(branch);
+  } else {
+    control_flow = {};
+    control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  }
 }

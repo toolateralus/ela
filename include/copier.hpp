@@ -57,6 +57,7 @@ struct ASTCopier {
   ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTNode *copy_node(ASTNode *node);
   ASTWhere *copy_where(ASTWhere *node);
+  ASTWhereStatement *copy_where_statement(ASTWhereStatement *node);
   ASTCast *copy_cast(ASTCast *node);
   ASTType_Of *copy_type_of(ASTType_Of *node);
   ASTImport *copy_import(ASTImport *node);
