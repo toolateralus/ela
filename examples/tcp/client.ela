@@ -33,18 +33,19 @@ fn main() {
 
   mut buff: u8[80];
   while {
-    std::c::memset(buff, 0, 80);
-
-    mut n: s32;
-    while n < 80 && (buff[n++]= std::c::getchar()) != '\n' {}
-
+    read_string(buff, 80);
+    if std::c::strncmp(buff, "exit"c, 4) == 0 {
+      println("Exiting...");
+      break;
+    }
     write(sockfd, buff, 80);
-    std::c::memset(buff, 0, 80);
-    read(sockfd, buff, 80);
-    println(str.{
-      data: buff,
-      length: 80
-    });
+
+    length := read(sockfd, buff, 80);
+    if length == 0 {
+      println("server disconnected");
+      break;
+    }
+    std::printf("%s\n", buff);
   }
 
   close(sockfd);
