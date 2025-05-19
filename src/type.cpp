@@ -429,10 +429,17 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   info->scope = scope;
   info->scope->name = base;
   type->set_info(info);
+
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+    type->traits.push_back(is_union_trait());
+  } else {
+    type->traits.push_back(is_struct_trait());
+  }
+
   return type;
 }
 
-Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
+Type *global_create_choice_type(const InternedString &name, Scope *scope,
                                       const std::vector<Type *> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_CHOICE));
   Type *type = type_table.back();
@@ -446,6 +453,7 @@ Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
   info->scope = scope;
   info->scope->name = base;
   type->set_info(info);
+  type->traits.push_back(is_choice_trait());
   return type;
 }
 
@@ -458,6 +466,7 @@ Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_
   info->scope = scope;
   info->scope->name = name;
   type->set_info(info);
+  type->traits.push_back(is_enum_trait());
   return type;
 }
 
@@ -486,7 +495,6 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
       type->traits.push_back(is_fn_ptr_trait());
     }
   }
-
 
   if (!info->scope) {
     info->scope = create_child(nullptr);
@@ -866,6 +874,28 @@ Type *is_tuple_trait() {
   static Type *id = global_create_trait_type("IsTuple", create_child(nullptr), {});
   return id;
 }
+/* NEW */
+Type *is_struct_trait() {
+  static Type *id = global_create_trait_type("IsStruct", create_child(nullptr), {});
+  return id;
+}
+Type *is_enum_trait() {
+  static Type *id = global_create_trait_type("IsEnum", create_child(nullptr), {});
+  return id;
+}
+Type *is_choice_trait() {
+  static Type *id = global_create_trait_type("IsChoice", create_child(nullptr), {});
+  return id;
+}
+Type *is_dyn_trait() {
+  static Type *id = global_create_trait_type("IsDyn", create_child(nullptr), {});
+  return id;
+}
+Type *is_union_trait() {
+  static Type *id = global_create_trait_type("IsUnion", create_child(nullptr), {});
+  return id;
+}
+/* END NEW */
 
 Type *is_array_trait() {
   static Type *id = global_create_trait_type("IsArray", create_child(nullptr), {});

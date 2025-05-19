@@ -375,14 +375,18 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
 // TODO: make sure this is correct.
 ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
   ASTWhereStatement *new_node = copy(node);
-  new_node->where = (ASTWhere*)copy_node(node->where);
+
+  new_node->where = copy_where(node->where);
+  new_node->block = copy_block(node->block);
+
   if (node->branch) {
     auto branch = node->branch.get();
-    if (branch->condition.is_not_null()) {
-      new_node->branch.get()->condition = (ASTWhereStatement*)copy_node(branch->condition.get());
-    }
+    new_node->branch = (WhereBranch*)ast_arena.allocate(sizeof(WhereBranch));
+    if (branch->where_stmt.is_not_null()) {
+      new_node->branch.get()->where_stmt = copy_where_statement(branch->where_stmt.get());
+    } 
     if (branch->block.is_not_null()) {
-      new_node->branch.get()->block = (ASTBlock*)copy_node(branch->block.get());
+      new_node->branch.get()->block = copy_block(branch->block.get());
     }
   }
   return new_node;

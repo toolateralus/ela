@@ -987,7 +987,7 @@ struct ASTWhereStatement: ASTStatement {
 
 struct WhereBranch {
   // If this has a else where, this will be the occupied field.
-  Nullable<ASTWhereStatement> condition;
+  Nullable<ASTWhereStatement> where_stmt;
   // if this is just an else {} this will be the occupied field.
   Nullable<ASTBlock> block;
 };

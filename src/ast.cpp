@@ -2195,7 +2195,7 @@ ASTWhereStatement *Parser::parse_where_statement() {
     expect(TType::Else);
     WhereBranch *branch = (WhereBranch *)ast_arena.allocate(sizeof(WhereBranch));
     if (peek().type == TType::Where) {
-      branch->condition = parse_where_statement();
+      branch->where_stmt = parse_where_statement();
     } else {
       branch->block = parse_block();
     }
@@ -2204,12 +2204,12 @@ ASTWhereStatement *Parser::parse_where_statement() {
 
   NODE_ALLOC(ASTWhereStatement, node, range, _, this);
   expect(TType::Where);
-  node->where = parse_clause();
-  node->block = parse_block();
   if (peek().type == TType::LogicalNot) {
     node->negative = true;
     eat();
   }
+  node->where = parse_clause();
+  node->block = parse_block();
   if (peek().type == TType::Else) {
     node->branch = parse_branch();
   }

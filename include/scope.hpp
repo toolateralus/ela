@@ -200,7 +200,7 @@ struct Scope {
   void erase(const InternedString &name);
 
   Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
-    auto type = global_create_tagged_union_type(name, scope, {});
+    auto type = global_create_choice_type(name, scope, {});
     auto sym = Symbol::create_type(type, name, TYPE_CHOICE, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;

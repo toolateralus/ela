@@ -322,10 +322,11 @@ void DependencyEmitter::visit(ASTPath *node) {
   for (auto &seg : node->segments) {
     auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
-    scope = nullptr;
     if (!symbol) {
       throw_error(std::format("symbol {} not found in scope", ident.get_str()), node->source_range);
     }
+    scope = nullptr;
+
 
     ASTDeclaration *instantiation = nullptr;
     if (!seg.generic_arguments.empty()) {
@@ -635,8 +636,8 @@ void DependencyEmitter::visit(ASTWhereStatement *node) {
     return;
 
   auto branch = node->branch.get();
-  if (branch->condition.is_not_null()) {
-    branch->condition.get()->accept(this);
+  if (branch->where_stmt.is_not_null()) {
+    branch->where_stmt.get()->accept(this);
     return;
   }
   if (branch->block.is_not_null()) {

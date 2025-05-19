@@ -269,6 +269,14 @@ Type *is_fn_trait();
 Type *is_fn_ptr_trait();
 Type *is_tuple_trait();
 Type *is_array_trait();
+
+Type *is_struct_trait();
+Type *is_enum_trait();
+Type *is_choice_trait();
+Type *is_dyn_trait();
+Type *is_union_trait();
+
+
 Type *is_pointer_trait();
 Type *is_mut_pointer_trait();
 Type *is_const_pointer_trait();
@@ -282,7 +290,7 @@ Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Typ
 
 Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
 
-Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
+Type *global_create_choice_type(const InternedString &name, Scope *scope,
                                       const std::vector<Type *> &generic_args);
 Type *global_create_enum_type(const InternedString &, Scope *, bool = false, Type *element_type = s32_type());
 

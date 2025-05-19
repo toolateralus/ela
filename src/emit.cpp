@@ -2784,8 +2784,8 @@ void Emitter::visit(ASTWhereStatement *node) {
     return;
 
   auto branch = node->branch.get();
-  if (branch->condition.is_not_null()) {
-    branch->condition.get()->accept(this);
+  if (branch->where_stmt.is_not_null()) {
+    branch->where_stmt.get()->accept(this);
     return;
   }
   if (branch->block.is_not_null()) {

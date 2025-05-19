@@ -231,7 +231,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
       ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
-    type = global_create_tagged_union_type(node->name.get_str(), node->scope, generic_args);
+    type = global_create_choice_type(node->name.get_str(), node->scope, generic_args);
   }
 
   node->resolved_type = type;
@@ -2763,8 +2763,11 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto dyn_info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo();
   dyn_info->trait_type = trait_type;
 
+
   // TODO: * determine whether 'dyn' should actually be in the type name itself. *
   auto ty = global_create_type(TYPE_DYN, trait_name, dyn_info);
+
+  ty->traits.push_back(is_dyn_trait());
 
   dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr,
                                    MUT);
@@ -3340,9 +3343,9 @@ void Typer::visit(ASTWhereStatement *node) {
   };
 
   const auto visit_branch = [&](WhereBranch *branch) -> ControlFlow {
-    if (branch->condition.is_not_null()) {
-      branch->condition.get()->accept(this);
-      return branch->condition.get()->control_flow;
+    if (branch->where_stmt.is_not_null()) {
+      branch->where_stmt.get()->accept(this);
+      return branch->where_stmt.get()->control_flow;
     } else {
       branch->block.get()->accept(this);
       return branch->block.get()->control_flow;
@@ -3350,10 +3353,10 @@ void Typer::visit(ASTWhereStatement *node) {
   };
 
   auto value = visit_where_clause_no_error(node->where);
-  node->should_compile = value;
 
   auto &control_flow = node->control_flow;
-  if (value) {
+  if (value || (!value && node->negative)) {
+    node->should_compile = true;
     node->block->accept(this);
     control_flow = node->block->control_flow;
   } else if (node->branch.is_not_null()) {

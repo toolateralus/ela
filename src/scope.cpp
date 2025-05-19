@@ -9,7 +9,7 @@ void get_varargs_handlers(Context *c) {
   auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
   va_list_type->info->as<StructTypeInfo>()->flags |= STRUCT_IS_FORWARD_DECLARED;
   scope->insert_type(va_list_type, "va_list", TYPE_STRUCT, nullptr);
-  
+
   FunctionTypeInfo func_type_info;
   func_type_info.is_varargs = true;
   func_type_info.return_type = void_type();
@@ -46,6 +46,22 @@ Context::Context() {
 
   if (compile_command.has_flag("test")) {
     Scope::add_def("TESTING");
+  }
+
+  // Initialize opaque traits.
+  {
+    is_fn_ptr_trait();
+    is_fn_trait();
+    is_tuple_trait();
+    is_struct_trait();
+    is_enum_trait();
+    is_choice_trait();
+    is_dyn_trait();
+    is_union_trait();
+    is_array_trait();
+    is_pointer_trait();
+    is_mut_pointer_trait();
+    is_const_pointer_trait();
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
