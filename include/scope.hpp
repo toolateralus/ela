@@ -156,7 +156,7 @@ struct Scope {
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
 
   // get the count of non-function variables in this scope.
-  inline int fields_count() const {
+  inline size_t fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
       if (!sym.is_function() && !sym.is_type())

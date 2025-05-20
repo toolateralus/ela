@@ -35,7 +35,7 @@ void DependencyEmitter::define_type(Type *type) {
     case TYPE_FUNCTION: {
       auto info = type->info->as<FunctionTypeInfo>();
       declare_type(info->return_type);
-      for (int index = 0; index < info->params_len; index++) {
+      for (size_t index = 0; index < info->params_len; index++) {
         auto param_ty = info->parameter_types[index];
         declare_type(param_ty);
       }
@@ -318,7 +318,6 @@ void DependencyEmitter::visit(ASTPath *node) {
   }
 
   Scope *scope = ctx.scope;
-  auto index = 0;
   for (auto &seg : node->segments) {
     auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
@@ -366,12 +365,10 @@ void DependencyEmitter::visit(ASTPath *node) {
         decl->accept(emitter);
       }
     }
-
-    index++;
   }
 }
 
-void DependencyEmitter::visit(ASTLiteral *node) {}
+void DependencyEmitter::visit(ASTLiteral *) {}
 
 void DependencyEmitter::visit(ASTType *node) { define_type(node->resolved_type); }
 
@@ -397,9 +394,9 @@ void DependencyEmitter::visit(ASTReturn *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTContinue *node) {}
+void DependencyEmitter::visit(ASTContinue *) {}
 
-void DependencyEmitter::visit(ASTBreak *node) {}
+void DependencyEmitter::visit(ASTBreak *) {}
 
 void DependencyEmitter::visit(ASTFor *node) {
   define_type(node->iterator_type);
@@ -512,9 +509,9 @@ void DependencyEmitter::visit(ASTDestructure *node) {
 
 void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTAlias *node) {}
+void DependencyEmitter::visit(ASTAlias *) {}
 
-void DependencyEmitter::visit(ASTImport *node) {}
+void DependencyEmitter::visit(ASTImport *) {}
 
 void DependencyEmitter::visit(ASTImpl *node) {
   auto old_scope = ctx.scope;
@@ -568,7 +565,7 @@ void DependencyEmitter::visit(ASTCast *node) {
   node->target_type->accept(this);
 }
 
-void DependencyEmitter::visit(ASTTraitDeclaration *node) {}
+void DependencyEmitter::visit(ASTTraitDeclaration *) {}
 
 void DependencyEmitter::visit(ASTLambda *node) {
   node->params->accept(this);
@@ -583,7 +580,7 @@ void DependencyEmitter::visit(ASTWhere *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTModule *node) {}
+void DependencyEmitter::visit(ASTModule *) {}
 
 void DependencyEmitter::visit(ASTDyn_Of *node) {
   declare_type(node->resolved_type);

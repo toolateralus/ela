@@ -49,4 +49,4 @@ THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *node) { return nul
 THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *node) { return nullptr; }
 THIR *THIRVisitor::visit_impl(ASTImpl *node) { return nullptr; }
 THIR *THIRVisitor::visit_defer(ASTDefer *node) { return nullptr; }
-THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *node) { return nullptr; }
+THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *) { return nullptr; }

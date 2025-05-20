@@ -21,11 +21,6 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
-static size_t get_uid() {
-  static size_t n = 0;
-  return n++;
-}
-
 #define USE_GENERIC_PANIC_HANDLER
 
 #ifdef USE_GENERIC_PANIC_HANDLER
@@ -475,7 +470,7 @@ bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
   if (trait_method_info->params_len != impl_method_info->params_len) {
     return false;
   }
-  for (int i = 0; i < trait_method_info->params_len; ++i) {
+  for (size_t i = 0; i < trait_method_info->params_len; ++i) {
     auto trait_param = trait_method_info->parameter_types[i];
     auto impl_param = impl_method_info->parameter_types[i];
     if (trait_param->is_kind(TYPE_TRAIT)) {
@@ -627,7 +622,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     alias->accept(this);
   }
 
-  int x = 0;
   // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
   // just like C-- (owned)
   for (const auto &method : node->methods) {
@@ -651,8 +645,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     if (!method->generic_parameters.empty()) {
       continue;
     }
-
-    auto func_ty_id = method->resolved_type;
 
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
@@ -711,7 +703,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         }
 
         visit_function_header(method, false);
-        auto func_ty_id = method->resolved_type;
 
         if (auto symbol = type_scope->local_lookup(method->name)) {
           if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
@@ -860,10 +851,10 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
-  int param_index = self_nullable.is_not_null() ? 1 : 0;
+  size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
   { // Check the other parameters, besides self.
-    for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
+    for (size_t arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
         if (arg_index < args_ct) {
@@ -971,7 +962,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
         node->source_range);
   }
 
-  for (int i = 0; i < args_ct; ++i) {
+  for (size_t i = 0; i < args_ct; ++i) {
     auto arg = node->arguments[i];
     expected_type = info->parameter_types[i];
     arg->accept(this);
@@ -1086,7 +1077,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
         }
       }
 
-      for (auto i = 0; i < generics.size(); ++i) {
+      for (size_t i = 0; i < generics.size(); ++i) {
         auto type = ast_alloc<ASTType>();
         type->source_range = source_range;
         if (!type_is_valid(inferred_generics[i])) {
@@ -1441,7 +1432,6 @@ void Typer::visit(ASTBlock *node) {
   Defer _([&] { ctx.scope = old_scope; });
   ctx.set_scope(node->scope);
 
-  Type *return_type = Type::INVALID_TYPE;
   node->control_flow.type = Type::INVALID_TYPE;
   for (auto &statement : node->statements) {
     statement->accept(this);
@@ -1483,13 +1473,9 @@ void Typer::visit(ASTParamDecl *node) {
     node->normal.type->accept(this);
     Type *id = node->normal.type->resolved_type;
     node->resolved_type = id;
-
     if (id == Type::INVALID_TYPE) {
       throw_error("Use of undeclared type.", node->source_range);
     }
-
-    auto type = id;
-
     auto old_ty = expected_type;
     expected_type = id;
     Defer _defer([&] { expected_type = old_ty; });
@@ -1824,7 +1810,7 @@ void Typer::visit(ASTArguments *node) {
   if (type) {
     info = dynamic_cast<FunctionTypeInfo *>(type->info);
   }
-  for (int i = 0; i < node->arguments.size(); ++i) {
+  for (size_t i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
     if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
       throw_error(
@@ -1890,8 +1876,6 @@ void Typer::visit(ASTType *node) {
     } else if (!symbol->is_type()) {
       throw_error("cannot use a non-type symbol as a type", node->source_range);
     }
-
-    auto declaring_node = symbol->type.declaration.get();
 
     normal_ty.path->accept(this);
     auto base_ty = normal_ty.path->resolved_type;
@@ -2139,9 +2123,6 @@ void Typer::visit(ASTUnaryExpr *node) {
     }
   }
 
-  // unary operator overload.
-  auto left_ty = operand_ty;
-
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule = type_conversion_rule(operand_ty, bool_type(), node->operand->source_range);
@@ -2196,7 +2177,6 @@ void Typer::visit(ASTLiteral *node) {
         static Type *type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
         node->resolved_type = type;
       } else {
-        static size_t uid_idx = 0;
         static Type *type = ctx.scope->find_type_id("str", {});
         node->resolved_type = type;
       }
@@ -2264,7 +2244,6 @@ void Typer::visit(ASTIndex *node) {
   node->left->accept(this);
   node->index->accept(this);
   auto left_ty = node->left->resolved_type;
-  auto subscript_ty = node->index->resolved_type;
 
   auto symbol = ctx.get_symbol(node->left);
 
@@ -2328,7 +2307,7 @@ void Typer::visit(ASTInitializerList *node) {
   }
 
   if (target_type->extensions.is_pointer() ||
-      target_type->is_kind(TYPE_SCALAR) && target_type->extensions.has_no_extensions()) {
+      (target_type->is_kind(TYPE_SCALAR) && target_type->extensions.has_no_extensions())) { // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2409,7 +2388,7 @@ void Typer::visit(ASTInitializerList *node) {
         return;
       }
 
-      for (int i = 0; i < values.size(); ++i) {
+      for (size_t i = 0; i < values.size(); ++i) {
         {
           auto old = expected_type;
           Defer _([&] { expected_type = old; });
@@ -2505,7 +2484,6 @@ void Typer::visit(ASTSwitch *node) {
     if (!node->is_pattern_match)
       _case.expression->accept(this);
 
-    auto expr_type = _case.expression->resolved_type;
     _case.block->accept(this);
     auto &block_cf = _case.block->control_flow;
     flags |= block_cf.flags;
@@ -2541,7 +2519,7 @@ void Typer::visit(ASTSwitch *node) {
 void Typer::visit(ASTTuple *node) {
   std::vector<Type *> types;
   auto declaring_tuple = expected_type;
-  int type_index = 0;
+  size_t type_index = 0;
   for (const auto &v : node->values) {
     auto old = expected_type;
     Defer _([&] { expected_type = old; });
@@ -2629,7 +2607,7 @@ void Typer::visit(ASTDestructure *node) {
   }
 
   auto scope = type->info->scope;
-  int i = 0;
+  size_t i = 0;
 
   for (const auto name : scope->ordered_symbols) {
     auto symbol = scope->local_lookup(name);
@@ -2786,7 +2764,7 @@ void Typer::visit(ASTDyn_Of *node) {
   TODO: this shouldn't be on the scope. it's an absolute eye sore, and could certainly be tidied up and cleaned
 */
 Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typer *typer) {
-  for (int i = 0; i < type_table.size(); ++i) {
+  for (size_t i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->is_kind(TYPE_DYN) && type_table[i]->info->as<DynTypeInfo>()->trait_type == trait_type) {
       return type_table[i];
     }
@@ -2807,7 +2785,13 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   auto trait_info = trait_type->info->as<TraitTypeInfo>();
 
-  const auto insert_function = [&](const InternedString &name, const Symbol &sym, ASTFunctionDeclaration *declaration) {
+  auto old_scope = typer->ctx.scope;
+  typer->ctx.scope = trait_info->scope;
+  Defer _defer([&]{
+    typer->ctx.scope = old_scope;
+  });
+  const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
+
     std::vector<Type *> parameters;
     bool has_self = false;
     for (auto param : declaration->params->params) {
@@ -2863,7 +2847,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   for (const auto &[name, sym] : trait_info->scope->symbols) {
     if (sym.is_function() && !sym.is_generic_function()) {
-      insert_function(name, sym, sym.function.declaration);
+      insert_function(name, sym.function.declaration);
     }
   };
 
@@ -2905,7 +2889,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
             continue;
           }
 
-          insert_function(name, sym, declaration);
+          insert_function(name, declaration);
         }
       }
     }
@@ -2929,7 +2913,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
     case AST_NODE_PATH: {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
-      auto index = 0;
+      size_t index = 0;
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
@@ -2987,7 +2971,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
     case AST_NODE_PATH: {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
-      auto index = 0;
+      size_t index = 0;
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
@@ -3191,7 +3175,7 @@ void Typer::visit(ASTPatternMatch *node) {
 
 void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
-  auto index = 0;
+  size_t index = 0;
   Type *previous_type = nullptr;
   for (auto &segment : node->segments) {
     auto &ident = segment.identifier;
@@ -3219,7 +3203,7 @@ void Typer::visit(ASTPath *node) {
         arg->accept(this);
         generic_args.push_back(arg->resolved_type);
       }
-      ASTDeclaration *instantiation;
+      ASTDeclaration *instantiation = nullptr;
       if (symbol->is_type()) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = visit_generic(decl, generic_args, node->source_range);
@@ -3255,7 +3239,7 @@ void Typer::visit(ASTPath *node) {
 
 void Typer::visit_path_for_call(ASTPath *node) {
   Scope *scope = ctx.scope;
-  auto index = 0;
+  size_t index = 0;
   Type *previous_type = nullptr;
   for (auto &segment : node->segments) {
     auto &ident = segment.identifier;

@@ -56,9 +56,8 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
-
-static std::string get_text_representation_of_source_range(const SourceRange &source_range,
-                                                           int num_lines_of_source_to_show) {
+static inline std::string get_text_representation_of_source_range(const SourceRange &source_range,
+                                                                  size_t num_lines_of_source_to_show) {
   std::stringstream ss;
   if (num_lines_of_source_to_show > 0) {
     ss << '\n';
@@ -78,7 +77,7 @@ static std::string get_text_representation_of_source_range(const SourceRange &so
       if (line_index >= start_line && line_index <= end_line) {
         ss << line << '\n';
         if (line_index == first.line - 1) {
-          std::string caret_indicator = std::string(std::max(1ul, first.column ), ' ') + "^^^";
+          std::string caret_indicator = std::string(std::max(1ul, first.column), ' ') + "^^^";
           if (terminal_supports_color) {
             ss << "\033[90;3m";
           }
@@ -101,21 +100,17 @@ static std::string get_text_representation_of_source_range(const SourceRange &so
 static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity,
                                           int num_lines_of_source_to_show = 5) {
   const char *color = "";
-  const char *code_color = "";
 
   if (terminal_supports_color) {
     switch (severity) {
       case ERROR_INFO:
-        color = "\033[36m";        // Cyan
-        code_color = "\033[1;36m"; // Bold Cyan
+        color = "\033[36m"; // Cyan
         break;
       case ERROR_WARNING:
-        color = "\033[33m";        // Yellow
-        code_color = "\033[1;33m"; // Bold Yellow
+        color = "\033[33m"; // Yellow
         break;
       case ERROR_FAILURE:
-        color = "\033[31m";        // Red
-        code_color = "\033[1;31m"; // Bold Red
+        color = "\033[31m"; // Red
         break;
     }
   }
@@ -151,7 +146,7 @@ static PanicHandler get_default_panic_handler() {
     std::transform(lower_message.begin(), lower_message.end(), lower_message.begin(), ::tolower);
 
     if (lower_message.contains("undeclared") ||
-        lower_message.contains("use of") && compile_command.has_flag("freestanding")) {
+        (lower_message.contains("use of") && compile_command.has_flag("freestanding"))) {
       lower_message += "\n You are in a freestanding environment. Many types that are normally built in, are not "
                        "included in this mode";
     }
@@ -164,11 +159,11 @@ static PanicHandler get_default_panic_handler() {
   };
 }
 
-static void set_panic_handler(PanicHandler handler) { panic_handler = handler; }
+static inline void set_panic_handler(PanicHandler handler) { panic_handler = handler; }
 
-static void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
+static inline void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
-static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
+static inline void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
   if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
     return;
   }
@@ -185,7 +180,7 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
 
 extern void *error_user_data;
 
-static void set_error_user_data(void *data) { error_user_data = data; }
+static inline void set_error_user_data(void *data) { error_user_data = data; }
 
 template <class T> T *get_error_user_data_as() {
   if (!error_user_data)

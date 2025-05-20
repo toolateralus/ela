@@ -14,7 +14,6 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 
 int CompileCommand::compile() {
   init_type_system();
-  Lexer lexer{};
   Context context{};
   original_path = std::filesystem::current_path();
   parse.begin();
@@ -52,7 +51,7 @@ int CompileCommand::compile() {
 
     emit.code << BOILERPLATE_C_CODE << '\n';
 
-    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
+    auto type_ptr_id = context.scope->find_type_id("Type", {{{.type = TYPE_EXT_POINTER_CONST, .array_size = 0}}});
     auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
     if (!is_freestanding && !has_flag("nostdlib")) {
       dependencyEmitter.declare_type(type_list);
@@ -90,8 +89,7 @@ int CompileCommand::compile() {
 
     if (has_flag("release")) {
       extra_flags += " -O3 ";
-    }
-    else {
+    } else {
       extra_flags += " -g ";
     }
 
@@ -108,7 +106,7 @@ int CompileCommand::compile() {
     cpp.begin();
     result = system(compilation_string.c_str());
     cpp.end("invoking `clang` C compiler and `lld` linker");
-    
+
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);
     }
@@ -166,7 +164,10 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       lldb = true;
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
-    } else if (arg.ends_with(".ela") && input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r main.ela where main.ela is the arg not the file. we should use a rust like -- seperator to seperate runtime args from ela compiler args.
+    } else if (arg.ends_with(".ela") &&
+               input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r
+                                     // main.ela where main.ela is the arg not the file. we should use a rust like --
+                                     // seperator to seperate runtime args from ela compiler args.
       input_path = arg;
     } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;

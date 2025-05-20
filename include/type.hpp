@@ -406,7 +406,7 @@ Type *find_operator_overload(int mutability, Type *left_ty, TType op, OperationK
 
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
-static std::string get_unmangled_name(const Type *type) {
+static inline std::string get_unmangled_name(const Type *type) {
   std::string base = type->basename.get_str();
   auto first = base.find("$");
   if (first != std::string::npos) {
@@ -415,13 +415,13 @@ static std::string get_unmangled_name(const Type *type) {
 
   if (!type->generic_args.empty()) {
     base += "!<";
-    auto it = 0;
+    size_t idx = 0;
     for (auto id : type->generic_args) {
       base += get_unmangled_name(id);
-      if (it != type->generic_args.size() - 1) {
+      if (idx != type->generic_args.size() - 1) {
         base += ", ";
       }
-      it++;
+      idx++;
     }
     base += ">";
   }

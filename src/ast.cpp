@@ -303,7 +303,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto tok = parser->expect(TType::DoubleColon);
+        parser->expect(TType::DoubleColon);
 
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           NODE_ALLOC(ASTStructDeclaration, node, range, _, parser)
@@ -335,9 +335,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto node = parser->parse_statement();
-        if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-          auto struct$ = static_cast<ASTStructDeclaration*>(node);
-        } else if (node->get_node_type() == AST_NODE_VARIABLE) {
+        if (node->get_node_type() == AST_NODE_VARIABLE) {
           auto decl = static_cast<ASTVariable*>(node);
           decl->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -526,7 +524,6 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_STATEMENT_LIST:
         break;
       default:
-      err:
         throw_error("Statement not allowed at the top-level of a program", statement->source_range);
     }
 
@@ -681,7 +678,7 @@ ASTExpr *Parser::parse_unary() {
     NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
     auto op = eat();
 
-    Mutability mutability;
+    Mutability mutability = CONST;
     if (op.type == TType::And) {
       if (peek().type == TType::Mut) {
         mutability = MUT;
@@ -697,10 +694,6 @@ ASTExpr *Parser::parse_unary() {
     }
 
     auto expr = parse_unary();
-
-    auto is_rvalue =
-        expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
-
     unaryexpr->mutability = mutability;
     unaryexpr->op = op.type;
     unaryexpr->operand = expr;
@@ -1659,7 +1652,7 @@ ASTStatement *Parser::parse_statement() {
     auto next_next = lookahead_buf()[2];
     // Both postfix and prefix (inc/dec)rement
     const bool is_increment_or_decrement =
-        (next.type == TType::Increment || next.type == TType::Decrement && next_next.type != TType::Semi) ||
+        (next.type == TType::Increment || (next.type == TType::Decrement && next_next.type != TType::Semi)) ||
         tok.type == TType::Increment || tok.type == TType::Decrement;
 
     // subscript assignment or dot assign/ call statement.
@@ -2029,7 +2022,6 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
   expect(TType::LCurly);
 
   int last_value = -1;
-  bool is_first = true;
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
@@ -2055,7 +2047,6 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     }
 
     node->key_values.push_back({iden, value});
-    is_first = false;
   }
   end_node(node, range);
   std::vector<InternedString> keys;
@@ -2521,8 +2512,6 @@ ASTLambda *Parser::parse_lambda() {
 }
 
 void Parser::parse_pointer_extensions(ASTType *type) {
-  int pointer_depth = 0;
-
   while (peek().type == TType::Mul) {
     expect(TType::Mul);
     type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});

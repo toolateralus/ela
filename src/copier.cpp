@@ -175,6 +175,7 @@ ASTFor *ASTCopier::copy_for(ASTFor *node) {
         new_node->left.destructure.push_back({
             .semantic = destructure.semantic,
             .identifier = destructure.identifier,
+            .mutability = CONST,
         });
       }
     } break;

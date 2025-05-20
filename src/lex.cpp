@@ -73,7 +73,6 @@ void Lexer::get_token(State &state) {
     SourceRange location{state.line, state.col, state.file_idx};
 
     if (c == '\'') {
-        auto start = pos;
         pos++; // move past '
         col++;
         c = input[pos];

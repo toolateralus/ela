@@ -51,7 +51,7 @@ std::unordered_set<InternedString> include_set;
 
 int ignored_warnings = WarningNone;
 
-static bool run_on_finished = false;
+bool run_on_finished = false;
 
 #include <string>
 
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     }
     std::string command = invocation + " " + args;
     std::cout << "running lldb: " << command << std::endl;
-    auto status = system(command.c_str());
+    system(command.c_str());
     return 0;
   }
 

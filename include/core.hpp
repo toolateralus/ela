@@ -88,7 +88,7 @@ struct CompileCommand {
 extern CompileCommand compile_command;
 
 
-static std::string get_source_filename(const SourceRange &range) {
+static inline std::string get_source_filename(const SourceRange &range) {
   return SourceRange::files()[range.file];
 }
 

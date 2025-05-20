@@ -73,7 +73,6 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
         default:
           throw_error("Invalid binary operator in constant expression", node->source_range);
       }
-      auto unary = static_cast<ASTUnaryExpr *>(node);
     } break;
     case AST_NODE_UNARY_EXPR: {
       auto unary = static_cast<ASTUnaryExpr *>(node);

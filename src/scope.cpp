@@ -64,7 +64,7 @@ Context::Context() {
     is_const_pointer_trait();
   }
 
-  for (int i = 0; i < type_table.size(); ++i) {
+  for (size_t i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->info->scope) {
       type_table[i]->info->scope->parent = scope;
     }

@@ -120,17 +120,11 @@ static constexpr auto BOILERPLATE_C_CODE = R"__(
   typedef signed char s8;
   typedef unsigned char u8;
 
+  /* static initializers. */
   void ela_run_global_initializers();
 
   #include <stddef.h>
   #include <stdarg.h>
-
-  // I don't think we need any of these includes anymore.
-  #if USE_STD_LIB
-    #include <stdint.h>
-    #include <errno.h>
-    #undef RAND_MAX
-  #endif
 
   #ifdef TESTING
     #if TEST_VERBOSE

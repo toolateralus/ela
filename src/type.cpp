@@ -28,7 +28,7 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   ss << ext.to_string() << ' ';
   ss << "(";
 
-  for (int i = 0; i < params_len; ++i) {
+  for (size_t i = 0; i < params_len; ++i) {
     auto t = parameter_types[i];
     ss << get_unmangled_name(t);
     if (i < params_len - 1) {
@@ -51,7 +51,7 @@ std::string FunctionTypeInfo::to_string() const {
   ss << "fn ";
   ss << "(";
 
-  for (int i = 0; i < params_len; ++i) {
+  for (size_t i = 0; i < params_len; ++i) {
     auto t = parameter_types[i];
     ss << t->to_string();
     if (i < params_len - 1) {
@@ -197,8 +197,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
         return CONVERT_IMPLICIT;
       }
       return CONVERT_EXPLICIT;
+
+      // !!!! I ADDED THE PARENTHESIS ON THE SECOND EXPRESSION HERE :: !!!!!
+      // ! This may cause bugs!
     } else if ((from == bool_type() && type_is_numerical(to)) ||
-               to == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
+               (to == bool_type() && type_is_numerical(from))) { // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -238,7 +241,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     auto to_elem = to->get_element_type();
     auto conversion = type_conversion_rule(from_elem, to_elem);
     if (conversion == CONVERT_NONE_NEEDED ||
-        conversion == CONVERT_IMPLICIT && (from->extensions.pointer_depth() == to->extensions.pointer_depth())) {
+        (conversion == CONVERT_IMPLICIT &&
+         (from->extensions.pointer_depth() ==
+          to->extensions.pointer_depth()))) { // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
       elements_cast = true;
     }
   }
@@ -270,7 +275,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     auto &from_params = from_fn_info->parameter_types;
     auto &to_params = to_fn_info->parameter_types;
 
-    for (int i = 0; i < from_fn_info->params_len; ++i) {
+    for (size_t i = 0; i < from_fn_info->params_len; ++i) {
       auto from = from_params[i];
       auto to = to_params[i];
       auto rule = type_conversion_rule(from, to);
@@ -372,7 +377,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
     if (finfo->params_len != sinfo->params_len)
       return false;
 
-    for (int i = 0; i < finfo->params_len; ++i)
+    for (size_t i = 0; i < finfo->params_len; ++i)
       if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
         return false;
       }
@@ -439,8 +444,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   return type;
 }
 
-Type *global_create_choice_type(const InternedString &name, Scope *scope,
-                                      const std::vector<Type *> &generic_args) {
+Type *global_create_choice_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_CHOICE));
   Type *type = type_table.back();
   std::string base = name.get_str();
@@ -457,11 +461,12 @@ Type *global_create_choice_type(const InternedString &name, Scope *scope,
   return type;
 }
 
-Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, Type *element_type) {
+Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, Type *underlying_type) {
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
+  info->underlying_type = underlying_type;
   info->is_flags = is_flags;
   info->scope = scope;
   info->scope->name = name;
@@ -697,7 +702,7 @@ Type *global_create_tuple_type(const std::vector<Type *> &types) {
   type->set_info(info);
   info->scope = create_child(nullptr);
 
-  for (int i = 0; i < types.size(); ++i) {
+  for (size_t i = 0; i < types.size(); ++i) {
     info->scope->insert_variable(std::to_string(i), types[i], nullptr, MUT);
   }
 
@@ -722,7 +727,7 @@ InternedString get_tuple_type_name(const std::vector<Type *> &types) {
 
 Type *Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
-  ext.extensions.push_back({is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
+  ext.extensions.push_back({.type = is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST, .array_size = 0});
   return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type *)this : base_type, ext);
 }
 

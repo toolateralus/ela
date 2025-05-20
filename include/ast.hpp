@@ -1026,7 +1026,7 @@ enum Precedence {
   // posfix
 };
 
-static Precedence get_operator_precedence(Token token);
+static inline Precedence get_operator_precedence(Token token);
 
 struct Typer;
 

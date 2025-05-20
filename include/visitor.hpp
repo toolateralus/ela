@@ -14,7 +14,7 @@
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
-  void visit(ASTNoop *noop) { return; }
+  void visit(ASTNoop *) { return; }
 
   virtual void visit(ASTWhereStatement*) = 0;
   virtual void visit(ASTPath *node) = 0;
@@ -243,8 +243,6 @@ struct Emitter : VisitorBase {
       compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
   inline void emit_line_directive(ASTNode *node) {
-    static int last_loc = -1;
-
     static bool is_release_or_omitting_line_info =
         compile_command.has_flag("release") || compile_command.has_flag("nl");
 
@@ -257,14 +255,13 @@ struct Emitter : VisitorBase {
 
     auto line = std::format("#line {} \"{}\"\n", loc, filename);
     code << line;
-    last_loc = loc;
   }
 
   void emit_dyn_dispatch_object(Type *trait, Type *dyn_type);
   void emit_tuple(Type *type);
   std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
-  void call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
+  void call_operator_overload(const SourceRange &range, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);
 
   void forward_decl_type(Type *type);
@@ -291,11 +288,10 @@ struct Emitter : VisitorBase {
   void emit_extern_function(ASTFunctionDeclaration *node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
-  std::string type_to_string(const TypeExtensions &ext, const std::string &base);
+  std::string type_to_string_with_extensions(const TypeExtensions &ext, const std::string &base);
   std::string type_to_string(Type *type);
-  std::string get_cpp_scalar_type(Type *id);
 
-  std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
+  std::string get_type_struct(Type *type, int id, Context &context);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 
@@ -303,7 +299,6 @@ struct Emitter : VisitorBase {
                                                bool type_erase_self = false);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
-  Type *get_expr_left_type_sr_dot(ASTNode *node);
   void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;

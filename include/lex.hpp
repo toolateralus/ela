@@ -411,7 +411,7 @@ struct Lexer {
     bool operator==(const Lexer::State &other) const { return other.input == input; }
 
     State(const std::string &input, size_t file_idx, size_t input_len, const std::filesystem::path &path)
-        : input(input), file_idx(file_idx), path(path), input_len(input_len) {}
+        : input(input), path(path), file_idx(file_idx), input_len(input_len) {}
 
     std::string input{};
     std::filesystem::path path;
