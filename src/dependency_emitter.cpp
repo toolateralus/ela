@@ -122,8 +122,8 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, Type *id)
   for (auto &[name, symbol] : scope->symbols) {
     if (symbol.is_function() && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
-    } else if (type_is_valid(symbol.type_id)) {
-      emit_dependencies_for_reflection(dep_resolver, symbol.type_id);
+    } else if (type_is_valid(symbol.resolved_type)) {
+      emit_dependencies_for_reflection(dep_resolver, symbol.resolved_type);
     }
   }
 }
@@ -149,7 +149,7 @@ void DependencyEmitter::visit(ASTProgram *node) {
   }
 
   if (auto env_sym = ctx.root_scope->local_lookup("Env")) {
-    auto env_scope = env_sym->type_id->info->scope;
+    auto env_scope = env_sym->resolved_type->info->scope;
     if (auto initialize_sym = env_scope->local_lookup("initialize")) {
       initialize_sym->function.declaration->accept(this);
     }
@@ -190,7 +190,7 @@ void DependencyEmitter::visit(ASTProgram *node) {
       } else if (sym->is_function()) {
         sym->function.declaration->accept(this);
       } else if (sym->is_type()) {
-        define_type(sym->type_id);
+        define_type(sym->resolved_type);
       }
     }
   };
@@ -297,11 +297,11 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
 
 void DependencyEmitter::visit(ASTIndex *node) {
   if (node->is_operator_overload) {
-    visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT), node->index);
+    visit_operator_overload(node->base, get_operator_overload_name(TType::LBrace, OPERATION_INDEX), node->index);
   } else {
     // make sure type is defined for size
-    define_type(node->left->resolved_type);
-    node->left->accept(this);
+    define_type(node->base->resolved_type);
+    node->base->accept(this);
     node->index->accept(this);
   }
 }
@@ -342,7 +342,7 @@ void DependencyEmitter::visit(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
-        scope = symbol->type_id->info->scope;
+        scope = symbol->resolved_type->info->scope;
       }
     }
 

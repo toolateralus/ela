@@ -249,7 +249,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context) {
         if (sym->is_type() || sym->is_function())
           continue;
 
-        auto t = sym->type_id;
+        auto t = sym->resolved_type;
 
         if (!t)
           throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
@@ -1405,16 +1405,16 @@ void Emitter::visit(ASTDotExpr *node) {
 }
 
 void Emitter::visit(ASTIndex *node) {
-  auto left_ty = node->left->resolved_type;
+  auto left_ty = node->base->resolved_type;
   if (left_ty && node->is_operator_overload) {
     code << "(*"; // always dereference via subscript. for `type[10] = 10` and such.
-    call_operator_overload(node->source_range, OPERATION_SUBSCRIPT, TType::LBrace, node->left, node->index);
+    call_operator_overload(node->source_range, OPERATION_INDEX, TType::LBrace, node->base, node->index);
     code << ")";
 
     return;
   }
 
-  node->left->accept(this);
+  node->base->accept(this);
   code << '[';
   node->index->accept(this);
   code << ']';
@@ -2215,7 +2215,7 @@ void Emitter::visit(ASTMethodCall *node) {
 
   auto func = symbol->function.declaration;
 
-  Type *function_type = symbol->type_id;
+  Type *function_type = symbol->resolved_type;
   // if generic function
   if (!func->generic_parameters.empty()) {
     func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);

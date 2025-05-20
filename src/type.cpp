@@ -735,6 +735,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
   switch (op) {
     case TType::LBrace:
+    // TODO: This needs to be 'index'/'index_mut'
       return "subscript";
 
     // Do we want this? might be useful for stuff like Array implementations etc.
@@ -824,8 +825,8 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
     return Type::INVALID_TYPE;
 
   if (auto symbol = scope->local_lookup(op_str)) {
-    if (symbol->is_function() && type_is_valid(symbol->type_id)) {
-      return symbol->type_id;
+    if (symbol->is_function() && type_is_valid(symbol->resolved_type)) {
+      return symbol->resolved_type;
     }
   }
 

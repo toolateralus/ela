@@ -34,7 +34,7 @@ struct Scope;
 
 struct Symbol {
   InternedString name;
-  Type *type_id = Type::INVALID_TYPE;
+  Type *resolved_type = Type::INVALID_TYPE;
   int flags = SYMBOL_IS_VARIABLE;
 
   Mutability mutability = CONST;
@@ -80,7 +80,7 @@ struct Symbol {
                                 Mutability mutability) {
     Symbol symbol;
     symbol.name = name;
-    symbol.type_id = type;
+    symbol.resolved_type = type;
     symbol.flags = SYMBOL_IS_VARIABLE;
     symbol.variable.initial_value = initial_value;
     symbol.variable.declaration = decl;
@@ -91,7 +91,7 @@ struct Symbol {
   static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration,
                                 SymbolFlags flags) {
     Symbol symbol;
-    symbol.type_id = type;
+    symbol.resolved_type = type;
     symbol.name = name;
     symbol.flags = flags;
     symbol.function.declaration = declaration;
@@ -104,7 +104,7 @@ struct Symbol {
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.kind = kind;
     symbol.type.declaration = declaration;
-    symbol.type_id = type;
+    symbol.resolved_type = type;
     return symbol;
   }
 
@@ -230,7 +230,7 @@ struct Scope {
   void create_type_alias(const InternedString &name, Type *type_id, TypeKind kind, ASTNode *declaring_node) {
     Symbol symbol;
     symbol.name = name;
-    symbol.type_id = type_id;
+    symbol.resolved_type = type_id;
     symbol.type.kind = kind;
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.declaration = declaring_node;
@@ -242,7 +242,7 @@ struct Scope {
   void forward_declare_type(const InternedString &name, Type *default_id) {
     Symbol symbol;
     symbol.name = name;
-    symbol.type_id = default_id;
+    symbol.resolved_type = default_id;
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.scope = this;
     symbols.insert_or_assign(name, symbol);
@@ -281,7 +281,7 @@ struct Scope {
         return Type::INVALID_TYPE;
       }
     }
-    return global_find_type_id(symbol->type_id, ext);
+    return global_find_type_id(symbol->resolved_type, ext);
   }
 
   Type *find_or_create_dyn_type_of(Type *trait, SourceRange range, Typer *typer);

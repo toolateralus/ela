@@ -683,10 +683,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       auto method = (ASTFunctionDeclaration *)deep_copy_ast(trait_method);
       if (auto impl_symbol = impl_scope.local_lookup(method->name)) {
         method->accept(this);
-        if (!impl_method_matches_trait(method->resolved_type, impl_symbol->type_id)) {
-          if (method->resolved_type != Type::INVALID_TYPE && impl_symbol->type_id != Type::INVALID_TYPE) {
+        if (!impl_method_matches_trait(method->resolved_type, impl_symbol->resolved_type)) {
+          if (method->resolved_type != Type::INVALID_TYPE && impl_symbol->resolved_type != Type::INVALID_TYPE) {
             throw_error(std::format("method \"{}\" doesn't match trait.\nexpected {},\ngot {}", method->name,
-                                    method->resolved_type->to_string(), impl_symbol->type_id->to_string()),
+                                    method->resolved_type->to_string(), impl_symbol->resolved_type->to_string()),
                         node->source_range);
           } else {
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
@@ -762,7 +762,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   auto type = global_create_trait_type(node->name.get_str(), ctx.scope, generic_args);
 
   if (auto symbol = ctx.scope->lookup(node->name)) {
-    type->generic_base_type = symbol->type_id;
+    type->generic_base_type = symbol->resolved_type;
   }
 
   if (generic_instantiation) {
@@ -833,7 +833,7 @@ bool is_const_pointer(ASTNode *node) {
     return false;
 
   if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
-    return is_const_pointer(subscript->left);
+    return is_const_pointer(subscript->base);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
   }
@@ -1526,14 +1526,14 @@ void Typer::visit(ASTFor *node) {
 
     compiler_mock_method_call_visit_impl(iterable_type_id, "iter");
     auto symbol = scope->local_lookup("iter");
-    auto symbol_ty = symbol->type_id;
+    auto symbol_ty = symbol->resolved_type;
     auto iter_return_ty = symbol_ty->info->as<FunctionTypeInfo>()->return_type;
     node->iterator_type = iter_return_ty;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_method_call_visit_impl(iter_return_ty, "next");
     symbol = iter_return_ty->info->scope->local_lookup("next");
-    iter_ty = symbol->type_id->info->as<FunctionTypeInfo>()->return_type;
+    iter_ty = symbol->resolved_type->info->as<FunctionTypeInfo>()->return_type;
     auto option = iter_ty;
     iter_ty = option->generic_args[0];
   } else if (iterable_type->implements(iterator_trait())) { // directly an iterator.
@@ -1544,7 +1544,7 @@ void Typer::visit(ASTFor *node) {
     auto iterable_type = iterable_type_id;
     compiler_mock_method_call_visit_impl(iterable_type_id, "next");
     auto symbol = iterable_type->info->scope->local_lookup("next");
-    iter_ty = symbol->type_id->info->as<FunctionTypeInfo>()->return_type;
+    iter_ty = symbol->resolved_type->info->as<FunctionTypeInfo>()->return_type;
     auto option = iter_ty;
     iter_ty = option->generic_args[0];
   } else {
@@ -1584,7 +1584,7 @@ void Typer::visit(ASTFor *node) {
 
       auto &destructure = node->left.destructure[i];
       auto iden = destructure.identifier;
-      auto type_id = symbol->type_id;
+      auto type_id = symbol->resolved_type;
       if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
         type_id = type_id->take_pointer_to(destructure.mutability);
       }
@@ -1695,7 +1695,7 @@ void Typer::visit(ASTCall *node) {
 
   if (symbol && symbol->is_function()) {
     if (!type) {
-      type = symbol->type_id;
+      type = symbol->resolved_type;
     }
     auto declaring_node = symbol->function.declaration;
     if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -1733,17 +1733,17 @@ void Typer::visit(ASTCall *node) {
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
       throw_error(
-          std::format("type {} must be a choice variant to use '(..)' constructor for now", symbol->type_id->basename),
+          std::format("type {} must be a choice variant to use '(..)' constructor for now", symbol->resolved_type->basename),
           node->source_range);
     }
     if (symbol->type.kind != TYPE_TUPLE) {
-      throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->type_id->basename),
+      throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->resolved_type->basename),
                   node->source_range);
     }
     ASTTuple tuple;
     tuple.values = node->arguments->arguments;
     auto old_expected = expected_type;
-    expected_type = symbol->type_id;
+    expected_type = symbol->resolved_type;
     tuple.accept(this);
     expected_type = old_expected;
     node->resolved_type = symbol->type.choice.get()->resolved_type;
@@ -1991,12 +1991,12 @@ void Typer::visit(ASTBinExpr *node) {
     } else if (node->left->get_node_type() == AST_NODE_INDEX) {
       auto subscript = (ASTIndex *)node->left;
 
-      auto subscript_left_ty = subscript->left->resolved_type;
+      auto subscript_left_ty = subscript->base->resolved_type;
       if (subscript_left_ty->extensions.is_const_pointer()) {
         throw_error("cannot subscript-assign into a const pointer!", node->source_range);
       }
 
-      auto symbol = ctx.get_symbol(subscript->left);
+      auto symbol = ctx.get_symbol(subscript->base);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->extensions.is_mut_pointer()) {
         throw_error("cannot subscript-assign into a const variable!", node->source_range);
       }
@@ -2230,7 +2230,7 @@ void Typer::visit(ASTDotExpr *node) {
     /*
       TODO Resolve generic arguments for dot expression?
     */
-    node->resolved_type = member->type_id;
+    node->resolved_type = member->resolved_type;
   } else {
     for (const auto &[name, _] : base_scope->symbols) {
       std::cout << "symbol: " << name.get_str() << '\n';
@@ -2241,14 +2241,14 @@ void Typer::visit(ASTDotExpr *node) {
 }
 
 void Typer::visit(ASTIndex *node) {
-  node->left->accept(this);
+  node->base->accept(this);
   node->index->accept(this);
-  auto left_ty = node->left->resolved_type;
+  auto left_ty = node->base->resolved_type;
 
-  auto symbol = ctx.get_symbol(node->left);
+  auto symbol = ctx.get_symbol(node->base);
 
   Mutability mutability = symbol ? symbol.get()->mutability : CONST;
-  auto overload = find_operator_overload(mutability, left_ty, TType::LBrace, OPERATION_SUBSCRIPT);
+  auto overload = find_operator_overload(mutability, left_ty, TType::LBrace, OPERATION_INDEX);
 
   if (overload != Type::INVALID_TYPE) {
     node->is_operator_overload = true;
@@ -2367,12 +2367,12 @@ void Typer::visit(ASTInitializerList *node) {
           throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
                       value->source_range);
         }
-        expected_type = symbol->type_id;
+        expected_type = symbol->resolved_type;
 
         value->accept(this);
 
         assert_types_can_cast_or_equal(
-            value, symbol->type_id, value->source_range,
+            value, symbol->resolved_type, value->source_range,
             std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
       }
 
@@ -2619,10 +2619,10 @@ void Typer::visit(ASTDestructure *node) {
       break;
 
     auto destructure = node->elements[i];
-    auto type = symbol->type_id;
+    auto type = symbol->resolved_type;
 
     if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
-      type = symbol->type_id->take_pointer_to(MUT);
+      type = symbol->resolved_type->take_pointer_to(MUT);
     }
     ctx.scope->insert_variable(destructure.identifier, type, symbol->variable.initial_value.get(),
                                destructure.mutability);
@@ -2936,7 +2936,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
           if (symbol->is_module()) {
             scope = symbol->module.declaration->scope;
           } else if (symbol->is_type()) {
-            auto resolved_type = symbol->type_id;
+            auto resolved_type = symbol->resolved_type;
             scope = resolved_type->info->scope;
           } else {
             return nullptr;
@@ -2994,7 +2994,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
           if (symbol->is_module()) {
             scope = symbol->module.declaration->scope;
           } else if (symbol->is_type()) {
-            auto resolved_type = symbol->type_id;
+            auto resolved_type = symbol->resolved_type;
             scope = resolved_type->info->scope;
           } else {
             return nullptr;
@@ -3018,7 +3018,7 @@ void Typer::visit(ASTMethodCall *node) {
   bool added_dyn_instance_argument_as_arg_0 = false;
 
   if (func_sym && func_sym->is_function()) {
-    type = func_sym->type_id;
+    type = func_sym->resolved_type;
 
     auto declaring_node = func_sym->function.declaration;
     if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -3130,7 +3130,7 @@ void Typer::visit(ASTPatternMatch *node) {
                       node->source_range);
         }
 
-        auto type_id = symbol->type_id;
+        auto type_id = symbol->resolved_type;
         if (part.semantic == PTR_MTCH_PTR_CONST) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
         } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
@@ -3219,13 +3219,13 @@ void Typer::visit(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
-        if (symbol->type_id == Type::UNRESOLVED_GENERIC) {
+        if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
-        previous_type = symbol->type_id;
+        previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
       }
-      segment.resolved_type = symbol->type_id;
+      segment.resolved_type = symbol->resolved_type;
     }
     if (!scope && index < node->segments.size() - 1) {
       throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
@@ -3290,13 +3290,13 @@ void Typer::visit_path_for_call(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
-        if (symbol->type_id == Type::UNRESOLVED_GENERIC) {
+        if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
-        previous_type = symbol->type_id;
+        previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
       }
-      segment.resolved_type = symbol->type_id;
+      segment.resolved_type = symbol->resolved_type;
     }
     if (!scope && index < node->segments.size() - 1) {
       throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),

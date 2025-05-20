@@ -814,7 +814,7 @@ ASTExpr *Parser::parse_postfix() {
       return unary;
     } else if (peek().type == TType::LBrace) {
       NODE_ALLOC(ASTIndex, subscript, range, _, this)
-      subscript->left = left;
+      subscript->base = left;
       eat();
       subscript->index = parse_expr();
       expect(TType::RBrace);

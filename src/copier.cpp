@@ -220,7 +220,7 @@ ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
 
 ASTIndex *ASTCopier::copy_subscript(ASTIndex *node) {
   auto new_node = copy(node);
-  new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
+  new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
   new_node->index = static_cast<ASTExpr *>(copy_node(node->index));
   return new_node;
 }

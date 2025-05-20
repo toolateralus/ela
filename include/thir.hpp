@@ -36,7 +36,9 @@ enum struct THIRNodeType : unsigned char {
 
 struct THIR {
   THIR() {}
-  Type *type;
+  // We default this to void so we never get any bad reads; full confidence this field cannot be null.
+  // statements are considered void expressions anyway in the THIR.
+  Type *type = void_type();
   SourceRange source_range;
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
@@ -74,7 +76,7 @@ struct THIRContext {
 };
 
 struct THIRPath : THIR {
-  enum Kind { Function, Variable } kind;
+  enum Kind { Function, Variable } tag;
   union {
     THIRFunction *function;
     THIRVariable *variable;
@@ -113,7 +115,7 @@ struct THIRMemberAccess : THIR {
 };
 
 struct THIRCast : THIR {
-  THIR *base;
+  THIR *operand;
   THIRNodeType get_node_type() const override { return THIRNodeType::Cast; }
 };
 
@@ -186,15 +188,24 @@ extern jstl::Arena thir_arena;
 
 template <class T> static inline T *thir_alloc() { return (T *)thir_arena.allocate(sizeof(T)); }
 
-#define THIR_ALLOC(__type, __original_node)                                                                            \
-  ({                                                                                                                   \
-    auto __node = thir_alloc<__type>();                                                                                  \
-    __node->source_range = __original_node->source_range;                                                                \
-    __node->type = __original_node->resolved_type;                                                               \
-    __node;\
-  })
+#define THIR_ALLOC_EXPR(__type, __name, ast)                                                                           \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
+  __type *__name = thir_alloc<__type>();                                                                               \
+  __name->source_range = ast->source_range;                                                                            \
+  __name->type = ast->resolved_type;
+
+#define THIR_ALLOC_STMT(__type, __name, ast)                                                                           \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
+  __type *__name = thir_alloc<__type>();                                                                               \
+  __name->source_range = ast->source_range;
+
+#define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                                                        \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
+  __type *__name = thir_alloc<__type>();
 
 struct THIRVisitor {
+  THIRVisitor(Context &ctx) : ctx(ctx) {}
+  Context &ctx;
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
   THIR *visit_pattern_match(ASTPatternMatch *node);
@@ -205,16 +216,15 @@ struct THIRVisitor {
   THIR *visit_bin_expr(ASTBinExpr *node);
   THIR *visit_unary_expr(ASTUnaryExpr *node);
   THIR *visit_literal(ASTLiteral *node);
-  THIR *visit_type(ASTType *node);
   THIR *visit_call(ASTCall *node);
   THIR *visit_return(ASTReturn *node);
   THIR *visit_dot_expr(ASTDotExpr *node);
-  THIR *visit_subscript(ASTIndex *node);
+  THIR *visit_index(ASTIndex *node);
   THIR *visit_initializer_list(ASTInitializerList *node);
   THIR *visit_range(ASTRange *node);
   THIR *visit_switch(ASTSwitch *node);
   THIR *visit_tuple(ASTTuple *node);
-  THIR *load_value(ASTNode *node, THIR *expr);
+  THIR *load_value(ASTNode *node, THIR *expr); // What exactly is this supposed to do?
   THIR *visit_cast(ASTCast *node);
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
@@ -293,8 +303,6 @@ struct THIRVisitor {
         return visit_literal(static_cast<ASTLiteral *>(expr));
       case AST_NODE_PATH:
         return visit_path(static_cast<ASTPath *>(expr));
-      case AST_NODE_TYPE:
-        return visit_type(static_cast<ASTType *>(expr));
       case AST_NODE_TUPLE:
         return visit_tuple(static_cast<ASTTuple *>(expr));
       case AST_NODE_CALL:
@@ -304,7 +312,7 @@ struct THIRVisitor {
       case AST_NODE_DOT_EXPR:
         return visit_dot_expr(static_cast<ASTDotExpr *>(expr));
       case AST_NODE_INDEX:
-        return visit_subscript(static_cast<ASTIndex *>(expr));
+        return visit_index(static_cast<ASTIndex *>(expr));
       case AST_NODE_INITIALIZER_LIST:
         return visit_initializer_list(static_cast<ASTInitializerList *>(expr));
       case AST_NODE_SIZE_OF:
@@ -339,8 +347,6 @@ struct THIRVisitor {
         return visit_literal(static_cast<ASTLiteral *>(node));
       case AST_NODE_PATH:
         return visit_path(static_cast<ASTPath *>(node));
-      case AST_NODE_TYPE:
-        return visit_type(static_cast<ASTType *>(node));
       case AST_NODE_TUPLE:
         return visit_tuple(static_cast<ASTTuple *>(node));
       case AST_NODE_CALL:
@@ -350,7 +356,7 @@ struct THIRVisitor {
       case AST_NODE_DOT_EXPR:
         return visit_dot_expr(static_cast<ASTDotExpr *>(node));
       case AST_NODE_INDEX:
-        return visit_subscript(static_cast<ASTIndex *>(node));
+        return visit_index(static_cast<ASTIndex *>(node));
       case AST_NODE_INITIALIZER_LIST:
         return visit_initializer_list(static_cast<ASTInitializerList *>(node));
       case AST_NODE_SIZE_OF:

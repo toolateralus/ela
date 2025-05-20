@@ -91,17 +91,17 @@ struct Typer : VisitorBase {
     statically available I think.
   */
   Type *iterator_trait() {
-    static Type *iter_id = ctx.scope->lookup("Iterator")->type_id;
+    static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
     return iter_id;
   }
 
   Type *iterable_trait() {
-    static Type *iterable_id = ctx.scope->lookup("Iterable")->type_id;
+    static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
     return iterable_id;
   }
 
   Type *init_trait() {
-    static Type *init_id = ctx.scope->lookup("Init")->type_id;
+    static Type *init_id = ctx.scope->lookup("Init")->resolved_type;
     return init_id;
   }
 

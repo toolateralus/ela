@@ -399,7 +399,7 @@ template <class T> static inline T *type_info_alloc() { return new (type_info_ar
 enum OperationKind {
   OPERATION_BINARY,
   OPERATION_UNARY,
-  OPERATION_SUBSCRIPT,
+  OPERATION_INDEX,
 };
 
 Type *find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);

@@ -648,7 +648,7 @@ struct ASTWhile : ASTStatement {
 
 struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
-  ASTExpr *left;
+  ASTExpr *base;
   ASTExpr *index;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_INDEX; }
