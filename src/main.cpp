@@ -10,6 +10,7 @@
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
+#include "thir.hpp"
 #include "type.hpp"
 
 /*
@@ -21,16 +22,15 @@
 using std::string;
 using std::vector;
 
-// This is probably WAYY over allocated but we just want to be sure there's enough space.
+// It might be more optimal to reduce these sizes since now they're linked lists.
 jstl::Arena type_info_arena{MB(10)};
-// the same for this
 jstl::Arena scope_arena{MB(10)};
-// the same for this
 jstl::Arena ast_arena{MB(10)};
+jstl::Arena thir_arena(MB(10));
 
 std::vector<Type *> type_table{};
 
-size_t LAMBDA_UNIQUE_ID = 0;
+size_t lambda_unique_id = 0;
 
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
@@ -43,6 +43,7 @@ CompileCommand compile_command;
 
 std::unordered_map<InternedString, Scope *> import_map;
 std::unordered_set<InternedString> include_set;
+
 /*
   #########################
   ### PROVIDING EXTERNS ###

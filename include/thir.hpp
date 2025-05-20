@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arena.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "type.hpp"
@@ -180,6 +181,18 @@ struct THIRCollectionInitializer : THIR {
   std::vector<THIR *> values;
   THIRNodeType get_node_type() const override { return THIRNodeType::CollectionInitializer; }
 };
+
+extern jstl::Arena thir_arena;
+
+template <class T> static inline T *thir_alloc() { return (T *)thir_arena.allocate(sizeof(T)); }
+
+#define THIR_ALLOC(__type, __original_node)                                                                            \
+  ({                                                                                                                   \
+    auto __node = thir_alloc<__type>();                                                                                  \
+    __node->source_range = __original_node->source_range;                                                                \
+    __node->type = __original_node->resolved_type;                                                               \
+    __node;\
+  })
 
 struct THIRVisitor {
   THIR *visit_method_call(ASTMethodCall *node);

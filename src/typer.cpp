@@ -1235,7 +1235,7 @@ void Typer::visit(ASTChoiceDeclaration *node) {
 }
 
 void Typer::visit(ASTLambda *node) {
-  node->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);
+  node->unique_identifier = "$lambda$" + std::to_string(lambda_unique_id++);
   node->params->accept(this);
   node->return_type->accept(this);
 

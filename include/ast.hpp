@@ -12,7 +12,7 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-extern size_t LAMBDA_UNIQUE_ID;
+extern size_t lambda_unique_id;
 extern jstl::Arena ast_arena;
 struct VisitorBase;
 extern std::unordered_map<InternedString, Scope *> import_map;
