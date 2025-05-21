@@ -170,7 +170,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
       if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
         ss << std::format(".size = sizeof({}), ", type_to_string(type));
       } else {
-        ss << ".size = 0, "; // non sized type
+        ss << ".size = 0, "; // ZST.
       }
     } else {
       ss << std::format(".size = sizeof({}), ", type_to_string(type));
