@@ -1,7 +1,6 @@
 #include <format>
 #include <functional>
 #include <iterator>
-#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -88,7 +87,6 @@ constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_TRAIT = 1 << 12;
 constexpr auto TYPE_FLAGS_DYN = 1 << 13;
 constexpr auto TYPE_FLAGS_UNION = 1 << 14;
-
 
 void append_reflection_type_flags(Type *type, StringBuilder &builder) {
   int kind_flags = 0;
@@ -240,13 +238,14 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
   };
 
   const auto get_fields_init_statements = [&] -> std::string {
-    if (type->is_kind(TYPE_FUNCTION)) {
-      return {};
+    if (type->is_kind(TYPE_FUNCTION) || type->info->scope->fields_count() == 0) {
+      return ".fields = {.data = NULL, .length = 0, .capacity = 0}, ";
     }
     size_t length = 0;
     StringBuilder builder;
 
-    builder << "(Field[]) {";
+    const auto label = std::format("$fields_array{}", id);
+    builder << std::format("Field {}[] = {{", label);
 
     auto info = type->info;
     length = info->scope->fields_count();
@@ -260,67 +259,62 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
         continue;
       builder << get_field_struct(name.get_str(), sym->resolved_type, type, context) << ", ";
     }
+    
+    builder << "};\n";
+    reflection_initialization << builder.str();
 
-    return std::format(".fields = {{ .data = {}, .length = {}, .capacity = {}}},", builder.str(), length, length);
+    return std::format(".fields = {{ .data = {}, .length = {}, .capacity = {}}},", label, length, length);
   };
 
-  const auto get_generic_args_init_statements = [&] {
-    std::stringstream generics_ss;
+  // Not done.
+  const auto get_generic_args_init_statements = [&] -> std::string {
+    const auto label = std::format("$gen_args_array{}", id);
 
     if (type->generic_args.empty()) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->generic_args;\nargs->length = 0;\nargs->data = "
-                         "NULL\n;args->capacity = 0;\n }}",
-                         id);
+      return ".generic_args = { .data = NULL, .length = 0, .capacity = 0 }, ";
     }
 
-    int count = type->generic_args.size();
-    {
-      generics_ss << "_type_info.data[" << id << "]->generic_args.data = malloc(" << count << " * sizeof(Type));\n";
-      generics_ss << "_type_info.data[" << id << "]->generic_args.length = " << count << ";\n";
-      generics_ss << "_type_info.data[" << id << "]->generic_args.capacity = " << count << ";\n";
-    }
+    StringBuilder generics_ss;
 
-    int idx = 0;
+    generics_ss << std::format("Type *{}[] = {{", label);
+
     for (const auto &arg : type->generic_args) {
-      generics_ss << "_type_info.data[" << id << "]->generic_args.data[" << idx << "] = ";
-      generics_ss << to_reflection_type_struct(arg, ctx) << ";\n";
-      ++idx;
+      generics_ss << to_reflection_type_struct(arg, ctx) << ", ";
     }
 
-    return generics_ss.str();
+    generics_ss << "};\n";
+
+    const int length = type->generic_args.size();
+
+    reflection_initialization << generics_ss.str() << "\n";
+
+    return std::format(".generic_args = {{.data = {}, .length = {}, .capacity = {}}}, ", label, length, length);
   };
 
-  const auto get_traits_init_stmts = [&] {
-    std::stringstream traits_ss;
-
+  const auto get_traits_init_stmts = [&] -> std::string {
     if (type->traits.empty()) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->traits;\nargs->length = 0;\nargs->data = "
-                         "NULL\n;args->capacity = 0;\n }}",
-                         id);
+      return ".traits = { .data = NULL, .length = 0, .capacity = 0}, ";
     }
 
-    int count = type->traits.size();
-    {
-      traits_ss << "_type_info.data[" << id << "]->traits.data = malloc(" << count << " * sizeof(Type));\n";
-      traits_ss << "_type_info.data[" << id << "]->traits.length = " << count << ";\n";
-      traits_ss << "_type_info.data[" << id << "]->traits.capacity = " << count << ";\n";
-    }
+    const auto label = std::format("$traits_array{}", id);
+    StringBuilder builder;
 
-    int idx = 0;
+    builder << std::format("Type *{}[] = {{", label);
     for (const auto &trait : type->traits) {
-      traits_ss << "_type_info.data[" << id << "]->traits.data[" << idx << "] = ";
-      traits_ss << to_reflection_type_struct(trait, ctx) << ";\n";
-      ++idx;
+      builder << to_reflection_type_struct(trait, ctx) << ", \n";
     }
+    builder << "};\n";
+    reflection_initialization << builder.str();
 
-    return traits_ss.str();
+    const size_t length = type->traits.size();
+    return std::format(".traits = {{ .data = {}, .length = {}, .capacity = {}}}, ", label, length, length);
   };
 
-  const auto get_methods_init_statements = [&] {
-    std::stringstream methods_ss;
+  const auto get_methods_init_statements = [&] -> std::string {
+    std::stringstream builder;
 
     auto scope = type->info->scope;
-    unsigned count = 0;
+    size_t length = 0;
 
     for (const auto &[name, symbol] : scope->symbols) {
       if (!symbol.is_function() || !symbol.function.declaration) {
@@ -330,61 +324,58 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
       if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD) || declaration->generic_arguments.size() != 0) {
         continue;
       }
-      count++;
+      length++;
     }
 
-    if (count == 0) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->traits;\nargs->length = 0;\nargs->data = "
-                         "NULL\n;args->capacity = 0;\n }}",
-                         id);
+    if (length == 0) {
+      return ".methods = {}, ";
     }
 
-    {
-      methods_ss << "_type_info.data[" << id << "]->methods.data = malloc(" << count << " * sizeof(Type));\n";
-      methods_ss << "_type_info.data[" << id << "]->methods.length = " << count << ";\n";
-      methods_ss << "_type_info.data[" << id << "]->methods.capacity = " << count << ";\n";
-    }
+    const auto label = std::format("$methods_array{}", id);
+    builder << std::format("Method {}[] = {{", label);
 
-    int idx = 0;
-    for (auto sym : scope->symbols) {
-      auto name = sym.first;
-      auto symbol = sym.second;
+    for (const auto &[name, symbol] : scope->symbols) {
       if (!symbol.is_function() || symbol.is_generic_function()) {
         continue;
       }
 
       auto declaration = symbol.function.declaration;
-      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD) || declaration->generic_arguments.size() != 0) {
+      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD)) {
         continue;
       }
-      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str()
-                 << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
 
-      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << ";\n";
-      ++idx;
+      const auto name_strlit = std::format("(str){{.data = \"{}\", .length =  {}}}", name.get_str(),
+                                           calculate_actual_length(name.get_str()));
+
+      builder << std::format("{{ .name = {}, .pointer = {} }}, ", name_strlit, emit_symbol((Symbol *)&symbol));
     }
-    return methods_ss.str();
+    builder << "};\n";
+
+    reflection_initialization << builder.str();
+
+    return std::format(".methods = {{ .data = {}, .length = {}, .capacity = {}}}, ", label, length, length);
   };
 
-  builder << std::format("const Type* {} = &(Type){{ .id = {}, .name = {}, ", string_id, id, type_name_strlit);
+  builder << std::format("Type {} = (Type){{ .id = {}, .name = {}, ", string_id, id, type_name_strlit);
   builder << get_size();
   append_reflection_type_flags(type, builder);
   builder << get_element_type();
   builder << get_fields_init_statements();
-  // builder << get_generic_args_init_statements();
-  // builder << get_traits_init_stmts();
+  builder << get_generic_args_init_statements();
+  builder << get_traits_init_stmts();
 
-  // if (!type->is_kind(TYPE_TRAIT))
-  // builder << get_methods_init_statements();
+  if (!type->is_kind(TYPE_TRAIT)) {
+    builder << get_methods_init_statements();
+  }
 
   builder << " };\n";
 
-  reflection_externs << std::format("extern const Type* {};\n", string_id);
+  reflection_externs << std::format("Type {};\n", string_id);
   reflection_initialization << builder.str();
 
   reflected_upon_types.insert(id);
 
-  return string_id;
+  return "(&" + string_id + ")";
 }
 
 std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
@@ -404,7 +395,7 @@ std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
     if so, reference it.
   */
   if (reflection_type_cache[id]) {
-    return std::format(REFL_TY_FORMAT_STRING, id);
+    return "(&" + std::format(REFL_TY_FORMAT_STRING, id) + ")";
   }
 
   reflection_type_cache[id] = true;

@@ -197,6 +197,8 @@ void DependencyEmitter::visit(ASTProgram *node) {
 
   emit_symbol("Type");
   emit_symbol("Field");
+  emit_symbol("Method");
+  
   emit_symbol("calloc");
   emit_symbol("malloc");
   emit_symbol("free");
