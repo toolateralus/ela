@@ -203,8 +203,11 @@ struct DeferBlock {
 struct DependencyEmitter;
 
 struct Emitter : VisitorBase {
-  std::vector<InternedString> type_info_strings{};
   std::unordered_set<int> reflected_upon_types;
+
+  StringBuilder reflection_externs;
+  StringBuilder reflection_initialization;
+
   StringBuilder global_initializer_builder;
   DependencyEmitter *dep_emitter;
 
@@ -268,7 +271,7 @@ struct Emitter : VisitorBase {
   void emit_deferred_statements(DeferBlockType type);
   void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments);
 
-  std::string to_type_struct(Type *type, Context &context);
+  std::string to_reflection_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
   inline void indented(const std::string &s) { code << indent() << s; }
@@ -291,7 +294,7 @@ struct Emitter : VisitorBase {
   std::string type_to_string_with_extensions(const TypeExtensions &ext, const std::string &base);
   std::string type_to_string(Type *type);
 
-  std::string get_type_struct(Type *type, int id, Context &context);
+  std::string create_reflection_type_struct(Type *type, int id, Context &context);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 

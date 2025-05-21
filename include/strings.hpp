@@ -1,5 +1,21 @@
 #pragma once
 
+/*
+  this is used for std::format() with the type id to get the reflected upon type info.
+*/
+constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
+
+constexpr auto MAIN_FMT = R"_(
+int main (int argc, char** argv) {{
+  /* initialize command line args. */
+  {}(argc, argv);
+  /* run the global initializers */
+  ela_run_global_initializers();
+  /* call user main, or dispatch tests, depending on the build type. */
+  ___MAIN___;
+}}
+)_";
+
 constexpr auto HELP_STRING = R"_(
   compile a file: `ela <filename.ela>` | 'ela' (compiles main.ela in current directory by default)
   compile & run a 'main.ela' in current directory: `ela run` | 'ela r'
@@ -93,6 +109,7 @@ fn main() {
 }
 )__";
 
+/* Macro to decide what to run at main. We could just do this in the compiler, idk why we have this. */
 static constexpr auto TESTING_BOILERPLATE = R"__(
 #ifdef TESTING
   #define ___MAIN___\

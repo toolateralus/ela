@@ -388,6 +388,10 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
+/* 
+  Get a display name of this type, in a readable manner to users.
+  Unmangles.
+*/
 std::string Type::to_string() const {
   switch (kind) {
     case TYPE_FUNCTION:

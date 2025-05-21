@@ -49,8 +49,6 @@ int CompileCommand::compile() {
       std ::cout << "adding TEST_VERBOSE\n";
     }
 
-    emit.code << BOILERPLATE_C_CODE << '\n';
-
     auto type_ptr_id = context.scope->find_type_id("Type", {{{.type = TYPE_EXT_POINTER_CONST, .array_size = 0}}});
     auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
     if (!is_freestanding && !has_flag("nostdlib")) {
@@ -75,7 +73,21 @@ int CompileCommand::compile() {
       output << "#define TESTING\n";
     }
 
+    output << BOILERPLATE_C_CODE << '\n';
+
+    const bool uses_reflection = emit.reflected_upon_types.size();
+
+    if (uses_reflection) {
+      output << "typedef struct Type Type;\n";
+      output << emit.reflection_externs.str();
+    }
+    
     output << emit.code.str();
+
+    if (uses_reflection) {
+      output << emit.reflection_initialization.str();
+    }
+
     output.flush();
     output.close();
   }

@@ -89,50 +89,8 @@ constexpr auto TYPE_FLAGS_TRAIT = 1 << 12;
 constexpr auto TYPE_FLAGS_DYN = 1 << 13;
 constexpr auto TYPE_FLAGS_UNION = 1 << 14;
 
-std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
-  std::stringstream ss;
-  ss << "(Field) { " << std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name))
-     << std::format(".type = {}, ", to_type_struct(type, context));
 
-  if (type->extensions.is_pointer()) {
-    ss << std::format(".size = sizeof(void*), ");
-  } else if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
-    if (type->is_kind(TYPE_STRUCT)) {
-      auto flags = type->info->as<StructTypeInfo>()->flags;
-      if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
-        ss << std::format(".size = sizeof({}), ", type_to_string(type));
-      } else {
-        ss << ".size = 0, "; // non sized type
-      }
-    } else {
-      ss << std::format(".size = sizeof({}), ", type_to_string(type));
-    }
-
-    if (parent_type->is_kind(TYPE_TUPLE)) {
-      ss << std::format(
-          ".offset = offsetof({}, {})",
-          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
-          "$" + name);
-    } else {
-      ss << std::format(
-          ".offset = offsetof({}, {})",
-          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
-    }
-  }
-
-  if (parent_type->is_kind(TYPE_ENUM)) {
-    auto symbol = parent_type->info->as<EnumTypeInfo>()->scope->local_lookup(name);
-    // We don't check the nullable here because it's an absolute guarantee that enum variables all have
-    // a value always.
-    auto value = evaluate_constexpr((ASTExpr *)symbol->variable.initial_value.get(), ctx);
-    ss << std::format(".enum_value = {}", value.integer);
-  }
-
-  ss << " }";
-  return ss.str();
-}
-
-std::string get_type_flags(Type *type) {
+void append_reflection_type_flags(Type *type, StringBuilder &builder) {
   int kind_flags = 0;
   switch (type->kind) {
     case TYPE_SCALAR: {
@@ -195,103 +153,118 @@ std::string get_type_flags(Type *type) {
         break;
     }
   }
-  return ".flags = " + std::to_string(kind_flags) + "\n";
+  builder << ".flags = " + std::to_string(kind_flags) + ",\n";
 }
 
-std::string Emitter::get_type_struct(Type *type, int id, Context &context) {
+std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
   std::stringstream ss;
+
+  const auto name_string =
+      std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name));
+
+  ss << "(Field) { " << name_string << std::format(".type = {}, ", to_reflection_type_struct(type, context));
+
+  if (type->extensions.is_pointer()) {
+    ss << std::format(".size = sizeof(void*), ");
+  } else if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
+    if (type->is_kind(TYPE_STRUCT)) {
+      auto flags = type->info->as<StructTypeInfo>()->flags;
+      if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
+        ss << std::format(".size = sizeof({}), ", type_to_string(type));
+      } else {
+        ss << ".size = 0, "; // non sized type
+      }
+    } else {
+      ss << std::format(".size = sizeof({}), ", type_to_string(type));
+    }
+
+    if (parent_type->is_kind(TYPE_TUPLE)) {
+      ss << std::format(
+          ".offset = offsetof({}, {})",
+          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
+          "$" + name);
+    } else {
+      ss << std::format(
+          ".offset = offsetof({}, {})",
+          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
+    }
+  }
+
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    auto symbol = parent_type->info->as<EnumTypeInfo>()->scope->local_lookup(name);
+    // We don't check the nullable here because it's an absolute guarantee that enum variables all have
+    // a value always.
+    auto value = evaluate_constexpr((ASTExpr *)symbol->variable.initial_value.get(), ctx);
+    ss << std::format(".enum_value = {}", value.integer);
+  }
+
+  ss << " }";
+  return ss.str();
+}
+
+std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &context) {
+  StringBuilder builder;
 
   if (!type) {
     throw_error("internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
   }
 
-  ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
+  const auto string_id = std::format(REFL_TY_FORMAT_STRING, id);
+  const auto type_name_string = type->to_string();
+  const auto type_name_strlit =
+      std::format("(str){{.data=\"{}\", .length = {}}}", type_name_string, calculate_actual_length(type_name_string));
 
-  const auto type_string = type->to_string();
-  ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id,
-                    type_string, calculate_actual_length(type_string));
-
-  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_TRAIT) && !type->is_kind(TYPE_FUNCTION)) {
-    if (type->extensions.is_pointer()) {
-      ss << ".size = sizeof(void*), ";
-    } else {
-      ss << ".size = sizeof(" << type_to_string(type) << "), ";
-    }
-  }
-
-  ss << get_type_flags(type) << ",\n";
-
-  if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
-    ss << ".element_type = " << to_type_struct(type->get_element_type(), context) << ",\n";
-  } else {
-    ss << ".element_type = NULL,\n";
-  }
-
-  ss << " };";
-
-  auto get_fields_init_statements = [&] {
-    std::stringstream fields_ss;
-    if (!type->is_kind(TYPE_FUNCTION) && !type->is_kind(TYPE_ENUM)) {
-      auto info = type->info;
-      int count = info->scope->fields_count();
-      if (count == 0) {
-        return std::string("{}");
-      }
-
-      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
-      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
-      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
-
-      int it = 0;
-      for (const auto &name : info->scope->ordered_symbols) {
-        auto sym = info->scope->local_lookup(name);
-
-        if (sym->is_type() || sym->is_function())
-          continue;
-
-        auto t = sym->resolved_type;
-
-        if (!t)
-          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
-
-        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
-        fields_ss << get_field_struct(name.get_str(), t, type, context) << ";\n";
-        ++it;
-      }
-    } else if (type->kind == TYPE_ENUM) {
-      // TODO: we have to fix this!.
-      auto info = type->info;
-      if (info->scope->ordered_symbols.empty()) {
-        return std::string("{}");
-      }
-
-      int count = info->scope->fields_count();
-
-      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
-      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
-      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
-
-      int it = 0;
-      for (const auto &field : info->scope->ordered_symbols) {
-        auto symbol = info->scope->local_lookup(field);
-        if (!symbol || symbol->is_function())
-          continue;
-
-        auto t = s32_type();
-
-        if (!t) {
-          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
-        }
-
-        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
-        fields_ss << get_field_struct(field.get_str(), t, type, context) << ";\n";
-        ++it;
+  const auto get_size = [&] -> std::string {
+    // Get the size.
+    // We should have our own sizer,
+    // But also enums should get a size probably..
+    if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_TRAIT) && !type->is_kind(TYPE_FUNCTION)) {
+      if (type->extensions.is_pointer()) {
+        return ".size = sizeof(void*), ";
+      } else {
+        return ".size = sizeof(" + type_to_string(type) + "), ";
       }
     }
-    return fields_ss.str();
+    return "";
   };
 
-  auto get_generic_args_init_statements = [&] {
+  const auto get_element_type = [&]() -> std::string {
+    if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
+      return ".element_type = " + to_reflection_type_struct(type->get_element_type(), context) + ",\n";
+    } else if (type->is_kind(TYPE_ENUM) && !type->extensions.has_extensions()) {
+      auto underyling_type = type->info->as<EnumTypeInfo>()->underlying_type;
+      return ".element_type = " + to_reflection_type_struct(underyling_type, context) + ",\n";
+    } else {
+      return ".element_type = NULL,\n";
+    }
+  };
+
+  const auto get_fields_init_statements = [&] -> std::string {
+    if (type->is_kind(TYPE_FUNCTION)) {
+      return {};
+    }
+    size_t length = 0;
+    StringBuilder builder;
+
+    builder << "(Field[]) {";
+
+    auto info = type->info;
+    length = info->scope->fields_count();
+    if (length == 0) {
+      return {};
+    }
+
+    for (const auto &name : info->scope->ordered_symbols) {
+      auto sym = info->scope->local_lookup(name);
+      if (sym->is_type() || sym->is_function())
+        continue;
+      builder << get_field_struct(name.get_str(), sym->resolved_type, type, context) << ", ";
+    }
+
+    return std::format(".fields = {{ .data = {}, .length = {}, .capacity = {}}},", builder.str(), length, length);
+  };
+
+  const auto get_generic_args_init_statements = [&] {
     std::stringstream generics_ss;
 
     if (type->generic_args.empty()) {
@@ -310,14 +283,14 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context) {
     int idx = 0;
     for (const auto &arg : type->generic_args) {
       generics_ss << "_type_info.data[" << id << "]->generic_args.data[" << idx << "] = ";
-      generics_ss << to_type_struct(arg, ctx) << ";\n";
+      generics_ss << to_reflection_type_struct(arg, ctx) << ";\n";
       ++idx;
     }
 
     return generics_ss.str();
   };
 
-  auto get_traits_init_stmts = [&] {
+  const auto get_traits_init_stmts = [&] {
     std::stringstream traits_ss;
 
     if (type->traits.empty()) {
@@ -336,14 +309,14 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context) {
     int idx = 0;
     for (const auto &trait : type->traits) {
       traits_ss << "_type_info.data[" << id << "]->traits.data[" << idx << "] = ";
-      traits_ss << to_type_struct(trait, ctx) << ";\n";
+      traits_ss << to_reflection_type_struct(trait, ctx) << ";\n";
       ++idx;
     }
 
     return traits_ss.str();
   };
 
-  auto get_methods_init_statements = [&] {
+  const auto get_methods_init_statements = [&] {
     std::stringstream methods_ss;
 
     auto scope = type->info->scope;
@@ -393,39 +366,49 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context) {
     return methods_ss.str();
   };
 
-  ss << get_fields_init_statements();
-  ss << get_generic_args_init_statements();
+  builder << std::format("const Type* {} = &(Type){{ .id = {}, .name = {}, ", string_id, id, type_name_strlit);
+  builder << get_size();
+  append_reflection_type_flags(type, builder);
+  builder << get_element_type();
+  builder << get_fields_init_statements();
+  // builder << get_generic_args_init_statements();
+  // builder << get_traits_init_stmts();
 
-  ss << get_traits_init_stmts();
+  // if (!type->is_kind(TYPE_TRAIT))
+  // builder << get_methods_init_statements();
 
-  if (!type->is_kind(TYPE_TRAIT))
-    ss << get_methods_init_statements();
+  builder << " };\n";
 
-  type_info_strings.push_back(ss.str());
+  reflection_externs << std::format("extern const Type* {};\n", string_id);
+  reflection_initialization << builder.str();
+
   reflected_upon_types.insert(id);
-  return std::format("_type_info.data[{}]", id);
+
+  return string_id;
 }
 
-std::string Emitter::to_type_struct(Type *type, Context &context) {
+std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
   if (!type) {
     throw_error("internal compiler error: Reflection system got a null type", {});
   }
 
-  auto id = type->uid;
-
-  static bool *type_cache = [] {
+  const auto id = type->uid;
+  static bool *reflection_type_cache = [] {
     auto arr = new bool[type_table.size()];
     memset(arr, 0, type_table.size() * sizeof(bool));
     return arr;
   }();
 
-  if (type_cache[id]) {
-    return std::format("_type_info.data[{}]", id);
+  /*
+    Has this type already been emitted to a struct?
+    if so, reference it.
+  */
+  if (reflection_type_cache[id]) {
+    return std::format(REFL_TY_FORMAT_STRING, id);
   }
 
-  type_cache[id] = true;
-
-  return get_type_struct(type, id, context);
+  reflection_type_cache[id] = true;
+  return create_reflection_type_struct(type, id, context);
 }
 
 // These should never get hit.
@@ -433,7 +416,7 @@ void Emitter::visit(ASTModule *) {}
 void Emitter::visit(ASTImport *) {}
 void Emitter::visit(ASTWhere *) {}
 void Emitter::visit(ASTTraitDeclaration *) {}
-void Emitter::visit(ASTAlias *) { }
+void Emitter::visit(ASTAlias *) {}
 
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {
@@ -641,8 +624,6 @@ void Emitter::visit(ASTFor *node) {
   return;
 }
 
-
-
 void Emitter::visit(ASTArguments *node) {
   code << "(";
   emit_arguments_no_parens(node);
@@ -655,7 +636,7 @@ void Emitter::visit(ASTType_Of *node) {
   if (!type_is_valid(id))
     throw_error("Invalid type in typeof() node", node->source_range);
   auto type = id;
-  code << to_type_struct(type, ctx);
+  code << to_reflection_type_struct(type, ctx);
 }
 
 void Emitter::visit(ASTType *node) {
@@ -1279,51 +1260,6 @@ void Emitter::visit(ASTProgram *) {
   static const auto testing = compile_command.has_flag("test");
   ctx.set_scope(ctx.root_scope);
 
-  // Emit runtime reflection type info for requested types,
-  if (!type_info_strings.empty() && !is_freestanding) {
-    std::stringstream type_info{};
-    for (const auto &str : type_info_strings) {
-      type_info << str.get_str() << ";\n";
-    }
-
-    code << "\nvoid $initialize_reflection_system() {\n";
-    {
-      // we don't bother doing pushes into type info, it's easier for us to do it this way.
-      code << std::format("_type_info.length = _type_info.capacity = {};\n", type_info_strings.size());
-      code << std::format("_type_info.data = calloc(sizeof(Type*), {});", type_table.size());
-      code << type_info.str() << ";\n";
-    }
-    code << "}\n";
-
-    code << R"_(
-void $deinit_type(Type *type) {
-  if (type->methods.length > 0 || type->methods.data != NULL)
-    free(type->methods.data);
-
-  if (type->traits.length  > 0 || type->traits.data != NULL)
-    free(type->traits.data);
-
-  if (type->fields.length  > 0 || type->fields.data != NULL)
-    free(type->fields.data);
-
-  if (type->generic_args.length  > 0 || type->generic_args.data != NULL)
-    free(type->generic_args.data);
-
-  free(type);
-}
-)_";
-
-    StringBuilder builder;
-    for (auto type : reflected_upon_types) {
-      builder << std::format("  $deinit_type(_type_info.data[{}]);\n", type);
-    }
-    code << "void $deinitialize_reflection_system() {\n";
-    code << builder.str();
-    code << "free(_type_info.data);\n";
-    code << "\n}\n";
-  }
-
-  // this is just a macro, and it's guarded by an ifdef.
   code << TESTING_BOILERPLATE;
 
   if (testing) {
@@ -1336,50 +1272,22 @@ void $deinit_type(Type *type) {
     // use the test runner main macro.
   }
 
-  // We now use a normalized main, with init and deinit code for Env and the reflection system, even in testing.
-  // I am not sure how this ever worked before, when it was selectively initialized.
-  // but this is better anyway
   if ((has_user_defined_main || testing) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
     auto env_scope = ctx.scope->find_type_id("Env", {})->info->scope;
 
-    const auto reflection_initialization =
-        type_info_strings.size() != 0 ? "$initialize_reflection_system();" : "{/* no reflection present in module */};";
-
-    const auto reflection_deinitialization = type_info_strings.size() != 0 ? "$deinitialize_reflection_system();"
-                                                                           : "{/* no reflection present in module */};";
-    constexpr auto main_format = R"_(
-int main (int argc, char** argv) {{
-  /* initialize command line args. */
-  {}(argc, argv);
-  /* run the global initializers */
-  ela_run_global_initializers();
-  /* reflection system. we do this after the global initializers because _type_info is defined in the stdlib, and a global initializer sets it to {{}} */
-  {}
-  /* call user main, or dispatch tests, depending on the build type. */
-  ___MAIN___;
-  /* deinitialize command line args. */
-  {}
-}}
-)_";
-
-    const auto global_init = global_initializer_builder.str();
     code << "void ela_run_global_initializers() {\n";
+    const auto global_init = global_initializer_builder.str();
     code << global_init;
     code << "}\n";
-
-    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
-                        reflection_deinitialization);
+    code << std::format(MAIN_FMT, emit_symbol(env_scope->lookup("initialize")));
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().
-  if (is_freestanding && !type_info_strings.empty()) {
+  if (is_freestanding && reflected_upon_types.size()) {
     throw_error("You cannot use runtime type reflection in a freestanding or "
-                "nostdlib environment, due to a lack of allocators. To compare "
-                "types, use typeid.",
+                "nostdlib environment, due to a lack of a `core` library. To be changed in the future",
                 {});
   }
-
-  return;
 }
 
 void Emitter::visit(ASTDotExpr *node) {
@@ -2091,8 +1999,8 @@ void Emitter::visit(ASTSize_Of *node) {
   code << ")";
 }
 
-void Emitter::call_operator_overload(const SourceRange &range, OperationKind operation, TType op,
-                                     ASTExpr *left, ASTExpr *right) {
+void Emitter::call_operator_overload(const SourceRange &range, OperationKind operation, TType op, ASTExpr *left,
+                                     ASTExpr *right) {
   auto call = ASTMethodCall{};
   auto dot = ASTDotExpr{};
   dot.base = left;
