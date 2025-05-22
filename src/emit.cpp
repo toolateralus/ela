@@ -70,23 +70,21 @@ static inline size_t calculate_actual_length(const std::string_view &str_view) {
   return length;
 }
 
-constexpr auto TYPE_FLAGS_INTEGER = 1 << 0;
-constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
-constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
-constexpr auto TYPE_FLAGS_STRUCT = 1 << 3;
-constexpr auto TYPE_FLAGS_CHOICE = 1 << 4;
-constexpr auto TYPE_FLAGS_ENUM = 1 << 5;
-constexpr auto TYPE_FLAGS_TUPLE = 1 << 6;
-
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 7;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 8;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 9;
-
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 10;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
-constexpr auto TYPE_FLAGS_TRAIT = 1 << 12;
-constexpr auto TYPE_FLAGS_DYN = 1 << 13;
-constexpr auto TYPE_FLAGS_UNION = 1 << 14;
+constexpr size_t TYPE_FLAGS_INTEGER = 1 << 0;
+constexpr size_t TYPE_FLAGS_FLOAT = 1 << 1;
+constexpr size_t TYPE_FLAGS_BOOL = 1 << 2;
+constexpr size_t TYPE_FLAGS_STRUCT = 1 << 3;
+constexpr size_t TYPE_FLAGS_CHOICE = 1 << 4;
+constexpr size_t TYPE_FLAGS_ENUM = 1 << 5;
+constexpr size_t TYPE_FLAGS_TUPLE = 1 << 6;
+constexpr size_t TYPE_FLAGS_ARRAY = 1 << 7;
+constexpr size_t TYPE_FLAGS_FUNCTION = 1 << 8;
+constexpr size_t TYPE_FLAGS_POINTER = 1 << 9;
+constexpr size_t TYPE_FLAGS_SIGNED = 1 << 10;
+constexpr size_t TYPE_FLAGS_UNSIGNED = 1 << 11;
+constexpr size_t TYPE_FLAGS_TRAIT = 1 << 12;
+constexpr size_t TYPE_FLAGS_DYN = 1 << 13;
+constexpr size_t TYPE_FLAGS_UNION = 1 << 14;
 
 void append_reflection_type_flags(Type *type, StringBuilder &builder) {
   int kind_flags = 0;
@@ -356,7 +354,7 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
     return std::format(".methods = {{ .data = {}, .length = {}, .capacity = {}}}, ", label, length, length);
   };
 
-  builder << std::format("Type {} = (Type){{ .id = {}, .name = {}, ", string_id, id, type_name_strlit);
+  builder << std::format("const Type {} = (Type){{ .id = {}, .name = {}, ", string_id, id, type_name_strlit);
   builder << get_size();
   append_reflection_type_flags(type, builder);
   builder << get_element_type();
@@ -370,12 +368,12 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
 
   builder << " };\n";
 
-  reflection_externs << std::format("Type {};\n", string_id);
+  reflection_externs << std::format("extern const Type {};\n", string_id);
   reflection_initialization << builder.str();
 
   reflected_upon_types.insert(id);
 
-  return "(&" + string_id + ")";
+  return "((Type *)(&" + string_id + "))";
 }
 
 std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
@@ -395,7 +393,7 @@ std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
     if so, reference it.
   */
   if (reflection_type_cache[id]) {
-    return "(&" + std::format(REFL_TY_FORMAT_STRING, id) + ")";
+    return "((Type *)(&" + std::format(REFL_TY_FORMAT_STRING, id) + "))";
   }
 
   reflection_type_cache[id] = true;
@@ -852,7 +850,14 @@ void Emitter::visit(ASTVariable *node) {
   emit_line_directive(node);
   auto name = emit_symbol(ctx.scope->lookup(node->name));
 
-  const bool is_global_variable = !node->is_local;
+  // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get global static initializers.
+  // We have to somehow tell the dependency emitter to forward declare it as extern at the correct moment.
+  const bool is_global_variable = !node->is_local;/*  || node->is_static; */
+
+  // if (node->is_static) {
+  //   node->type->accept(dep_emitter);
+  //   reflection_externs << "extern " << type_to_string(node->type->resolved_type) << " " << name << ";\n";
+  // }
 
   if (node->type->resolved_type == Type::INVALID_TYPE) {
     throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
@@ -2134,16 +2139,8 @@ void Emitter::visit(ASTMethodCall *node) {
     if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
       auto base_node_ty = node->callee->base->get_node_type();
 
-      // !@Cooper-Pilot
-      // This is something I didn't know about
-      // C (GCC and Clang at least) have this thing called "Block Expressions"
-      // They work basically just like a Rust block, where you can execute any arbitrary set of statements,
-      // and return a value from the block with just
-      // `value;`
-      // at the end of it.
-
-      // We can use this to our advantage to fix the hackiness associated with switch returning expressions
-      // and also add a system for if/else/else if chains that return values. this is pretty freaking cool
+      // TODO: It would be preferable to use a compound literal here, but we'd have to get all the fields from structs so I don't think we can.
+      // I don't know what kind of memory implications this might have, it may be messed up idk.
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
         code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
         node->callee->base->accept(this);
@@ -2570,6 +2567,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
         code << "(" << type_to_string(type) << ")";
         initializer->accept(this);
       }
+      indent_level--;
       code << ",";
     } else if (member.default_value) {
       code << "\n";

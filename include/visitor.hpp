@@ -273,7 +273,10 @@ struct Emitter : VisitorBase {
 
   std::string to_reflection_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
-  inline std::string indent() { return std::string(indent_level * 2, ' '); }
+  inline std::string indent() { 
+    if (indent_level < 0) indent_level = 0;
+    return std::string(indent_level * 2, ' '); 
+  }
   inline void indented(const std::string &s) { code << indent() << s; }
   inline void indentedln(const std::string &s) { code << indent() << s + '\n'; }
   inline void newline() { code << '\n'; }
