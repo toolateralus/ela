@@ -1,0 +1,16 @@
+/* 
+  This will be a most-basic introduction to a simple hello world. There are several ways to do this of course,
+  but I'll choose the most 'idiomatic' and high level version.
+*/
+
+
+// format library.
+import fmt::{
+  println
+};
+
+fn main() {
+  // fmt::println can accept any type. here it's taking 'str', a immutable, static-lifetime string. mostly identical to Rust's 'str' type,
+  // except it's null terminated for simpler C FFI.
+  println("Hello, World! | Здравствуйте, Мир!");
+}

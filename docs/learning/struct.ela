@@ -1,5 +1,0 @@
-
-MyStruct :: struct {
-  field: f32;
-  field2: #self *;
-}

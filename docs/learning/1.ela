@@ -1,0 +1,61 @@
+
+
+// Import all symbols from fmt.
+import fmt::*;
+
+
+/* 
+  Here we'll cover some control flow, namely the 'for' loop, which includes covering Iterators.
+
+  We'll also cover some string stuff, and introduce you to how most collections look in Ela.
+  We use the 'qformat` formatter from fmt, 
+  and we use std::printf (which is just a wrapper for std::c::printf that takes a str instead of *const u8 for the format argument)
+*/
+
+fn main() {
+  // Instead of varargs, format takes a tuple, which is effectively an anonymous struct.
+  // String is a heap allocated string, that must be freed. hence, the deferred 'deinit' call. 
+  string: String = qformat("%%%", ("Hello","World","!"));
+
+  // the defer statement will execute at the closing bracket '}' of wherever it's used.
+  // it can be any statement, including a block.
+  defer string.deinit();
+
+  // We can iterate directly over strings, because it implements the trait "Iterable"
+  for ch in string {
+    println(ch);
+  }
+
+  // we can iterate over its length, with a Range type. Range also implements Iterable.
+  std::printf("string.length loop\n");
+  for i in 0..string.length {
+    // string types all implement the Index trait, so they can be 'subscripted'.
+    std::printf("string[%d]=%c\n", i, string[i]);
+  }
+
+
+  // we can call .iter(), which is what Iterable does automatically. identical to the first example, in essence.
+  std::printf("string.iter() loop\n");
+  for ch in string.iter() {
+    std::printf("%c\n", ch);
+  }
+
+  // iter_mut will always return a *mut T (mutable pointer to the element type of the Iterator).
+  // we can safely modify the value of these pointers while traversing.
+
+  // This will not work in this example, because the variable 'string' is not marked as mutable, and obtaining
+  // a mutable iterator to its data would violate this, since 'iter_mut()'s first argument is *mut self.
+
+  // Instead we can clone it, which is a deep copy (assignment is a shallow copy, just like C)
+  // and mutate it this way.
+  mut mutable_string := string.clone();
+  defer mutable_string.deinit();
+
+  std::printf("mutable_string.iter_mut() loop\n");
+  for ch in mutable_string.iter_mut() {
+    *ch = 0;
+  }
+
+
+
+}
