@@ -6,6 +6,7 @@
 
 #include "ast.hpp"
 #include "builder.hpp"
+#include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
