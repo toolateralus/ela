@@ -1,0 +1,14 @@
+
+
+choice Choice {
+  A, B
+}
+
+fn main() { 
+  instance := Choice::A;
+  // This emits all fucked up.
+  result := switch is instance {
+    Choice::A => 10,
+    Choice::B => 20,
+  };
+}

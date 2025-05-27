@@ -471,6 +471,7 @@ void Emitter::visit(ASTIf *node) {
     emit_pattern_match_for_if(node, (ASTPatternMatch *)node->condition);
     return;
   }
+
   newline();
   emit_line_directive(node);
   if (node->is_expression) {
@@ -2236,6 +2237,17 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
   const auto object_type = pattern->object->resolved_type;
   const auto is_pointer = object_type->extensions.is_pointer();
 
+  static std::string the_register;
+  if (the_if->is_expression) {
+    the_register = "register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &the_register;
+    code << "({\n";
+
+    code << type_to_string(the_if->resolved_type) << " " << the_register;
+    semicolon();
+    newline();
+  }
+
   code << "if (";
   pattern->object->accept(this);
   if (is_pointer) {
@@ -2243,16 +2255,22 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
   } else {
     code << ".";
   }
+
   code << "index == " << variant_index << ") {\n";
   // within the if block
   emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
-  // the_if->block->scope->parent = ctx.scope;
   the_if->block->accept(this);
   // exiting the if block.
   code << "}\n";
 
   if (the_if->_else.get()) {
     the_if->_else.get()->accept(this);
+  }
+
+  if (the_if->is_expression) {
+    cf_expr_return_register = nullptr;
+    code << the_register;
+    code << ";\n});\n";
   }
 }
 
@@ -2475,9 +2493,6 @@ void Emitter::visit(ASTSwitch *node) {
       code << indent() << "else ";
     }
 
-    /*
-      The 'else' is handled above.
-    */
     if (_case.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
       emit_pattern_match_for_switch_case(target_type, target_unique_id, _case, (ASTPatternMatch *)_case.expression);
       return;
