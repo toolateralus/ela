@@ -258,7 +258,7 @@ std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &
         continue;
       builder << get_field_struct(name.get_str(), sym->resolved_type, type, context) << ", ";
     }
-    
+
     builder << "};\n";
     reflection_initialization << builder.str();
 
@@ -471,15 +471,42 @@ void Emitter::visit(ASTIf *node) {
     emit_pattern_match_for_if(node, (ASTPatternMatch *)node->condition);
     return;
   }
-
+  newline();
   emit_line_directive(node);
-  code << indent() << "if (";
-  node->condition->accept(this);
-  code << ") ";
-  node->block->accept(this);
-  if (node->_else.is_not_null()) {
+  if (node->is_expression) {
+    if (!node->_else) { // TODO: put this in typer.
+      throw_error("cannot use an 'if' expression without at least an 'else'.", node->source_range);
+    }
+    code << "({";
+    static std::string the_register;
+    the_register = "regsiter$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &the_register;
+
+    auto type = type_to_string(node->resolved_type);
+    code << type << " " << the_register;
+    semicolon();
+
+    code << indent() << "if (";
+    node->condition->accept(this);
+    code << ") ";
+    node->block->accept(this);
     node->_else.get()->accept(this);
+
+    code << the_register;
+    cf_expr_return_register = nullptr;
+    semicolon();
+
+    code << "})";
+  } else {
+    code << indent() << "if (";
+    node->condition->accept(this);
+    code << ") ";
+    node->block->accept(this);
+    if (node->_else.is_not_null()) {
+      node->_else.get()->accept(this);
+    }
   }
+
   return;
 }
 
@@ -787,26 +814,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
 }
 
 void Emitter::visit(ASTBinExpr *node) {
-  if (node->op == TType::Assign &&
-      (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
-    auto old = std::move(cf_expr_return_register);
-    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
-    auto type = node->resolved_type;
-    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
-    cf_expr_return_register = &str;
-
-    emit_line_directive(node);
-    code << indent() << type_to_string(type) << " " << str << ";\n";
-
-    code << indent();
-    node->right->accept(this);
-    node->left->accept(this);
-    code << " = " << str;
-    return;
-  }
-
   auto left_ty = node->left->resolved_type;
-
   if (left_ty && node->is_operator_overload) {
     call_operator_overload(node->source_range, OPERATION_BINARY, node->op, node->left, node->right);
     return;
@@ -851,9 +859,10 @@ void Emitter::visit(ASTVariable *node) {
   emit_line_directive(node);
   auto name = emit_symbol(ctx.scope->lookup(node->name));
 
-  // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get global static initializers.
-  // We have to somehow tell the dependency emitter to forward declare it as extern at the correct moment.
-  const bool is_global_variable = !node->is_local;/*  || node->is_static; */
+  // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get
+  // global static initializers. We have to somehow tell the dependency emitter to forward declare it as extern at the
+  // correct moment.
+  const bool is_global_variable = !node->is_local; /*  || node->is_static; */
 
   // if (node->is_static) {
   //   node->type->accept(dep_emitter);
@@ -891,22 +900,6 @@ void Emitter::visit(ASTVariable *node) {
   }
   if (node->is_constexpr) {
     code << " "; // ! TEMPORARILY DISABLED, FOR GLOBAL INITIALIZATION. NEED TO FIGURE OUT A BETTER SOLUTION.
-  }
-
-  // Emit switch / if expressions.
-  if (!is_global_variable && node->value &&
-      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
-    auto old = std::move(cf_expr_return_register);
-    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
-    auto type = node->resolved_type;
-    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
-    cf_expr_return_register = &str;
-
-    code << indent() << type_to_string(type) << " " << str << ";\n";
-    node->value.get()->accept(this);
-    emit_line_directive(node);
-    code << indent() << type_to_string(node->type->resolved_type) << " " << name << " = " << str << ";\n";
-    return;
   }
 
   // This will work fine if global
@@ -1845,33 +1838,6 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 }
 
 void Emitter::visit(ASTReturn *node) {
-  // Emit switch / if expressions.
-  if (node->expression && (node->expression.get()->get_node_type() == AST_NODE_SWITCH ||
-                           node->expression.get()->get_node_type() == AST_NODE_IF)) {
-    auto old = std::move(cf_expr_return_register);
-    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
-    auto type = node->resolved_type;
-    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
-    cf_expr_return_register = &str;
-
-    emit_line_directive(node);
-    code << indent() << type_to_string(type) << " " << str << ";\n";
-    node->expression.get()->accept(this);
-
-    if (emitting_function_with_defer ||
-        (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-      emit_line_directive(node);
-      code << indent() << type_to_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
-      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-      emit_line_directive(node);
-      code << indent() << "return " << defer_return_value_key << ";\n";
-    } else {
-      emit_line_directive(node);
-      code << indent() << "return " << str << ";\n";
-    }
-    return;
-  }
-
   if (emitting_function_with_defer ||
       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
@@ -2140,8 +2106,9 @@ void Emitter::visit(ASTMethodCall *node) {
     if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
       auto base_node_ty = node->callee->base->get_node_type();
 
-      // TODO: It would be preferable to use a compound literal here, but we'd have to get all the fields from structs so I don't think we can.
-      // I don't know what kind of memory implications this might have, it may be messed up idk.
+      // TODO: It would be preferable to use a compound literal here, but we'd have to get all the fields from structs
+      // so I don't think we can. I don't know what kind of memory implications this might have, it may be messed up
+      // idk.
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
         code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
         node->callee->base->accept(this);
@@ -2474,16 +2441,27 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
 
 void Emitter::visit(ASTSwitch *node) {
   auto type = node->target->resolved_type;
-  bool use_eq_operator = true;
+  bool use_default_eq_operator = true;
 
   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer()) {
-    use_eq_operator = false;
+    use_default_eq_operator = false;
+  }
+
+  code << "({";
+
+  // This is static to help with the lifetime issues taking an `address of` here would cause.
+  static std::string the_register;
+  if (!node->is_statement) {
+    the_register = "register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &the_register;
+    code << type_to_string(node->return_type) << " " << the_register;
+    semicolon();
   }
 
   static size_t index = 0;
   auto target_unique_id = "$switch_target$" + std::to_string(index++);
 
-  code << indent() << "auto " << target_unique_id << " = ";
+  code << indent() << type_to_string(node->target->resolved_type) << " " << target_unique_id << " = ";
   node->target->accept(this);
 
   semicolon();
@@ -2506,7 +2484,7 @@ void Emitter::visit(ASTSwitch *node) {
     }
 
     code << indent() << "if (";
-    if (use_eq_operator) {
+    if (use_default_eq_operator) {
       code << target_unique_id;
       code << " == ";
       _case.expression->accept(this);
@@ -2528,6 +2506,14 @@ void Emitter::visit(ASTSwitch *node) {
     node->default_case.get()->accept(this);
     code << "}\n";
   }
+
+  if (!node->is_statement) {
+    cf_expr_return_register = nullptr;
+    code << the_register;
+    semicolon();
+  }
+
+  code << "})";
 }
 
 void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {

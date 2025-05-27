@@ -885,6 +885,9 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::If: {
+      return parse_if();
+    }
     case TType::Dyn_Of: {
       expect(TType::Dyn_Of);
       NODE_ALLOC(ASTDyn_Of, dyn_of, range, _, this)
@@ -1195,6 +1198,45 @@ ASTType *Parser::parse_type() {
   append_type_extensions(node);
 
   end_node(node, range);
+  return node;
+}
+
+// TODO: we should handle the 'then' statement more gracefully.
+// Also, => is super fricken janky, and is really poorly implemented.
+ASTIf *Parser::parse_if() {
+  NODE_ALLOC(ASTIf, node, range, _, this)
+  node->is_expression = true;
+  eat();
+  node->condition = parse_expr();
+
+  if (peek().type == TType::Then) {
+    NODE_ALLOC(ASTBlock, block, _range, defer, this);
+    eat();
+    node->block = block;
+    ctx.set_scope();
+    auto statement = parse_statement();
+    node->block->statements = {statement};
+    if (statement->get_node_type() == AST_NODE_VARIABLE) {
+      throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
+    }
+    node->block->scope = ctx.exit_scope();
+  } else {
+    node->block = parse_block();
+  }
+
+  if (peek().type == TType::Else) {
+    NODE_ALLOC(ASTElse, node_else, range, _, this)
+    eat();
+    if (peek().type == TType::If) {
+      auto inner_if = parse_if();
+      inner_if->is_expression=false;
+      node_else->_if = inner_if;
+    } else {
+      node_else->block = parse_block();
+    }
+    node->_else = node_else;
+  }
+
   return node;
 }
 
@@ -1551,42 +1593,12 @@ ASTStatement *Parser::parse_statement() {
       return node;
     }
 
-    // TODO: we should handle the 'then' statement more gracefully.
-    // Also, => is super fricken janky, and is really poorly implemented.
     if (tok.type == TType::If) {
-      NODE_ALLOC(ASTIf, node, range, _, this)
-      eat();
-      node->condition = parse_expr();
-
-      if (peek().type == TType::Then) {
-        NODE_ALLOC(ASTBlock, block, _range, defer, this);
-        eat();
-        node->block = block;
-        ctx.set_scope();
-        auto statement = parse_statement();
-        node->block->statements = {statement};
-        if (statement->get_node_type() == AST_NODE_VARIABLE) {
-          throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
-        }
-        node->block->scope = ctx.exit_scope();
-      } else {
-        node->block = parse_block();
-      }
-
-      if (peek().type == TType::Else) {
-        NODE_ALLOC(ASTElse, node_else, range, _, this)
-        eat();
-        if (peek().type == TType::If) {
-          auto inner_if = parse_statement();
-          assert(inner_if->get_node_type() == AST_NODE_IF);
-          node_else->_if = static_cast<ASTIf *>(inner_if);
-        } else {
-          node_else->block = parse_block();
-        }
-        node->_else = node_else;
-      }
-      end_node(node, range);
-      return node;
+      NODE_ALLOC(ASTExprStatement, expr_statement, defer, range1, this);
+      auto the_if = parse_if();
+      the_if->is_expression = false;
+      expr_statement->expression = the_if;
+      return expr_statement;
     }
   }
 
@@ -2157,7 +2169,7 @@ ASTWhereStatement *Parser::parse_where_statement() {
   const auto parse_clause = [&]() -> ASTWhere * {
     NODE_ALLOC(ASTWhere, node, range, _, this);
     std::vector<Constraint> &constraints = node->constraints;
-    
+
     const auto parse_constraint = [&] -> Constraint {
       ASTExpr *expression = parse_expr();
       expect(TType::Colon);
@@ -2171,7 +2183,7 @@ ASTWhereStatement *Parser::parse_where_statement() {
         condition = (ASTExpr *)binexpr;
       }
 
-      return Constraint { expression, condition };
+      return Constraint{expression, condition};
     };
 
     constraints.push_back(parse_constraint());

@@ -1630,6 +1630,7 @@ void Typer::visit(ASTIf *node) {
 
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
+  
 
   if (node->_else.is_not_null()) {
     auto _else = node->_else.get();
@@ -1639,8 +1640,13 @@ void Typer::visit(ASTIf *node) {
   } else {
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
-
+  
   node->control_flow = control_flow;
+  node->resolved_type = control_flow.type;
+
+  if ((node->resolved_type == nullptr || node->resolved_type == void_type()) && node->is_expression) {
+    throw_error("'if' expressions must return a value that's non-void", node->condition->source_range);
+  }
 }
 
 void Typer::visit(ASTElse *node) {
@@ -1812,11 +1818,6 @@ void Typer::visit(ASTArguments *node) {
   }
   for (size_t i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
-    if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
-      throw_error(
-          "cannot use 'switch' or 'if' expressions in binary expressions, only `=`, `:=` and `return` statements",
-          node->source_range);
-    }
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -1832,10 +1833,22 @@ void Typer::visit(ASTArguments *node) {
 
 void Typer::visit(ASTExprStatement *node) {
   node->expression->accept(this);
-  if (auto _switch = dynamic_cast<ASTSwitch *>(node->expression)) {
-    node->control_flow = _switch->control_flow;
-    node->resolved_type = _switch->resolved_type;
-    node->resolved_type = _switch->resolved_type;
+  switch (node->expression->get_node_type()) {
+    case AST_NODE_SWITCH: {
+      auto _switch = static_cast<ASTSwitch*>(node->expression);
+      node->control_flow = _switch->control_flow;
+      node->resolved_type = _switch->resolved_type;
+      node->resolved_type = _switch->resolved_type;
+      break;
+    }
+    case AST_NODE_IF: {
+      auto _if = static_cast<ASTIf*>(node->expression);
+      node->control_flow = _if->control_flow;
+      node->resolved_type = _if->resolved_type;
+      node->resolved_type = _if->resolved_type;
+      break;
+    }
+    default: break;
   }
 }
 
@@ -1937,11 +1950,6 @@ void Typer::visit(ASTBinExpr *node) {
 
   if (node->op == TType::Assign) {
     expected_type = left;
-  } else if (node->left->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_SWITCH ||
-             node->right->get_node_type() == AST_NODE_IF || node->left->get_node_type() == AST_NODE_IF) {
-    throw_error("cannot use 'switch' or 'if' expressions in function arguments, they're only valid in `=`, `:=` and "
-                "`return` statements",
-                node->source_range);
   }
 
   node->right->accept(this);
@@ -2063,12 +2071,6 @@ void Typer::visit(ASTBinExpr *node) {
 }
 
 void Typer::visit(ASTUnaryExpr *node) {
-  if (node->operand->get_node_type() == AST_NODE_SWITCH || node->operand->get_node_type() == AST_NODE_IF) {
-    throw_error("cannot use 'switch' or 'if' expressions in unary expressions. they're only valid in `=`, `:=` and "
-                "`return` statements",
-                node->source_range);
-  }
-
   node->operand->accept(this);
   auto operand_ty = node->operand->resolved_type;
 

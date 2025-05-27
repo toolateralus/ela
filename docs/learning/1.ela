@@ -14,8 +14,11 @@ import fmt::*;
 
 fn main() {
   // Instead of varargs, format takes a tuple, which is effectively an anonymous struct.
-  // String is a heap allocated string, that must be freed. hence, the deferred 'deinit' call. 
-  string: String = qformat("%%%", ("Hello","World","!"));
+  // String is a heap allocated string, that must be freed. hence, the deferred 'deinit' call.
+
+  // qformat is the same as format except it doesnt take a FormatOpions arg. it's deprecated since
+  // default arguments were implemented recently.
+  string: String = qformat("% %%", ("Hello","World","!"));
 
   // the defer statement will execute at the closing bracket '}' of wherever it's used.
   // it can be any statement, including a block.
@@ -43,7 +46,9 @@ fn main() {
   // iter_mut will always return a *mut T (mutable pointer to the element type of the Iterator).
   // we can safely modify the value of these pointers while traversing.
 
-  // This will not work in this example, because the variable 'string' is not marked as mutable, and obtaining
+  // ! for ch in string.iter_mut() { *ch = 0; }
+
+  // This (above) will not work in this example, because the variable 'string' is not marked as mutable, and obtaining
   // a mutable iterator to its data would violate this, since 'iter_mut()'s first argument is *mut self.
 
   // Instead we can clone it, which is a deep copy (assignment is a shallow copy, just like C)
@@ -57,5 +62,95 @@ fn main() {
   }
 
 
+  // If we wanted to create a custom iterator, we just need a type that implements `trait Iterator`.
+  struct CustomIter {
+    count: s32,
+  }
+
+  impl Iterator!<s32> for CustomIter {
+    // Iterator returns an option, `None` indicating that the sequence is complete.
+    fn next(*mut self) -> Option!<s32> {
+      if self.count < 100 {
+        return Some(self.count++);
+      }
+      return None();
+    }
+  }
+
+  // Then, we can freely iterate on this with for loops or in whatever capacity we'd like
+  iter: CustomIter;
+  mut sum := 0;
+  for value in iter {
+    sum += value;
+  }
+
+  // * A note about the fmt library:
+  /* 
+    the data arguments for the formatting function (printlnf in this case, but format() and fmt::printf() too), 
+    as shown below, often take a tuple (even if a single value).
+    The alternative is that the single argument implements Format. then, the type doesn't need to be encased in a tuple.
+
+    The format library can print any type, without a Format implementation. 
+    However, it does this with runtime reflection, which is slower than a hardcoded impl, 
+    and customization is limited. So, implementing Format can be desirable in many cases.
+  */
+  printlnf("sum of 0..99 iter: %", (sum,));
+
+
+  /* 
+    Other basic control flow 
+  
+  */
+
+  /* 
+    different ways to write 'if' statements.
+
+    Note: there is pattern matching that will be covered later.
+  */
+  if true {
+    println("if true ;; expected");
+  }
+
+  // shorthand block.
+  if true then println("if true then ;; expected");
+  
+  if false {
+    panic("unexpected");
+  } else if false {
+    panic("unexpected");
+  } else {
+    println("if false, else if false, else ;; expected");
+  }
+
+
+  /* 
+    Switch statements:
+
+    Any type that implements Eq 
+      (or a self == operator "fn eq(self, other: #self) -> bool")
+    can be used in a switch,
+
+    you do not need to break from switch cases.
+    We currently don't support falling through cases.
+  */
+  switch "Asdf" {
+    "Asd": { panic("wrong"); }
+    "As":  { panic("wrong"); }
+    "Asdf": { println("switch \"Asdf\" ;; expected"); }
+  }
+
+  /* Switch statements (and soon to be if's) can be used as an expression. */
+  x := switch "Asdf" {
+    "Asd": { return "Xaryu"; }
+    "As" => "Xarbar", // => is shorthand for a block returning an expression
+    "Asdf" => "expected",
+  };
+
+  assert_eq("switch expression failed", x, "expected");
+
+  // while loops are self explanatory.
+  while true {
+    
+  }
 
 }

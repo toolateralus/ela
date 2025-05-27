@@ -624,7 +624,8 @@ struct ASTFor : ASTStatement {
 };
 
 struct ASTElse;
-struct ASTIf : ASTStatement {
+struct ASTIf : ASTExpr {
+  bool is_expression = false;
   ASTExpr *condition;
   ASTBlock *block;
   Nullable<ASTElse> _else; // just an else.
@@ -1031,6 +1032,7 @@ static inline Precedence get_operator_precedence(Token token);
 struct Typer;
 
 struct Parser {
+  ASTIf *parse_if();
   ASTProgram *parse_program();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();

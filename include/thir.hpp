@@ -266,8 +266,7 @@ struct THIRVisitor {
         return visit_break(static_cast<ASTBreak *>(statement));
       case AST_NODE_FOR:
         return visit_for(static_cast<ASTFor *>(statement));
-      case AST_NODE_IF:
-        return visit_if(static_cast<ASTIf *>(statement));
+
       case AST_NODE_ELSE:
         return visit_else(static_cast<ASTElse *>(statement));
       case AST_NODE_WHILE:
@@ -293,6 +292,8 @@ struct THIRVisitor {
 
   THIR *visit_expr(ASTExpr *expr) {
     switch (expr->get_node_type()) {
+      case AST_NODE_IF:
+        return visit_if(static_cast<ASTIf *>(expr));
       case AST_NODE_LAMBDA:
         return visit_lambda(static_cast<ASTLambda *>(expr));
       case AST_NODE_BIN_EXPR:
