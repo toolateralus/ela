@@ -2,6 +2,10 @@
 
 Mainly focusing on big big ideas here. as an over-arching idea; The entire compiler can benefit endlessly from being rewritten, all over the place. redundancies, inefficiencies, just straight up bad/hacky systems. seperation of concerns. It's pretty sloppy!
 
+To search for all info comments in the source just use vscodes regex search with
+`TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
+
+
 #### THIR
   - We should definitely have a fully resolved, desugared THIR (Typed High Level Intermediate Representation) instead of just emitting AST.
   It will make the emitter simpler, and it will make it more reliable. It will also allow us to do an MIR in the future, for even more control. It will also decouple our emitters from our AST, while still being source code dependent, it would be less of a system-shock 
@@ -46,9 +50,6 @@ Mainly focusing on big big ideas here. as an over-arching idea; The entire compi
 #### Improved alias system
   - Aliasing should work for functions and symbols, not just types. Would be nice to have something like Rust's `use` or C++'s `using`, so you can alias almost anything, and in various capacities.
 
-#### Variadic generics and value generics
-  - Supporting variadic generics (like `fn!<T...>`) and value generics (like `struct!<T, N: u32>`) would make abstractions way more expressive and reusable.
-
 #### Better error reporting and diagnostics
   - Error reporting is always a pain point, especially with iterative or out-of-order compilation. We need to make it easier for users to understand and fix type errors and dependency cycles, without writing a million visitors.
 
@@ -75,3 +76,111 @@ Mainly focusing on big big ideas here. as an over-arching idea; The entire compi
 
 #### Documentation and examples
   - Docs and examples are always lagging behind. Need to keep them up to date and practical, so users can actually learn and contribute.
+
+
+#### add variadic generics and value generics.
+```rust
+  format :: fn!<T...>(fmt: str, pack: ...T) -> String {
+    builder: std::String_Builder;
+    builder.set_allocator(std::mem::temp_allocator.{});
+    defer builder.deinit();
+    #for (t, v) in pack {
+      builder.rtti_append(typeof(t), v);
+    }
+    return builder.string();
+  }
+```
+
+```rust
+Fixed_Array :: struct!<T, N: u32> {
+  data: T[N],
+  length: N
+}
+```
+
+```rust
+index :: fn!<T, SIZE: u32, N: u32>(array: T[SIZE]) -> T {
+  return array[N];
+}
+```
+
+#### improve aliases. make it so we can alias functions and bascially any symbol (besides variables and arguments)
+
+```rust
+module main;
+import { println } in std::format;
+
+alias!<_Ok, _Err> Ok  :: Result!<_Ok, _Err>::Ok;
+alias!<_Ok, _Err> Err :: Result!<_Ok, _Err>::Err;
+
+main :: fn() @entry {
+  x : Result!<s32, None> = Ok(100);
+}
+```
+
+
+
+#### Method trait bounds (Reimplementing 'impl')
+
+Right now, if I did:
+
+```rust
+impl!<T> List!<T> {
+  fn idk!<T>() where T: u32 { ... }
+}
+```
+
+This would ***never*** compile, because any `T` that isn't `u32` would trigger an error, and our standard library alone will break this assumption 10 times over.
+
+Instead, we need to look at _`T`_ in that **trait bounds**, and if the condition fails, we _exclude_ that function from being added to 
+the types symbol table. However, if and when that function gets called by the user, we need to _then_ throw the error for the trait bounds
+not being satisified.
+
+This raises a need to rewrite how methods are even added to types, we need them to be available for lookup by the compiler, yet we need to be able to defer errors to usage in certain cases, or consider them off limits.
+
+> See the next section for another reason we might want to do something like this, storing methods outside of the symbol table entirely in the c++ `Type *`.
+
+This is a very important part of having generics that are truly extremely flexible, right now everything is very rigid, and hard to use 
+when doing very very generalized generics, such as a `List!<T>`
+
+Another plain example, is somethning like `fn contains()`, for any container:
+
+```rust
+struct List!<T> { ... }
+
+impl!<T> List!<T> {
+  fn contains(self, value: T) where T: Eq {
+    for item in self {
+      if item == value {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+```
+
+The above example is very simple and performant, yet we are completely unable to do this, because we have to assume that **every single type that is used in a list** would _have an equality operator implemented_ which is completely unreasonable.
+
+
+#### Extremely arbitrary and imprecise impl's.
+
+We are currently unable to do something like this:
+
+```rust
+  // marker trait.
+  impl!<T> IsPointer for *mut T {}
+
+  // trait on everything.
+  impl!<T> T {
+    fn my_method_on_every_type_in_the_world(self) {
+
+    }
+  }
+```
+
+As mentioned in the above section, this would be made easier if methods weren't just jammed into the type's symbol table, and if it were more so a pool of available methods.
+
+This still wouldn't be trivial; I am not entirely sure how this would even work. We could run cleanup every time the compiler hit a block like this, retroactively do all the `impl`s, and then moving forward every type would get them?
+
+There's certainly a better way, we can look into how rust even accomplishes such insanely fluid and generic behaviour.

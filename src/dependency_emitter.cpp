@@ -122,8 +122,7 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, Type *id)
   for (auto &[name, symbol] : scope->symbols) {
     if (symbol.is_function() && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
-    }
-    if (type_is_valid(symbol.resolved_type)) {
+    } else if (type_is_valid(symbol.resolved_type)) {
       emit_dependencies_for_reflection(dep_resolver, symbol.resolved_type);
     }
   }
@@ -199,7 +198,7 @@ void DependencyEmitter::visit(ASTProgram *node) {
   emit_symbol("Type");
   emit_symbol("Field");
   emit_symbol("Method");
-  
+
   emit_symbol("calloc");
   emit_symbol("malloc");
   emit_symbol("free");
@@ -317,7 +316,7 @@ void DependencyEmitter::visit(ASTPath *node) {
   }
 
   if (type && type->kind == TYPE_CHOICE) {
-    return; // Do we need to do anything here?
+    return;  // Do we need to do anything here?
   }
 
   Scope *scope = ctx.scope;
@@ -328,7 +327,6 @@ void DependencyEmitter::visit(ASTPath *node) {
       throw_error(std::format("symbol {} not found in scope", ident.get_str()), node->source_range);
     }
     scope = nullptr;
-
 
     ASTDeclaration *instantiation = nullptr;
     if (!seg.generic_arguments.empty()) {
@@ -455,8 +453,7 @@ void DependencyEmitter::visit(ASTDotExpr *node) {
 }
 
 void DependencyEmitter::visit(ASTInitializerList *node) {
-  if (node->target_type)
-    node->target_type.get()->accept(this);
+  if (node->target_type) node->target_type.get()->accept(this);
   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
     for (const auto &value : node->values) {
       value->accept(this);
@@ -595,7 +592,9 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   for (auto [name, _] : node->resolved_type->info->as<DynTypeInfo>()->methods) {
     auto sym = element_scope->local_lookup(name);
     if (!sym) {
-      throw_error(std::format("Internal compiler error: couldn't find method {} in dynof({})", name, element_type->to_string()), node->source_range);
+      throw_error(
+          std::format("Internal compiler error: couldn't find method {} in dynof({})", name, element_type->to_string()),
+          node->source_range);
     }
     if (!sym->is_function() || sym->is_generic_function()) {
       printf("%d\n", sym->flags);
@@ -636,8 +635,7 @@ void DependencyEmitter::visit(ASTWhereStatement *node) {
     node->block->accept(this);
     return;
   }
-  if (node->branch.is_null())
-    return;
+  if (node->branch.is_null()) return;
 
   auto branch = node->branch.get();
   if (branch->where_stmt.is_not_null()) {
