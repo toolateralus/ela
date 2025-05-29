@@ -12,6 +12,7 @@
 #include "scope.hpp"
 #include "thir.hpp"
 #include "type.hpp"
+#include "visitor.hpp"
 
 /*
   #########################

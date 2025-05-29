@@ -35,10 +35,26 @@ struct CompilationMetric {
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   std::chrono::duration<double> duration;
   void begin() { start_time = std::chrono::high_resolution_clock::now(); }
-  void end(const std::string &note) {
-    id = note;
+  void end() {
     end_time = std::chrono::high_resolution_clock::now();
     duration = end_time - start_time;
+  }
+
+  template <class T>
+  T run(const std::string &note, std::function<T()> fn) {
+    id = std::move(note);
+    begin();
+    auto result = fn();
+    end();
+    return result;
+  }
+
+  template <>
+  void run(const std::string &note, std::function<void()> fn) {
+    id = std::move(note);
+    begin();
+    fn();
+    end();
   }
 
   std::string get_time() {
@@ -56,8 +72,6 @@ struct CompilationMetric {
 };
 
 struct CompileCommand {
-  
-
   CompilationMetric parse;
   CompilationMetric lower;
   CompilationMetric cpp;
@@ -73,24 +87,20 @@ struct CompileCommand {
   int compile();
   void print_command() const;
   void add_c_flag(const std::string &flags);
-  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests, bool &lldb);
+  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished,
+                 bool &run_tests, bool &lldb);
   bool has_flag(const std::string &flag) const;
 
   void print_metrics() {
-    if (has_flag("metrics")) {
-      std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
-      std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
-      std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
-    }
+    std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
+    std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
+    std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
   }
 };
 
 extern CompileCommand compile_command;
 
-
-static inline std::string get_source_filename(const SourceRange &range) {
-  return SourceRange::files()[range.file];
-}
+static inline std::string get_source_filename(const SourceRange &range) { return SourceRange::files()[range.file]; }
 
 struct Defer {
   const std::function<void()> func;
@@ -115,9 +125,8 @@ struct std::formatter<std::vector<T>> {
   }
 };
 
-
 template <class T>
-requires(std::is_enum_v<T>)
+  requires(std::is_enum_v<T>)
 struct Flags {
   using underlying = std::underlying_type_t<T>;
   Flags() = default;
@@ -132,12 +141,8 @@ struct Flags {
     value &= static_cast<underlying>(other);
     return *this;
   }
-  inline Flags operator|(T other) const {
-    return Flags(value | static_cast<underlying>(other));
-  }
-  inline Flags operator&(T other) const {
-    return Flags(value & static_cast<underlying>(other));
-  }
+  inline Flags operator|(T other) const { return Flags(value | static_cast<underlying>(other)); }
+  inline Flags operator&(T other) const { return Flags(value & static_cast<underlying>(other)); }
 
   inline Flags &operator|=(underlying other) {
     value |= other;
@@ -147,18 +152,11 @@ struct Flags {
     value &= other;
     return *this;
   }
-  inline Flags operator|(underlying other) const {
-    return Flags(value | other);
-  }
-  inline Flags operator&(underlying other) const {
-    return Flags(value & other);
-  }
-  inline explicit operator bool() const {
-    return value != 0;
-  }
+  inline Flags operator|(underlying other) const { return Flags(value | other); }
+  inline Flags operator&(underlying other) const { return Flags(value & other); }
+  inline explicit operator bool() const { return value != 0; }
   underlying value{};
 };
-
 
 #define HAS_FLAG(var, flag) ((var & flag) != 0)
 #define DOESNT_HAVE_FLAG(var, flag) ((var & flag) == 0)

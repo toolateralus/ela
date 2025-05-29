@@ -567,43 +567,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     if (decl_node && decl_node->where_clause) {
       ctx.set_scope(decl_node->scope);
       decl_node->where_clause.get()->accept(this);
-
-      /*
-        @Cooper-Pilot
-        TODO:
-        FEATURE:
-        * when we use a where clause and have a trait bounds on a trait declaration,
-
-        such as:
-        trait X where #self: Y {
-
-        }
-
-        * X should have access to Y's methods when used in a trait object (dyn X)
-
-        such as:
-        {
-          mut x: TypeThatImplementsX;
-          trait_obj := dynof(x, X);
-          trait_obj.method_from_y();
-        }
-
-        * Right now this isn't possible. This kind of 'forwarding' is especially useful for trait objects that
-        * need to call deinit() or other common methods.
-
-        * if you tried to do a default like
-
-        trait X where #self Deinit {
-          fn deinit(*mut self) {
-            self.deinit();
-          }
-        }
-
-        * You get a redefinition error.
-
-        Right now, you're limited to doing some hack to get a function pointer to the deinit then calling it,
-        and I don't even know if that's possible.
-      */
       ctx.set_scope(node->scope);
     }
   }
@@ -672,7 +635,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto declaring_node = trait_ty->declaring_node.get();
 
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_TRAIT_DECLARATION) {
-      throw_error(std::format("\'impl <trait> for <type>\' must implement an trait. got {}", trait_ty->to_string()),
+      throw_error(std::format("\'impl <trait> for <type>\' must implement a trait. got {}", trait_ty->to_string()),
                   node->source_range);
     }
 
@@ -923,11 +886,11 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   }
 
   /*
-    We use some strange semantics for deinit.
+    We use some strange semantics for destroy.
     It is technically a mutating function, but simply declaring a string that you later want
     to destroy would require mut EVERYWHERE.
 
-    So, we compromise, and allow constant variables and pointers to be passed to deinit calls,
+    So, we compromise, and allow constant variables and pointers to be passed to destroy calls,
     just for QOL.
   */
   if (self_nullable.is_not_null() && !is_deinit_call) {
@@ -1771,7 +1734,7 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    type_check_args_from_params(node->arguments, func_decl->params, func_decl, nullptr, func_decl->name == "deinit");
+    type_check_args_from_params(node->arguments, func_decl->params, func_decl, nullptr, func_decl->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -3082,7 +3045,7 @@ void Typer::visit(ASTMethodCall *node) {
       throw_error("Calling static methods with instance not allowed", node->source_range);
     }
     type_check_args_from_params(node->arguments, func_decl->params, func_decl, node->callee->base,
-                                func_sym->name == "deinit");
+                                func_sym->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
   }

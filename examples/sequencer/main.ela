@@ -240,7 +240,7 @@ fn main() {
   bg_color.b -= 175;
 
   mut dir := Directory::open(".").unwrap();
-  defer dir.deinit();
+  defer dir.destroy();
 
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer"c);
@@ -258,7 +258,7 @@ fn main() {
     }
     return false;
   });
-  files.deinit();
+  files.destroy();
 
   reset_label := String::from("reset (no undo)");
   remove_label := String::from("remove channel");
@@ -281,7 +281,7 @@ fn main() {
         subdiv := note % subdivisions + 1;
         mut text := format("%.%", (beat, subdiv), FormatOptions::default());
         DrawText(text.data, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
-        text.deinit();
+        text.destroy();
       }
 
       if playing {

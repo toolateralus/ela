@@ -6,7 +6,7 @@ struct Widget!<Label> {
 
 impl!<Label> Widget!<Label> {
   fn printme(*mut self) {
-    where self.label.unwrap(): Deinit {
+    where self.label.unwrap(): Destroy {
       if self.label is Option!<Label>::Some(vb) {
         fmt::println(self.label.unwrap());
       }

@@ -14,7 +14,7 @@ import fmt::*;
 
 fn main() {
   // Instead of varargs, format takes a tuple, which is effectively an anonymous struct.
-  // String is a heap allocated string, that must be freed. hence, the deferred 'deinit' call.
+  // String is a heap allocated string, that must be freed. hence, the deferred 'destroy' call.
 
   // qformat is the same as format except it doesnt take a FormatOpions arg. it's deprecated since
   // default arguments were implemented recently.
@@ -22,7 +22,7 @@ fn main() {
 
   // the defer statement will execute at the closing bracket '}' of wherever it's used.
   // it can be any statement, including a block.
-  defer string.deinit();
+  defer string.destroy();
 
   // We can iterate directly over strings, because it implements the trait "Iterable"
   for ch in string {
@@ -54,7 +54,7 @@ fn main() {
   // Instead we can clone it, which is a deep copy (assignment is a shallow copy, just like C)
   // and mutate it this way.
   mut mutable_string := string.clone();
-  defer mutable_string.deinit();
+  defer mutable_string.destroy();
 
   std::printf("mutable_string.iter_mut() loop\n");
   for ch in mutable_string.iter_mut() {
@@ -150,7 +150,7 @@ fn main() {
 
   // while loops are self explanatory.
   while true {
-    
+    continue;
   }
 
 }

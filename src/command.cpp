@@ -16,19 +16,20 @@ int CompileCommand::compile() {
   init_type_system();
   Context context{};
   original_path = std::filesystem::current_path();
-  parse.begin();
-  Parser parser(input_path.string(), context);
-  ASTProgram *root = parser.parse_program();
-  parse.end("parsing done.");
 
-  lower.begin();
-  Typer type_visitor{context};
-  type_visitor.visit(root);
+  auto root = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+    Parser parser(input_path.string(), context);
+    ASTProgram *root = parser.parse_program();
+    return root;
+  });
 
-  {
+  lower.run<void>("typing & lowering to C", [&] {
+    Typer type_visitor{context};
+    type_visitor.visit(root);
+
     Emitter emit(context, type_visitor);
-    DependencyEmitter dependencyEmitter(context, &emit);
-    emit.dep_emitter = &dependencyEmitter;
+    Resolver dep_resolver(context, &emit);
+    emit.dep_emitter = &dep_resolver;
 
     static const auto testing = compile_command.has_flag("test");
     const bool is_freestanding =
@@ -38,9 +39,10 @@ int CompileCommand::compile() {
       emit.code << "#define USE_STD_LIB 1\n";
     } else {
       if (compile_command.has_flag("test")) {
-        throw_error("You cannot use unit tests in a freestanding or nostlib "
-                    "environment due to lack of exception handling",
-                    {});
+        throw_error(
+            "You cannot use unit tests in a freestanding or nostlib "
+            "environment due to lack of exception handling",
+            {});
       }
     }
 
@@ -49,20 +51,11 @@ int CompileCommand::compile() {
       std ::cout << "adding TEST_VERBOSE\n";
     }
 
-    auto type_ptr_id = context.scope->find_type_id("Type", {{{.type = TYPE_EXT_POINTER_CONST, .array_size = 0}}});
-    auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
-    if (!is_freestanding && !has_flag("nostdlib")) {
-      dependencyEmitter.declare_type(type_list);
-      dependencyEmitter.define_type(type_list);
-      emit.code << "typedef struct Type Type;\n";
-      emit.code << std::format("extern {} _type_info;\n", emit.type_to_string(type_list));
-    }
-
     if (testing) {
       emit.code << "#define TESTING\n";
     }
 
-    root->accept(&dependencyEmitter);
+    root->accept(&dep_resolver);
     root->accept(&emit);
 
     std::filesystem::current_path(compile_command.original_path);
@@ -81,7 +74,7 @@ int CompileCommand::compile() {
       output << "typedef struct Type Type;\n";
       output << emit.reflection_externs.str();
     }
-    
+
     output << emit.code.str();
 
     if (uses_reflection) {
@@ -90,42 +83,42 @@ int CompileCommand::compile() {
 
     output.flush();
     output.close();
+  });
+
+  if (has_flag("no-compile")) {
+    return 0;
   }
 
-  lower.end("lowering to cpp complete");
+  std::string extra_flags = c_flags;
+  if (has_flag("release")) {
+    extra_flags += " -O3 ";
+  } else {
+    extra_flags += " -g ";
+  }
 
-  int result = 0;
+  const static std::string ignored_warnings = "-w";
 
-  if (!has_flag("no-compile")) {
-    std::string extra_flags = c_flags;
+  const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-    if (has_flag("release")) {
-      extra_flags += " -O3 ";
-    } else {
-      extra_flags += " -g ";
-    }
+  const auto compilation_string =
+      std::format("clang -std=c23 {} {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
 
-    static std::string ignored_warnings = "-w";
+  if (compile_command.has_flag("x")) {
+    printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
+  }
 
-    std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+  int result = cpp.run<int>("invoking 'clang' compiler on transpiled C code",
+                            [&compilation_string] { return system(compilation_string.c_str()); });
 
-    auto compilation_string =
-        std::format("clang -std=c23 {} {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
-
-    if (compile_command.has_flag("x"))
-      printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
-
-    cpp.begin();
-    result = system(compilation_string.c_str());
-    cpp.end("invoking `clang` C compiler and `lld` linker");
-
-    if (!has_flag("s")) {
-      std::filesystem::remove(output_path);
-    }
+  if (!has_flag("s")) {
+    std::filesystem::remove(output_path);
   }
 
   std::filesystem::current_path(original_path);
-  print_metrics();
+
+  if (has_flag("metrics")) {
+    print_metrics();
+  }
 
   return result;
 }
@@ -177,9 +170,9 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
     } else if (arg.ends_with(".ela") &&
-               input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r
-                                     // main.ela where main.ela is the arg not the file. we should use a rust like --
-                                     // seperator to seperate runtime args from ela compiler args.
+               input_path.empty()) {  // Sometimes this is annoying if you're just passing args to a thing. like ela r
+                                      // main.ela where main.ela is the arg not the file. we should use a rust like --
+                                      // seperator to seperate runtime args from ela compiler args.
       input_path = arg;
     } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;

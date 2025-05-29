@@ -83,7 +83,7 @@ To search for all info comments in the source just use vscodes regex search with
   format :: fn!<T...>(fmt: str, pack: ...T) -> String {
     builder: std::String_Builder;
     builder.set_allocator(std::mem::temp_allocator.{});
-    defer builder.deinit();
+    defer builder.destroy();
     #for (t, v) in pack {
       builder.rtti_append(typeof(t), v);
     }
@@ -184,3 +184,7 @@ As mentioned in the above section, this would be made easier if methods weren't 
 This still wouldn't be trivial; I am not entirely sure how this would even work. We could run cleanup every time the compiler hit a block like this, retroactively do all the `impl`s, and then moving forward every type would get them?
 
 There's certainly a better way, we can look into how rust even accomplishes such insanely fluid and generic behaviour.
+
+#### Vtables instead of dyn objects being an aggregate of function pointers
+`const static vtable_dynof_something` instead of using a struct full of pointer methods.
+Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.

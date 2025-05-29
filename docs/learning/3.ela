@@ -1,0 +1,29 @@
+
+
+fn main() {
+
+  /*
+    Here, we'll cover some basic data types.
+    Structs, Enums, and Unions namely.
+  */
+
+  // Of course a basic struct. No methods, (impl only), just data.
+  struct Vec2 {
+    x: f32, y: f32
+  }
+
+  // A union. research C unions for more info on how this works.
+  union Vector2 {
+    values: f32[2],
+    vec: Vec2,
+  }
+
+  // A basic enum. We don't have to use choice types for basic enums in this language,
+  // this is much less type safe and casts to and from integers implicitly.
+  // This lack of type safety is intentional. Use a choice type with markers for better safety.
+  // This fits C interop perfectly, though.
+  enum Tag {
+    Value,
+    Array,
+  }
+}

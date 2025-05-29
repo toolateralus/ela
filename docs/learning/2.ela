@@ -1,0 +1,154 @@
+import fmt::*;
+
+fn main() {
+  /* 
+    Pattern matching
+
+    To cover pattern matching, we must first confront the first user-defined type definition we've discussed. Structs are mostly
+    self explanatory, but here we have a `choice` type.
+
+    It is a type safe discriminated union, aka tagged union, rust 'enum'.
+    
+    for reference, a choice 'variant' is one of its members, seen as each A, B, and C below.
+
+    variants have 3 different styles they can be:
+  */
+
+  choice Choice {
+    // Bare, with no data. often called a 'Marker' variant, as it just marks the state of the choice type with no associated data.
+    A,
+    // `Tuple` style, where the value of the variant is a tuple. This can have 0, 1, or any arbitrary number of subtypes. 
+    // This is probably the most common variant kind you'll see.
+    B(s32, s32),
+    // Then, we have `Struct` style. pretty self explanatory, similar to the tuple, except we can name fields. cool!
+    C {
+      x: s32, y: s32, z: s32
+    }
+  }
+
+  /*  
+    Instantiating choice types is easy. We basically can act like our variants are subtypes, although there is a strict caveat to that
+    line of thinking; 
+
+    A choice type's variant can never exist as a standalone value, that is, not encapsulated in it's parent 'choice' type.
+
+    so, i couldn't say
+
+    x: Choice::A = ...;
+
+    because it's not truly a distinct type, due to some technical reasons.
+
+    long story short, knowing at runtime how to create the discriminated union 
+    from a subtype or variant, would add additional code and complexity to the compiler.
+    We don't see that as a primary focus right now.
+
+    Anyway, we can still think of them as subtypes, and to instantiate them, we'd treat it just like we would a type in am module. 
+    (with the exception of tuples, they are more akin to a a constructor)
+  */
+
+  // For markers:
+  choice_a: Choice = Choice::A;
+  // For tuples (constructor):
+  choice_b: Choice = Choice::B(10, 10);
+  // And for structs, your typical aggregate initializer list.
+  choice_c: Choice = Choice::C.{x: 10, y: 10, z: 10};
+
+
+  /* 
+    awesome. So, now we have some instances of choice types. But, how do we read from them, mutate them, and identify which variant occupies
+    the parent 'Choice' encapsulating type?
+
+    To do so, we have a pattern matching mechanism, each an extension to the `if`, `while`, and `switch` statements.
+  */
+
+  /* 
+    first, we'll cover the basic if statements. Below, for Choice::A, it's incredibly simple, because it's just a marker.
+
+    A note: even if a variant _isnt_ a marker, we can still pattern match against it as if it was, with no deconstruction.
+    This will make more sense later.
+  */
+  if choice_a is Choice::A {
+    println("choice_a was in fact Choice::A!");
+  } else {
+    println(":(");
+  }
+
+  // And for the B, 
+  if choice_b is Choice::B(a, b) {
+    // Here we have access to `a` and `b`, names we've given to the values in the tuple.
+    // In this case, they are not by any reference, and purely a copied value.
+    printlnf("choice_b(a=%, b=%)", (a, b));
+  }
+
+  // If we wanted to take a reference to the interior values, we'd:
+  if choice_b is Choice::B(&const a, &mut b) {
+    // now, here `a` is a `*const s32` and `b` is a `*mut s32`.
+    // they simply point to the data within the tuple.
+    printlnf("choice_b(&const a=%, &mut b=%)", (a, b));
+  }
+
+  // If we don't want a reference, but need to mutate the destructured values, 
+  if choice_b is Choice::B(mut a, mut b) {
+    // We can declare them as mutable, which arent references but just allow mutation.
+    // By default, of course, they'll be const, or immutable.
+    printlnf("choice_b(mut a=%, mut b=%)", (a, b));
+  }
+
+
+  /* For the third, we'll see a similar pattern, but instead with what looks like an aggregate initializer. */
+  if choice_c is Choice::C.{x: mut x, y: &const xarbar, z: z} {
+    // we renamed y to 'xarbar' just to show, the variables coming out (right hand side of colon)
+    // do not need to match the struct's field names.
+
+    // As we can see, we take `x` as a mutable copy, `y` as a constant pointer to the struct's `y`, 
+    // and `z` by constant copy, or by value.
+
+    // for the sake of not repeating ourselves excessively, these mutability / reference semantics apply to all of the different
+    // control flow constructs that support pattern matching, in this exact way.
+    printlnf("choice_c{mut x=%, &const y(aka xarbar)=%, z=%}", (x, xarbar, z));
+  }
+
+  /* 
+    Now, for while loops 
+    This is just exactly the same as the if, except it only continues looping while the pattern match is true.  
+  */
+
+  // copy choice_c for the demo's sake; we wanna set this to something else to break out of the loop.
+  mut the_loop_choice := choice_c;
+
+  // As we stated before, even though Choice::C has fields, we don't actually need to access them. 
+  // We can just check whether it is that variant or not.
+
+  // of course, we _can_ destructure here, in all of the above listed ways, but we're not going to. For simplicity's sake.
+  while the_loop_choice is Choice::C {
+    println("the_loop_choice was Choice::C!");
+    the_loop_choice = choice_b; // break after first iteration
+  }
+  println("broke out of the while loop because the_loop_choice was no longer Choice::C!");
+
+
+  /* 
+    Switch statements, 
+
+    Switch statements have a unique syntax, opposed to the other two styles.
+    this is born out of not wanting to repeat typing, and it's subject to change because it's a bit awkward.
+
+    'switch is' will start a pattern-matching switch statement/expression
+  */
+
+  // ! This shit is broken right now. see `repro/118.ela`
+  #if 0 {
+    switch is choice_c {
+      Choice::A: {
+        println("in switch: was choice A!");
+      }
+      Choice::B(a, b): {
+        println("in switch: was choice B!");
+      }
+      Choice::C.{x: x, y: y, z: z}: {
+        printlnf("in switch: was choice C! (expected). (x=%, y=%, z=%)", (x, y, z));
+      }
+    }
+  }
+
+}

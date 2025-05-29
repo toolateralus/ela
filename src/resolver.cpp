@@ -6,7 +6,7 @@
 #include "visitor.hpp"
 #include <set>
 
-void DependencyEmitter::declare_type(Type *type) {
+void Resolver::declare_type(Type *type) {
   auto extensions = type->extensions.extensions;
 
   // TODO:
@@ -27,10 +27,11 @@ void DependencyEmitter::declare_type(Type *type) {
   define_type(type);
 }
 
-void DependencyEmitter::define_type(Type *type) {
+void Resolver::define_type(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {
     type = type->base_type;
   }
+  
   switch (type->kind) {
     case TYPE_FUNCTION: {
       auto info = type->info->as<FunctionTypeInfo>();
@@ -86,7 +87,7 @@ void DependencyEmitter::define_type(Type *type) {
   }
 }
 
-void DependencyEmitter::visit(ASTStructDeclaration *node) {
+void Resolver::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -105,7 +106,7 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   }
 }
 
-void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, Type *id) {
+void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id) {
   static std::set<Type *> visited = {};
   if (visited.contains(id)) {
     return;
@@ -128,25 +129,8 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, Type *id)
   }
 }
 
-void DependencyEmitter::visit(ASTProgram *node) {
+void Resolver::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
-
-  if (!compile_command.has_flag("nostdlib")) {
-    // We have to do this here because the reflection system depends on this type and it doesn't
-    // neccesarily get instantiatied.
-    // see the `Emitter:get_type_struct`
-    // and `bootstrap/reflection.ela/Type :: struct`
-
-    auto sub_types = std::vector<Type *>{
-        ctx.scope->find_type_id("str", {}),
-        ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
-    };
-
-    auto tuple_id = global_find_type_id(sub_types, {});
-
-    define_type(tuple_id);
-    declare_type(tuple_id);
-  }
 
   if (auto env_sym = ctx.root_scope->local_lookup("Env")) {
     auto env_scope = env_sym->resolved_type->info->scope;
@@ -177,8 +161,8 @@ void DependencyEmitter::visit(ASTProgram *node) {
     }
   }
 
-  for (auto id : reflected_upon_types) {
-    emit_dependencies_for_reflection(this, id);
+  for (auto type: reflected_upon_types) {
+    emit_dependencies_for_reflection(this, type);
   }
 
   auto emit_symbol = [&](InternedString name) {
@@ -195,19 +179,17 @@ void DependencyEmitter::visit(ASTProgram *node) {
     }
   };
 
-  emit_symbol("Type");
-  emit_symbol("Field");
-  emit_symbol("Method");
-
-  emit_symbol("calloc");
-  emit_symbol("malloc");
-  emit_symbol("free");
-  emit_symbol("_type_info");
+  // We only need to emit these when we reflect.
+  if (reflected_upon_types.size()) {
+    emit_symbol("Type");
+    emit_symbol("Field");
+    emit_symbol("Method");
+  }
 
   ctx.set_scope(ctx.root_scope);
 }
 
-void DependencyEmitter::visit(ASTBlock *node) {
+void Resolver::visit(ASTBlock *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
@@ -217,7 +199,7 @@ void DependencyEmitter::visit(ASTBlock *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
+void Resolver::visit(ASTFunctionDeclaration *node) {
   if (visited_functions.contains(node)) {
     emitter->emit_forward_declaration(node);
     return;
@@ -238,13 +220,13 @@ void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
   node->accept(emitter);
 }
 
-void DependencyEmitter::visit(ASTParamsDecl *node) {
+void Resolver::visit(ASTParamsDecl *node) {
   for (auto param : node->params) {
     param->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTParamDecl *node) {
+void Resolver::visit(ASTParamDecl *node) {
   declare_type(node->resolved_type);
   if (node->tag == ASTParamDecl::Normal && node->normal.default_value) {
     /*
@@ -254,16 +236,16 @@ void DependencyEmitter::visit(ASTParamDecl *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTVariable *node) {
+void Resolver::visit(ASTVariable *node) {
   node->type->accept(this);
   if (node->value) {
     node->value.get()->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTExprStatement *node) { node->expression->accept(this); }
+void Resolver::visit(ASTExprStatement *node) { node->expression->accept(this); }
 
-void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
+void Resolver::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
   auto call = ASTMethodCall{};
   auto dot = ASTDotExpr{};
   dot.base = base;
@@ -277,7 +259,7 @@ void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string
   call.accept(this);
 }
 
-void DependencyEmitter::visit(ASTBinExpr *node) {
+void Resolver::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->left, get_operator_overload_name(node->op, OPERATION_BINARY), node->right);
   } else {
@@ -286,7 +268,7 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTUnaryExpr *node) {
+void Resolver::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->operand, get_operator_overload_name(node->op, OPERATION_UNARY), nullptr);
   } else {
@@ -297,7 +279,7 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTIndex *node) {
+void Resolver::visit(ASTIndex *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->base, get_operator_overload_name(TType::LBrace, OPERATION_INDEX), node->index);
   } else {
@@ -308,7 +290,7 @@ void DependencyEmitter::visit(ASTIndex *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPath *node) {
+void Resolver::visit(ASTPath *node) {
   auto type = node->resolved_type;
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
@@ -369,37 +351,37 @@ void DependencyEmitter::visit(ASTPath *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTLiteral *) {}
+void Resolver::visit(ASTLiteral *) {}
 
-void DependencyEmitter::visit(ASTType *node) { define_type(node->resolved_type); }
+void Resolver::visit(ASTType *node) { define_type(node->resolved_type); }
 
-void DependencyEmitter::visit(ASTType_Of *node) {
+void Resolver::visit(ASTType_Of *node) {
   node->target->accept(this);
   reflected_upon_types.insert(node->target->resolved_type);
 }
 
-void DependencyEmitter::visit(ASTCall *node) {
+void Resolver::visit(ASTCall *node) {
   node->arguments->accept(this);
   node->callee->accept(this);
 }
 
-void DependencyEmitter::visit(ASTArguments *node) {
+void Resolver::visit(ASTArguments *node) {
   for (auto arg : node->arguments) {
     arg->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTReturn *node) {
+void Resolver::visit(ASTReturn *node) {
   if (node->expression.is_not_null()) {
     node->expression.get()->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTContinue *) {}
+void Resolver::visit(ASTContinue *) {}
 
-void DependencyEmitter::visit(ASTBreak *) {}
+void Resolver::visit(ASTBreak *) {}
 
-void DependencyEmitter::visit(ASTFor *node) {
+void Resolver::visit(ASTFor *node) {
   define_type(node->iterator_type);
   define_type(node->iterable_type);
   define_type(node->identifier_type);
@@ -423,7 +405,7 @@ void DependencyEmitter::visit(ASTFor *node) {
   node->block->accept(this);
 }
 
-void DependencyEmitter::visit(ASTIf *node) {
+void Resolver::visit(ASTIf *node) {
   node->condition->accept(this);
   node->block->accept(this);
   if (node->_else.is_not_null()) {
@@ -431,7 +413,7 @@ void DependencyEmitter::visit(ASTIf *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTElse *node) {
+void Resolver::visit(ASTElse *node) {
   if (node->_if) {
     node->_if.get()->accept(this);
   }
@@ -440,19 +422,19 @@ void DependencyEmitter::visit(ASTElse *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTWhile *node) {
+void Resolver::visit(ASTWhile *node) {
   if (node->condition) {
     node->condition.get()->accept(this);
   }
   node->block->accept(this);
 }
 
-void DependencyEmitter::visit(ASTDotExpr *node) {
+void Resolver::visit(ASTDotExpr *node) {
   define_type(node->base->resolved_type);
   node->base->accept(this);
 }
 
-void DependencyEmitter::visit(ASTInitializerList *node) {
+void Resolver::visit(ASTInitializerList *node) {
   if (node->target_type) node->target_type.get()->accept(this);
   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
     for (const auto &value : node->values) {
@@ -463,20 +445,21 @@ void DependencyEmitter::visit(ASTInitializerList *node) {
       value->accept(this);
     }
   }
+  declare_type(node->resolved_type);
 }
 
-void DependencyEmitter::visit(ASTEnumDeclaration *node) {
+void Resolver::visit(ASTEnumDeclaration *node) {
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTRange *node) {
+void Resolver::visit(ASTRange *node) {
   node->left->accept(this);
   node->right->accept(this);
 }
 
-void DependencyEmitter::visit(ASTSwitch *node) {
+void Resolver::visit(ASTSwitch *node) {
   node->target->accept(this);
 
   auto type = node->target->resolved_type;
@@ -496,24 +479,24 @@ void DependencyEmitter::visit(ASTSwitch *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTTuple *node) {
+void Resolver::visit(ASTTuple *node) {
   for (const auto &value : node->values) {
     value->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTDestructure *node) {
+void Resolver::visit(ASTDestructure *node) {
   define_type(node->right->resolved_type);
   node->right->accept(this);
 }
 
-void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
+void Resolver::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTAlias *) {}
+void Resolver::visit(ASTAlias *) {}
 
-void DependencyEmitter::visit(ASTImport *) {}
+void Resolver::visit(ASTImport *) {}
 
-void DependencyEmitter::visit(ASTImpl *node) {
+void Resolver::visit(ASTImpl *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
@@ -531,9 +514,9 @@ void DependencyEmitter::visit(ASTImpl *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
+void Resolver::visit(ASTDefer *node) { node->statement->accept(this); }
 
-void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
+void Resolver::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -560,29 +543,29 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTCast *node) {
+void Resolver::visit(ASTCast *node) {
   node->expression->accept(this);
   node->target_type->accept(this);
 }
 
-void DependencyEmitter::visit(ASTTraitDeclaration *) {}
+void Resolver::visit(ASTTraitDeclaration *) {}
 
-void DependencyEmitter::visit(ASTLambda *node) {
+void Resolver::visit(ASTLambda *node) {
   node->params->accept(this);
   node->block->accept(this);
   emitter->emit_lambda(node);
 }
 
-void DependencyEmitter::visit(ASTWhere *node) {
+void Resolver::visit(ASTWhere *node) {
   for (const auto &[target, predicate] : node->constraints) {
     target->accept(this);
     predicate->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTModule *) {}
+void Resolver::visit(ASTModule *) {}
 
-void DependencyEmitter::visit(ASTDyn_Of *node) {
+void Resolver::visit(ASTDyn_Of *node) {
   declare_type(node->resolved_type);
   define_type(node->resolved_type);
 
@@ -605,12 +588,12 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPatternMatch *node) {
+void Resolver::visit(ASTPatternMatch *node) {
   node->object->accept(this);
   node->target_type_path->accept(this);
 }
 
-void DependencyEmitter::visit(ASTMethodCall *node) {
+void Resolver::visit(ASTMethodCall *node) {
   node->arguments->accept(this);
   node->callee->accept(this);
   auto symbol_nullable = ctx.get_symbol(node->callee);
@@ -630,7 +613,7 @@ void DependencyEmitter::visit(ASTMethodCall *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTWhereStatement *node) {
+void Resolver::visit(ASTWhereStatement *node) {
   if (node->should_compile) {
     node->block->accept(this);
     return;

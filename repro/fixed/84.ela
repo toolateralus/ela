@@ -2,7 +2,7 @@ import fmt::*;
 
 fn main() { 
   mut builder: StringBuilder;
-  defer builder.deinit();
+  defer builder.destroy();
   builder.append('c');
 
   // ! there is a problem with StringBuilder and As_Char_Slice![u32]

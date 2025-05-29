@@ -101,7 +101,7 @@ fn main() {
     "Salve, Mundi!"
   ]);
 
-  defer hellos.deinit();
+  defer hellos.destroy();
 
   for hello in hellos {
     println(hello);

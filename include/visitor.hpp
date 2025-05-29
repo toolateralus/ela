@@ -16,7 +16,7 @@ struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *) { return; }
 
-  virtual void visit(ASTWhereStatement*) = 0;
+  virtual void visit(ASTWhereStatement *) = 0;
   virtual void visit(ASTPath *node) = 0;
   virtual void visit(ASTMethodCall *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
@@ -148,8 +148,8 @@ struct Typer : VisitorBase {
 
   Type *get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function, Nullable<ASTExpr> self,
-                                   bool is_deinit_call);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
+                                   Nullable<ASTExpr> self, bool is_deinit_call);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
                                                         std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
@@ -200,7 +200,7 @@ struct DeferBlock {
   DeferBlockType type;
 };
 
-struct DependencyEmitter;
+struct Resolver;
 
 struct Emitter : VisitorBase {
   std::unordered_set<int> reflected_upon_types;
@@ -209,7 +209,7 @@ struct Emitter : VisitorBase {
   StringBuilder reflection_initialization;
 
   StringBuilder global_initializer_builder;
-  DependencyEmitter *dep_emitter;
+  Resolver *dep_emitter;
 
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
@@ -273,9 +273,9 @@ struct Emitter : VisitorBase {
 
   std::string to_reflection_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
-  inline std::string indent() { 
+  inline std::string indent() {
     if (indent_level < 0) indent_level = 0;
-    return std::string(indent_level * 2, ' '); 
+    return std::string(indent_level * 2, ' ');
   }
   inline void indented(const std::string &s) { code << indent() << s; }
   inline void indentedln(const std::string &s) { code << indent() << s + '\n'; }
@@ -283,9 +283,7 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { code << '\n' << indent(); }
   inline void semicolon() { code << ";"; }
   inline void space() { code << ' '; }
-  inline void parenthesized(const std::string &s) {
-    code << '(' << s << ')';
-  }
+  inline void parenthesized(const std::string &s) { code << '(' << s << ')'; }
 
   void emit_arguments_no_parens(ASTArguments *args);
   void emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> initialized_values = {});
@@ -371,12 +369,12 @@ struct Emitter : VisitorBase {
   void emit_choice_marker_variant_instantiation(Type *type, ASTPath *value);
 };
 
-struct DependencyEmitter : VisitorBase {
+struct Resolver : VisitorBase {
   Context &ctx;
   Emitter *emitter;
   std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<Type *> reflected_upon_types;
-  inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
+  inline Resolver(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
   void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
   void define_type(Type *type_id);
@@ -439,3 +437,5 @@ struct GenericInstantiationErrorUserData {
   SourceRange definition_range = {};
   jmp_buf save_state;
 };
+
+void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id);

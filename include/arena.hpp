@@ -2,15 +2,12 @@
 
 /**
  * @class Arena
- * @brief Represents an arena for allocating memory in a fixed-size buffer.
+ * @brief Simple memory arena with linked blocks for fast allocation.
  *
- * The Arena class provides a simple trait for allocating memory in a
- * fixed-size buffer. It prevents dynamic memory allocation by using a
- * pre-allocated buffer. The buffer size is specified during construction and
- * cannot be changed afterwards. Memory is allocated sequentially from the
- * buffer, and deallocation is not supported. If the buffer is full and there is
- * not enough space to allocate the requested memory, an exception of type
- * std::runtime_error is thrown.
+ * Arena is a basic memory allocator that hands out memory from a fixed-size buffer.
+ * When the buffer fills up, it automatically links to a new Arena block of the same size.
+ * Allocations are fast and sequential; individual deallocation isn't supported.
+ * Use this for quick, temporary allocations where you free everything at once by destroying the arena.
  */
 
 #include <cstring>

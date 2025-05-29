@@ -409,6 +409,7 @@ void Emitter::visit(ASTTraitDeclaration *) {}
 void Emitter::visit(ASTAlias *) {}
 
 void Emitter::forward_decl_type(Type *type) {
+
   if (type->base_type != Type::INVALID_TYPE) {
     type = type->base_type;
   }
@@ -2378,13 +2379,13 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
   auto old_scope = ctx.scope;
   Defer _([&] { ctx.scope = old_scope; });
 
-  auto path = pattern->target_type_path;
+  const auto path = pattern->target_type_path;
   const auto type = pattern->target_type_path->resolved_type;
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto segment = path->segments.back();
 
   const auto variant_name = segment.identifier;
-  auto variant_type = info->get_variant_type(variant_name);
+  const auto variant_type = info->get_variant_type(variant_name);
   const auto variant_index = info->get_variant_index(variant_name);
   const auto is_pointer = target_type->extensions.is_pointer();
 
@@ -2465,11 +2466,11 @@ void Emitter::visit(ASTSwitch *node) {
     use_default_eq_operator = false;
   }
 
-  code << "({";
-
+  
   // This is static to help with the lifetime issues taking an `address of` here would cause.
   static std::string the_register;
   if (!node->is_statement) {
+    code << "({";
     the_register = "register$" + std::to_string(cf_expr_return_id++);
     cf_expr_return_register = &the_register;
     code << type_to_string(node->return_type) << " " << the_register;
@@ -2477,7 +2478,7 @@ void Emitter::visit(ASTSwitch *node) {
   }
 
   static size_t index = 0;
-  auto target_unique_id = "$switch_target$" + std::to_string(index++);
+  const auto target_unique_id = "$switch_target$" + std::to_string(index++);
 
   code << indent() << type_to_string(node->target->resolved_type) << " " << target_unique_id << " = ";
   node->target->accept(this);
@@ -2526,9 +2527,9 @@ void Emitter::visit(ASTSwitch *node) {
     cf_expr_return_register = nullptr;
     code << the_register;
     semicolon();
+    code << "})";
   }
 
-  code << "})";
 }
 
 void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {

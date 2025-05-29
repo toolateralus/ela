@@ -41,8 +41,7 @@ Context::Context() {
 
   get_varargs_handlers(this);
 
-  if (compile_command.has_flag("freestanding"))
-    Scope::defines().insert("FREESTANDING");
+  if (compile_command.has_flag("freestanding")) Scope::defines().insert("FREESTANDING");
 
   if (compile_command.has_flag("test")) {
     Scope::add_def("TESTING");
@@ -87,10 +86,9 @@ void Scope::erase(const InternedString &name) {
 }
 
 bool Symbol::is_generic_function() const {
-  if (!is_function())
-    return false;
+  if (!is_function()) return false;
 
-  auto declaration = this->function.declaration;
+  auto &declaration = this->function.declaration;
 
   if (declaration->generic_parameters.size() != 0 || declaration->generic_arguments.size() != 0 ||
       declaration->generic_instantiations.size() != 0) {

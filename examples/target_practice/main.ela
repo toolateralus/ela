@@ -546,13 +546,13 @@ fn update_game() {
       text_w := measure_jiggly_text(text, style) / 4.0;
       mut center := get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 0.0});
       jiggly_text(text, center, style, jiggle_intensity, jiggle_rate);
-      text.deinit();
+      text.destroy();
 
       v = round_base_num_enemies_to_advance * round_index;
       text = format("Requires % enemies to pass.", (v,), FormatOptions::default());
       center = get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 24});
       jiggly_text(text, center, style, jiggle_intensity, jiggle_rate);
-      text.deinit();
+      text.destroy();
     } else {
       misses_this_round = 0;
       round_index++;
@@ -682,7 +682,7 @@ fn update_game() {
         
         mut text := format("+%", (amount,), FormatOptions::default());
         make_text_particle(text, 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
-        text.deinit();
+        text.destroy();
         break;
       }
     }
@@ -810,7 +810,7 @@ fn reset_game_state() {
   }
   while text_particles.length > 0 {
     n := text_particles.pop();
-    n.text.deinit();
+    n.text.destroy();
   }
 }
 
@@ -871,15 +871,15 @@ fn draw_main_menu() {
     const jiggle_rate := 1.0;
     mut text := qformat("reached round %,", (round_index,));
     jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
-    text.deinit();
+    text.destroy();
     rect.y += 64;
     text = qformat("% targets taken down", (targets_destroyed,));
     jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
-    text.deinit();
+    text.destroy();
     rect.y += 64;
     text = qformat("scored % points", (score,));
     jiggly_text(text, rect, style, jiggle_intensity, jiggle_rate);
-    text.deinit();
+    text.destroy();
   }
 }
 

@@ -1,0 +1,27 @@
+import fs::*;
+
+fn main() {
+  dir := Directory::open(".").unwrap();
+  files := dir.files();
+  
+  filtered := files.filter(fn (string: *const String) -> bool {
+    return string.ends_with(".ela");
+  });
+
+  defer {
+    dir.destroy();
+    
+    for file in files {
+      file.destroy();
+    }
+
+    for file in filtered {
+      file.destroy();
+    }
+    
+    files.destroy();
+  }
+
+
+
+}
