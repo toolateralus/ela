@@ -84,7 +84,8 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
     path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
     path->tag = THIRPath::Function;
     overload_call->callee = path;
-    overload_call->arguments.append_range(std::array{visit_expr(ast->left), visit_expr(ast->right)});
+    overload_call->arguments.push_back(visit_expr(ast->left));
+    overload_call->arguments.push_back(visit_expr(ast->right));
     return overload_call;
   }
 }
@@ -124,7 +125,8 @@ THIR *THIRVisitor::visit_index(ASTIndex *ast) {
     path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
     path->tag = THIRPath::Function;
     overload_call->callee = path;
-    overload_call->arguments.append_range(std::array{visit_expr(ast->base), visit_expr(ast->index)});
+    overload_call->arguments.push_back(visit_expr(ast->base));
+    overload_call->arguments.push_back(visit_expr(ast->index));
     return overload_call;
   }
 }
