@@ -186,10 +186,10 @@ ASTFor *ASTCopier::copy_for(ASTFor *node) {
 }
 ASTIf *ASTCopier::copy_if(ASTIf *node) {
   auto new_node = copy(node);
-  new_node->condition = static_cast<ASTExpr *>(copy_node(node->condition));
-  new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
+  new_node->condition = (ASTExpr *)copy_node(node->condition);
+  new_node->block = copy_block(node->block);
   if (node->_else)
-    new_node->_else = static_cast<ASTElse *>(copy_node(node->_else.get()));
+    new_node->_else = copy_else(node->_else.get());
   return new_node;
 }
 ASTElse *ASTCopier::copy_else(ASTElse *node) {
