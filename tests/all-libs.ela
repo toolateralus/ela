@@ -4,17 +4,25 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-import fs::*;
-import dlfcn::*;
-import fmt::*;
-import json::*;
-import math::*;
-import pthread::*;
 
-import gl::*;
-import rayui::*;
-
-import time::*;
+// bootstrap auto included.
+// formatters quto included.
+import gl;
+import llvm;
+import rayui;
+import arena;
+import compiler;
+import dlfcn;
+import elexify;
+import event;
+import fmt;
+import fs;
+import interned;
+import map;
+import math;
+import net;
+import pthread;
+import time;
 
 module std {
   // kuchi lypz

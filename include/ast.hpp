@@ -139,6 +139,8 @@ enum AttributeTag {
   ATTRIBUTE_PUB,
   // @[no_mangle]                           : don't mangle a symbols name ever.
   ATTRIBUTE_NO_MANGLE,
+  // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this function will never return control flow back to the caller, when called.
+  ATTRIBUTE_NO_RETURN,
 };
 
 struct Attribute {

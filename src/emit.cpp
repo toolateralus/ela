@@ -864,7 +864,7 @@ void Emitter::visit(ASTVariable *node) {
   // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get
   // global static initializers. We have to somehow tell the dependency emitter to forward declare it as extern at the
   // correct moment.
-  const bool is_global_variable = !node->is_local; /*  || node->is_static; */
+  const bool is_global_variable = !node->is_local && !node->is_constexpr; /*  || node->is_static; */
 
   // if (node->is_static) {
   //   node->type->accept(dep_emitter);
@@ -901,7 +901,7 @@ void Emitter::visit(ASTVariable *node) {
     code << "static ";
   }
   if (node->is_constexpr) {
-    code << " "; // ! TEMPORARILY DISABLED, FOR GLOBAL INITIALIZATION. NEED TO FIGURE OUT A BETTER SOLUTION.
+    code << "const static ";
   }
 
   // This will work fine if global
@@ -2538,6 +2538,11 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
   if (type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions() &&
       HAS_FLAG(type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
     code << "{}";
+    return;
+  }
+
+  if (type->extensions.is_pointer()) {
+    code << "NULL";
     return;
   }
 

@@ -1399,6 +1399,31 @@ void Typer::visit(ASTBlock *node) {
   for (auto &statement : node->statements) {
     statement->accept(this);
     auto &stmnt_cf = statement->control_flow;
+
+    // Handle 'no_return' calls.
+    // TODO: probably add a never type so the analysis here is much cheaper.
+    if (statement->get_node_type() == AST_NODE_EXPR_STATEMENT) {
+      auto expr_stmt = (ASTExprStatement*)statement;
+      if (expr_stmt->expression->get_node_type() == AST_NODE_CALL) {
+        auto call = (ASTCall*)expr_stmt->expression;
+        auto symbol = ctx.get_symbol(call->callee).get();
+
+        if (!symbol || !symbol->function.declaration) {
+          continue;
+        }
+
+        auto &function = symbol->function;
+
+        for (auto attr: function.declaration->attributes) {
+          if (attr.tag == ATTRIBUTE_NO_RETURN) {
+            stmnt_cf.flags = BLOCK_FLAGS_RETURN;
+            stmnt_cf.type = expected_type;
+            break;
+          }
+        }
+      }
+    }
+    
     auto &block_cf = node->control_flow;
     block_cf.flags |= stmnt_cf.flags;
 

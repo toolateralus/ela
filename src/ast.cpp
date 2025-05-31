@@ -1279,7 +1279,9 @@ ASTStatement *Parser::parse_statement() {
           attribute.tag = ATTRIBUTE_CONST;
         } else {
           auto ident = expect(TType::Identifier).value.get_str();
-          if (ident == "pub") {
+          if (ident == "no_return") {
+            attribute.tag = ATTRIBUTE_NO_RETURN;
+          } else if (ident == "pub") {
             attribute.tag = ATTRIBUTE_PUB;
           } else if (ident == "entry") {
             attribute.tag = ATTRIBUTE_ENTRY;
