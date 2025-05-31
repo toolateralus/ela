@@ -188,3 +188,12 @@ There's certainly a better way, we can look into how rust even accomplishes such
 #### Vtables instead of dyn objects being an aggregate of function pointers
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
+
+
+#### Pattern matching improvements
+recursive pattern stuff like this should work, to any degree:
+```rust
+  if x is Some(Ok(&mut v)) {
+
+  }
+```
