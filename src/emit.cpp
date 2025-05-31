@@ -2590,6 +2590,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
       code << ",";
     }
   }
+  
   code << "}";
 }
 

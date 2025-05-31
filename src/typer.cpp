@@ -1416,8 +1416,10 @@ void Typer::visit(ASTBlock *node) {
 
         for (auto attr: function.declaration->attributes) {
           if (attr.tag == ATTRIBUTE_NO_RETURN) {
-            stmnt_cf.flags = BLOCK_FLAGS_RETURN;
-            stmnt_cf.type = expected_type;
+            stmnt_cf = {
+              BLOCK_FLAGS_RETURN,
+              expected_type
+            };
             break;
           }
         }
@@ -1619,7 +1621,6 @@ void Typer::visit(ASTIf *node) {
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
   
-
   if (node->_else.is_not_null()) {
     auto _else = node->_else.get();
     _else->accept(this);
