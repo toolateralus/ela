@@ -2469,7 +2469,7 @@ void Typer::visit(ASTSwitch *node) {
   Defer _([&] { expected_type = old_expected_type; });
 
   Type *return_type = void_type();
-  int flags = BLOCK_FLAGS_FALL_THROUGH;
+  int flags = 0;
 
   for (const auto &_case : node->cases) {
     if (!node->is_pattern_match)
@@ -2493,6 +2493,14 @@ void Typer::visit(ASTSwitch *node) {
   if (node->default_case) {
     auto _case = node->default_case.get();
     _case->accept(this);
+    auto &block_cf = _case->control_flow;
+    flags |= block_cf.flags;
+
+    if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
+      return_type = block_cf.type;
+    }
+  } else {
+    flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
 
   node->resolved_type = node->return_type = return_type;
