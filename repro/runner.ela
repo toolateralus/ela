@@ -1,27 +1,57 @@
 import fs::*;
 
+struct Repro {
+  filename: String,
+  data: String,
+  no_compile: bool,
+}
+
+fn run_repro(repro: Repro) -> bool {
+  command := qformat("ela b %", (repro.filename,));
+  result := std::system(command.as_str());
+  return (result && repro.no_compile) || !result;
+}
+
 fn main() {
   dir := Directory::open(".").unwrap();
   files := dir.files();
-  
+
   filtered := files.filter(fn (string: *const String) -> bool {
-    return string.ends_with(".ela");
+    return string.ends_with(".ela") && 
+           std::c::strcmp(string.data, "runner.ela"c) != 0;
   });
+
+  mut repros: List!<Repro>;
+  for f in filtered {
+    data := File::read_all(f).unwrap();
+    repros.push(.{
+      filename: f,
+      data: data,
+      no_compile: false,
+    });
+  }
 
   defer {
     dir.destroy();
-    
-    for file in files {
-      file.destroy();
-    }
-
-    for file in filtered {
-      file.destroy();
-    }
-    
     files.destroy();
+    filtered.destroy();
+    repros.destroy();
   }
 
+  for repro in repros.iter_mut() {
+    if repro.data.starts_with("//NO_COMPILE") {
+      repro.no_compile=true;
+      printlnf("\033[1;31mNO_COMPILE\033[0m \033[1;32m%\033[0m", (repro.filename,));
+    }
+  }
 
-
+  mut results: List!<(String, bool, bool)>;
+  for repro in repros {
+    status := run_repro(repro);
+    results.push((repro.filename, status, repro.no_compile));
+  }
+  
+  for result in results {
+    printlnf("repro='%' passed=%, no_compile=%", result);
+  }
 }

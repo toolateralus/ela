@@ -1,4 +1,4 @@
-// !FEATURE
+//!FEATURE
 
 fn main() { 
   // Again, range needs a == or .contains function applied for switches.

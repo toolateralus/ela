@@ -1,4 +1,4 @@
-// !NO_COMPILE
+//NO_COMPILE
 
 struct Test_Enumerator!<Index, Value_Type> {
   slice: Slice!<Value_Type>,

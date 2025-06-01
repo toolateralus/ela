@@ -1,4 +1,4 @@
-// !NOCOMPILE
+//NO_COMPILE
 
 // move this somwhere it belongs
 struct Test_Enumerator!<Index, Value_Type> {

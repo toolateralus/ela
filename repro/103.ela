@@ -1,4 +1,4 @@
-//! NOCOMPILE
+//NO_COMPILE
 
 fn main() { 
   // See `Typer::resolve_generic_function_call` for info as to why this crashes.
