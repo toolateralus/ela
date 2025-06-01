@@ -42,7 +42,7 @@ THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) { return visit_no
   ! These three are going to be tough, with generics and all.
   @Cooper-Pilot Need Sum Backup :O
 */
-THIR *THIRVisitor::visit_call(ASTCall *ast) { return nullptr; }
+THIR *THIRVisitor::visit_call(ASTCall *ast) { throw_error("not implemented", ast->source_range); }
 THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC_EXPR(THIRCall, thir, ast);
   auto base = ast->callee->base;
@@ -62,11 +62,11 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
   thir->source_range = ast->source_range;
   return thir;
 }
-THIR *THIRVisitor::visit_path(ASTPath *ast) { return nullptr; }
-THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) { return nullptr; }
+THIR *THIRVisitor::visit_path(ASTPath *ast) { throw_error("not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) { throw_error("not implemented", ast->source_range); }
 
 // This is gonna be tricky to do right, for nested patterns, which we 100% plan on supporting.
-THIR *THIRVisitor::visit_pattern_match(ASTPatternMatch *ast) { return nullptr; }
+THIR *THIRVisitor::visit_pattern_match(ASTPatternMatch *ast) { throw_error("not implemented", ast->source_range); }
 
 THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
   if (!ast->is_operator_overload) {
@@ -79,11 +79,7 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC_EXPR(THIRCall, overload_call, ast);
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    THIR_ALLOC_EXPR(THIRPath, path, ast);
-    path->type = symbol->resolved_type;
-    path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
-    path->tag = THIRPath::Function;
-    overload_call->callee = path;
+    overload_call->callee = visit_function_declaration(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->left));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
@@ -100,11 +96,7 @@ THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC_EXPR(THIRCall, overload_call, ast);
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    THIR_ALLOC_EXPR(THIRPath, path, ast);
-    path->type = symbol->resolved_type;
-    path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
-    path->tag = THIRPath::Function;
-    overload_call->callee = path;
+    overload_call->callee = visit_function_declaration(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
@@ -120,11 +112,7 @@ THIR *THIRVisitor::visit_index(ASTIndex *ast) {
     THIR_ALLOC_EXPR(THIRCall, overload_call, ast);
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    THIR_ALLOC_EXPR(THIRPath, path, ast);
-    path->type = symbol->resolved_type;
-    path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
-    path->tag = THIRPath::Function;
-    overload_call->callee = path;
+    overload_call->callee = visit_function_declaration(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->base));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
@@ -138,14 +126,16 @@ THIR *THIRVisitor::visit_literal(ASTLiteral *ast) {
 }
 
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_dyn_of(ASTDyn_Of *ast) { return nullptr; }
+THIR *THIRVisitor::visit_dyn_of(ASTDyn_Of *ast) { throw_error("not implemented", ast->source_range); }
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_tuple(ASTTuple *ast) { return nullptr; }
+THIR *THIRVisitor::visit_tuple(ASTTuple *ast) { throw_error("not implemented", ast->source_range); }
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_range(ASTRange *ast) { return nullptr; }
+THIR *THIRVisitor::visit_range(ASTRange *ast) { throw_error("not implemented", ast->source_range); }
 // Use THIRAggregateInitializer/Collection/Empty here.
 // Really, the AST could benefit from the seperation of those possibly.
-THIR *THIRVisitor::visit_initializer_list(ASTInitializerList *ast) { return nullptr; }
+THIR *THIRVisitor::visit_initializer_list(ASTInitializerList *ast) {
+  throw_error("not implemented", ast->source_range);
+}
 
 THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) {
   // TODO: Gotta make a decision about the future of the RTTI:
@@ -166,29 +156,30 @@ THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) {
     trade off in binary size.
   */
 
-  THIR_ALLOC_EXPR(THIRIndex, index, ast);
-  THIR_ALLOC_EXPR(THIRLiteral, type_index, ast);
-  type_index->value = std::to_string(ast->target->resolved_type->uid);
-  type_index->type = u64_type();
+  // THIR_ALLOC_EXPR(THIRIndex, index, ast);
+  // THIR_ALLOC_EXPR(THIRLiteral, type_index, ast);
+  // type_index->value = std::to_string(ast->target->resolved_type->uid);
+  // type_index->type = u64_type();
 
-  index->index = type_index;
-  THIR_ALLOC_EXPR(THIRPath, type_info_path, ast);
+  // index->index = type_index;
+  // THIR_ALLOC_EXPR(THIRPath, type_info_path, ast);
 
-  {  // Ugly but we have to do some type resolution here, for the List!<*const Type>. then, set the type_infp_path->type
-    // to that.
-    const static Type *type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
-    static Type *list = ctx.scope->find_type_id("List", {});
-    const static ASTDeclaration *declaring_node = (ASTStructDeclaration *)list->declaring_node.get();
-    const static ASTDeclaration *instance = find_generic_instance(declaring_node->generic_instantiations, {list});
-    static Type *type_ptr_list = instance->resolved_type;
-    type_info_path->type = type_ptr_list;
-  }
+  // {  // Ugly but we have to do some type resolution here, for the List!<*const Type>. then, set the type_infp_path->type
+  //   // to that.
+  //   const static Type *type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
+  //   static Type *list = ctx.scope->find_type_id("List", {});
+  //   const static ASTDeclaration *declaring_node = (ASTStructDeclaration *)list->declaring_node.get();
+  //   const static ASTDeclaration *instance = find_generic_instance(declaring_node->generic_instantiations, {list});
+  //   static Type *type_ptr_list = instance->resolved_type;
+  //   type_info_path->type = type_ptr_list;
+  // }
 
-  type_info_path->tag = THIRPath::Variable;
-  type_info_path->variable->name = "__type_info";
-  type_info_path->variable->source_range = ast->source_range;
-  index->base = type_info_path;
-  return index;
+  // type_info_path->tag = THIRPath::Variable;
+  // type_info_path->variable->name = "__type_info";
+  // type_info_path->variable->source_range = ast->source_range;
+  // index->base = type_info_path;
+  // return index;
+  throw_error("not implemented", ast->source_range);
 }
 
 THIR *THIRVisitor::visit_cast(ASTCast *ast) {
@@ -201,7 +192,7 @@ THIR *THIRVisitor::visit_cast(ASTCast *ast) {
 THIR *THIRVisitor::visit_lambda(ASTLambda *ast) {
   // TODO: We need to insert the lambdas into the scope by their UID, so we can fetch the symbol,
   // and get the THIRFunction* node from the declaration.
-  return nullptr;
+  throw_error("not implemented", ast->source_range);
 }
 
 THIR *THIRVisitor::visit_block(ASTBlock *ast) {
@@ -238,36 +229,73 @@ THIR *THIRVisitor::visit_block(ASTBlock *ast) {
 
   As well as ASTVariable, right below.
 */
-THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) { return nullptr; }
-THIR *THIRVisitor::visit_variable(ASTVariable *ast) { return nullptr; }
+THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  ENTER_SCOPE(ast->scope);
+  THIR_ALLOC_STMT(THIRFunction, thir, ast);
+  thir->name = ast->scope->full_name();
+  thir->type = ast->resolved_type;
+  if (ast->block) {
+    thir->block = (THIRBlock *)visit_block(ast->block.get());
+  }
+  return thir;
+}
 
-THIR *THIRVisitor::visit_struct_declaration(ASTStructDeclaration *ast) { return nullptr; }
-THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *) { return nullptr; }
-THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *ast) { return nullptr; }
+THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
+  THIR_ALLOC_STMT(THIRVariable, thir, ast);
+  if (!ast->is_local) {
+    thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
+  } else {
+    thir->name = ast->name;
+  }
+  if (ast->value) {
+    thir->value = visit_node(ast->value.get());
+  }
+  return thir;
+}
 
-THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { return nullptr; }
-THIR *THIRVisitor::visit_program(ASTProgram *ast) { return nullptr; }
+THIR *THIRVisitor::visit_struct_declaration(ASTStructDeclaration *ast) {
+  throw_error("not implemented", ast->source_range);
+}
+THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *ast) {
+  throw_error("not implemented", ast->source_range);
+}
+THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *ast) {
+  throw_error("not implemented", ast->source_range);
+}
+
+THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { throw_error("not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_program(ASTProgram *ast) {
+  ENTER_SCOPE(ast->scope);
+  THIR_ALLOC_STMT(THIRProgram, program, ast);
+
+  for (const auto &statement : ast->statements) {
+    program->statements.push_back(visit_node(statement));
+  }
+  return program;
+}
 
 // Optimization idea:
 // For simple 'for i in 0..10' etc loops over range literals,
 // we can optimize down into a classic C style for loop. Yank out some iterator overhead.
 // We'd still have RangeIter for other uses, and for runtime loops that take a non constant range.
-THIR *THIRVisitor::visit_for(ASTFor *ast) { return nullptr; }
+THIR *THIRVisitor::visit_for(ASTFor *ast) { throw_error("not implemented", ast->source_range); }
 
 // this should have the capability to return values. It's easier than ever with my new knowledge of C,
 // and we can easily support it.
-THIR *THIRVisitor::visit_if(ASTIf *ast) { return nullptr; }
-THIR *THIRVisitor::visit_else(ASTElse *ast) { return nullptr; }
-THIR *THIRVisitor::visit_while(ASTWhile *ast) { return nullptr; }
+THIR *THIRVisitor::visit_if(ASTIf *ast) { throw_error("not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_else(ASTElse *ast) { throw_error("not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_while(ASTWhile *ast) { throw_error("not implemented", ast->source_range); }
 
 // This would likely result in just declaring several variables, it's tough to return several nodes from one visit.
-THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) { return nullptr; }
+THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) {
+  throw_error("not implemented", ast->source_range);
+}
 // This shouldn't be carried past this point; they should be placed in the correct parts of each block,
 // and 'instantiated' for lack of a better term, then shelled off.
-THIR *THIRVisitor::visit_defer(ASTDefer *ast) { return nullptr; }
+THIR *THIRVisitor::visit_defer(ASTDefer *ast) { throw_error("not implemented", ast->source_range); }
 // Not really sure what significance this would have either.
-THIR *THIRVisitor::visit_import(ASTImport *ast) { return nullptr; }
+THIR *THIRVisitor::visit_import(ASTImport *ast) { throw_error("not implemented", ast->source_range); }
 // Not sure how we'd use this. I guess module $name { ... } has code in it.
-THIR *THIRVisitor::visit_module(ASTModule *ast) { return nullptr; }
+THIR *THIRVisitor::visit_module(ASTModule *ast) { throw_error("not implemented", ast->source_range); }
 // I don't think we need this, this should completely done after typing.
-THIR *THIRVisitor::visit_impl(ASTImpl *ast) { return nullptr; }
+THIR *THIRVisitor::visit_impl(ASTImpl *ast) { throw_error("not implemented", ast->source_range); }

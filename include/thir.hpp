@@ -8,7 +8,7 @@
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
-  Path,
+  Program,
   BinExpr,
   UnaryExpr,
   Literal,
@@ -31,6 +31,7 @@ enum struct THIRNodeType : unsigned char {
   Switch,
   Variable,
   Block,
+  Function,
 };
 
 struct THIR {
@@ -43,44 +44,26 @@ struct THIR {
   virtual THIRNodeType get_node_type() const = 0;
 };
 
+struct THIRProgram : THIR {
+  std::vector<THIR *> statements;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Program; }
+};
+
 struct THIRBlock : THIR {
   std::vector<THIR *> statements;
   THIRNodeType get_node_type() const override { return THIRNodeType::Block; }
 };
 
-struct THIRFunction {
+struct THIRFunction : THIR {
   InternedString name;
-  // includes parameters and return type of course.
-  Type *type;
-  // Where the meat of the executable portion of the program resides.
-  THIRBlock block;
-
-  size_t id;
+  THIRBlock *block;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
 };
 
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
-};
-
-struct THIRContext {
-  std::vector<THIRFunction> functions;
-  std::vector<THIRVariable> global_variables;
-  inline size_t insert_function(const THIRFunction &fn) {
-    size_t id = functions.size();
-    functions.push_back(std::move(fn));
-    return id;
-  }
-};
-
-struct THIRPath : THIR {
-  enum Kind { Function, Variable } tag;
-  union {
-    THIRFunction *function;
-    THIRVariable *variable;
-  };
-  THIRNodeType get_node_type() const override { return THIRNodeType::Path; }
 };
 
 struct THIRBinExpr : THIR {

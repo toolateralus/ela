@@ -1,6 +1,8 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "strings.hpp"
+#include "thir.hpp"
+#include "thir_emitter.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
@@ -25,64 +27,72 @@ int CompileCommand::compile() {
 
   lower.run<void>("typing & lowering to C", [&] {
     Typer type_visitor{context};
+    THIRVisitor thir_visitor(context);
+    THIREmitter thir_emitter;
     type_visitor.visit(root);
-
-    Emitter emit(context, type_visitor);
-    Resolver dep_resolver(context, &emit);
-    emit.dep_emitter = &dep_resolver;
-
-    static const auto testing = compile_command.has_flag("test");
-    const bool is_freestanding =
-        compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
-
-    if (!is_freestanding) {
-      emit.code << "#define USE_STD_LIB 1\n";
-    } else {
-      if (compile_command.has_flag("test")) {
-        throw_error(
-            "You cannot use unit tests in a freestanding or nostlib "
-            "environment due to lack of exception handling",
-            {});
-      }
-    }
-
-    if (compile_command.has_flag("test-verbose")) {
-      emit.code << "#define TEST_VERBOSE;\n";
-      std ::cout << "adding TEST_VERBOSE\n";
-    }
-
-    if (testing) {
-      emit.code << "#define TESTING\n";
-    }
-
-    root->accept(&dep_resolver);
-    root->accept(&emit);
+    auto thir = thir_visitor.visit_program(root);
+    thir_emitter.emit_program(thir);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
+    output << thir_emitter.code.str();
 
-    std::string program;
-    if (compile_command.has_flag("test")) {
-      output << "#define TESTING\n";
-    }
+    // Emitter emit(context, type_visitor);
+    // Resolver dep_resolver(context, &emit);
+    // emit.dep_emitter = &dep_resolver;
 
-    output << BOILERPLATE_C_CODE << '\n';
+    // static const auto testing = compile_command.has_flag("test");
+    // const bool is_freestanding =
+    //     compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
-    const bool uses_reflection = emit.reflected_upon_types.size();
+    // if (!is_freestanding) {
+    //   emit.code << "#define USE_STD_LIB 1\n";
+    // } else {
+    //   if (compile_command.has_flag("test")) {
+    //     throw_error(
+    //         "You cannot use unit tests in a freestanding or nostlib "
+    //         "environment due to lack of exception handling",
+    //         {});
+    //   }
+    // }
 
-    if (uses_reflection) {
-      output << "typedef struct Type Type;\n";
-      output << emit.reflection_externs.str();
-    }
+    // if (compile_command.has_flag("test-verbose")) {
+    //   emit.code << "#define TEST_VERBOSE;\n";
+    //   std ::cout << "adding TEST_VERBOSE\n";
+    // }
 
-    output << emit.code.str();
+    // if (testing) {
+    //   emit.code << "#define TESTING\n";
+    // }
 
-    if (uses_reflection) {
-      output << emit.reflection_initialization.str();
-    }
+    // root->accept(&dep_resolver);
+    // root->accept(&emit);
 
-    output.flush();
-    output.close();
+    // std::filesystem::current_path(compile_command.original_path);
+    // std::ofstream output(compile_command.output_path);
+
+    // std::string program;
+    // if (compile_command.has_flag("test")) {
+    //   output << "#define TESTING\n";
+    // }
+
+    // output << BOILERPLATE_C_CODE << '\n';
+
+    // const bool uses_reflection = emit.reflected_upon_types.size();
+
+    // if (uses_reflection) {
+    //   output << "typedef struct Type Type;\n";
+    //   output << emit.reflection_externs.str();
+    // }
+
+    // output << emit.code.str();
+
+    // if (uses_reflection) {
+    //   output << emit.reflection_initialization.str();
+    // }
+
+    // output.flush();
+    // output.close();
   });
 
   if (has_flag("no-compile")) {
