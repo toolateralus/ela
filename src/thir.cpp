@@ -273,8 +273,6 @@ THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) { return null
 THIR *THIRVisitor::visit_defer(ASTDefer *ast) { return nullptr; }
 // Not really sure what significance this would have either.
 THIR *THIRVisitor::visit_import(ASTImport *ast) { return nullptr; }
-// I don't think we really need this, this would be for a MIR or something.
-THIR *THIRVisitor::load_value(ASTNode *ast, THIR *expr) { return nullptr; }
 // Not sure how we'd use this. I guess module $name { ... } has code in it.
 THIR *THIRVisitor::visit_module(ASTModule *ast) { return nullptr; }
 // I don't think we need this, this should completely done after typing.

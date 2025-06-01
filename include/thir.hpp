@@ -224,7 +224,6 @@ struct THIRVisitor {
   THIR *visit_range(ASTRange *node);
   THIR *visit_switch(ASTSwitch *node);
   THIR *visit_tuple(ASTTuple *node);
-  THIR *load_value(ASTNode *node, THIR *expr); // What exactly is this supposed to do?
   THIR *visit_cast(ASTCast *node);
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
