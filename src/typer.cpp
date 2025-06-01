@@ -441,7 +441,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
-      ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability);
+      ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability, param);
       ctx.scope->local_lookup(normal.name)->flags |= SYMBOL_IS_LOCAL;
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
@@ -450,7 +450,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
         type = type->take_pointer_to(param->mutability);
       }
 
-      ctx.scope->insert_variable("self", type, nullptr, param->mutability);
+      ctx.scope->insert_variable("self", type, nullptr, param->mutability, param);
       ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
       info.parameter_types[info.params_len] = type;
     }
@@ -1215,7 +1215,7 @@ void Typer::visit(ASTLambda *node) {
   for (const auto &param : node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
     info.params_len++;
-    node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr, param->mutability);
+    node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr, param->mutability, param);
     node->block->scope->local_lookup(param->normal.name)->flags |= SYMBOL_IS_LOCAL;
     parameter_index++;
   }

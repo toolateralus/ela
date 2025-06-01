@@ -8,7 +8,13 @@
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
+  // Statements
   Program,
+  Block,
+  Variable,
+  Function,
+  Struct,
+  // Expressions
   BinExpr,
   UnaryExpr,
   Literal,
@@ -21,7 +27,7 @@ enum struct THIRNodeType : unsigned char {
   EmptyInitializer,
 
   Size_Of,
-
+  // Flow Control
   Return,
   Break,
   Continue,
@@ -29,9 +35,6 @@ enum struct THIRNodeType : unsigned char {
   If,
   While,
   Switch,
-  Variable,
-  Block,
-  Function,
 };
 
 struct THIR {
@@ -49,6 +52,18 @@ struct THIRProgram : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Program; }
 };
 
+struct THIRVariable : THIR {
+  InternedString name;
+  THIR *value;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
+};
+
+struct THIRStruct : THIR {
+  InternedString name;
+  std::vector<THIRVariable *> fields;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Struct; }
+};
+
 struct THIRBlock : THIR {
   std::vector<THIR *> statements;
   THIRNodeType get_node_type() const override { return THIRNodeType::Block; }
@@ -58,12 +73,6 @@ struct THIRFunction : THIR {
   InternedString name;
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
-};
-
-struct THIRVariable : THIR {
-  InternedString name;
-  THIR *value;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
 struct THIRBinExpr : THIR {
@@ -170,16 +179,11 @@ extern jstl::Arena thir_arena;
 
 template <class T> static inline T *thir_alloc() { return (T *)thir_arena.allocate(sizeof(T)); }
 
-#define THIR_ALLOC_EXPR(__type, __name, ast)                                                                           \
+#define THIR_ALLOC(__type, __name, ast)                                                                           \
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
   __type *__name = thir_alloc<__type>();                                                                               \
   __name->source_range = ast->source_range;                                                                            \
   __name->type = ast->resolved_type;
-
-#define THIR_ALLOC_STMT(__type, __name, ast)                                                                           \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
-  __type *__name = thir_alloc<__type>();                                                                               \
-  __name->source_range = ast->source_range;
 
 #define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                                                        \
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \

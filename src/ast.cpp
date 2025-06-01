@@ -1316,7 +1316,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto variable = parse_variable();
     variable->is_constexpr = true;
-    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST);
+    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST, variable);
     return variable;
   }
 
