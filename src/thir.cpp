@@ -3,9 +3,9 @@
 #include "core.hpp"
 #include "type.hpp"
 
-#define ENTER_SCOPE(new_scope)                                                                                         \
-  auto _old_scope_ = ctx.scope;                                                                                        \
-  ctx.scope = new_scope;                                                                                               \
+#define ENTER_SCOPE(new_scope)  \
+  auto _old_scope_ = ctx.scope; \
+  ctx.scope = new_scope;        \
   Defer _defer([&] { ctx.scope = _old_scope_; });
 
 /*
@@ -31,12 +31,12 @@ THIR *THIRVisitor::visit_break(ASTBreak *ast) {
 THIR *THIRVisitor::visit_return(ASTReturn *ast) {
   THIR_ALLOC_STMT(THIRReturn, thir, ast);
   if (ast->expression) {
-    thir->expression = visit_expr(ast->expression.get());
+    thir->expression = visit_node(ast->expression.get());
   }
   return thir;
 }
 
-THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) { return visit_expr(ast->expression); }
+THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) { return visit_node(ast->expression); }
 
 /*
   ! These three are going to be tough, with generics and all.
@@ -56,7 +56,7 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
     thir->callee = visit_dot_expr(ast->callee);
   }
   for (const auto &argument : ast->arguments->arguments) {
-    thir->arguments.push_back(visit_expr(argument));
+    thir->arguments.push_back(visit_node(argument));
   }
   thir->type = ast->resolved_type;
   thir->source_range = ast->source_range;
@@ -71,8 +71,8 @@ THIR *THIRVisitor::visit_pattern_match(ASTPatternMatch *ast) { return nullptr; }
 THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC_EXPR(THIRBinExpr, binexpr, ast);
-    binexpr->left = visit_expr(ast->left);
-    binexpr->right = visit_expr(ast->right);
+    binexpr->left = visit_node(ast->left);
+    binexpr->right = visit_node(ast->right);
     binexpr->op = ast->op;
     return binexpr;
   } else {
@@ -84,8 +84,8 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
     path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
     path->tag = THIRPath::Function;
     overload_call->callee = path;
-    overload_call->arguments.push_back(visit_expr(ast->left));
-    overload_call->arguments.push_back(visit_expr(ast->right));
+    overload_call->arguments.push_back(visit_node(ast->left));
+    overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
 }
@@ -93,7 +93,7 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
 THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC_EXPR(THIRUnaryExpr, unary, ast);
-    unary->operand = visit_expr(ast->operand);
+    unary->operand = visit_node(ast->operand);
     unary->op = ast->op;
     return unary;
   } else {
@@ -105,7 +105,7 @@ THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
     path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
     path->tag = THIRPath::Function;
     overload_call->callee = path;
-    overload_call->arguments.push_back(visit_expr(ast->operand));
+    overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
 }
@@ -113,8 +113,8 @@ THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
 THIR *THIRVisitor::visit_index(ASTIndex *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC_EXPR(THIRIndex, index, ast);
-    index->base = visit_expr(ast->base);
-    index->index = visit_expr(ast->index);
+    index->base = visit_node(ast->base);
+    index->index = visit_node(ast->index);
     return index;
   } else {
     THIR_ALLOC_EXPR(THIRCall, overload_call, ast);
@@ -125,8 +125,8 @@ THIR *THIRVisitor::visit_index(ASTIndex *ast) {
     path->function = (THIRFunction *)visit_function_declaration(symbol->function.declaration);
     path->tag = THIRPath::Function;
     overload_call->callee = path;
-    overload_call->arguments.push_back(visit_expr(ast->base));
-    overload_call->arguments.push_back(visit_expr(ast->index));
+    overload_call->arguments.push_back(visit_node(ast->base));
+    overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
   }
 }
@@ -174,7 +174,7 @@ THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) {
   index->index = type_index;
   THIR_ALLOC_EXPR(THIRPath, type_info_path, ast);
 
-  { // Ugly but we have to do some type resolution here, for the List!<*const Type>. then, set the type_infp_path->type
+  {  // Ugly but we have to do some type resolution here, for the List!<*const Type>. then, set the type_infp_path->type
     // to that.
     const static Type *type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
     static Type *list = ctx.scope->find_type_id("List", {});
@@ -193,7 +193,7 @@ THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) {
 
 THIR *THIRVisitor::visit_cast(ASTCast *ast) {
   THIR_ALLOC_EXPR(THIRCast, cast, ast);
-  cast->operand = visit_expr(ast->expression);
+  cast->operand = visit_node(ast->expression);
   cast->type = ast->target_type->resolved_type;
   return cast;
 }
@@ -213,30 +213,24 @@ THIR *THIRVisitor::visit_block(ASTBlock *ast) {
     if (statement->get_node_type() == AST_NODE_DEFER) {
       deferred_statements.push_back((ASTDefer *)statement);
     }
-
-    auto variant = visit_node(statement);
-    if (variant.index() == 0) {
-      THIR *thir = std::get<0>(variant);
-      block->statements.push_back(thir);
-    }
+    auto thir = visit_node(statement);
+    block->statements.push_back(thir);
   }
 
-  // ! 
+  // !
   // TODO: this is gonna have to be a lot more complex than this. we have to look up at our parent blocks
   // and grab up all their deferred statements on early returns.
   // This is just the basic idea, append them at the end, and all the continues, breaks, and returns, when applicable.
   // !
   for (const auto &deferred : deferred_statements) {
-    auto variant = visit_node(deferred->statement);
-    if (variant.index() == 1) {
-      block->statements.push_back(std::get<0>(variant));
-    }
+    auto thir = visit_node(deferred->statement);
+    block->statements.push_back(thir);
   }
 
   return block;
 }
 
-/* 
+/*
   This needs a caching mechanism so we can always just lookup the symbol, call visit function declaration,
   and get the THIRFunction * for any given function at any time.
 
@@ -255,12 +249,12 @@ THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { return nullptr; }
 THIR *THIRVisitor::visit_program(ASTProgram *ast) { return nullptr; }
 
 // Optimization idea:
-// For simple 'for i in 0..10' etc loops over range literals, 
+// For simple 'for i in 0..10' etc loops over range literals,
 // we can optimize down into a classic C style for loop. Yank out some iterator overhead.
 // We'd still have RangeIter for other uses, and for runtime loops that take a non constant range.
 THIR *THIRVisitor::visit_for(ASTFor *ast) { return nullptr; }
 
-// this should have the capability to return values. It's easier than ever with my new knowledge of C, 
+// this should have the capability to return values. It's easier than ever with my new knowledge of C,
 // and we can easily support it.
 THIR *THIRVisitor::visit_if(ASTIf *ast) { return nullptr; }
 THIR *THIRVisitor::visit_else(ASTElse *ast) { return nullptr; }

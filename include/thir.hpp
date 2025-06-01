@@ -5,7 +5,6 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "ast.hpp"
-#include <variant>
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
@@ -37,7 +36,7 @@ enum struct THIRNodeType : unsigned char {
 struct THIR {
   THIR() {}
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
-  // statements are considered void expressions anyway in the THIR.
+  // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
   SourceRange source_range;
   virtual ~THIR() {}
@@ -245,98 +244,10 @@ struct THIRVisitor {
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
 
-  THIR *visit_statement(ASTStatement *statement) {
-    switch (statement->get_node_type()) {
-      case AST_NODE_BLOCK:
-        return visit_block(static_cast<ASTBlock *>(statement));
-      case AST_NODE_FUNCTION_DECLARATION:
-        return visit_function_declaration(static_cast<ASTFunctionDeclaration *>(statement));
-      case AST_NODE_IMPL:
-        return visit_impl(static_cast<ASTImpl *>(statement));
-      case AST_NODE_IMPORT:
-        return visit_import(static_cast<ASTImport *>(statement));
-      case AST_NODE_MODULE:
-        return visit_module(static_cast<ASTModule *>(statement));
-      case AST_NODE_RETURN:
-        return visit_return(static_cast<ASTReturn *>(statement));
-      case AST_NODE_CONTINUE:
-        return visit_continue(static_cast<ASTContinue *>(statement));
-      case AST_NODE_BREAK:
-        return visit_break(static_cast<ASTBreak *>(statement));
-      case AST_NODE_FOR:
-        return visit_for(static_cast<ASTFor *>(statement));
-
-      case AST_NODE_ELSE:
-        return visit_else(static_cast<ASTElse *>(statement));
-      case AST_NODE_WHILE:
-        return visit_while(static_cast<ASTWhile *>(statement));
-      case AST_NODE_STRUCT_DECLARATION:
-        return visit_struct_declaration(static_cast<ASTStructDeclaration *>(statement));
-      case AST_NODE_ENUM_DECLARATION:
-        return visit_enum_declaration(static_cast<ASTEnumDeclaration *>(statement));
-      case AST_NODE_CHOICE_DECLARATION:
-        return visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(statement));
-      case AST_NODE_VARIABLE:
-        return visit_variable(static_cast<ASTVariable *>(statement));
-      case AST_NODE_EXPR_STATEMENT:
-        return visit_expr_statement(static_cast<ASTExprStatement *>(statement));
-      case AST_NODE_DEFER:
-        return visit_defer(static_cast<ASTDefer *>(statement));
-      case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction(static_cast<ASTDestructure *>(statement));
-      default:
-        return nullptr;
-    }
-  }
-
-  THIR *visit_expr(ASTExpr *expr) {
-    switch (expr->get_node_type()) {
-      case AST_NODE_IF:
-        return visit_if(static_cast<ASTIf *>(expr));
-      case AST_NODE_LAMBDA:
-        return visit_lambda(static_cast<ASTLambda *>(expr));
-      case AST_NODE_BIN_EXPR:
-        return visit_bin_expr(static_cast<ASTBinExpr *>(expr));
-      case AST_NODE_UNARY_EXPR:
-        return visit_unary_expr(static_cast<ASTUnaryExpr *>(expr));
-      case AST_NODE_LITERAL:
-        return visit_literal(static_cast<ASTLiteral *>(expr));
-      case AST_NODE_PATH:
-        return visit_path(static_cast<ASTPath *>(expr));
-      case AST_NODE_TUPLE:
-        return visit_tuple(static_cast<ASTTuple *>(expr));
-      case AST_NODE_CALL:
-        return visit_call(static_cast<ASTCall *>(expr));
-      case AST_NODE_METHOD_CALL:
-        return visit_method_call(static_cast<ASTMethodCall *>(expr));
-      case AST_NODE_DOT_EXPR:
-        return visit_dot_expr(static_cast<ASTDotExpr *>(expr));
-      case AST_NODE_INDEX:
-        return visit_index(static_cast<ASTIndex *>(expr));
-      case AST_NODE_INITIALIZER_LIST:
-        return visit_initializer_list(static_cast<ASTInitializerList *>(expr));
-      case AST_NODE_SIZE_OF:
-        return visit_size_of(static_cast<ASTSize_Of *>(expr));
-      case AST_NODE_TYPE_OF:
-        return visit_type_of(static_cast<ASTType_Of *>(expr));
-      case AST_NODE_DYN_OF:
-        return visit_dyn_of(static_cast<ASTDyn_Of *>(expr));
-      case AST_NODE_CAST:
-        return visit_cast(static_cast<ASTCast *>(expr));
-      case AST_NODE_RANGE:
-        return visit_range(static_cast<ASTRange *>(expr));
-      case AST_NODE_SWITCH:
-        return visit_switch(static_cast<ASTSwitch *>(expr));
-      case AST_NODE_PATTERN_MATCH:
-        return visit_pattern_match(static_cast<ASTPatternMatch *>(expr));
-      default:
-        return nullptr;
-    }
-  }
-
-  std::variant<THIR *, std::nullptr_t> visit_node(ASTNode *node) {
+  THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
-      // Expression nodes
+      case AST_NODE_IF:
+        return visit_if(static_cast<ASTIf *>(node));
       case AST_NODE_LAMBDA:
         return visit_lambda(static_cast<ASTLambda *>(node));
       case AST_NODE_BIN_EXPR:
@@ -392,8 +303,6 @@ struct THIRVisitor {
         return visit_break(static_cast<ASTBreak *>(node));
       case AST_NODE_FOR:
         return visit_for(static_cast<ASTFor *>(node));
-      case AST_NODE_IF:
-        return visit_if(static_cast<ASTIf *>(node));
       case AST_NODE_ELSE:
         return visit_else(static_cast<ASTElse *>(node));
       case AST_NODE_WHILE:
