@@ -13,7 +13,7 @@ static inline std::string type_to_string_with_extensions(const TypeExtensions &e
   }
   return ss.str();
 }
-static inline std::string type_to_c_code(Type *type);
+static inline std::string c_type_string(Type *type);
 static inline std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
                                                            bool type_erase_self) {
   if (!type->is_kind(TYPE_FUNCTION)) {
@@ -40,7 +40,7 @@ static inline std::string get_function_pointer_type_string(Type *type, Nullable<
   auto info = (type->info->as<FunctionTypeInfo>());
   auto return_type = info->return_type;
 
-  ss << type_to_c_code(return_type) << "(" << type_prefix;
+  ss << c_type_string(return_type) << "(" << type_prefix;
 
   if (identifier) {
     ss << *identifier.get();
@@ -55,7 +55,7 @@ static inline std::string get_function_pointer_type_string(Type *type, Nullable<
       ss << "void*";
     } else {
       auto type = info->parameter_types[i];
-      ss << type_to_c_code(type);
+      ss << c_type_string(type);
     }
 
     if (i != info->params_len - 1) {
@@ -65,12 +65,36 @@ static inline std::string get_function_pointer_type_string(Type *type, Nullable<
   ss << ")";
   return ss.str();
 }
-static inline std::string type_to_c_code(Type *type) {
+
+static inline std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+  std::stringstream tss;
+
+  if (type->is_kind(TYPE_FUNCTION)) {
+    std::string identifier = name;
+    return get_function_pointer_type_string(type, &identifier, false);
+  }
+
+  std::string base_type_str = c_type_string(type->base_type == Type::INVALID_TYPE ? type : type->base_type);
+  std::string identifier = name;
+
+  for (const auto &ext : type->extensions.extensions) {
+    if (ext.type == TYPE_EXT_POINTER_MUT || ext.type == TYPE_EXT_POINTER_CONST) {
+      base_type_str += "*";
+    } else if (ext.type == TYPE_EXT_ARRAY) {
+      identifier += "[" + std::to_string(ext.array_size) + "]";
+    }
+  }
+
+  tss << base_type_str << " " << identifier;
+  return tss.str();
+}
+
+static inline std::string c_type_string(Type *type) {
   auto output = std::string{};
   switch (type->kind) {
     case TYPE_DYN: {
       auto info = type->info->as<DynTypeInfo>();
-      output = "dyn$" + type_to_c_code(info->trait_type);
+      output = "dyn$" + c_type_string(info->trait_type);
       output = type_to_string_with_extensions(type->extensions, output);
     } break;
     case TYPE_FUNCTION:
@@ -140,10 +164,10 @@ void Emitter::emit_struct(const THIRStruct *thir) { throw_error("emit_struct is 
 
 void Emitter::emit_function(const THIRFunction *thir) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
-  code << type_to_c_code(info->return_type);
+  code << c_type_string(info->return_type);
   code << ' ' << thir->name.get_str() << '(';
   for (size_t i = 0; i < info->params_len; ++i) {
-    code << type_to_c_code(info->parameter_types[i]);
+    code << c_type_string(info->parameter_types[i]);
     if (i < info->params_len - 1) {
       code << ",";
     }
@@ -163,7 +187,7 @@ void Emitter::emit_block(const THIRBlock *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
-  indented(type_to_c_code(thir->type) + " " + thir->name.get_str());
+  indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   if (thir->value) {
     code << " = ";
     emit_node(thir->value);
