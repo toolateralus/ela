@@ -1,6 +1,7 @@
 #include "emit.hpp"
 #include "core.hpp"
 #include "lex.hpp"
+#include "thir.hpp"
 #include "type.hpp"
 
 // These macros help with formatting the C code correctly.
@@ -254,11 +255,12 @@ void Emitter::emit_function(const THIRFunction *thir) {
   code << c_type_string(info->return_type);
   code << ' ' << thir->name.get_str() << '(';
 
-  auto param_name_iter = thir->parameter_names.begin();
+  auto param_iter = thir->parameters.begin();
 
   for (size_t i = 0; i < info->params_len; ++i) {
-    code << c_type_string(info->parameter_types[i]) << ' ' << param_name_iter->get_str();
-    param_name_iter++;
+    const auto parameter = *param_iter;
+    code << c_type_string(info->parameter_types[i]) << ' ' << parameter.name.get_str();
+    param_iter++;
     if (i < info->params_len - 1) {
       code << ",";
     }
@@ -304,6 +306,7 @@ void Emitter::emit_return(const THIRReturn *thir) {
 void Emitter::emit_call(const THIRCall *thir) {
   EXPR_BEGIN(thir);
   emit_expr(thir->callee);
+
   code << '(';
   for (const auto &arg : thir->arguments) {
     emit_expr(arg);
@@ -314,6 +317,7 @@ void Emitter::emit_call(const THIRCall *thir) {
   code << ')';
   EXPR_TERMINATE(thir);
 }
+
 void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
 

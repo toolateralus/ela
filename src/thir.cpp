@@ -49,14 +49,36 @@ THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) {
 
 /*
   ! These three are going to be tough, with generics and all.
-  @Cooper-Pilot Need Sum Backup :O
+  @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
 THIR *THIRVisitor::visit_call(ASTCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
-  thir->callee = visit_node(ast->callee);
-  for (const auto &argument : ast->arguments->arguments) {
-    thir->arguments.push_back(visit_node(argument));
+  auto callee = thir->callee = visit_node(ast->callee);
+
+  // Only handle default arguments for function calls that have a definition, not function pointers.
+  if (callee->get_node_type() == THIRNodeType::Function) {
+    const auto function = (const THIRFunction *)callee;
+    const auto &params = function->parameters;
+    const auto &args = ast->arguments->arguments;
+
+    size_t i = 0;
+    for (; i < args.size(); ++i) {
+      thir->arguments.push_back(visit_node(args[i]));
+    }
+
+    for (; i < params.size(); ++i) {
+      if (params[i].default_value) {
+        thir->arguments.push_back(params[i].default_value);
+      } else {
+        throw_error("Missing argument with no default value", ast->source_range);
+      }
+    }
+  } else { // Other calls, via function pointers, variables, non-symbol calls &c &c.
+    for (const auto &argument : ast->arguments->arguments) {
+      thir->arguments.push_back(visit_node(argument));
+    }
   }
+
   return thir;
 }
 THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
@@ -265,22 +287,31 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
   convert_function_attributes(thir, ast->attributes);
 
   for (const auto &param : ast->params->params) {
+    THIR *default_value = nullptr;
     THIR_ALLOC(THIRVariable, thir_param, param);
     if (param->tag == ASTParamDecl::Normal) {
       thir_param->name = param->normal.name;
       thir_param->type = param->normal.type->resolved_type;
+      if (param->normal.default_value.is_not_null()) {
+        default_value = visit_node(param->normal.default_value.get());
+      }
       if (param->normal.default_value) {
         thir_param->value = visit_node(param->normal.default_value.get());
       } else {
-        // TODO: this may be problematic.
+        // TODO: this may be problematic. Not certain yet we can assume this is never null. Maybe we make this nullable
+        // in def
         thir_param->value = nullptr;
       }
     } else {
       thir_param->name = "self";
       thir_param->type = param->resolved_type;
     }
+
     symbol_map[param] = thir_param;
-    thir->parameter_names.push_back(thir_param->name);
+    thir->parameters.push_back(THIRParameter{
+        .name = thir_param->name,
+        .default_value = default_value,
+    });
   }
 
   if (thir->name == "main") {
@@ -397,3 +428,4 @@ THIR *THIRVisitor::visit_import(ASTImport *ast) { throw_error("visit_import not 
 THIR *THIRVisitor::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
 // I don't think we need this, this should completely done after typing.
 THIR *THIRVisitor::visit_impl(ASTImpl *ast) { throw_error("visit_impl not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_where_statement(ASTWhereStatement *node) {}

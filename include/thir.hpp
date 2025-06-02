@@ -27,7 +27,7 @@ enum struct THIRNodeType : unsigned char {
   EmptyInitializer,
 
   Size_Of,
-  // Flow Control
+  // Control Flow
   Return,
   Break,
   Continue,
@@ -38,10 +38,10 @@ enum struct THIRNodeType : unsigned char {
 };
 
 struct THIR {
-  // This is purely used to handle putting semicolons after expression statements, without needing an 'expression statement' node
-  // This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper way to do this
-  // it is a bit messy, but it's far preferable to THIRStmt/THIRExpr && ThirExprStatement.
-  bool is_statement=false;
+  // This is purely used to handle putting semicolons after expression statements, without needing an 'expression
+  // statement' node This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper
+  // way to do this it is a bit messy, but it's far preferable to THIRStmt/THIRExpr && ThirExprStatement.
+  bool is_statement = false;
 
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
@@ -85,6 +85,11 @@ struct THIRBlock : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Block; }
 };
 
+struct THIRParameter {
+  InternedString name;
+  THIR *default_value;
+};
+
 struct THIRFunction : THIR {
   bool is_extern : 1;
   bool is_inline : 1;
@@ -96,8 +101,8 @@ struct THIRFunction : THIR {
   bool is_no_mangle : 1;
 
   InternedString name;
-  std::vector<InternedString> parameter_names;
-  
+  std::vector<THIRParameter> parameters;
+
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
 };
@@ -260,86 +265,96 @@ struct THIRVisitor {
   THIR *visit_impl(ASTImpl *node);
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
-
+  THIR *visit_where_statement(ASTWhereStatement *node);
   THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
+      default: {
+        throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
+        return nullptr;
+      }
+      // Ignored nodes, should these return nullptr? idk. don't want nulls in our THIR. maybe just a static THIR* that's
+      // just a noop in general.
+      case AST_NODE_NOOP: {
+        return nullptr;
+      }
+      // Actual nodes.
       case AST_NODE_IF:
-        return visit_if(static_cast<ASTIf *>(node));
+        return visit_if((ASTIf *)node);
       case AST_NODE_LAMBDA:
-        return visit_lambda(static_cast<ASTLambda *>(node));
+        return visit_lambda((ASTLambda *)node);
       case AST_NODE_BIN_EXPR:
-        return visit_bin_expr(static_cast<ASTBinExpr *>(node));
+        return visit_bin_expr((ASTBinExpr *)node);
       case AST_NODE_UNARY_EXPR:
-        return visit_unary_expr(static_cast<ASTUnaryExpr *>(node));
+        return visit_unary_expr((ASTUnaryExpr *)node);
       case AST_NODE_LITERAL:
-        return visit_literal(static_cast<ASTLiteral *>(node));
+        return visit_literal((ASTLiteral *)node);
       case AST_NODE_PATH:
-        return visit_path(static_cast<ASTPath *>(node));
+        return visit_path((ASTPath *)node);
       case AST_NODE_TUPLE:
-        return visit_tuple(static_cast<ASTTuple *>(node));
+        return visit_tuple((ASTTuple *)node);
       case AST_NODE_CALL:
-        return visit_call(static_cast<ASTCall *>(node));
+        return visit_call((ASTCall *)node);
       case AST_NODE_METHOD_CALL:
-        return visit_method_call(static_cast<ASTMethodCall *>(node));
+        return visit_method_call((ASTMethodCall *)node);
       case AST_NODE_DOT_EXPR:
-        return visit_dot_expr(static_cast<ASTDotExpr *>(node));
+        return visit_dot_expr((ASTDotExpr *)node);
       case AST_NODE_INDEX:
-        return visit_index(static_cast<ASTIndex *>(node));
+        return visit_index((ASTIndex *)node);
       case AST_NODE_INITIALIZER_LIST:
-        return visit_initializer_list(static_cast<ASTInitializerList *>(node));
+        return visit_initializer_list((ASTInitializerList *)node);
       case AST_NODE_SIZE_OF:
-        return visit_size_of(static_cast<ASTSize_Of *>(node));
+        return visit_size_of((ASTSize_Of *)node);
       case AST_NODE_TYPE_OF:
-        return visit_type_of(static_cast<ASTType_Of *>(node));
+        return visit_type_of((ASTType_Of *)node);
       case AST_NODE_DYN_OF:
-        return visit_dyn_of(static_cast<ASTDyn_Of *>(node));
+        return visit_dyn_of((ASTDyn_Of *)node);
       case AST_NODE_CAST:
-        return visit_cast(static_cast<ASTCast *>(node));
+        return visit_cast((ASTCast *)node);
       case AST_NODE_RANGE:
-        return visit_range(static_cast<ASTRange *>(node));
+        return visit_range((ASTRange *)node);
       case AST_NODE_SWITCH:
-        return visit_switch(static_cast<ASTSwitch *>(node));
+        return visit_switch((ASTSwitch *)node);
       case AST_NODE_PATTERN_MATCH:
-        return visit_pattern_match(static_cast<ASTPatternMatch *>(node));
+        return visit_pattern_match((ASTPatternMatch *)node);
       // Statement nodes
       case AST_NODE_BLOCK:
-        return visit_block(static_cast<ASTBlock *>(node));
+        return visit_block((ASTBlock *)node);
       case AST_NODE_FUNCTION_DECLARATION:
-        return visit_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
+        return visit_function_declaration((ASTFunctionDeclaration *)node);
       case AST_NODE_IMPL:
-        return visit_impl(static_cast<ASTImpl *>(node));
+        return visit_impl((ASTImpl *)node);
       case AST_NODE_IMPORT:
-        return visit_import(static_cast<ASTImport *>(node));
+        return visit_import((ASTImport *)node);
       case AST_NODE_MODULE:
-        return visit_module(static_cast<ASTModule *>(node));
+        return visit_module((ASTModule *)node);
       case AST_NODE_RETURN:
-        return visit_return(static_cast<ASTReturn *>(node));
+        return visit_return((ASTReturn *)node);
       case AST_NODE_CONTINUE:
-        return visit_continue(static_cast<ASTContinue *>(node));
+        return visit_continue((ASTContinue *)node);
       case AST_NODE_BREAK:
-        return visit_break(static_cast<ASTBreak *>(node));
+        return visit_break((ASTBreak *)node);
       case AST_NODE_FOR:
-        return visit_for(static_cast<ASTFor *>(node));
+        return visit_for((ASTFor *)node);
       case AST_NODE_ELSE:
-        return visit_else(static_cast<ASTElse *>(node));
+        return visit_else((ASTElse *)node);
       case AST_NODE_WHILE:
-        return visit_while(static_cast<ASTWhile *>(node));
+        return visit_while((ASTWhile *)node);
       case AST_NODE_STRUCT_DECLARATION:
-        return visit_struct_declaration(static_cast<ASTStructDeclaration *>(node));
+        return visit_struct_declaration((ASTStructDeclaration *)node);
       case AST_NODE_ENUM_DECLARATION:
-        return visit_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
+        return visit_enum_declaration((ASTEnumDeclaration *)node);
       case AST_NODE_CHOICE_DECLARATION:
-        return visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
+        return visit_choice_declaration((ASTChoiceDeclaration *)node);
       case AST_NODE_VARIABLE:
-        return visit_variable(static_cast<ASTVariable *>(node));
+        return visit_variable((ASTVariable *)node);
       case AST_NODE_EXPR_STATEMENT:
-        return visit_expr_statement(static_cast<ASTExprStatement *>(node));
+        return visit_expr_statement((ASTExprStatement *)node);
       case AST_NODE_DEFER:
-        return visit_defer(static_cast<ASTDefer *>(node));
+        return visit_defer((ASTDefer *)node);
       case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction(static_cast<ASTDestructure *>(node));
-      default:
-        return nullptr;
+        return visit_tuple_deconstruction((ASTDestructure *)node);
+      case AST_NODE_WHERE_STATEMENT:
+        return visit_where_statement((ASTWhereStatement *)node);
     }
   }
 };
