@@ -216,7 +216,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // --filter=* - "My Test Group" // run all but test group
 
         auto func = parser->parse_function_declaration();
-        func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
+        func->flags |= FUNCTION_IS_TEST;
 
         if (compile_command.has_flag("test")) {
           return func;

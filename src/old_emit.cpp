@@ -826,6 +826,7 @@ void OldEmitter::visit(ASTBinExpr *node) {
   node->left->accept(this);
   space();
   code << ttype_get_operator_string(node->op, node->source_range);
+
   if (node->op == TType::Assign) {
     auto type = node->resolved_type;
     if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
@@ -837,6 +838,7 @@ void OldEmitter::visit(ASTBinExpr *node) {
       }
     }
   }
+  
   space();
   node->right->accept(this);
   code << ")";

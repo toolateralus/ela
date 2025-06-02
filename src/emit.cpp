@@ -1,5 +1,17 @@
 #include "emit.hpp"
+#include "core.hpp"
+#include "lex.hpp"
 #include "type.hpp"
+
+// These macros help with formatting the C code correctly.
+#define EXPR_BEGIN($node)    \
+  if ($node->is_statement) { \
+    indented();              \
+  }
+#define EXPR_TERMINATE($node) \
+  if ($node->is_statement) {  \
+    code << ";\n";            \
+  }
 
 static inline std::string type_to_string_with_extensions(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
@@ -127,32 +139,56 @@ void Emitter::emit_program(const THIRProgram *thir) {
     emit_node(stmt);
   }
 }
+
 void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
-  throw_error("emit_bin_expr is unimplemented", thir->source_range);
-}
-void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
-  throw_error("emit_unary_expr is unimplemented", thir->source_range);
-}
-void Emitter::emit_literal(const THIRLiteral *thir) {
-  // TODO: we gotta do more than this of course.
-  code << thir->value.get_str();
+  EXPR_BEGIN(thir);
+  emit_expr(thir->left);
+  code << ttype_get_operator_string(thir->op, thir->source_range);
+  emit_expr(thir->right);
+  EXPR_TERMINATE(thir);
 }
 
-void Emitter::emit_call(const THIRCall *thir) { throw_error("emit_call is unimplemented", thir->source_range); }
-void Emitter::emit_member_access(const THIRMemberAccess *thir) {
-  throw_error("emit_member_access is unimplemented", thir->source_range);
+void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
+  EXPR_BEGIN(thir);
+  code << ttype_get_operator_string(thir->op, thir->source_range);
+  emit_expr(thir->operand);
+  EXPR_TERMINATE(thir);
 }
+
+void Emitter::emit_literal(const THIRLiteral *thir) {
+  // TODO: we gotta do more than this of course.
+  bool is_string = thir->type == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+  if (is_string) {
+    code << '\"';
+  }
+  code << thir->value.get_str();
+  if (is_string) {
+    code << '\"';
+  }
+}
+
+void Emitter::emit_member_access(const THIRMemberAccess *thir) {
+  emit_expr(thir->base);
+  code << '.' << thir->member.get_str();
+}
+
 void Emitter::emit_cast(const THIRCast *thir) { throw_error("emit_cast is unimplemented", thir->source_range); }
-void Emitter::emit_index(const THIRIndex *thir) { throw_error("emit_index is unimplemented", thir->source_range); }
+
+void Emitter::emit_index(const THIRIndex *thir) {
+  emit_expr(thir->base);
+  code << "[";
+  emit_expr(thir->index);
+  code << "]";
+}
+
 void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
   throw_error("emit_aggregate_initializer is unimplemented", thir->source_range);
 }
 void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir) {
   throw_error("emit_collection_initializer is unimplemented", thir->source_range);
 }
-void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
-  throw_error("emit_empty_initializer is unimplemented", thir->source_range);
-}
+
+void Emitter::emit_empty_initializer(const THIREmptyInitializer *) { code << "{0}"; }
 void Emitter::emit_size_of(const THIRSizeOf *thir) { throw_error("emit_size_of is unimplemented", thir->source_range); }
 
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
@@ -160,22 +196,86 @@ void Emitter::emit_if(const THIRIf *thir) { throw_error("emit_if is unimplemente
 void Emitter::emit_while(const THIRWhile *thir) { throw_error("emit_while is unimplemented", thir->source_range); }
 void Emitter::emit_switch(const THIRSwitch *thir) { throw_error("emit_switch is unimplemented", thir->source_range); }
 
-void Emitter::emit_struct(const THIRStruct *thir) { throw_error("emit_struct is unimplemented", thir->source_range); }
+void Emitter::emit_anonymous_struct(const THIRStruct *thir) {
+  auto info = thir->type->info->as<StructTypeInfo>();
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+    indented("union {\n");
+  } else {
+    indented("struct {\n");
+  }
+  emit_struct_body(thir);
+  indented("};\n");
+}
+
+void Emitter::emit_struct_body(const THIRStruct *thir) {
+  indent_level++;
+  for (const auto &subtype : thir->subtypes) {
+    emit_anonymous_struct(subtype);
+  }
+  for (const auto &field : thir->fields) {
+    indented(get_declaration_type_signature_and_identifier(field->name.get_str(), field->type) + ";\n");
+  }
+  indent_level--;
+}
+
+void Emitter::emit_struct(const THIRStruct *thir) {
+  auto info = thir->type->info->as<StructTypeInfo>();
+
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+    code << "typedef union " << thir->name.get_str() << "{\n";
+  } else {
+    code << "typedef struct " << thir->name.get_str() << "{\n";
+  }
+  emit_struct_body(thir);
+  code << "} " << thir->name.get_str() << ";\n";
+}
 
 void Emitter::emit_function(const THIRFunction *thir) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
+
+  if (thir->is_extern || thir->is_exported) {
+    code << "extern ";
+  }
+  if (thir->is_inline) {
+    code << "static inline ";
+  }
+  if (thir->is_test) {
+    // TODO: emit test functions into a fixture again.
+    throw_error("emit_function:test not yet implemented", thir->source_range);
+  }
+  if (thir->is_entry) {
+    entry_point = thir;
+  }
+
+  if (thir->is_no_return) {
+    throw_error("emit_function:no_return is not yet implemented", thir->source_range);
+  }
+
   code << c_type_string(info->return_type);
   code << ' ' << thir->name.get_str() << '(';
+
+  auto param_name_iter = thir->parameter_names.begin();
+
   for (size_t i = 0; i < info->params_len; ++i) {
-    code << c_type_string(info->parameter_types[i]);
+    code << c_type_string(info->parameter_types[i]) << ' ' << param_name_iter->get_str();
+    param_name_iter++;
     if (i < info->params_len - 1) {
       code << ",";
     }
   }
-  code << ')';
-  emit_block(thir->block);
-}
 
+  if (thir->is_varargs) {
+    code << ", ...";
+  }
+
+  code << ')';
+
+  if (thir->block) {
+    emit_block(thir->block);
+  } else {
+    code << ";\n";
+  }
+}
 void Emitter::emit_block(const THIRBlock *thir) {
   code << "{\n";
   indent_level++;
@@ -185,16 +285,12 @@ void Emitter::emit_block(const THIRBlock *thir) {
   indent_level--;
   code << "}";
 }
-
 void Emitter::emit_variable(const THIRVariable *thir) {
   indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
-  if (thir->value) {
-    code << " = ";
-    emit_node(thir->value);
-  }
+  code << " = ";
+  emit_node(thir->value);
   code << ";\n";
 }
-
 void Emitter::emit_return(const THIRReturn *thir) {
   indented("return");
   if (thir->expression) {
@@ -202,6 +298,21 @@ void Emitter::emit_return(const THIRReturn *thir) {
     emit_node(thir->expression);
   }
   code << ";\n";
+}
+
+// TODO: add default argument emission.
+void Emitter::emit_call(const THIRCall *thir) {
+  EXPR_BEGIN(thir);
+  emit_expr(thir->callee);
+  code << '(';
+  for (const auto &arg : thir->arguments) {
+    emit_expr(arg);
+    if (arg != thir->arguments.back()) {
+      code << ", ";
+    }
+  }
+  code << ')';
+  EXPR_TERMINATE(thir);
 }
 void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }

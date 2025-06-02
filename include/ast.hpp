@@ -483,7 +483,7 @@ struct ASTWhere;
 struct ASTLambda;
 
 struct ASTFunctionDeclaration : ASTDeclaration {
-  size_t flags = 0;
+  unsigned int flags;
   bool has_defer = false;
   bool is_declared = false;
   Type *declaring_type = Type::INVALID_TYPE;

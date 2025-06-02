@@ -38,6 +38,11 @@ enum struct THIRNodeType : unsigned char {
 };
 
 struct THIR {
+  // This is purely used to handle putting semicolons after expression statements, without needing an 'expression statement' node
+  // This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper way to do this
+  // it is a bit messy, but it's far preferable to THIRStmt/THIRExpr && ThirExprStatement.
+  bool is_statement=false;
+
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
@@ -58,9 +63,20 @@ struct THIRVariable : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
+/*
+  We can use this to emit various types,
+  'struct'
+  'union'
+  'choice'
+  'dyn ...'
+  tuple types.
+
+  as long as we structure it in a desugared, literal way.
+*/
 struct THIRStruct : THIR {
   InternedString name;
   std::vector<THIRVariable *> fields;
+  std::vector<THIRStruct *> subtypes;
   THIRNodeType get_node_type() const override { return THIRNodeType::Struct; }
 };
 
@@ -70,14 +86,18 @@ struct THIRBlock : THIR {
 };
 
 struct THIRFunction : THIR {
-  bool is_extern: 1;
-  bool is_inline: 1;
-  bool is_exported: 1;
-  bool is_test: 1;
-  bool is_varargs: 1;
-  bool is_entry: 1;
+  bool is_extern : 1;
+  bool is_inline : 1;
+  bool is_exported : 1;
+  bool is_test : 1;
+  bool is_varargs : 1;
+  bool is_entry : 1;
+  bool is_no_return : 1;
+  bool is_no_mangle : 1;
 
   InternedString name;
+  std::vector<InternedString> parameter_names;
+  
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
 };
@@ -184,16 +204,19 @@ struct THIRCollectionInitializer : THIR {
 
 extern jstl::Arena thir_arena;
 
-template <class T> static inline T *thir_alloc() { return new (thir_arena.allocate(sizeof(T))) T(); }
+template <class T>
+static inline T *thir_alloc() {
+  return new (thir_arena.allocate(sizeof(T))) T();
+}
 
-#define THIR_ALLOC(__type, __name, ast)                                                                           \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
-  __type *__name = thir_alloc<__type>();                                                                               \
-  __name->source_range = ast->source_range;                                                                            \
+#define THIR_ALLOC(__type, __name, ast)                                                \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
+  __type *__name = thir_alloc<__type>();                                               \
+  __name->source_range = ast->source_range;                                            \
   __name->type = ast->resolved_type;
 
-#define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                                                        \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
+#define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                        \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();
 
 struct THIRVisitor {

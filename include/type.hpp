@@ -68,7 +68,7 @@ enum TypeExtEnum {
   TYPE_EXT_ARRAY,
 };
 
-enum FunctionInstanceFlags : size_t {
+enum FunctionInstanceFlags : unsigned int {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,

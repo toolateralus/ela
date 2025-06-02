@@ -6,7 +6,9 @@ struct Emitter {
   StringBuilder code{};
   int indent_level = 0;
 
-  inline void indented(const std::string &string) {
+  const THIRFunction *entry_point;
+
+  inline void indented(const std::string &string={}) {
     // 2 space indenting is our standard.
     code << std::string(indent_level * 2, ' ');
     code << string;
@@ -15,6 +17,23 @@ struct Emitter {
   inline void indented_terminated(const std::string &string) {
     indented(string);
     code << ";\n";
+  }
+
+  // similar to 'emit_symbol' except, when passed say a THIRFunction*, this will emit the identifier that points to that
+  // function we just compute paths/references instead of storing them in the THIR, which aligns more with LLVM in the
+  // long run.
+  
+  // this will call emit_node if it doesn't require extra intercepted support to emit correctly.
+  void emit_expr(const THIR *thir) {
+    if (thir->get_node_type() == THIRNodeType::Function) {
+      auto function = static_cast<const THIRFunction *>(thir);
+      code << function->name.get_str();
+    } else if (thir->get_node_type() == THIRNodeType::Variable) {
+      auto variable = static_cast<const THIRVariable *>(thir);
+      code << variable->name.get_str();
+    } else {
+      emit_node(thir);
+    }
   }
 
   void emit_node(const THIR *thir);
@@ -38,7 +57,11 @@ struct Emitter {
   void emit_while(const THIRWhile *thir);
   void emit_switch(const THIRSwitch *thir);
   void emit_variable(const THIRVariable *thir);
+
+  void emit_struct_body(const THIRStruct *thir);
+  void emit_anonymous_struct(const THIRStruct *thir);
   void emit_struct(const THIRStruct *thir);
+
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);
 };
