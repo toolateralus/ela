@@ -367,14 +367,15 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
+    // TODO: make this a keyword.
     {.identifier = "static",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto statement = parser->parse_statement();
         if (auto decl = dynamic_cast<ASTVariable *>(statement)) {
           decl->is_static = true;
-        } else if (auto decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
-          decl->flags |= FUNCTION_IS_STATIC;
+        } else {
+          throw_error("static is only valid for variables, global or local.", statement->source_range);
         }
         return statement;
     }},

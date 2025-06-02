@@ -75,10 +75,9 @@ enum FunctionInstanceFlags : size_t {
   FUNCTION_IS_VARARGS = 1 << 3,
   FUNCTION_IS_EXPORTED = 1 << 4,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
-  FUNCTION_IS_STATIC = 1 << 6,
-  FUNCTION_IS_EXTERN = 1 << 7,
-  FUNCTION_IS_INLINE = 1 << 8,
-  FUNCTION_IS_ENTRY = 1 << 9,
+  FUNCTION_IS_EXTERN = 1 << 6,
+  FUNCTION_IS_INLINE = 1 << 7,
+  FUNCTION_IS_ENTRY = 1 << 8,
 };
 
 enum StructTypeFlags {

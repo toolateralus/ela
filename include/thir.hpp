@@ -38,11 +38,11 @@ enum struct THIRNodeType : unsigned char {
 };
 
 struct THIR {
-  THIR() {}
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
   SourceRange source_range;
+
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
 };
@@ -70,6 +70,13 @@ struct THIRBlock : THIR {
 };
 
 struct THIRFunction : THIR {
+  bool is_extern: 1;
+  bool is_inline: 1;
+  bool is_exported: 1;
+  bool is_test: 1;
+  bool is_varargs: 1;
+  bool is_entry: 1;
+
   InternedString name;
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
@@ -177,7 +184,7 @@ struct THIRCollectionInitializer : THIR {
 
 extern jstl::Arena thir_arena;
 
-template <class T> static inline T *thir_alloc() { return (T *)thir_arena.allocate(sizeof(T)); }
+template <class T> static inline T *thir_alloc() { return new (thir_arena.allocate(sizeof(T))) T(); }
 
 #define THIR_ALLOC(__type, __name, ast)                                                                           \
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \

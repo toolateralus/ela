@@ -172,6 +172,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   for (auto subunion : node->subtypes) {
     subunion->accept(this);
 
+    // TODO: we shouldn't just unload these members in there.
+    // This shells off the information that shows that these members came from a union, in the type descriptor
     for (const auto &field : subunion->members) {
       field.type->accept(this);
       info->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
@@ -2840,7 +2842,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
-    dyn_info->methods.push_back({name.get_str(), function_type/* , declaration */});
+    dyn_info->methods.push_back({name.get_str(), function_type});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };
 

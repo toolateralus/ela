@@ -65,7 +65,7 @@
       "args": [
         "main.ela",
         "--s",
-        "--nl"
+        "--nl",
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {

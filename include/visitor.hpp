@@ -202,7 +202,7 @@ struct DeferBlock {
 
 struct Resolver;
 
-struct Emitter : VisitorBase {
+struct OldEmitter : VisitorBase {
   std::unordered_set<int> reflected_upon_types;
 
   StringBuilder reflection_externs;
@@ -272,7 +272,7 @@ struct Emitter : VisitorBase {
   void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments);
 
   std::string to_reflection_type_struct(Type *type, Context &context);
-  Emitter(Context &context, Typer &type_visitor);
+  OldEmitter(Context &context, Typer &type_visitor);
   inline std::string indent() {
     if (indent_level < 0) indent_level = 0;
     return std::string(indent_level * 2, ' ');
@@ -291,7 +291,7 @@ struct Emitter : VisitorBase {
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_extern_function(ASTFunctionDeclaration *node);
 
-  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
+  bool should_emit_function(OldEmitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string type_to_string_with_extensions(const TypeExtensions &ext, const std::string &base);
   std::string type_to_string(Type *type);
 
@@ -371,10 +371,10 @@ struct Emitter : VisitorBase {
 
 struct Resolver : VisitorBase {
   Context &ctx;
-  Emitter *emitter;
+  OldEmitter *emitter;
   std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<Type *> reflected_upon_types;
-  inline Resolver(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
+  inline Resolver(Context &context, OldEmitter *emitter) : ctx(context), emitter(emitter) {}
   void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
   void define_type(Type *type_id);

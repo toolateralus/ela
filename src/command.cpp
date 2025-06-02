@@ -2,7 +2,7 @@
 #include "error.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
-#include "thir_emitter.hpp"
+#include "emit.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
@@ -28,13 +28,14 @@ int CompileCommand::compile() {
   lower.run<void>("typing & lowering to C", [&] {
     Typer type_visitor{context};
     THIRVisitor thir_visitor(context);
-    THIREmitter thir_emitter;
+    Emitter thir_emitter;
     type_visitor.visit(root);
     auto thir = thir_visitor.visit_program(root);
-    thir_emitter.emit_program(thir);
+    thir_emitter.emit_program((THIRProgram *)thir);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
+    output << BOILERPLATE_C_CODE << '\n';
     output << thir_emitter.code.str();
 
     // Emitter emit(context, type_visitor);

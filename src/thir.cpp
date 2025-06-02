@@ -74,8 +74,18 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
 THIR *THIRVisitor::visit_path(ASTPath *ast) {
   auto sym = ctx.get_symbol(ast).get();
   if (sym->is_variable()) {
+    // Many variables do not come from AST.
+    // for loop identifiers, tuple/struct destructured elements,
+    // enum variants, the self variable.
+
+    // This should be fine for now, but will be problematic.
     return symbol_map[sym->variable.declaration.get()];
   }
+  if (sym->is_function()) {
+    return symbol_map[sym->function.declaration];
+  }
+  // This probably won't ever return anything but variables, and static functions;
+  return nullptr;
 }
 THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) { throw_error("not implemented", ast->source_range); }
 
@@ -152,47 +162,6 @@ THIR *THIRVisitor::visit_initializer_list(ASTInitializerList *ast) {
 }
 
 THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) {
-  // TODO: Gotta make a decision about the future of the RTTI:
-  /*
-    We can continue to use a big runtime initialized array of data, which slows program startup, and causes a ton of
-    memory leaks, but works as is.
-
-    Or, we can switch to using a ton of fields that are forward declared with extern, and embedded in the binary as
-    const static / equivalent in LLVM.
-
-    this would probably be most ideal, compile time setting up RTTI.
-
-    In one case, we'll take the address of a specific field here (the second option)
-    and in the other case (how it works now) we'll subscript the __type_info[..] array
-    to get our heap allocated pointer.
-
-    We should rework it, it would be great to use the second idea. cheaper accesses, cheaper initialization, a little
-    trade off in binary size.
-  */
-
-  // THIR_ALLOC(THIRIndex, index, ast);
-  // THIR_ALLOC(THIRLiteral, type_index, ast);
-  // type_index->value = std::to_string(ast->target->resolved_type->uid);
-  // type_index->type = u64_type();
-
-  // index->index = type_index;
-  // THIR_ALLOC(THIRPath, type_info_path, ast);
-
-  // {  // Ugly but we have to do some type resolution here, for the List!<*const Type>. then, set the type_infp_path->type
-  //   // to that.
-  //   const static Type *type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
-  //   static Type *list = ctx.scope->find_type_id("List", {});
-  //   const static ASTDeclaration *declaring_node = (ASTStructDeclaration *)list->declaring_node.get();
-  //   const static ASTDeclaration *instance = find_generic_instance(declaring_node->generic_instantiations, {list});
-  //   static Type *type_ptr_list = instance->resolved_type;
-  //   type_info_path->type = type_ptr_list;
-  // }
-
-  // type_info_path->tag = THIRPath::Variable;
-  // type_info_path->variable->name = "__type_info";
-  // type_info_path->variable->source_range = ast->source_range;
-  // index->base = type_info_path;
-  // return index;
   throw_error("not implemented", ast->source_range);
 }
 
@@ -236,14 +205,6 @@ THIR *THIRVisitor::visit_block(ASTBlock *ast) {
   return thir;
 }
 
-/*
-  This needs a caching mechanism so we can always just lookup the symbol, call visit function declaration,
-  and get the THIRFunction * for any given function at any time.
-
-  Then, we don't need a dual symbol table.
-
-  As well as ASTVariable, right below.
-*/
 THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRFunction, thir, ast);
@@ -266,20 +227,16 @@ THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
   if (ast->value) {
     thir->value = visit_node(ast->value.get());
   }
+  thir->type = ast->type->resolved_type;
   return thir;
 }
 
-THIR *THIRVisitor::visit_struct_declaration(ASTStructDeclaration *ast) {
-  return nullptr;
-}
-THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *ast) {
-  return nullptr;
-}
-THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *ast) {
-  return nullptr;
-}
+THIR *THIRVisitor::visit_struct_declaration(ASTStructDeclaration *ast) { return nullptr; }
+THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *ast) { return nullptr; }
+THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *ast) { return nullptr; }
 
 THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { throw_error("not implemented", ast->source_range); }
+
 THIR *THIRVisitor::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
@@ -298,10 +255,10 @@ THIR *THIRVisitor::visit_program(ASTProgram *ast) {
 // We'd still have RangeIter for other uses, and for runtime loops that take a non constant range.
 THIR *THIRVisitor::visit_for(ASTFor *ast) { throw_error("not implemented", ast->source_range); }
 
-// this should have the capability to return values. It's easier than ever with my new knowledge of C,
-// and we can easily support it.
+
 THIR *THIRVisitor::visit_if(ASTIf *ast) { throw_error("not implemented", ast->source_range); }
 THIR *THIRVisitor::visit_else(ASTElse *ast) { throw_error("not implemented", ast->source_range); }
+
 THIR *THIRVisitor::visit_while(ASTWhile *ast) { throw_error("not implemented", ast->source_range); }
 
 // This would likely result in just declaring several variables, it's tough to return several nodes from one visit.
