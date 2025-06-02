@@ -1,20 +1,27 @@
 #include "thir.hpp"
-#include <map>
 #include "ast.hpp"
 #include "core.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 
-#define ENTER_SCOPE(new_scope)  \
-  auto _old_scope_ = ctx.scope; \
-  ctx.scope = new_scope;        \
-  Defer _defer([&] { ctx.scope = _old_scope_; });
+#define ENTER_SCOPE($new_scope)       \
+  const auto $old_scope_ = ctx.scope; \
+  ctx.scope = $new_scope;             \
+  const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
+
+// This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
+// this is very important.
+#define ENTER_STMT_VEC($stmt_vector)                                                       \
+  static_assert(std::is_same_v<std::decay_t<decltype($stmt_vector)>, std::vector<THIR *>>, \
+                "ENTER_STMT_VEC expects a std::vector<THIR *>");                           \
+  const auto $old_stmt_vector = current_statement_list;                                    \
+  current_statement_list = (&$stmt_vector);                                                \
+  const Defer $stmt_container_defer([&] { current_statement_list = $old_stmt_vector; });
 
 /*
   I put some of these super trivial nodes up top here so they stay out of the way
 */
-
-std::map<ASTNode *, THIR *> symbol_map;
 
 THIR *THIRVisitor::visit_size_of(ASTSize_Of *ast) {
   THIR_ALLOC(THIRSizeOf, thir, ast);
@@ -51,51 +58,55 @@ THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) {
   ! These three are going to be tough, with generics and all.
   @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
-THIR *THIRVisitor::visit_call(ASTCall *ast) {
-  THIR_ALLOC(THIRCall, thir, ast);
-  auto callee = thir->callee = visit_node(ast->callee);
 
+void THIRVisitor::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
+                                                     std::vector<THIR *> &out_args) {
   // Only handle default arguments for function calls that have a definition, not function pointers.
   if (callee->get_node_type() == THIRNodeType::Function) {
     const auto function = (const THIRFunction *)callee;
     const auto &params = function->parameters;
-    const auto &args = ast->arguments->arguments;
+    const auto &ast_args = in_args->arguments;
 
     size_t i = 0;
-    for (; i < args.size(); ++i) {
-      thir->arguments.push_back(visit_node(args[i]));
+    for (; i < ast_args.size(); ++i) {
+      out_args.push_back(visit_node(ast_args[i]));
     }
 
     for (; i < params.size(); ++i) {
       if (params[i].default_value) {
-        thir->arguments.push_back(params[i].default_value);
-      } else {
-        throw_error("Missing argument with no default value", ast->source_range);
+        out_args.push_back(params[i].default_value);
       }
     }
-  } else { // Other calls, via function pointers, variables, non-symbol calls &c &c.
-    for (const auto &argument : ast->arguments->arguments) {
-      thir->arguments.push_back(visit_node(argument));
+  } else {
+    // Other calls, via function pointers, variables, non-symbol calls &c &c.
+    for (const auto &argument : in_args->arguments) {
+      out_args.push_back(visit_node(argument));
     }
   }
+}
 
+THIR *THIRVisitor::visit_call(ASTCall *ast) {
+  THIR_ALLOC(THIRCall, thir, ast);
+  auto callee = thir->callee = visit_node(ast->callee);
+  extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
   return thir;
 }
+
 THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
-  auto base = ast->callee->base;
-  auto member = ast->callee->member;
-  auto type_scope = base->resolved_type->info->scope;
-
-  // ! TODO: we need to have a centralized way to get monomorphized generic functions,
-  // ! and we need a way to monomorphize generic types too.
-  auto symbol = type_scope->local_lookup(member.identifier);
+  const auto base = ast->callee->base;
+  const auto member = ast->callee->member;
+  const auto type_scope = base->resolved_type->info->scope;
+  const auto symbol = type_scope->local_lookup(member.identifier);
   if (symbol->is_variable()) {
     thir->callee = visit_dot_expr(ast->callee);
+  } else {
+    // Push the self argument
+    const auto thir_base = visit_node(base);
+    thir->arguments.push_back(thir_base);
+    thir->callee = visit_function_declaration(symbol->function.declaration);
   }
-  for (const auto &argument : ast->arguments->arguments) {
-    thir->arguments.push_back(visit_node(argument));
-  }
+  extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
 }
 
@@ -116,6 +127,7 @@ THIR *THIRVisitor::visit_path(ASTPath *ast) {
   }
   return symbol_map[sym->variable.declaration.get()];
 }
+
 THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
@@ -194,6 +206,7 @@ THIR *THIRVisitor::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not 
 THIR *THIRVisitor::visit_tuple(ASTTuple *ast) { throw_error("visit_tuple not implemented", ast->source_range); }
 // Use THIRAggregateInitializer here.
 THIR *THIRVisitor::visit_range(ASTRange *ast) { throw_error("visit_range not implemented", ast->source_range); }
+
 // Use THIRAggregateInitializer/Collection/Empty here.
 // Really, the AST could benefit from the seperation of those possibly.
 THIR *THIRVisitor::visit_initializer_list(ASTInitializerList *ast) {
@@ -218,6 +231,7 @@ THIR *THIRVisitor::visit_lambda(ASTLambda *ast) {
 THIR *THIRVisitor::visit_block(ASTBlock *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRBlock, thir, ast);
+  ENTER_STMT_VEC(thir->statements);
 
   std::vector<ASTDefer *> deferred_statements;
   for (const auto &ast_statement : ast->statements) {
@@ -342,22 +356,24 @@ THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
 
   symbol_map[ast] = thir;
+
   if (!ast->is_local) {
     thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
   } else {
     thir->name = ast->name;
   }
+
   if (ast->value) {
     thir->value = visit_node(ast->value.get());
   } else {
     // TODO: we should have an option for initializing variable declarations with no value that lets it circumvent zero
     // init.
     // TODO: akin to jai's --- operator.
-
     // we use this for default construction, to be more explicit.
     THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
     thir->value = empty_init;
   }
+
   thir->type = ast->type->resolved_type;
   return thir;
 }
@@ -395,7 +411,7 @@ THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not 
 THIR *THIRVisitor::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
-
+  ENTER_STMT_VEC(thir->statements);
   for (const auto &ast_statement : ast->statements) {
     if (auto thir_statement = visit_node(ast_statement)) {
       thir->statements.push_back(thir_statement);
@@ -411,21 +427,29 @@ THIR *THIRVisitor::visit_program(ASTProgram *ast) {
 THIR *THIRVisitor::visit_for(ASTFor *ast) { throw_error("visit_for not implemented", ast->source_range); }
 
 THIR *THIRVisitor::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); }
+
 THIR *THIRVisitor::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); }
 
 THIR *THIRVisitor::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); }
 
-// This would likely result in just declaring several variables, it's tough to return several nodes from one visit.
-THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) {
+THIR *THIRVisitor::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); }
+
+void THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) {
   throw_error("visit_tuple_deconstruction not implemented", ast->source_range);
 }
-// This shouldn't be carried past this point; they should be placed in the correct parts of each block,
-// and 'instantiated' for lack of a better term, then shelled off.
-THIR *THIRVisitor::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); }
-// Not really sure what significance this would have either.
-THIR *THIRVisitor::visit_import(ASTImport *ast) { throw_error("visit_import not implemented", ast->source_range); }
-// Not sure how we'd use this. I guess module $name { ... } has code in it.
-THIR *THIRVisitor::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
-// I don't think we need this, this should completely done after typing.
-THIR *THIRVisitor::visit_impl(ASTImpl *ast) { throw_error("visit_impl not implemented", ast->source_range); }
-THIR *THIRVisitor::visit_where_statement(ASTWhereStatement *node) {}
+
+void THIRVisitor::visit_impl(ASTImpl *ast) {
+  for (const auto &method : ast->methods) {
+    current_statement_list->push_back(visit_node(method));
+  }
+  for (const auto &constant : ast->constants) {
+    current_statement_list->push_back(visit_node(constant));
+  }
+}
+
+void THIRVisitor::visit_import(ASTImport *ast) { throw_error("visit_import not implemented", ast->source_range); }
+void THIRVisitor::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
+
+void THIRVisitor::visit_where_statement(ASTWhereStatement *ast) {
+  throw_error("visit_where_statement not yet implemented", ast->source_range);
+}

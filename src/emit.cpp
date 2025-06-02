@@ -173,7 +173,15 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   code << '.' << thir->member.get_str();
 }
 
-void Emitter::emit_cast(const THIRCast *thir) { throw_error("emit_cast is unimplemented", thir->source_range); }
+void Emitter::emit_cast(const THIRCast *thir) { 
+  code << '(' << c_type_string(thir->type) << ')';
+  emit_expr(thir->operand);  
+}
+void Emitter::emit_size_of(const THIRSizeOf *thir) { 
+  code << "sizeof(";
+  c_type_string(thir->target);
+  code << ')';
+}
 
 void Emitter::emit_index(const THIRIndex *thir) {
   emit_expr(thir->base);
@@ -190,7 +198,7 @@ void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir)
 }
 
 void Emitter::emit_empty_initializer(const THIREmptyInitializer *) { code << "{0}"; }
-void Emitter::emit_size_of(const THIRSizeOf *thir) { throw_error("emit_size_of is unimplemented", thir->source_range); }
+
 
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
 void Emitter::emit_if(const THIRIf *thir) { throw_error("emit_if is unimplemented", thir->source_range); }

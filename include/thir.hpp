@@ -5,6 +5,7 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "ast.hpp"
+#include <map>
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
@@ -227,16 +228,25 @@ static inline T *thir_alloc() {
 struct THIRVisitor {
   THIRVisitor(Context &ctx) : ctx(ctx) {}
   Context &ctx;
+  std::map<ASTNode *, THIR *> symbol_map;
+
+  // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
+  // typically these will just return void.
+  std::vector<THIR *> *current_statement_list;
+
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
   THIR *visit_pattern_match(ASTPatternMatch *node);
   THIR *visit_dyn_of(ASTDyn_Of *node);
   THIR *visit_type_of(ASTType_Of *node);
   THIR *visit_block(ASTBlock *node);
-  THIR *visit_expr_statement(ASTExprStatement *node);
   THIR *visit_bin_expr(ASTBinExpr *node);
   THIR *visit_unary_expr(ASTUnaryExpr *node);
   THIR *visit_literal(ASTLiteral *node);
+
+  void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
+                                          std::vector<THIR *> &out_args);
+
   THIR *visit_call(ASTCall *node);
   THIR *visit_return(ASTReturn *node);
   THIR *visit_dot_expr(ASTDotExpr *node);
@@ -249,8 +259,7 @@ struct THIRVisitor {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-  THIR *visit_module(ASTModule *node);
-  THIR *visit_import(ASTImport *node);
+
   THIR *visit_program(ASTProgram *node);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);
@@ -261,22 +270,50 @@ struct THIRVisitor {
   THIR *visit_else(ASTElse *node);
   THIR *visit_while(ASTWhile *node);
   THIR *visit_enum_declaration(ASTEnumDeclaration *node);
-  THIR *visit_tuple_deconstruction(ASTDestructure *node);
-  THIR *visit_impl(ASTImpl *node);
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
-  THIR *visit_where_statement(ASTWhereStatement *node);
+  THIR *visit_expr_statement(ASTExprStatement *node);
+
+  void visit_module(ASTModule *node);
+  void visit_import(ASTImport *node);
+  void visit_impl(ASTImpl *node);
+  void visit_tuple_deconstruction(ASTDestructure *node);
+  void visit_where_statement(ASTWhereStatement *node);
+
   THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
       default: {
         throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
         return nullptr;
       }
-      // Ignored nodes, should these return nullptr? idk. don't want nulls in our THIR. maybe just a static THIR* that's
-      // just a noop in general.
+      
+      // Ignored nodes.
       case AST_NODE_NOOP: {
         return nullptr;
       }
+
+      // These nodes can return many nodes, so they always return void, and push the nodes manually.
+      case AST_NODE_TUPLE_DECONSTRUCTION: {
+        visit_tuple_deconstruction((ASTDestructure *)node);
+        return nullptr;
+      }
+      case AST_NODE_WHERE_STATEMENT: {
+        visit_where_statement((ASTWhereStatement *)node);
+        return nullptr;
+      }
+      case AST_NODE_IMPL: {
+        visit_impl((ASTImpl *)node);
+        return nullptr;
+      }
+      case AST_NODE_IMPORT: {
+        visit_import((ASTImport *)node);
+        return nullptr;
+      }
+      case AST_NODE_MODULE: {
+        visit_module((ASTModule *)node);
+        return nullptr;
+      }
+
       // Actual nodes.
       case AST_NODE_IF:
         return visit_if((ASTIf *)node);
@@ -321,12 +358,7 @@ struct THIRVisitor {
         return visit_block((ASTBlock *)node);
       case AST_NODE_FUNCTION_DECLARATION:
         return visit_function_declaration((ASTFunctionDeclaration *)node);
-      case AST_NODE_IMPL:
-        return visit_impl((ASTImpl *)node);
-      case AST_NODE_IMPORT:
-        return visit_import((ASTImport *)node);
-      case AST_NODE_MODULE:
-        return visit_module((ASTModule *)node);
+
       case AST_NODE_RETURN:
         return visit_return((ASTReturn *)node);
       case AST_NODE_CONTINUE:
@@ -351,10 +383,7 @@ struct THIRVisitor {
         return visit_expr_statement((ASTExprStatement *)node);
       case AST_NODE_DEFER:
         return visit_defer((ASTDefer *)node);
-      case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction((ASTDestructure *)node);
-      case AST_NODE_WHERE_STATEMENT:
-        return visit_where_statement((ASTWhereStatement *)node);
+      
     }
   }
 };
