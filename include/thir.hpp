@@ -171,7 +171,7 @@ struct THIRFor : THIR {
   THIR *initialization;
   THIR *condition;
   THIR *increment;
-  THIRBlock *block;
+  THIR *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::For; }
 };
 
@@ -229,6 +229,16 @@ struct THIRVisitor {
   THIRVisitor(Context &ctx) : ctx(ctx) {}
   Context &ctx;
   std::map<ASTNode *, THIR *> symbol_map;
+
+  Type *iterator_trait() {
+    static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
+    return iter_id;
+  }
+
+  Type *iterable_trait() {
+    static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
+    return iterable_id;
+  }
 
   // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
   // typically these will just return void.

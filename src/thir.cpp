@@ -420,11 +420,37 @@ THIR *THIRVisitor::visit_program(ASTProgram *ast) {
   return thir;
 }
 
-// Optimization idea:
-// For simple 'for i in 0..10' etc loops over range literals,
-// we can optimize down into a classic C style for loop. Yank out some iterator overhead.
-// We'd still have RangeIter for other uses, and for runtime loops that take a non constant range.
-THIR *THIRVisitor::visit_for(ASTFor *ast) { throw_error("visit_for not implemented", ast->source_range); }
+THIR *THIRVisitor::visit_for(ASTFor *ast) {
+  THIR_ALLOC(THIRFor, thir, ast)
+
+  THIR *initialization = nullptr;
+
+  if (ast->right->resolved_type->implements(iterable_trait())) {
+    ASTMethodCall iter_method;
+    ASTDotExpr dot_iter;
+    dot_iter.base = ast->right;
+    dot_iter.member = {
+        .identifier = "iter",
+    };
+    iter_method.callee = &dot_iter;
+    iter_method.arguments->arguments.push_back(ast->right);
+
+    ASTMethodCall next_method;
+    ASTDotExpr dot_next;
+    dot_next.base= &iter_method;
+    dot_next.member = {
+      "next"
+    };
+    
+    auto iterator = visit_node(&next_method);
+
+  } else if (ast->right->resolved_type->implements(iterator_trait())) {
+
+  }
+
+  thir->initialization = initialization;
+  thir->block = visit_node(ast->block);
+}
 
 THIR *THIRVisitor::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); }
 
