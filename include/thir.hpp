@@ -228,11 +228,13 @@ static inline T *thir_alloc() {
 struct THIRVisitor {
   THIRVisitor(Context &ctx) : ctx(ctx) {}
   Context &ctx;
-  std::map<ASTNode *, THIR *> symbol_map;
+  std::map<InternedString, THIR *> symbol_map;
 
   // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
   // typically these will just return void.
   std::vector<THIR *> *current_statement_list;
+
+  std::string symbol_fullname(Scope *scope, InternedString name, std::vector<Type *> generic_args);
 
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);

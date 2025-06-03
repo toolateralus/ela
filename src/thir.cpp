@@ -1,4 +1,5 @@
 #include "thir.hpp"
+#include <vector>
 #include "ast.hpp"
 #include "core.hpp"
 #include "lex.hpp"
@@ -104,7 +105,12 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
     // Push the self argument
     const auto thir_base = visit_node(base);
     thir->arguments.push_back(thir_base);
-    thir->callee = visit_function_declaration(symbol->function.declaration);
+    std::vector<Type *> generic_args;
+    for (auto arg: member.generic_arguments) {
+      generic_args.push_back(arg->resolved_type);
+    }
+    auto fullname = symbol_fullname(symbol->scope, symbol->name, generic_args);
+    thir->callee = symbol_map[fullname];
   }
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -122,10 +128,20 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
 */
 THIR *THIRVisitor::visit_path(ASTPath *ast) {
   auto sym = ctx.get_symbol(ast).get();
-  if (sym->is_function()) {
-    return symbol_map[sym->function.declaration];
+  auto fullname = symbol_fullname(sym->scope, sym->name, ast->segments.back().get_resolved_generics());
+  return symbol_map[fullname];
+}
+
+std::string THIRVisitor::symbol_fullname(Scope *scope, InternedString name, std::vector<Type *> generic_args) {
+  std::string full_name;
+  if (scope) {
+    full_name += scope->full_name();
   }
-  return symbol_map[sym->variable.declaration.get()];
+  if (!full_name.empty()) {
+    full_name += "$";
+  }
+  full_name += name.get_str() + mangled_type_args(generic_args);
+  return full_name;
 }
 
 THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) {
@@ -154,7 +170,7 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = symbol_map[symbol_fullname(symbol->scope, symbol->name, {})];
     overload_call->arguments.push_back(visit_node(ast->left));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
@@ -171,7 +187,7 @@ THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = symbol_map[symbol_fullname(symbol->scope, symbol->name, {})];
     overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
@@ -187,7 +203,7 @@ THIR *THIRVisitor::visit_index(ASTIndex *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = symbol_map[symbol_fullname(symbol->scope, symbol->name, {})];
     overload_call->arguments.push_back(visit_node(ast->base));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
@@ -295,10 +311,19 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
 }
 
 THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  // have to do this before we set scope bc scope is null for some fun decls
+  auto fullname = symbol_fullname(ctx.scope, ast->name, ast->generic_arguments);
+
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRFunction, thir, ast);
   convert_function_flags(thir, (FunctionInstanceFlags)ast->flags);
   convert_function_attributes(thir, ast->attributes);
+
+  if (thir->is_exported || thir->is_extern || thir->is_no_mangle) {
+    thir->name = ast->name;
+  } else {
+    thir->name = fullname;
+  }
 
   for (const auto &param : ast->params->params) {
     THIR *default_value = nullptr;
@@ -321,7 +346,7 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
       thir_param->type = param->resolved_type;
     }
 
-    symbol_map[param] = thir_param;
+    symbol_map[thir->name.get_str() + "$" + thir_param->name.get_str()] = thir_param;
     thir->parameters.push_back(THIRParameter{
         .name = thir_param->name,
         .default_value = default_value,
@@ -332,12 +357,6 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
     thir->is_entry = true;
   }
 
-  if (thir->is_exported || thir->is_extern || thir->is_no_mangle) {
-    thir->name = ast->name;
-  } else {
-    thir->name = ast->scope->full_name();
-  }
-
   printf(
       "function %s = {\n  is_extern=%s,\n  is_inline=%s\n  is_exported=%s\n  is_test=%s\n  is_varargs=%s\n  "
       "is_entry=%s\n  is_no_return=%s }\n",
@@ -345,7 +364,7 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
       thir->is_exported ? "true" : "false", thir->is_test ? "true" : "false", thir->is_varargs ? "true" : "false",
       thir->is_entry ? "true" : "false", thir->is_no_return ? "true" : "false");
 
-  symbol_map[ast] = thir;
+  symbol_map[thir->name] = thir;
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
   }
@@ -355,10 +374,11 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
 THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
 
-  symbol_map[ast] = thir;
+  auto fullname = symbol_fullname(ctx.scope, ast->name, {});
+  symbol_map[fullname] = thir;
 
   if (!ast->is_local) {
-    thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
+    thir->name = fullname;
   } else {
     thir->name = ast->name;
   }
