@@ -84,7 +84,6 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
       }
     },
     {

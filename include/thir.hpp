@@ -233,7 +233,7 @@ struct THIRGen {
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
   Typer &typer;
 
-  std::map<ASTNode *, THIR *> symbol_map;
+  std::map<Symbol *, THIR *> symbol_map;
 
   THIR *entry_point;
 
