@@ -420,6 +420,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
     code << ";\n";
   }
 }
+
 void Emitter::emit_block(const THIRBlock *thir) {
   code << "{\n";
   INDENTED_BLOCK();
@@ -428,12 +429,14 @@ void Emitter::emit_block(const THIRBlock *thir) {
   }
   code << "}";
 }
+
 void Emitter::emit_variable(const THIRVariable *thir) {
   indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   code << " = ";
   emit_expr(thir->value);
   code << ";\n";
 }
+
 void Emitter::emit_return(const THIRReturn *thir) {
   indented("return");
   if (thir->expression) {
