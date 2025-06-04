@@ -4,7 +4,9 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-#include "visitor.hpp"
+
+// this is used directly. clangd stop b*tchin
+#include "visitor.hpp" 
 
 #define ENTER_SCOPE($new_scope)       \
   const auto $old_scope_ = ctx.scope; \
@@ -23,7 +25,6 @@
 /*
   I put some of these super trivial nodes up top here so they stay out of the way
 */
-
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
   THIR_ALLOC(THIRSizeOf, thir, ast);
   thir->target = ast->target_type->resolved_type;
@@ -59,7 +60,6 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   ! These three are going to be tough, with generics and all.
   @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
-
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                      std::vector<THIR *> &out_args) {
   // Only handle default arguments for function calls that have a definition, not function pointers.

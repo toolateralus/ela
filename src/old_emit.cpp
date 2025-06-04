@@ -2190,7 +2190,7 @@ void OldEmitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArgum
   const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
-  code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
+  code << ".index = " << std::to_string(info->get_variant_index(variant_name)+1) << ",\n";
   ASTTuple tuple;
 
   code << "." << variant_name.get_str() << " = ";
@@ -2210,7 +2210,7 @@ void OldEmitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTIniti
   const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
-  code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
+  code << ".index = " << std::to_string(info->get_variant_index(variant_name)+1) << ",\n";
   code << "." << variant_name.get_str() << " = " << "{";
   for (const auto &[name, value] : initializer->key_values) {
     code << "." << name.get_str() << " = ";
@@ -2385,7 +2385,7 @@ void OldEmitter::emit_pattern_match_for_switch_case(const Type *target_type, con
 
   const auto variant_name = segment.identifier;
   const auto variant_type = info->get_variant_type(variant_name);
-  const auto variant_index = info->get_variant_index(variant_name);
+  const auto variant_index = info->get_variant_index(variant_name)+1;
   const auto is_pointer = target_type->extensions.is_pointer();
 
   code << "if (" << target_temp_identifier;

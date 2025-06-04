@@ -486,6 +486,8 @@ struct Scope {
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
+
+
     return type;
   }
 

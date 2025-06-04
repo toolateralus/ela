@@ -1,5 +1,4 @@
 #include "emit.hpp"
-#include "ast.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "thir.hpp"

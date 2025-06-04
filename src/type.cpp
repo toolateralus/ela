@@ -438,6 +438,15 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
     type->traits.push_back(is_struct_trait());
   }
 
+  for (const auto &[name, symbol] : scope->symbols) {
+    if (symbol.is_variable()) {
+      info->members.push_back(TypeMember{
+          .name = name,
+          .type = symbol.resolved_type,
+      });
+    }
+  }
+
   return type;
 }
 

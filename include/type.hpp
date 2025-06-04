@@ -94,8 +94,7 @@ struct TypeExtension {
   TypeExtEnum type;
   size_t array_size;
   bool operator==(const TypeExtension &other) const {
-    if (type != other.type)
-      return false;
+    if (type != other.type) return false;
     if (type == TYPE_EXT_ARRAY) {
       return array_size == other.array_size;
     }
@@ -141,8 +140,7 @@ struct TypeExtensions {
   inline bool operator==(const TypeExtensions &other) const { return equals(other); }
 
   inline bool equals(const TypeExtensions &other) const {
-    if (extensions != other.extensions)
-      return false;
+    if (extensions != other.extensions) return false;
     return true;
   }
 
@@ -208,7 +206,7 @@ struct ASTFunctionDeclaration;
 struct FunctionTypeInfo : TypeInfo {
   FunctionTypeInfo() { memset(parameter_types, 0, 256 * sizeof(Type *)); }
   Type *return_type = nullptr;
-  Type *parameter_types[256]; // max no of params in c++.
+  Type *parameter_types[256];  // max no of params in c++.
   size_t params_len = 0;
   bool is_varargs = false;
   virtual std::string to_string() const override;
@@ -270,7 +268,6 @@ Type *is_choice_trait();
 Type *is_dyn_trait();
 Type *is_union_trait();
 
-
 Type *is_pointer_trait();
 Type *is_mut_pointer_trait();
 Type *is_const_pointer_trait();
@@ -284,8 +281,7 @@ Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Typ
 
 Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
 
-Type *global_create_choice_type(const InternedString &name, Scope *scope,
-                                      const std::vector<Type *> &generic_args);
+Type *global_create_choice_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args);
 Type *global_create_enum_type(const InternedString &, Scope *, bool = false, Type *element_type = s32_type());
 
 Type *global_create_tuple_type(const std::vector<Type *> &types);
@@ -350,7 +346,6 @@ struct Type {
     if (kind == TYPE_FUNCTION) {
       traits.push_back(is_fn_trait());
     }
-
   }
 
   /*
@@ -388,7 +383,10 @@ static inline constexpr bool type_is_valid(Type *type) {
 
 struct ASTFunctionDeclaration;
 
-template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
+template <class T>
+static inline T *type_info_alloc() {
+  return new (type_info_arena.allocate(sizeof(T))) T();
+}
 
 enum OperationKind {
   OPERATION_BINARY,
