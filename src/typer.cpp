@@ -2590,8 +2590,8 @@ void Typer::visit(ASTDestructure *node) {
   node->resolved_type = node->right->resolved_type;
   auto type = node->right->resolved_type;
 
-  for (const auto &destruct : node->elements) {
-    auto symbol = ctx.scope->local_lookup(destruct.identifier);
+  for (auto &element : node->elements) {
+    auto symbol = ctx.scope->local_lookup(element.identifier);
 
     if (node->op == TType::ColonEquals) {
       if (symbol) {
@@ -2600,14 +2600,13 @@ void Typer::visit(ASTDestructure *node) {
             "the identifiers",
             node->source_range);
       }
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
-
+      ctx.scope->insert_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
     } else {
       if (!symbol) {
         throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
                     node->source_range);
       }
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
+      ctx.scope->insert_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
     }
   }
 
@@ -2623,7 +2622,6 @@ void Typer::visit(ASTDestructure *node) {
 
   auto scope = type->info->scope;
   size_t i = 0;
-
   for (const auto name : scope->ordered_symbols) {
     auto symbol = scope->local_lookup(name);
 
@@ -2631,15 +2629,18 @@ void Typer::visit(ASTDestructure *node) {
 
     if (i > node->elements.size()) break;
 
-    auto destructure = node->elements[i];
+    auto &element = node->elements[i];
     auto type = symbol->resolved_type;
 
-    if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
+    if (element.semantic == VALUE_SEMANTIC_POINTER) {
       type = symbol->resolved_type->take_pointer_to(MUT);
     }
-    ctx.scope->insert_variable(destructure.identifier, type, symbol->variable.initial_value.get(),
-                               destructure.mutability);
-    ctx.scope->local_lookup(destructure.identifier)->flags |= SYMBOL_IS_LOCAL;
+
+    element.type = type;
+    ctx.scope->insert_variable(element.identifier, type, symbol->variable.initial_value.get(), element.mutability);
+
+    ctx.scope->local_lookup(element.identifier)->flags |= SYMBOL_IS_LOCAL;
+
     ++i;
   }
 };

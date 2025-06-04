@@ -177,10 +177,6 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
 }
 
 THIR *THIRGen::visit_path(ASTPath *ast) {
-  // This is just nonsense in many ways; What about choice type variants, what about enum variants?
-  // This just won't work.
-  // Not even the string rework will work perfectly.
-
   if (should_emit_choice_type_marker_variant_instantiation(ast)) {
     return get_choice_type_instantiation_boilerplate(ast);
   }
@@ -468,8 +464,9 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   if (thir->name == "main" || thir->is_entry) {
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
-      throw_error("multiple functions with the @[entry] were found, or multiple 'main()' functions were found",
-                  ast->source_range);
+      throw_error(
+          "multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found",
+          ast->source_range);
     }
 
     entry_point = thir;
@@ -647,8 +644,49 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
   return nullptr;
 }
 
+// x, y := (0, 0);
 void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
-  throw_error("visit_tuple_deconstruction not implemented", ast->source_range);
+  const auto type = ast->right->resolved_type;
+  auto members_iter = type->info->members.begin();
+
+  THIR *base = visit_node(ast->right);
+  THIR_ALLOC(THIRVariable, cached_base, ast->right);
+  static int key = 0;
+  cached_base->name = "$destructure$" + std::to_string(key);
+  cached_base->value = base;
+  cached_base->type = type;
+  cached_base->is_global = false;
+  cached_base->is_statement = true;
+  current_statement_list->push_back(cached_base);
+
+  for (const DestructureElement &element : ast->elements) {
+    THIR_ALLOC(THIRVariable, var, ast);
+    var->name = element.identifier;
+    var->type = element.type;
+
+    THIR_ALLOC(THIRMemberAccess, member_access, ast);
+    var->value = member_access;
+
+    const auto member = *members_iter;
+    members_iter++;
+
+    member_access->member = member.name;
+    member_access->base = cached_base;
+    member_access->type = element.type;
+
+    if (element.semantic == VALUE_SEMANTIC_POINTER) {
+      THIR_ALLOC(THIRUnaryExpr, unary, ast);
+      unary->op = TType::And;
+      unary->operand = member_access;
+      var->value = unary;
+    }
+
+    auto sym = ctx.scope->lookup(element.identifier);
+    auto noop = (sym->variable.declaration = ast_alloc<ASTNoop>()).get();
+    symbol_map[noop] = var;
+
+    current_statement_list->push_back(var);
+  }
 }
 
 void THIRGen::visit_impl(ASTImpl *ast) {

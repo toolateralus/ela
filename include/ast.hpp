@@ -409,6 +409,7 @@ struct DestructureElement {
   ValueSemantic semantic;
   InternedString identifier;
   Mutability mutability;
+  Type *type;
 };
 
 struct ASTDestructure : ASTStatement {
