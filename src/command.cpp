@@ -26,17 +26,17 @@ int CompileCommand::compile() {
   });
 
   lower.run<void>("typing & lowering to C", [&] {
-    Typer type_visitor{context};
-    THIRVisitor thir_visitor(context);
-    Emitter thir_emitter;
-    type_visitor.visit(root);
-    auto thir = thir_visitor.visit_program(root);
-    thir_emitter.emit_program((THIRProgram *)thir);
+    Typer typer{context};
+    THIRGen thir_gen(typer, context);
+    Emitter emitter;
+    typer.visit(root);
+    auto thir = thir_gen.visit_program(root);
+    emitter.emit_program((THIRProgram *)thir);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
     output << BOILERPLATE_C_CODE << '\n';
-    output << thir_emitter.code.str();
+    output << emitter.code.str();
 
     // Emitter emit(context, type_visitor);
     // Resolver dep_resolver(context, &emit);

@@ -329,7 +329,7 @@ struct Symbol {
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTChoiceDeclaration> choice;
+      Nullable<ASTChoiceDeclaration> choice; // ? Why is this here? Just to confirm the type is a child of a choice type?
       Nullable<ASTNode> declaration;
       TypeKind kind;
     } type;

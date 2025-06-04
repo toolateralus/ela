@@ -58,9 +58,12 @@ struct Emitter {
   void emit_switch(const THIRSwitch *thir);
   void emit_variable(const THIRVariable *thir);
 
-  void emit_struct_body(const THIRStruct *thir);
-  void emit_anonymous_struct(const THIRStruct *thir);
-  void emit_struct(const THIRStruct *thir);
+  void emit_struct(Type *type);
+  void emit_choice(Type *type);
+  void emit_enum(Type *type);
+  void emit_anonymous_struct(Type *thir);
+  void emit_struct_body(Type *thir);
+  void emit_type(const THIRType *thir);
 
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);

@@ -4,6 +4,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include "visitor.hpp"
 
 #define ENTER_SCOPE($new_scope)       \
   const auto $old_scope_ = ctx.scope; \
@@ -23,24 +24,24 @@
   I put some of these super trivial nodes up top here so they stay out of the way
 */
 
-THIR *THIRVisitor::visit_size_of(ASTSize_Of *ast) {
+THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
   THIR_ALLOC(THIRSizeOf, thir, ast);
   thir->target = ast->target_type->resolved_type;
   thir->type = u64_type();
   return thir;
 }
 
-THIR *THIRVisitor::visit_continue(ASTContinue *ast) {
+THIR *THIRGen::visit_continue(ASTContinue *ast) {
   THIR_ALLOC(THIRContinue, thir, ast);
   return thir;
 }
 
-THIR *THIRVisitor::visit_break(ASTBreak *ast) {
+THIR *THIRGen::visit_break(ASTBreak *ast) {
   THIR_ALLOC(THIRBreak, thir, ast);
   return thir;
 }
 
-THIR *THIRVisitor::visit_return(ASTReturn *ast) {
+THIR *THIRGen::visit_return(ASTReturn *ast) {
   THIR_ALLOC(THIRReturn, thir, ast);
   if (ast->expression) {
     thir->expression = visit_node(ast->expression.get());
@@ -48,7 +49,7 @@ THIR *THIRVisitor::visit_return(ASTReturn *ast) {
   return thir;
 }
 
-THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) {
+THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   auto thir = visit_node(ast->expression);
   thir->is_statement = true;
   return thir;
@@ -59,7 +60,7 @@ THIR *THIRVisitor::visit_expr_statement(ASTExprStatement *ast) {
   @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
 
-void THIRVisitor::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
+void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                      std::vector<THIR *> &out_args) {
   // Only handle default arguments for function calls that have a definition, not function pointers.
   if (callee->get_node_type() == THIRNodeType::Function) {
@@ -85,14 +86,14 @@ void THIRVisitor::extract_arguments_desugar_defaults(const THIR *callee, const A
   }
 }
 
-THIR *THIRVisitor::visit_call(ASTCall *ast) {
+THIR *THIRGen::visit_call(ASTCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   auto callee = thir->callee = visit_node(ast->callee);
   extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
   return thir;
 }
 
-THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
+THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   const auto base = ast->callee->base;
   const auto member = ast->callee->member;
@@ -120,7 +121,7 @@ THIR *THIRVisitor::visit_method_call(ASTMethodCall *ast) {
     enum variants, the self variable.
     This should be fine for now, but will be problematic.
 */
-THIR *THIRVisitor::visit_path(ASTPath *ast) {
+THIR *THIRGen::visit_path(ASTPath *ast) {
   auto sym = ctx.get_symbol(ast).get();
   if (sym->is_function()) {
     return symbol_map[sym->function.declaration];
@@ -128,7 +129,7 @@ THIR *THIRVisitor::visit_path(ASTPath *ast) {
   return symbol_map[sym->variable.declaration.get()];
 }
 
-THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) {
+THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
   // TODO:
@@ -139,11 +140,11 @@ THIR *THIRVisitor::visit_dot_expr(ASTDotExpr *ast) {
 }
 
 // This is gonna be tricky to do right, for nested patterns, which we 100% plan on supporting.
-THIR *THIRVisitor::visit_pattern_match(ASTPatternMatch *ast) {
+THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast) {
   throw_error("visit_pattern_match not implemented", ast->source_range);
 }
 
-THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
+THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC(THIRBinExpr, binexpr, ast);
     binexpr->left = visit_node(ast->left);
@@ -161,7 +162,7 @@ THIR *THIRVisitor::visit_bin_expr(ASTBinExpr *ast) {
   }
 }
 
-THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
+THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC(THIRUnaryExpr, unary, ast);
     unary->operand = visit_node(ast->operand);
@@ -177,7 +178,7 @@ THIR *THIRVisitor::visit_unary_expr(ASTUnaryExpr *ast) {
   }
 }
 
-THIR *THIRVisitor::visit_index(ASTIndex *ast) {
+THIR *THIRGen::visit_index(ASTIndex *ast) {
   if (!ast->is_operator_overload) {
     THIR_ALLOC(THIRIndex, index, ast);
     index->base = visit_node(ast->base);
@@ -194,41 +195,41 @@ THIR *THIRVisitor::visit_index(ASTIndex *ast) {
   }
 }
 
-THIR *THIRVisitor::visit_literal(ASTLiteral *ast) {
+THIR *THIRGen::visit_literal(ASTLiteral *ast) {
   THIR_ALLOC(THIRLiteral, literal, ast);
   literal->value = ast->value;
   return literal;
 }
 
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); }
+THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); }
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_tuple(ASTTuple *ast) { throw_error("visit_tuple not implemented", ast->source_range); }
+THIR *THIRGen::visit_tuple(ASTTuple *ast) { throw_error("visit_tuple not implemented", ast->source_range); }
 // Use THIRAggregateInitializer here.
-THIR *THIRVisitor::visit_range(ASTRange *ast) { throw_error("visit_range not implemented", ast->source_range); }
+THIR *THIRGen::visit_range(ASTRange *ast) { throw_error("visit_range not implemented", ast->source_range); }
 
 // Use THIRAggregateInitializer/Collection/Empty here.
 // Really, the AST could benefit from the seperation of those possibly.
-THIR *THIRVisitor::visit_initializer_list(ASTInitializerList *ast) {
+THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   throw_error("visit_initializer_list not implemented", ast->source_range);
 }
 
-THIR *THIRVisitor::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); }
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); }
 
-THIR *THIRVisitor::visit_cast(ASTCast *ast) {
+THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
   thir->operand = visit_node(ast->expression);
   thir->type = ast->target_type->resolved_type;
   return thir;
 }
 
-THIR *THIRVisitor::visit_lambda(ASTLambda *ast) {
+THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   // TODO: We need to insert the lambdas into the scope by their UID, so we can fetch the symbol,
   // and get the THIRFunction* node from the declaration.
   throw_error("visit_lambda not implemented", ast->source_range);
 }
 
-THIR *THIRVisitor::visit_block(ASTBlock *ast) {
+THIR *THIRGen::visit_block(ASTBlock *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRBlock, thir, ast);
   ENTER_STMT_VEC(thir->statements);
@@ -294,7 +295,7 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
   }
 }
 
-THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
+THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRFunction, thir, ast);
   convert_function_flags(thir, (FunctionInstanceFlags)ast->flags);
@@ -338,13 +339,6 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
     thir->name = ast->scope->full_name();
   }
 
-  printf(
-      "function %s = {\n  is_extern=%s,\n  is_inline=%s\n  is_exported=%s\n  is_test=%s\n  is_varargs=%s\n  "
-      "is_entry=%s\n  is_no_return=%s }\n",
-      thir->name.get_str().c_str(), thir->is_extern ? "true" : "false", thir->is_inline ? "true" : "false",
-      thir->is_exported ? "true" : "false", thir->is_test ? "true" : "false", thir->is_varargs ? "true" : "false",
-      thir->is_entry ? "true" : "false", thir->is_no_return ? "true" : "false");
-
   symbol_map[ast] = thir;
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
@@ -352,7 +346,7 @@ THIR *THIRVisitor::visit_function_declaration(ASTFunctionDeclaration *ast) {
   return thir;
 }
 
-THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
+THIR *THIRGen::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
 
   symbol_map[ast] = thir;
@@ -378,37 +372,35 @@ THIR *THIRVisitor::visit_variable(ASTVariable *ast) {
   return thir;
 }
 
-THIR *THIRVisitor::visit_struct_declaration(ASTStructDeclaration *ast) {
-  THIR_ALLOC(THIRStruct, thir, ast);
-  thir->name = ast->name;
-
-  for (const auto &subtype : ast->subtypes) {
-    thir->subtypes.push_back((THIRStruct *)visit_struct_declaration(subtype));
-  }
-
-  for (const auto &member : ast->members) {
-    // use the type here to just get the source_location, and resolved_type
-    THIR_ALLOC(THIRVariable, field, member.type);
-    field->name = member.name;
+void THIRGen::extract_thir_values_for_type_members(Type *type) {
+  for (auto &member: type->info->members) {
     if (member.default_value) {
-      field->value = visit_node(member.default_value.get());
-    } else {
-      THIR_ALLOC(THIREmptyInitializer, init, member.type);
-      field->value = init;
+      member.thir_value = visit_node(member.default_value.get());
     }
-    thir->fields.push_back(field);
   }
+}
 
+THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
+  THIR_ALLOC(THIRType, thir, ast);
+  extract_thir_values_for_type_members(thir->type);
   return thir;
 }
 
-THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *ast) { return nullptr; }
+THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
+  THIR_ALLOC(THIRType, thir, ast);
+  extract_thir_values_for_type_members(thir->type);
+  return thir;
+}
 
-THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *ast) { return nullptr; }
+THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
+  THIR_ALLOC(THIRType, thir, ast);
+  extract_thir_values_for_type_members(thir->type);
+  return thir;
+}
 
-THIR *THIRVisitor::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not implemented", ast->source_range); }
+THIR *THIRGen::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not implemented", ast->source_range); }
 
-THIR *THIRVisitor::visit_program(ASTProgram *ast) {
+THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
   ENTER_STMT_VEC(thir->statements);
@@ -420,7 +412,23 @@ THIR *THIRVisitor::visit_program(ASTProgram *ast) {
   return thir;
 }
 
-THIR *THIRVisitor::visit_for(ASTFor *ast) {
+/*
+  * Here's some example compiled code of how we handle iterators, in this case, a constant Range.
+
+  RangeBase$1 $iterable = (RangeBase$1) {.begin = 0, .end = argc};
+
+  RangeIter$1 $iterator = RangeBase$1$iter(&$iterable);
+
+  for (
+    auto $next = RangeIter$1$next(&$iterator);
+    $next.index != 0;
+    $next = RangeIter$1$next(&$iterator)) {
+      s32 i = $next.Some.$0;
+      -- ! user code goes here ! --
+  }
+*/
+
+THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast)
 
   THIR *initialization = nullptr;
@@ -437,34 +445,32 @@ THIR *THIRVisitor::visit_for(ASTFor *ast) {
 
     ASTMethodCall next_method;
     ASTDotExpr dot_next;
-    dot_next.base= &iter_method;
-    dot_next.member = {
-      "next"
-    };
-    
-    auto iterator = visit_node(&next_method);
+    dot_next.base = &iter_method;
+    dot_next.member = {"next"};
+
+    next_method.accept(&typer);
+    initialization = visit_node(&next_method);
 
   } else if (ast->right->resolved_type->implements(iterator_trait())) {
-
   }
 
   thir->initialization = initialization;
   thir->block = visit_node(ast->block);
 }
 
-THIR *THIRVisitor::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); }
+THIR *THIRGen::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); }
 
-THIR *THIRVisitor::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); }
+THIR *THIRGen::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); }
 
-THIR *THIRVisitor::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); }
+THIR *THIRGen::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); }
 
-THIR *THIRVisitor::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); }
+THIR *THIRGen::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); }
 
-void THIRVisitor::visit_tuple_deconstruction(ASTDestructure *ast) {
+void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   throw_error("visit_tuple_deconstruction not implemented", ast->source_range);
 }
 
-void THIRVisitor::visit_impl(ASTImpl *ast) {
+void THIRGen::visit_impl(ASTImpl *ast) {
   for (const auto &method : ast->methods) {
     current_statement_list->push_back(visit_node(method));
   }
@@ -473,9 +479,9 @@ void THIRVisitor::visit_impl(ASTImpl *ast) {
   }
 }
 
-void THIRVisitor::visit_import(ASTImport *ast) { throw_error("visit_import not implemented", ast->source_range); }
-void THIRVisitor::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
+void THIRGen::visit_import(ASTImport *ast) { throw_error("visit_import not implemented", ast->source_range); }
+void THIRGen::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
 
-void THIRVisitor::visit_where_statement(ASTWhereStatement *ast) {
+void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
   throw_error("visit_where_statement not yet implemented", ast->source_range);
 }

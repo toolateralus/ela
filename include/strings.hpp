@@ -1,9 +1,12 @@
 #pragma once
-
+#include <string>
 /*
   this is used for std::format() with the type id to get the reflected upon type info.
 */
+
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
+
+constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
 
 constexpr auto MAIN_FMT = R"_(
 int main (int argc, char** argv) {{

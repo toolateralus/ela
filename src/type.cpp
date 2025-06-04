@@ -9,6 +9,7 @@
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
+#include "strings.hpp"
 
 Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
 
@@ -92,11 +93,9 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
 }
 
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
-  if (!type_is_valid(base_t))
-    return Type::INVALID_TYPE;
+  if (!type_is_valid(base_t)) return Type::INVALID_TYPE;
 
-  if (!type_extensions.has_extensions())
-    return base_t;
+  if (!type_extensions.has_extensions()) return base_t;
 
   auto extensions_copy = type_extensions;
 
@@ -151,8 +150,7 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
 
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions) {
   for (auto &type : type_table) {
-    if (!type->is_kind(TYPE_TUPLE))
-      continue;
+    if (!type->is_kind(TYPE_TUPLE)) continue;
 
     auto info = (type->info->as<TupleTypeInfo>());
 
@@ -184,8 +182,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // * Same exact type. no cast needed.
-  if (from == to)
-    return CONVERT_NONE_NEEDED;
+  if (from == to) return CONVERT_NONE_NEEDED;
 
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
@@ -201,7 +198,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       // !!!! I ADDED THE PARENTHESIS ON THE SECOND EXPRESSION HERE :: !!!!!
       // ! This may cause bugs!
     } else if ((from == bool_type() && type_is_numerical(to)) ||
-               (to == bool_type() && type_is_numerical(from))) { // Convert booleans to number types explicitly
+               (to == bool_type() && type_is_numerical(from))) {  // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -243,7 +240,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (conversion == CONVERT_NONE_NEEDED ||
         (conversion == CONVERT_IMPLICIT &&
          (from->extensions.pointer_depth() ==
-          to->extensions.pointer_depth()))) { // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
+          to->extensions.pointer_depth()))) {  // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
       elements_cast = true;
     }
   }
@@ -307,11 +304,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     const auto implicit_fixed_array_to_ptr_cast = [&]() {
       // not array, return.
-      if (!from->extensions.is_fixed_sized_array())
-        return false;
+      if (!from->extensions.is_fixed_sized_array()) return false;
 
-      if (!to->extensions.is_pointer())
-        return false;
+      if (!to->extensions.is_pointer()) return false;
 
       auto element_ty_ptr = from->get_element_type()->take_pointer_to(MUT);
       auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
@@ -363,8 +358,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  if (this->kind != kind)
-    return false;
+  if (this->kind != kind) return false;
 
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
@@ -374,8 +368,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
       return false;
     }
 
-    if (finfo->params_len != sinfo->params_len)
-      return false;
+    if (finfo->params_len != sinfo->params_len) return false;
 
     for (size_t i = 0; i < finfo->params_len; ++i)
       if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
@@ -388,7 +381,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-/* 
+/*
   Get a display name of this type, in a readable manner to users.
   Unmangles.
 */
@@ -530,7 +523,7 @@ Type *Type::get_element_type() const {
 // used for anonymous structs etc.
 Token get_unique_identifier() {
   static int num = 0;
-  auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier, TFamily::Identifier);
+  auto tok = Token({}, ANONYMOUS_TYPE_PREFIX + std::to_string(num), TType::Identifier, TFamily::Identifier);
   num++;
   return tok;
 }
@@ -652,15 +645,13 @@ void init_type_system() {
 }
 
 bool type_is_numerical(const Type *t) {
-  if (!t->is_kind(TYPE_SCALAR))
-    return false;
+  if (!t->is_kind(TYPE_SCALAR)) return false;
   return t == s32_type() || t == s8_type() || t == s16_type() || t == s32_type() || t == s64_type() || t == u8_type() ||
          t == u16_type() || t == u32_type() || t == u64_type() || t == f32_type() || t == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
-  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
-    return false;
+  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) return false;
 
   auto from_info = (from->info->as<ScalarTypeInfo>());
   auto to_info = (to->info->as<ScalarTypeInfo>());
@@ -708,6 +699,10 @@ Type *global_create_tuple_type(const std::vector<Type *> &types) {
 
   for (size_t i = 0; i < types.size(); ++i) {
     info->scope->insert_variable(std::to_string(i), types[i], nullptr, MUT);
+    info->members.push_back(TypeMember{
+        .name = "$" + std::to_string(i),
+        .type = types[i],
+    });
   }
 
   return type;
@@ -739,7 +734,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
   switch (op) {
     case TType::LBrace:
-    // TODO: This needs to be 'index'/'index_mut'
+      // TODO: This needs to be 'index'/'index_mut'
       return "subscript";
 
     // Do we want this? might be useful for stuff like Array implementations etc.
@@ -825,8 +820,7 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
 
   auto scope = type->info->scope;
 
-  if (!scope)
-    return Type::INVALID_TYPE;
+  if (!scope) return Type::INVALID_TYPE;
 
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && type_is_valid(symbol->resolved_type)) {
@@ -932,12 +926,12 @@ Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const
   if (variant_index == -1) {
     return nullptr;
   }
-  return variants[variant_index].type;
+  return members[variant_index].type;
 }
 
 int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const {
-  for (size_t i = 0; i < variants.size(); ++i) {
-    if (variants[i].name == variant_name) {
+  for (size_t i = 0; i < members.size(); ++i) {
+    if (members[i].name == variant_name) {
       return i;
     }
   }

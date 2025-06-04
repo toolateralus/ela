@@ -169,11 +169,12 @@ struct TypeExtensions {
 
 using GenericParameter = InternedString;
 
-
+struct THIR;
 struct TypeMember {
   InternedString name;
   Type *type;
   Nullable<ASTExpr> default_value;
+  Nullable<THIR> thir_value;
 };
 
 struct TypeInfo {
@@ -197,13 +198,7 @@ struct TraitTypeInfo : TypeInfo {
   InternedString name;
 };
 
-struct ChoiceVariant {
-  InternedString name;
-  Type *type;
-};
-
 struct ChoiceTypeInfo : TypeInfo {
-  std::vector<ChoiceVariant> variants;
   int get_variant_index(const InternedString &variant_name) const;
   Type *get_variant_type(const InternedString &variant_name) const;
 };

@@ -13,8 +13,10 @@ enum struct THIRNodeType : unsigned char {
   Program,
   Block,
   Variable,
+
   Function,
-  Struct,
+  Type,
+
   // Expressions
   BinExpr,
   UnaryExpr,
@@ -74,11 +76,8 @@ struct THIRVariable : THIR {
 
   as long as we structure it in a desugared, literal way.
 */
-struct THIRStruct : THIR {
-  InternedString name;
-  std::vector<THIRVariable *> fields;
-  std::vector<THIRStruct *> subtypes;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Struct; }
+struct THIRType : THIR {
+  THIRNodeType get_node_type() const override { return THIRNodeType::Type; }
 };
 
 struct THIRBlock : THIR {
@@ -225,9 +224,14 @@ static inline T *thir_alloc() {
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();
 
-struct THIRVisitor {
-  THIRVisitor(Context &ctx) : ctx(ctx) {}
+struct THIRGen {
+  THIRGen(Typer &typer, Context &ctx) : ctx(ctx), typer(typer) {}
+
   Context &ctx;
+
+  // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
+  Typer &typer;
+
   std::map<ASTNode *, THIR *> symbol_map;
 
   Type *iterator_trait() {
@@ -256,6 +260,8 @@ struct THIRVisitor {
 
   void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                           std::vector<THIR *> &out_args);
+
+  void extract_thir_values_for_type_members(Type *type);
 
   THIR *visit_call(ASTCall *node);
   THIR *visit_return(ASTReturn *node);
@@ -296,7 +302,7 @@ struct THIRVisitor {
         throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
         return nullptr;
       }
-      
+
       // Ignored nodes.
       case AST_NODE_NOOP: {
         return nullptr;
@@ -393,7 +399,6 @@ struct THIRVisitor {
         return visit_expr_statement((ASTExprStatement *)node);
       case AST_NODE_DEFER:
         return visit_defer((ASTDefer *)node);
-      
     }
   }
 };
