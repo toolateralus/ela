@@ -189,6 +189,7 @@ THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
 // This is gonna be tricky to do right, for nested patterns, which we 100% plan on supporting.
 THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast) {
   throw_error("visit_pattern_match not implemented", ast->source_range);
+  return nullptr;
 }
 
 THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
@@ -248,10 +249,6 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
   return literal;
 }
 
-// Use THIRAggregateInitializer here.
-THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); }
-
-// Use THIRAggregateInitializer here.
 THIR *THIRGen::visit_tuple(ASTTuple *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast)
   size_t index = 0;
@@ -260,9 +257,15 @@ THIR *THIRGen::visit_tuple(ASTTuple *ast) {
   }
   return thir;
 }
-
 // Use THIRAggregateInitializer here.
-THIR *THIRGen::visit_range(ASTRange *ast) { throw_error("visit_range not implemented", ast->source_range); }
+THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); return nullptr; }
+
+THIR *THIRGen::visit_range(ASTRange *ast) {
+  THIR_ALLOC(THIRAggregateInitializer, thir, ast);
+  thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, visit_node(ast->left)});
+  thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->left)});
+  return thir;
+}
 
 // Use THIRAggregateInitializer/Collection/Empty here.
 // Really, the AST could benefit from the seperation of those possibly.
@@ -325,7 +328,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   }
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); }
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); return nullptr; }
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
@@ -338,6 +341,7 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   // TODO: We need to insert the lambdas into the scope by their UID, so we can fetch the symbol,
   // and get the THIRFunction* node from the declaration.
   throw_error("visit_lambda not implemented", ast->source_range);
+  return nullptr;
 }
 
 THIR *THIRGen::visit_block(ASTBlock *ast) {
@@ -442,7 +446,8 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   if (thir->name == "main" || thir->is_entry) {
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
-      throw_error("multiple functions with the @[entry] were found, or multiple 'main()' functions were found", ast->source_range);
+      throw_error("multiple functions with the @[entry] were found, or multiple 'main()' functions were found",
+                  ast->source_range);
     }
 
     entry_point = thir;
@@ -514,7 +519,7 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   return thir;
 }
 
-THIR *THIRGen::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not implemented", ast->source_range); }
+THIR *THIRGen::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not implemented", ast->source_range); return nullptr; }
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
@@ -547,10 +552,9 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
       -- ! user code goes here ! --
   }
 */
-
 THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast)
-
+  // ! I put this on pause because I hadn't done `choice` types yet, and for loops depend on them.
   THIR *initialization = nullptr;
 
   if (ast->right->resolved_type->implements(iterable_trait())) {
@@ -576,15 +580,16 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
   thir->initialization = initialization;
   thir->block = visit_node(ast->block);
+  return thir;
 }
 
-THIR *THIRGen::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); }
+THIR *THIRGen::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); return nullptr; }
 
-THIR *THIRGen::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); }
+THIR *THIRGen::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); return nullptr; }
 
-THIR *THIRGen::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); }
+THIR *THIRGen::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); return nullptr; }
 
-THIR *THIRGen::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); }
+THIR *THIRGen::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); return nullptr; }
 
 void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   throw_error("visit_tuple_deconstruction not implemented", ast->source_range);

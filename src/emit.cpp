@@ -284,13 +284,12 @@ void Emitter::emit_choice(Type *type) {
   indent_level++;
   for (const auto &variant : info->members) {
     if (variant.type->kind == TYPE_STRUCT) {
-      auto variant_name = variant.name.get_str();
-      auto subtype_name = choice_type_name + "$" + variant_name;
-      indented();
-      code << subtype_name << ' ' << variant_name << ";\n";
+      const auto variant_name = variant.name.get_str();
+      const auto subtype_name = choice_type_name + "$" + variant_name;
+      indented(subtype_name + ' ' + variant_name + ";\n");
     } else if (variant.type->kind == TYPE_TUPLE) {
-      auto variant_name = variant.name.get_str();
-      code << c_type_string(variant.type) << ' ' << variant_name << ";\n";
+      const auto variant_name = variant.name.get_str();
+      indented(c_type_string(variant.type) + ' ' + variant_name + ";\n");
     }
   }
   indent_level--;
