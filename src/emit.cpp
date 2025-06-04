@@ -102,7 +102,7 @@ static inline std::string get_declaration_type_signature_and_identifier(const st
     }
   }
 
-  tss << base_type_str << " " << identifier;
+  tss << base_type_str << ' ' << identifier;
   return tss.str();
 }
 
@@ -217,15 +217,23 @@ void Emitter::emit_if(const THIRIf *thir) { throw_error("emit_if is unimplemente
 void Emitter::emit_while(const THIRWhile *thir) { throw_error("emit_while is unimplemented", thir->source_range); }
 void Emitter::emit_switch(const THIRSwitch *thir) { throw_error("emit_switch is unimplemented", thir->source_range); }
 
+void Emitter::emit_tuple(Type *type) {
+  const auto type_name = c_type_string(type);
+  code << "typedef struct";
+  emit_struct_body(type);
+  code << ' ' << type_name << ";\n";
+}
+
 void Emitter::emit_struct(Type *type) {
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
+  const auto type_name = type->basename.get_str();
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
-    code << "typedef union " << type->basename.get_str();
+    code << "typedef union " << type_name;
   } else {
-    code << "typedef struct " << type->basename.get_str();
+    code << "typedef struct " << type_name;
   }
   emit_struct_body(type);
-  code << ' ' << type->basename.get_str() << ";\n";
+  code << ' ' << type_name << ";\n";
 }
 
 void Emitter::emit_anonymous_struct(Type *type) {
@@ -256,38 +264,39 @@ void Emitter::emit_struct_body(Type *type) {
 }
 
 void Emitter::emit_choice(Type *type) {
-  const ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
-  auto name = type->basename.get_str();
+  ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
+  const auto choice_type_name = type->basename.get_str();
 
-  for (const auto &variant : info->members) {
-    if (variant.type->kind != TYPE_STRUCT && variant.type->kind != TYPE_TUPLE) {
-      continue;
+  for (auto &variant : info->members) {
+    if (variant.type->kind == TYPE_STRUCT) {
+      const auto variant_name = variant.name.get_str();
+      const auto subtype_name = choice_type_name + "$" + variant_name;
+      variant.type->basename = subtype_name;
+      emit_struct(variant.type);
     }
-    auto variant_name = variant.name.get_str();
-    auto subtype_name = name + "$" + variant_name;
-    variant.type->basename = subtype_name;
-    emit_struct(variant.type);
   }
 
   // Emit the main choice struct
-  code << "typedef struct " << name << " {\n";
+  code << "typedef struct " << choice_type_name << " {\n";
   indent_level++;
   indentedf("%s %s;\n", "int", DISCRIMINANT_KEY);  // Discriminant, TODO: optimize for different discriminant sizes
   indented("union {\n");
   indent_level++;
   for (const auto &variant : info->members) {
-    if (variant.type->kind != TYPE_STRUCT && variant.type->kind != TYPE_TUPLE) {
-      continue;
+    if (variant.type->kind == TYPE_STRUCT) {
+      auto variant_name = variant.name.get_str();
+      auto subtype_name = choice_type_name + "$" + variant_name;
+      indented();
+      code << subtype_name << ' ' << variant_name << ";\n";
+    } else if (variant.type->kind == TYPE_TUPLE) {
+      auto variant_name = variant.name.get_str();
+      code << c_type_string(variant.type) << ' ' << variant_name << ";\n";
     }
-    auto variant_name = variant.name.get_str();
-    auto subtype_name = name + "$" + variant_name;
-    indented();
-    code << subtype_name << " " << variant_name << ";\n";
   }
   indent_level--;
   indented("};\n");
   indent_level--;
-  code << "} " << name << ";\n";
+  code << "} " << choice_type_name << ";\n";
 }
 
 void Emitter::emit_enum(Type *type) {
@@ -305,7 +314,6 @@ void Emitter::emit_enum(Type *type) {
   code << "} " << type->basename.get_str() << ";\n";
 }
 
-void Emitter::emit_tuple(const Type *) {}
 void Emitter::forward_declare_type(const Type *) {}
 void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
 
@@ -315,22 +323,16 @@ void Emitter::emit_type(const THIRType *thir) {
     case TYPE_FUNCTION:
     case TYPE_TRAIT:
       return;
-
-    case TYPE_TUPLE:
-      emit_tuple(thir->type);
-      return;
     case TYPE_DYN:
-      emit_dyn_dispatch_object_struct(thir->type);
-      return;
+      return emit_dyn_dispatch_object_struct(thir->type);
+    case TYPE_TUPLE:
+      return emit_tuple(thir->type);
     case TYPE_STRUCT:
-      emit_struct(thir->type);
-      return;
+      return emit_struct(thir->type);
     case TYPE_ENUM:
-      emit_enum(thir->type);
-      return;
+      return emit_enum(thir->type);
     case TYPE_CHOICE:
-      emit_choice(thir->type);
-      return;
+      return emit_choice(thir->type);
   }
 }
 
