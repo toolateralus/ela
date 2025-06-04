@@ -197,7 +197,7 @@ struct TraitTypeInfo : TypeInfo {
 };
 
 struct ChoiceTypeInfo : TypeInfo {
-  int get_variant_index(const InternedString &variant_name) const;
+  int get_variant_discriminant(const InternedString &variant_name) const;
   Type *get_variant_type(const InternedString &variant_name) const;
 };
 

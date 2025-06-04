@@ -2175,7 +2175,7 @@ void OldEmitter::emit_choice_marker_variant_instantiation(Type *type, ASTPath *v
     return;
   }
   if (variant_type == void_type()) {
-    const auto index = info->get_variant_index(last_segment.identifier);
+    const auto index = info->get_variant_discriminant(last_segment.identifier);
     const auto type_string = type_to_string(type);
     code << " (" << type_string << ") { .index = " << index << "}";
   }
@@ -2190,7 +2190,7 @@ void OldEmitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArgum
   const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
-  code << ".index = " << std::to_string(info->get_variant_index(variant_name)+1) << ",\n";
+  code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)+1) << ",\n";
   ASTTuple tuple;
 
   code << "." << variant_name.get_str() << " = ";
@@ -2210,7 +2210,7 @@ void OldEmitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTIniti
   const auto type_string = type_to_string(choice_type);
 
   code << "(" << type_string << ") {\n";
-  code << ".index = " << std::to_string(info->get_variant_index(variant_name)+1) << ",\n";
+  code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)+1) << ",\n";
   code << "." << variant_name.get_str() << " = " << "{";
   for (const auto &[name, value] : initializer->key_values) {
     code << "." << name.get_str() << " = ";
@@ -2232,7 +2232,7 @@ void OldEmitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *patte
   const auto segment = path->segments.back();
 
   auto variant_type = info->get_variant_type(segment.identifier);
-  const auto variant_index = info->get_variant_index(segment.identifier);
+  const auto variant_index = info->get_variant_discriminant(segment.identifier);
 
   const auto object_type = pattern->object->resolved_type;
   const auto is_pointer = object_type->extensions.is_pointer();
@@ -2285,7 +2285,7 @@ void OldEmitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMat
   const auto segment = path->segments.back();
 
   auto variant_type = info->get_variant_type(segment.identifier);
-  const auto variant_index = info->get_variant_index(segment.identifier);
+  const auto variant_index = info->get_variant_discriminant(segment.identifier);
 
   const auto object_type = pattern->object->resolved_type;
   const auto is_pointer = object_type->extensions.is_pointer();
@@ -2385,7 +2385,7 @@ void OldEmitter::emit_pattern_match_for_switch_case(const Type *target_type, con
 
   const auto variant_name = segment.identifier;
   const auto variant_type = info->get_variant_type(variant_name);
-  const auto variant_index = info->get_variant_index(variant_name)+1;
+  const auto variant_index = info->get_variant_discriminant(variant_name)+1;
   const auto is_pointer = target_type->extensions.is_pointer();
 
   code << "if (" << target_temp_identifier;

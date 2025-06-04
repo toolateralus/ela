@@ -8,6 +8,8 @@ constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
 
+constexpr const char * DISCRIMINANT_KEY = "$discriminant";
+
 constexpr auto MAIN_FMT = R"_(
 int main (int argc, char** argv) {{
   /* initialize command line args. */

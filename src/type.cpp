@@ -931,17 +931,19 @@ Type *is_const_pointer_trait() {
 }
 
 Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const {
-  int variant_index = get_variant_index(variant_name);
-  if (variant_index == -1) {
-    return nullptr;
-  }
-  return members[variant_index].type;
-}
-
-int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const {
   for (size_t i = 0; i < members.size(); ++i) {
     if (members[i].name == variant_name) {
-      return i;
+      return members[i].type;
+    }
+  }
+  return nullptr;
+}
+
+int ChoiceTypeInfo::get_variant_discriminant(const InternedString &variant_name) const {
+  for (size_t i = 0; i < members.size(); ++i) {
+    if (members[i].name == variant_name) {
+      // We return +1 so that default constructed choice types never have a value that can be pattern matched.
+      return i + 1;
     }
   }
   return -1;

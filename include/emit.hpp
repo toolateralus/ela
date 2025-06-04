@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdarg>
 #include "builder.hpp"
 #include "thir.hpp"
 
@@ -8,10 +9,20 @@ struct Emitter {
 
   const THIRFunction *entry_point;
 
-  inline void indented(const std::string &string={}) {
+  inline void indented(const std::string &string = {}) {
     // 2 space indenting is our standard.
     code << std::string(indent_level * 2, ' ');
     code << string;
+  }
+
+  inline void indentedf(const char *fmt, ...) {
+    code << std::string(indent_level * 2, ' ');
+    va_list args;
+    va_start(args, fmt);
+    char *result;
+    vasprintf(&result, fmt, args);
+    va_end(args);
+    code << result;
   }
 
   inline void indented_terminated(const std::string &string) {
@@ -22,7 +33,7 @@ struct Emitter {
   // similar to 'emit_symbol' except, when passed say a THIRFunction*, this will emit the identifier that points to that
   // function we just compute paths/references instead of storing them in the THIR, which aligns more with LLVM in the
   // long run.
-  
+
   // this will call emit_node if it doesn't require extra intercepted support to emit correctly.
   void emit_expr(const THIR *thir) {
     if (thir->get_node_type() == THIRNodeType::Function) {

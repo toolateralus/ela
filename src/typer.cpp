@@ -2327,12 +2327,11 @@ void Typer::visit(ASTInitializerList *node) {
   }
 
   auto scope = target_type->info->scope;
-
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_NAMED: {
+      std::set<InternedString> names;
       auto old_target = target_type;
       auto old_scope = scope;
-
       if (target_type->is_kind(TYPE_CHOICE)) {
         if (node->target_type.get() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH) {
           const auto path = (ASTPath *)node->target_type.get()->normal.path;
@@ -2359,6 +2358,11 @@ void Typer::visit(ASTInitializerList *node) {
       }
 
       for (const auto &[id, value] : node->key_values) {
+        if (names.contains(id)) {
+          throw_error(std::format("Duplicate member initialization in named initializer list. member {}", id.get_str()),
+                      value->source_range);
+        }
+        names.insert(id);
         auto old = expected_type;
         Defer _([&] { expected_type = old; });
         auto symbol = scope->local_lookup(id);

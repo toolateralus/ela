@@ -374,7 +374,6 @@ struct THIRGen {
         return visit_block((ASTBlock *)node);
       case AST_NODE_FUNCTION_DECLARATION:
         return visit_function_declaration((ASTFunctionDeclaration *)node);
-
       case AST_NODE_RETURN:
         return visit_return((ASTReturn *)node);
       case AST_NODE_CONTINUE:

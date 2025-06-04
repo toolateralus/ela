@@ -1,6 +1,7 @@
 #include "emit.hpp"
 #include "core.hpp"
 #include "lex.hpp"
+#include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
 
@@ -194,13 +195,22 @@ void Emitter::emit_index(const THIRIndex *thir) {
 }
 
 void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
-  throw_error("emit_aggregate_initializer is unimplemented", thir->source_range);
+  code << "(" << c_type_string(thir->type) << "){ ";
+  for (const auto &[key, value] : thir->key_values) {
+    code << '.' << key.get_str() << " = ";
+    emit_expr(value);
+    code << ", ";
+  }
+  code << '}';
 }
+
 void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir) {
   throw_error("emit_collection_initializer is unimplemented", thir->source_range);
 }
 
-void Emitter::emit_empty_initializer(const THIREmptyInitializer *) { code << "{0}"; }
+void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
+  code << "(" << c_type_string(thir->type) << "){0}";
+}
 
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
 void Emitter::emit_if(const THIRIf *thir) { throw_error("emit_if is unimplemented", thir->source_range); }
@@ -262,7 +272,7 @@ void Emitter::emit_choice(Type *type) {
   // Emit the main choice struct
   code << "typedef struct " << name << " {\n";
   indent_level++;
-  indented("int index;\n");  // Discriminant
+  indentedf("%s %s;\n", "int", DISCRIMINANT_KEY);  // Discriminant, TODO: optimize for different discriminant sizes
   indented("union {\n");
   indent_level++;
   for (const auto &variant : info->members) {

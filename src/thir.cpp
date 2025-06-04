@@ -1,12 +1,14 @@
 #include "thir.hpp"
+#include <string>
 #include "ast.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
+#include "strings.hpp"
 #include "type.hpp"
 
 // this is used directly. clangd stop b*tchin
-#include "visitor.hpp" 
+#include "visitor.hpp"
 
 #define ENTER_SCOPE($new_scope)       \
   const auto $old_scope_ = ctx.scope; \
@@ -21,6 +23,38 @@
   const auto $old_stmt_vector = current_statement_list;                                    \
   current_statement_list = (&$stmt_vector);                                                \
   const Defer $stmt_container_defer([&] { current_statement_list = $old_stmt_vector; });
+
+static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath *ast) {
+  if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->extensions.has_extensions()) {
+    return false;
+  }
+
+  ChoiceTypeInfo *info = ast->resolved_type->info->as<ChoiceTypeInfo>();
+  const auto last_segment = ast->segments.back();
+
+  for (const auto &member : info->members) {
+    if (last_segment.identifier == member.name) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplate(ASTPath *ast) {
+  THIR_ALLOC(THIRAggregateInitializer, thir, ast);
+  const auto type = ast->resolved_type;
+  const auto path = ast;
+  const auto variant_name = path->segments.back().identifier;
+  const auto info = type->info->as<ChoiceTypeInfo>();
+  const auto discriminant = info->get_variant_discriminant(variant_name);
+  THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, discriminant_literal);
+  // TODO: optimize the discriminant type size based on the number of variants in a choice type.
+  discriminant_literal->value = std::to_string(discriminant);
+  discriminant_literal->type = u32_type();
+  thir->key_values.push_back({DISCRIMINANT_KEY, discriminant_literal});
+  return thir;
+}
 
 /*
   I put some of these super trivial nodes up top here so they stay out of the way
@@ -61,7 +95,7 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
-                                                     std::vector<THIR *> &out_args) {
+                                                 std::vector<THIR *> &out_args) {
   // Only handle default arguments for function calls that have a definition, not function pointers.
   if (callee->get_node_type() == THIRNodeType::Function) {
     const auto function = (const THIRFunction *)callee;
@@ -88,6 +122,21 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
 
 THIR *THIRGen::visit_call(ASTCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
+
+  // Tuple style constructor for choice type.
+  if (ast->callee->resolved_type->is_kind(TYPE_CHOICE) && ast->callee->get_node_type() == AST_NODE_PATH) {
+    const auto path = (ASTPath *)ast->callee;
+    const auto variant_name = path->segments.back().identifier;
+    const auto type = ast->callee->resolved_type;
+    const auto info = type->info->as<ChoiceTypeInfo>();
+    const auto thir = get_choice_type_instantiation_boilerplate(path);
+    ASTTuple tuple;
+    tuple.resolved_type = info->get_variant_type(variant_name);
+    tuple.values = ast->arguments->arguments;
+    thir->key_values.push_back({variant_name, visit_node(&tuple)});
+    return thir;
+  }
+
   auto callee = thir->callee = visit_node(ast->callee);
   extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
   return thir;
@@ -111,17 +160,15 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   return thir;
 }
 
-/*
-  TODO: we need to basically rework the symbol table (or the AST) for this to work.
-  right now, it's impossible to refer to a parameter.
-
-  OLD NOTE:
-    Many variables do not come from AST.
-    for loop identifiers, tuple/struct destructured elements,
-    enum variants, the self variable.
-    This should be fine for now, but will be problematic.
-*/
 THIR *THIRGen::visit_path(ASTPath *ast) {
+  // This is just nonsense in many ways; What about choice type variants, what about enum variants?
+  // This just won't work.
+  // Not even the string rework will work perfectly.
+
+  if (should_emit_choice_type_marker_variant_instantiation(ast)) {
+    return get_choice_type_instantiation_boilerplate(ast);
+  }
+
   auto sym = ctx.get_symbol(ast).get();
   if (sym->is_function()) {
     return symbol_map[sym->function.declaration];
@@ -203,15 +250,79 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
 
 // Use THIRAggregateInitializer here.
 THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); }
+
 // Use THIRAggregateInitializer here.
-THIR *THIRGen::visit_tuple(ASTTuple *ast) { throw_error("visit_tuple not implemented", ast->source_range); }
+THIR *THIRGen::visit_tuple(ASTTuple *ast) {
+  THIR_ALLOC(THIRAggregateInitializer, thir, ast)
+  size_t index = 0;
+  for (const auto value : ast->values) {
+    thir->key_values.push_back({"$" + std::to_string(index++), visit_node(value)});
+  }
+  return thir;
+}
+
 // Use THIRAggregateInitializer here.
 THIR *THIRGen::visit_range(ASTRange *ast) { throw_error("visit_range not implemented", ast->source_range); }
 
 // Use THIRAggregateInitializer/Collection/Empty here.
 // Really, the AST could benefit from the seperation of those possibly.
 THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
-  throw_error("visit_initializer_list not implemented", ast->source_range);
+  switch (ast->tag) {
+    case ASTInitializerList::INIT_LIST_EMPTY: {
+      THIR_ALLOC(THIREmptyInitializer, thir, ast);
+      return thir;
+    }
+    case ASTInitializerList::INIT_LIST_NAMED: {
+      const auto type = ast->resolved_type;
+      if (type->kind == TYPE_STRUCT) {
+        THIR_ALLOC(THIRAggregateInitializer, thir, ast);
+        const auto info = type->info->as<StructTypeInfo>();
+        for (const auto &member : info->members) {
+          bool set = false;
+          for (size_t i = 0; i < ast->key_values.size(); ++i) {
+            const auto &[key, value] = ast->key_values[i];
+            if (key == member.name) {
+              thir->key_values.push_back({key, visit_node(value)});
+              set = true;
+              break;
+            }
+          }
+          if (!set) {
+            THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
+            empty_init->type = member.type;
+            thir->key_values.push_back({member.name, empty_init});
+          }
+        }
+        return thir;
+      } else if (type->kind == TYPE_CHOICE) {  // Choice variant instantiation.
+        const auto path = ast->target_type.get()->normal.path;
+        const auto info = ast->resolved_type->info->as<ChoiceTypeInfo>();
+        const auto thir = get_choice_type_instantiation_boilerplate(path);
+        const auto variant_name = path->segments.back().identifier;
+        const auto variant_type = info->get_variant_type(variant_name);
+
+        // Mock up a temporary initializer list to just take advantage of existing THIR generation
+        ASTInitializerList subinit{};
+        subinit.resolved_type = variant_type;
+        subinit.tag = ASTInitializerList::INIT_LIST_NAMED;
+
+        new (&subinit.key_values) decltype(subinit.key_values)();
+        for (const auto kv : ast->key_values) {
+          subinit.key_values.push_back(kv);
+        }
+
+        thir->key_values.push_back({variant_name, visit_node(&subinit)});
+        return thir;
+      }
+    }
+    case ASTInitializerList::INIT_LIST_COLLECTION: {
+      THIR_ALLOC(THIRCollectionInitializer, thir, ast)
+      for (const auto &value : ast->values) {
+        thir->values.push_back(visit_node(value));
+      }
+      return thir;
+    }
+  }
 }
 
 THIR *THIRGen::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); }
@@ -373,7 +484,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 }
 
 void THIRGen::extract_thir_values_for_type_members(Type *type) {
-  for (auto &member: type->info->members) {
+  for (auto &member : type->info->members) {
     if (member.default_value) {
       member.thir_value = visit_node(member.default_value.get());
     }
@@ -404,11 +515,13 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
   ENTER_STMT_VEC(thir->statements);
+
   for (const auto &ast_statement : ast->statements) {
     if (auto thir_statement = visit_node(ast_statement)) {
       thir->statements.push_back(thir_statement);
     }
   }
+
   return thir;
 }
 
