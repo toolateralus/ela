@@ -152,8 +152,24 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     thir->callee = visit_dot_expr(ast->callee);
   } else {
     // Push the self argument
-    const auto thir_base = visit_node(base);
-    thir->arguments.push_back(thir_base);
+    auto self = visit_node(base);
+    const auto requires_self_ptr = symbol->function.declaration->params->params[0]->self.is_pointer;
+    auto base_type = self->type;
+
+    // auto dereference / address of logic.
+    if (!base_type->extensions.is_pointer() && requires_self_ptr) {
+      THIR_ALLOC(THIRUnaryExpr, thir, base)
+      thir->op = TType::And;
+      thir->operand = self;
+      self = thir;
+    } else if (base_type->extensions.is_pointer() && !requires_self_ptr) {
+      THIR_ALLOC(THIRUnaryExpr, thir, base)
+      thir->op = TType::Mul;
+      thir->operand = self;
+      self = thir;
+    }
+
+    thir->arguments.push_back(self);
     thir->callee = visit_function_declaration(symbol->function.declaration);
   }
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
@@ -258,7 +274,10 @@ THIR *THIRGen::visit_tuple(ASTTuple *ast) {
   return thir;
 }
 // Use THIRAggregateInitializer here.
-THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) { throw_error("visit_dyn_of not implemented", ast->source_range); return nullptr; }
+THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
+  throw_error("visit_dyn_of not implemented", ast->source_range);
+  return nullptr;
+}
 
 THIR *THIRGen::visit_range(ASTRange *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
@@ -328,7 +347,10 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   }
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) { throw_error("visit_type_of not implemented", ast->source_range); return nullptr; }
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) {
+  throw_error("visit_type_of not implemented", ast->source_range);
+  return nullptr;
+}
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
@@ -519,7 +541,10 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   return thir;
 }
 
-THIR *THIRGen::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not implemented", ast->source_range); return nullptr; }
+THIR *THIRGen::visit_switch(ASTSwitch *ast) {
+  throw_error("visit_switch not implemented", ast->source_range);
+  return nullptr;
+}
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
@@ -583,13 +608,42 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   return thir;
 }
 
-THIR *THIRGen::visit_if(ASTIf *ast) { throw_error("visit_if not implemented", ast->source_range); return nullptr; }
+THIR *THIRGen::visit_if(ASTIf *ast) {
+  THIR_ALLOC(THIRIf, thir, ast)
 
-THIR *THIRGen::visit_else(ASTElse *ast) { throw_error("visit_else not implemented", ast->source_range); return nullptr; }
+  // TODO: we need to figure out how to do block expressions via the THIR.  ({ int x = 10; x }) type sh
+  // thir->is_statement = thir->is_statement;
 
-THIR *THIRGen::visit_while(ASTWhile *ast) { throw_error("visit_while not implemented", ast->source_range); return nullptr; }
+  thir->condition = visit_node(ast->condition);
+  thir->block = (THIRBlock *)visit_block(ast->block);
 
-THIR *THIRGen::visit_defer(ASTDefer *ast) { throw_error("visit_defer not implemented", ast->source_range); return nullptr; }
+  if (ast->_else) {
+    thir->_else = visit_else(ast->_else.get());
+  }
+  return thir;
+}
+
+THIR *THIRGen::visit_else(ASTElse *ast) {
+  if (ast->_if) {
+    return visit_node(ast->_if.get());
+  } else {
+    return visit_node(ast->block.get());
+  }
+}
+
+THIR *THIRGen::visit_while(ASTWhile *ast) {
+  THIR_ALLOC(THIRWhile, thir, ast)
+  if (ast->condition) {
+    thir->condition = visit_node(ast->condition.get());
+  }
+  thir->block = (THIRBlock *)visit_node(ast->block);
+  return thir;
+}
+
+THIR *THIRGen::visit_defer(ASTDefer *ast) {
+  throw_error("visit_defer not implemented", ast->source_range);
+  return nullptr;
+}
 
 void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   throw_error("visit_tuple_deconstruction not implemented", ast->source_range);
@@ -604,9 +658,26 @@ void THIRGen::visit_impl(ASTImpl *ast) {
   }
 }
 
-void THIRGen::visit_import(ASTImport *ast) { throw_error("visit_import not implemented", ast->source_range); }
-void THIRGen::visit_module(ASTModule *ast) { throw_error("visit_module not implemented", ast->source_range); }
+void THIRGen::visit_import(ASTImport *ast) {
+  for (const auto &ast_stmt : ast->statements) {
+    visit_node(ast_stmt);
+  }
+}
+
+void THIRGen::visit_module(ASTModule *ast) {
+  for (const auto &ast_stmt : ast->statements) {
+    if (auto thir_stmt = visit_node(ast_stmt)) {
+      current_statement_list->push_back(thir_stmt);
+    }
+  }
+}
 
 void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
-  throw_error("visit_where_statement not yet implemented", ast->source_range);
+  if (ast->should_compile) {
+    for (const auto &ast_stmt : ast->block->statements) {
+      if (auto thir_stmt = visit_node(ast_stmt)) {
+        current_statement_list->push_back(thir_stmt);
+      }
+    }
+  }
 }

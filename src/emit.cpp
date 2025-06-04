@@ -213,8 +213,29 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
 }
 
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
-void Emitter::emit_if(const THIRIf *thir) { throw_error("emit_if is unimplemented", thir->source_range); }
-void Emitter::emit_while(const THIRWhile *thir) { throw_error("emit_while is unimplemented", thir->source_range); }
+
+void Emitter::emit_if(const THIRIf *thir) {
+  code << "if (";
+  emit_expr(thir->condition);
+  code << ")";
+  emit_node(thir->block);
+
+  if (thir->_else) {
+    code << "else ";
+    emit_node(thir->_else);
+  }
+}
+
+void Emitter::emit_while(const THIRWhile *thir) {
+  code << "while (";
+  if (thir->condition) {
+    emit_expr(thir->condition);
+  } else {
+    code << '1';
+  }
+  code << ')';
+  emit_block(thir->block);
+}
 void Emitter::emit_switch(const THIRSwitch *thir) { throw_error("emit_switch is unimplemented", thir->source_range); }
 
 void Emitter::emit_tuple(Type *type) {

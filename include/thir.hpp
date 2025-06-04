@@ -304,8 +304,10 @@ struct THIRGen {
 
   THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
-      // Ignored nodes.
-      case AST_NODE_NOOP: {
+      case AST_NODE_STATEMENT_LIST: {
+        for (const auto &ast_stmt : ((ASTStatementList *)node)->statements) {
+          visit_node(ast_stmt);
+        }
         return nullptr;
       }
 
@@ -401,10 +403,23 @@ struct THIRGen {
         return visit_defer((ASTDefer *)node);
       case AST_NODE_PROGRAM:
         return visit_program((ASTProgram *)node);
-      default: {
-        throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
+
+      // Ignored nodes.
+      case AST_NODE_NOOP:
+      case AST_NODE_ALIAS:
+      case AST_NODE_TRAIT_DECLARATION:
         return nullptr;
-      }
+
+      case AST_NODE_PARAMS_DECL:
+      case AST_NODE_TYPE:
+      case AST_NODE_PARAM_DECL:
+      case AST_NODE_ARGUMENTS:
+      case AST_NODE_WHERE:
+        throw_error(
+            "INTERNAL COMPILER ERROR: ast node not supported by thir gen. it's likely it just needs to be moved to the "
+            "ignored cases",
+            node->source_range);
+        return nullptr;
     }
   }
 };
