@@ -200,7 +200,7 @@ struct DeferBlock {
   DeferBlockType type;
 };
 
-struct Resolver;
+struct OldResolver;
 
 struct OldEmitter : VisitorBase {
   std::unordered_set<int> reflected_upon_types;
@@ -209,7 +209,7 @@ struct OldEmitter : VisitorBase {
   StringBuilder reflection_initialization;
 
   StringBuilder global_initializer_builder;
-  Resolver *dep_emitter;
+  OldResolver *dep_emitter;
 
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
@@ -369,12 +369,12 @@ struct OldEmitter : VisitorBase {
   void emit_choice_marker_variant_instantiation(Type *type, ASTPath *value);
 };
 
-struct Resolver : VisitorBase {
+struct OldResolver : VisitorBase {
   Context &ctx;
   OldEmitter *emitter;
   std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<Type *> reflected_upon_types;
-  inline Resolver(Context &context, OldEmitter *emitter) : ctx(context), emitter(emitter) {}
+  inline OldResolver(Context &context, OldEmitter *emitter) : ctx(context), emitter(emitter) {}
   void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
   void define_type(Type *type_id);
@@ -438,4 +438,4 @@ struct GenericInstantiationErrorUserData {
   jmp_buf save_state;
 };
 
-void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id);
+void emit_dependencies_for_reflection(OldResolver *dep_resolver, Type *id);

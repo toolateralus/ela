@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "error.hpp"
+#include "resolver.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "emit.hpp"
@@ -29,9 +30,11 @@ int CompileCommand::compile() {
     Typer typer{context};
     THIRGen thir_gen(typer, context);
     Emitter emitter;
+    Resolver resolver(emitter);
     typer.visit(root);
-    auto thir = thir_gen.visit_program(root);
-    emitter.emit_program((THIRProgram *)thir);
+    thir_gen.visit_node(root);
+
+    resolver.visit_node(thir_gen.get_entry_point());
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);

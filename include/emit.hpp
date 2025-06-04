@@ -47,6 +47,8 @@ struct Emitter {
     }
   }
 
+  
+
   void emit_node(const THIR *thir);
   void emit_program(const THIRProgram *thir);
   void emit_bin_expr(const THIRBinExpr *thir);
@@ -75,7 +77,11 @@ struct Emitter {
   void emit_anonymous_struct(Type *thir);
   void emit_struct_body(Type *thir);
   void emit_type(const THIRType *thir);
+  void forward_declare_type(const Type *type);
+  void emit_tuple(const Type *type);
+  void emit_dyn_dispatch_object_struct(const Type *type);
 
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);
+
 };

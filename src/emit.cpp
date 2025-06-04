@@ -148,7 +148,7 @@ void Emitter::emit_program(const THIRProgram *thir) {
 void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
   EXPR_BEGIN(thir);
   emit_expr(thir->left);
-  code << ttype_get_operator_string(thir->op, thir->source_range);
+  code << ' ' << ttype_get_operator_string(thir->op, thir->source_range) << ' ';
   emit_expr(thir->right);
   EXPR_TERMINATE(thir);
 }
@@ -305,31 +305,32 @@ void Emitter::emit_enum(Type *type) {
   code << "} " << type->basename.get_str() << ";\n";
 }
 
+void Emitter::emit_tuple(const Type *) {}
+void Emitter::forward_declare_type(const Type *) {}
+void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
+
 void Emitter::emit_type(const THIRType *thir) {
   switch (thir->type->kind) {
-    // ignored types, don't have a declarative representation
     case TYPE_SCALAR:
     case TYPE_FUNCTION:
     case TYPE_TRAIT:
       return;
 
-    // These will have to be handled in a special way by the dependency emitter.
     case TYPE_TUPLE:
-    case TYPE_DYN:
+      emit_tuple(thir->type);
       return;
-
-    case TYPE_STRUCT: {
+    case TYPE_DYN:
+      emit_dyn_dispatch_object_struct(thir->type);
+      return;
+    case TYPE_STRUCT:
       emit_struct(thir->type);
       return;
-    }
-    case TYPE_ENUM: {
+    case TYPE_ENUM:
       emit_enum(thir->type);
       return;
-    }
-    case TYPE_CHOICE: {
+    case TYPE_CHOICE:
       emit_choice(thir->type);
       return;
-    }
   }
 }
 

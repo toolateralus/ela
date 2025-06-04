@@ -188,7 +188,7 @@ struct THIRWhile : THIR {
 };
 
 struct THIRSwitch : THIR {
-  THIR *target;
+  THIR *expression;
   std::vector<std::pair<THIR *, THIRBlock *>> branches;
   THIRNodeType get_node_type() const override { return THIRNodeType::Switch; }
 };
@@ -234,15 +234,21 @@ struct THIRGen {
 
   std::map<ASTNode *, THIR *> symbol_map;
 
-  Type *iterator_trait() {
+  THIR *entry_point;
+
+  inline Type *iterator_trait() const {
     static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
     return iter_id;
   }
 
-  Type *iterable_trait() {
+  inline Type *iterable_trait() const {
     static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
     return iterable_id;
   }
+
+  // This will either point to the entire THIRProgram, or, it will point to a function, either being `fn main()` or any
+  // `@[entry]` tagged function.
+  inline THIR *get_entry_point() const { return entry_point; }
 
   // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
   // typically these will just return void.
@@ -298,11 +304,6 @@ struct THIRGen {
 
   THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
-      default: {
-        throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
-        return nullptr;
-      }
-
       // Ignored nodes.
       case AST_NODE_NOOP: {
         return nullptr;
@@ -398,6 +399,12 @@ struct THIRGen {
         return visit_expr_statement((ASTExprStatement *)node);
       case AST_NODE_DEFER:
         return visit_defer((ASTDefer *)node);
+      case AST_NODE_PROGRAM:
+        return visit_program((ASTProgram *)node);
+      default: {
+        throw_error("node not yet implemented by THIR, or needs to be ignored", node->source_range);
+        return nullptr;
+      }
     }
   }
 };

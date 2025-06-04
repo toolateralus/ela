@@ -440,7 +440,12 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     });
   }
 
-  if (thir->name == "main") {
+  if (thir->name == "main" || thir->is_entry) {
+    if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
+      throw_error("multiple functions with the @[entry] were found, or multiple 'main()' functions were found", ast->source_range);
+    }
+
+    entry_point = thir;
     thir->is_entry = true;
   }
 
@@ -514,6 +519,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) { throw_error("visit_switch not impl
 THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
+  entry_point = thir;  // We default to using the entire program as an entry point (for emitting), but if we get a
+                       // main/@[entry] function, this gets replaced.
   ENTER_STMT_VEC(thir->statements);
 
   for (const auto &ast_statement : ast->statements) {

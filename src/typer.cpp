@@ -300,9 +300,10 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
       } break;
       case STRUCT_VARIANT_INDEX: {
         const auto &[name, scope] = std::get<STRUCT_VARIANT_INDEX>(variant);
-        const auto type = info->scope->create_struct_type(name, scope, nullptr);
-        info->members.push_back(TypeMember{.name = name, .type = type});
+        const auto variant_type = info->scope->create_struct_type(name, scope, nullptr);
+        info->members.push_back(TypeMember{.name = name, .type = variant_type});
         info->scope->local_lookup(name)->type.choice = node;
+        variant_type->choice_parent = type;
       } break;
     }
   }
@@ -2308,8 +2309,7 @@ void Typer::visit(ASTInitializerList *node) {
   }
 
   if (target_type->extensions.is_pointer() ||
-      (target_type->is_kind(TYPE_SCALAR) &&
-       target_type->extensions.has_no_extensions())) {  // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
+      (target_type->is_kind(TYPE_SCALAR) && target_type->extensions.has_no_extensions())) {
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
