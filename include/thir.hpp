@@ -63,6 +63,7 @@ struct THIRProgram : THIR {
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
+  bool is_global;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 

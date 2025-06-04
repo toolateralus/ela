@@ -1,6 +1,7 @@
 #include "emit.hpp"
 #include "core.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -147,16 +148,20 @@ void Emitter::emit_program(const THIRProgram *thir) {
 
 void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
   EXPR_BEGIN(thir);
+  code << '(';
   emit_expr(thir->left);
   code << ' ' << ttype_get_operator_string(thir->op, thir->source_range) << ' ';
   emit_expr(thir->right);
+  code << ')';
   EXPR_TERMINATE(thir);
 }
 
 void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
   EXPR_BEGIN(thir);
   code << ttype_get_operator_string(thir->op, thir->source_range);
+  code << '(';
   emit_expr(thir->operand);
+  code << ')';
   EXPR_TERMINATE(thir);
 }
 
@@ -174,7 +179,14 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
 
 void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   emit_expr(thir->base);
-  code << '.' << thir->member.get_str();
+
+  if (thir->base->type->extensions.is_pointer()) {
+    code << "->";
+  } else {
+    code << '.';
+  }
+
+  code << thir->member.get_str();
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
@@ -205,7 +217,12 @@ void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
 }
 
 void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir) {
-  throw_error("emit_collection_initializer is unimplemented", thir->source_range);
+  code << "(" << c_type_string(thir->type) << "){";
+  for (const auto &value : thir->values) {
+    emit_expr(value);
+    code << ", ";
+  }
+  code << "}";
 }
 
 void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
@@ -414,14 +431,14 @@ void Emitter::emit_block(const THIRBlock *thir) {
 void Emitter::emit_variable(const THIRVariable *thir) {
   indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   code << " = ";
-  emit_node(thir->value);
+  emit_expr(thir->value);
   code << ";\n";
 }
 void Emitter::emit_return(const THIRReturn *thir) {
   indented("return");
   if (thir->expression) {
     code << ' ';
-    emit_node(thir->expression);
+    emit_expr(thir->expression);
   }
   code << ";\n";
 }

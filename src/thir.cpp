@@ -492,6 +492,8 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 THIR *THIRGen::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
 
+  thir->is_global = !ast->is_local;
+
   symbol_map[ast] = thir;
 
   if (!ast->is_local) {

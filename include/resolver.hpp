@@ -7,6 +7,7 @@ struct Resolver {
   std::set<const Type *> forward_declared_types;
   std::set<const Type *> emitted_types;
   std::set<const THIRFunction *> emitted_functions;
+  std::set<const THIRVariable *> emitted_global_variables;
 
   Resolver(Emitter &emitter): emitter(emitter) {}
   Emitter &emitter;
