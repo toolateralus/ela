@@ -931,7 +931,7 @@ ASTExpr *Parser::parse_primary() {
         node->is_pattern_match = true;
       }
 
-      node->target = parse_expr();
+      node->expression = parse_expr();
       expect(TType::LCurly);
 
       while (peek().type != TType::RCurly) {
@@ -947,13 +947,13 @@ ASTExpr *Parser::parse_primary() {
           continue;
         }
 
-        SwitchCase _case;
+        SwitchBranch _case;
 
         if (node->is_pattern_match) {
           NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
           pattern_match->scope = create_child(ctx.scope);
           pattern_match->target_type_path = parse_path();
-          pattern_match->object = node->target;
+          pattern_match->object = node->expression;
           _case.expression = pattern_match;
 
           if (peek().type == TType::Dot && lookahead_buf()[1].type == TType::LCurly) {
@@ -1030,7 +1030,7 @@ ASTExpr *Parser::parse_primary() {
           expect(TType::Colon);
         }
         _case.block = parse_block();
-        node->cases.push_back(_case);
+        node->branches.push_back(_case);
         if (peek().type == TType::Comma) {
           eat();
         }

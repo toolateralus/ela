@@ -39,7 +39,6 @@ enum struct THIRNodeType : unsigned char {
   For,
   If,
   While,
-  Switch,
 };
 
 struct THIR {
@@ -196,12 +195,6 @@ struct THIRWhile : THIR {
   THIR *condition;
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::While; }
-};
-
-struct THIRSwitch : THIR {
-  THIR *expression;
-  std::vector<std::pair<THIR *, THIRBlock *>> branches;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Switch; }
 };
 
 struct THIREmptyInitializer : THIR {

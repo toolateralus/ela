@@ -88,7 +88,7 @@ THIR *THIRGen::visit_return(ASTReturn *ast) {
     thir->op = TType::Assign;
     thir->left = return_override_register.get();
     thir->right = visit_node(ast->expression.get());
-    thir->is_statement=true;
+    thir->is_statement = true;
     return thir;
   }
 
@@ -555,9 +555,55 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   return thir;
 }
 
+// TODO: 
+/* 
+  Right now, we're just going to lower this into a bunch of if-else branches.
+  This maintains the previous meaning of all the programs that exist in the language
+
+  However, with a future LLVM backend and an improvement of the behaviour of switch statements in general,
+  We're going to need a THIRSwitch, because it won't just act as an if-else (fall throughs, jump table optimizations, etc)
+*/
 THIR *THIRGen::visit_switch(ASTSwitch *ast) {
-  throw_error("visit_switch not implemented", ast->source_range);
-  return nullptr;
+  // TODO: maybe we want to throw an error for this, instead of just optimizing it out.
+  if (ast->branches.empty() && !ast->default_case) {
+    return nullptr;
+  }
+
+  static int idx = 0;
+  
+  THIR_ALLOC(THIRVariable, cached_expr, ast);
+  cached_expr->name= std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++);
+  cached_expr->is_global=false;
+  cached_expr->type = ast->expression->resolved_type;
+  cached_expr->value = visit_node(ast->expression);
+  current_statement_list->push_back(cached_expr);
+
+  const auto get_condition_comparator = [&](size_t index) -> THIR * {
+    THIR_ALLOC(THIRBinExpr, binexpr, ast);
+    binexpr->left = cached_expr;
+    binexpr->right = visit_node(ast->branches[index].expression);
+    binexpr->op = TType::EQ;
+    binexpr->type = bool_type();
+    return binexpr;
+  };
+
+  THIR_ALLOC(THIRIf, first_case, ast)
+  first_case->condition = get_condition_comparator(0);
+  first_case->block = (THIRBlock*)visit_node(ast->branches[0].block);
+  first_case->is_statement = true;
+
+  THIRIf *the_if = first_case;
+  for (size_t i = 1; i < ast->branches.size(); ++i) {
+    const auto &ast_branch = ast->branches[i];
+    THIR_ALLOC(THIRIf, thir_branch, ast)
+    thir_branch->condition = get_condition_comparator(i);
+    thir_branch->block = (THIRBlock*)visit_node(ast_branch.block);
+    thir_branch->is_statement = true;
+    the_if->_else = thir_branch;
+    the_if = thir_branch;
+  }
+
+  return first_case;
 }
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {

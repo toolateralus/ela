@@ -298,10 +298,10 @@ ASTRange *ASTCopier::copy_range(ASTRange *node) {
 }
 ASTSwitch *ASTCopier::copy_switch(ASTSwitch *node) {
   auto new_node = copy(node);
-  new_node->target = static_cast<ASTExpr *>(copy_node(node->target));
-  new_node->cases.clear();
-  for (auto &case_ : node->cases) {
-    new_node->cases.push_back(
+  new_node->expression = static_cast<ASTExpr *>(copy_node(node->expression));
+  new_node->branches.clear();
+  for (auto &case_ : node->branches) {
+    new_node->branches.push_back(
         {static_cast<ASTExpr *>(copy_node(case_.expression)), static_cast<ASTBlock *>(copy_node(case_.block))});
   }
   return new_node;

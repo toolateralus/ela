@@ -69,7 +69,6 @@ struct Emitter {
   void emit_for(const THIRFor *thir);
   void emit_if(const THIRIf *thir);
   void emit_while(const THIRWhile *thir);
-  void emit_switch(const THIRSwitch *thir);
   void emit_variable(const THIRVariable *thir);
 
   void emit_struct(Type *type);

@@ -253,7 +253,6 @@ void Emitter::emit_while(const THIRWhile *thir) {
   code << ')';
   emit_block(thir->block);
 }
-void Emitter::emit_switch(const THIRSwitch *thir) { throw_error("emit_switch is unimplemented", thir->source_range); }
 
 void Emitter::emit_tuple(Type *type) {
   const auto type_name = c_type_string(type);
@@ -525,7 +524,5 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_if((const THIRIf *)thir);
     case THIRNodeType::While:
       return emit_while((const THIRWhile *)thir);
-    case THIRNodeType::Switch:
-      return emit_switch((const THIRSwitch *)thir);
   }
 }

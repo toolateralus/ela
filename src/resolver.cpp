@@ -136,13 +136,7 @@ void Resolver::visit_while(const THIRWhile *thir) {
   }
   visit_node(thir->block);
 }
-void Resolver::visit_switch(const THIRSwitch *thir) {
-  visit_node(thir->expression);
-  for (const auto &[cond, body] : thir->branches) {
-    visit_node(cond);
-    visit_node(body);
-  }
-}
+
 void Resolver::visit_variable(const THIRVariable *thir) {
   if (thir->value) visit_node(thir->value);
   if (thir->is_global && !emitted_global_variables.contains(thir)) {
@@ -246,9 +240,6 @@ void Resolver::visit_node(const THIR *thir) {
       break;
     case THIRNodeType::While:
       visit_while((const THIRWhile *)thir);
-      break;
-    case THIRNodeType::Switch:
-      visit_switch((const THIRSwitch *)thir);
       break;
   }
 }

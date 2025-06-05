@@ -2373,7 +2373,7 @@ void OldEmitter::emit_pattern_match_destructure(ASTExpr *object, const std::stri
 }
 
 void OldEmitter::emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target_temp_identifier,
-                                                 const SwitchCase &the_case, ASTPatternMatch *pattern) {
+                                                 const SwitchBranch &the_case, ASTPatternMatch *pattern) {
   ctx.set_scope(pattern->scope);
   auto old_scope = ctx.scope;
   Defer _([&] { ctx.scope = old_scope; });
@@ -2458,7 +2458,7 @@ void OldEmitter::emit_pattern_match_for_switch_case(const Type *target_type, con
 }
 
 void OldEmitter::visit(ASTSwitch *node) {
-  auto type = node->target->resolved_type;
+  auto type = node->expression->resolved_type;
   bool use_default_eq_operator = true;
 
   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer()) {
@@ -2479,15 +2479,15 @@ void OldEmitter::visit(ASTSwitch *node) {
   static size_t index = 0;
   const auto target_unique_id = "$switch_target$" + std::to_string(index++);
 
-  code << indent() << type_to_string(node->target->resolved_type) << " " << target_unique_id << " = ";
-  node->target->accept(this);
+  code << indent() << type_to_string(node->expression->resolved_type) << " " << target_unique_id << " = ";
+  node->expression->accept(this);
 
   semicolon();
   newline();
 
-  const auto target_type = node->target->resolved_type;
+  const auto target_type = node->expression->resolved_type;
 
-  auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
+  auto emit_switch_case = [&](ASTExpr *target, const SwitchBranch &_case, bool first) {
     emit_line_directive(target);
     if (!first) {
       code << indent() << "else ";
@@ -2511,8 +2511,8 @@ void OldEmitter::visit(ASTSwitch *node) {
   };
 
   bool first = true;
-  for (const auto &_case : node->cases) {
-    emit_switch_case(node->target, _case, first);
+  for (const auto &_case : node->branches) {
+    emit_switch_case(node->expression, _case, first);
     first = false;
   }
 

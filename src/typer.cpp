@@ -2445,12 +2445,12 @@ void Typer::visit(ASTRange *node) {
 }
 
 void Typer::visit(ASTSwitch *node) {
-  node->target->accept(this);
-  auto type_id = node->target->resolved_type;
+  node->expression->accept(this);
+  auto type_id = node->expression->resolved_type;
   auto type = type_id;
 
   if (node->is_pattern_match) {
-    for (auto _case = node->cases.begin(); _case != node->cases.end(); _case++) {
+    for (auto _case = node->branches.begin(); _case != node->branches.end(); _case++) {
       auto condition = _case->expression;
       if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
         auto pattern = (ASTPatternMatch *)condition;
@@ -2474,7 +2474,7 @@ void Typer::visit(ASTSwitch *node) {
                       "doesn't implement "
                       "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
                       type->to_string()),
-          node->target->source_range);
+          node->expression->source_range);
     }
   }
 
@@ -2487,7 +2487,7 @@ void Typer::visit(ASTSwitch *node) {
   Type *return_type = void_type();
   int flags = 0;
 
-  for (const auto &_case : node->cases) {
+  for (const auto &_case : node->branches) {
     if (!node->is_pattern_match) _case.expression->accept(this);
 
     _case.block->accept(this);
