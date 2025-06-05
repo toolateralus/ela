@@ -297,42 +297,60 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
   return thir;
 }
 
-// Use THIRAggregateInitializer/Collection/Empty here.
-// Really, the AST could benefit from the seperation of those possibly.
+THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
+                          const std::vector<std::pair<InternedString, ASTExpr *>> &key_values) {
+  const auto info = type->info;
+  if (info->members.empty()) {
+    THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
+    thir->source_range = source_range;
+    thir->type = type;
+    return thir;
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->source_range = source_range;
+  thir->type = type;
+
+  for (const auto &member : info->members) {
+    ASTExpr *initializer = nullptr;
+    for (const auto &[key, value] : key_values) {
+      if (key == member.name) {
+        initializer = value;
+        break;
+      }
+    }
+    const auto is_non_ptr_non_union_struct =
+        member.type->is_kind(TYPE_STRUCT) && member.type->extensions.has_no_extensions() &&
+        DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION);
+
+    if (initializer) {
+      thir->key_values.push_back({member.name, visit_node(initializer)});
+    } else if (member.default_value) {
+      thir->key_values.push_back({member.name, visit_node(member.default_value.get())});
+    } else if (is_non_ptr_non_union_struct) {
+      thir->key_values.push_back({member.name, initialize(source_range, member.type, {})});
+    } else {
+      THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, empty_init);
+      empty_init->source_range = source_range;
+      empty_init->type = type;
+      empty_init->type = member.type;
+      thir->key_values.push_back({member.name, empty_init});
+    }
+  }
+  return thir;
+}
+
 THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
+  const auto type = ast->resolved_type;
   switch (ast->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
-      THIR_ALLOC(THIREmptyInitializer, thir, ast);
-      return thir;
+      return initialize(ast->source_range, type, {});
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
-      const auto type = ast->resolved_type;
       if (type->kind == TYPE_STRUCT) {
-        THIR_ALLOC(THIRAggregateInitializer, thir, ast);
-        const auto info = type->info->as<StructTypeInfo>();
-        for (const auto &member : info->members) {
-          bool set = false;
-          for (size_t i = 0; i < ast->key_values.size(); ++i) {
-            const auto &[key, value] = ast->key_values[i];
-            if (key == member.name) {
-              thir->key_values.push_back({key, visit_node(value)});
-              set = true;
-              break;
-            }
-          }
-          if (!set) {
-            if (member.default_value) {
-              printf("default member emitted for %s\n", member.name.get_str().c_str());
-              thir->key_values.push_back({member.name, visit_node(member.default_value.get())});
-            } else {
-              THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
-              empty_init->type = member.type;
-              thir->key_values.push_back({member.name, empty_init});
-            }
-          }
-        }
-        return thir;
-      } else if (type->kind == TYPE_CHOICE) {  // Choice variant instantiation.
+        return initialize(ast->source_range, type, ast->key_values);
+      } else if (type->kind == TYPE_CHOICE) {
+        // Choice variant instantiation
         const auto path = ast->target_type.get()->normal.path;
         const auto info = ast->resolved_type->info->as<ChoiceTypeInfo>();
         const auto thir = get_choice_type_instantiation_boilerplate(path);
@@ -352,6 +370,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         thir->key_values.push_back({variant_name, visit_node(&subinit)});
         return thir;
       }
+      break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
       THIR_ALLOC(THIRCollectionInitializer, thir, ast)
@@ -361,6 +380,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       return thir;
     }
   }
+  return nullptr;
 }
 
 THIR *THIRGen::visit_type_of(ASTType_Of *ast) {
@@ -544,13 +564,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   if (ast->value) {
     thir->value = visit_node(ast->value.get());
   } else {
-    // TODO: we should have an option for initializing variable declarations with no value that lets it circumvent zero
-    // init.
-    // TODO: akin to jai's --- operator.
-    // we use this for default construction, to be more explicit.
-    THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
-    empty_init->type = ast->type->resolved_type;
-    thir->value = empty_init;
+    thir->value = initialize(thir->source_range, ast->type->resolved_type, {});
   }
 
   thir->type = ast->type->resolved_type;

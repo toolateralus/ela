@@ -299,7 +299,7 @@ struct THIRGen {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-
+  THIR *initialize(const SourceRange &source_range, Type *type, const std::vector<std::pair<InternedString, ASTExpr *>> &key_values);
   THIR *visit_program(ASTProgram *node);
   THIR *visit_function_declaration_via_symbol(Symbol *symbol);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
