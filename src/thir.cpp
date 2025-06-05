@@ -625,6 +625,10 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     the_if = thir_branch;
   }
 
+  if (ast->default_case) {
+    the_if->_else = (THIRBlock *)visit_node(ast->default_case.get());
+  }
+
   return first_case;
 }
 
