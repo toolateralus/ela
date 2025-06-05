@@ -189,6 +189,10 @@ There's certainly a better way, we can look into how rust even accomplishes such
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
 
+#### remove the 'switch' node. replace it with a 'match' node
+We right now have `switch` and `switch is` nodes. we should replace this with just a `match` since it's not really a switch,
+it does so much more. In my mind, `switch` is just switching over enumeration values, i.e C `enum`. in our case, we will be able to
+do very complex pattern matching, as shown below, and this would be much nicer to not have a `switch`, rather copy rust with just a `match`
 
 #### Pattern matching improvements
 recursive pattern stuff like this should work, to any degree:
@@ -196,4 +200,27 @@ recursive pattern stuff like this should work, to any degree:
   if x is Some(Ok(&mut v)) {
 
   }
+
+  switch is (1, 2) {
+    (1, 2): {
+
+    }
+    (2, 3): {
+
+    }
+  }
+
+  switch is 50 {
+    0..100: {
+
+    }
+  }
+
+  switch is (Some(10), None) {
+    (Some(v), None): {
+
+    }
+  }
+
 ```
+
