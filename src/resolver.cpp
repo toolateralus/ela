@@ -159,6 +159,7 @@ void Resolver::visit_function(const THIRFunction *thir) {
   if (thir->block) {
     visit_node(thir->block);
   }
+  printf("emitting function (via dep emitter) = '%s', node=%p\n", thir->name.get_str().c_str(), thir);
   emitter.emit_function(thir);
 }
 void Resolver::visit_block(const THIRBlock *thir) {

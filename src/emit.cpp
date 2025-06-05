@@ -232,19 +232,19 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
 
 void Emitter::emit_if(const THIRIf *thir) {
-  code << "if (";
+  indented("if (");
   emit_expr(thir->condition);
   code << ")";
   emit_node(thir->block);
 
   if (thir->_else) {
-    code << "else ";
+    indented("else ");
     emit_node(thir->_else);
   }
 }
 
 void Emitter::emit_while(const THIRWhile *thir) {
-  code << "while (";
+  indented("while (");
   if (thir->condition) {
     emit_expr(thir->condition);
   } else {
@@ -374,6 +374,7 @@ void Emitter::emit_type(const THIRType *thir) {
 }
 
 void Emitter::emit_function(const THIRFunction *thir) {
+  printf("emitting function (via emitter) = '%s'\n", thir->name.get_str().c_str());
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
   if (thir->is_extern || thir->is_exported) {
@@ -395,7 +396,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
   }
 
   code << c_type_string(info->return_type);
-  code << ' ' << thir->name.get_str() << '(';
+  code << ' ' << thir->name.get_str() << " (";
 
   auto param_iter = thir->parameters.begin();
 
@@ -404,7 +405,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
     code << c_type_string(info->parameter_types[i]) << ' ' << parameter.name.get_str();
     param_iter++;
     if (i < info->params_len - 1) {
-      code << ",";
+      code << ", ";
     }
   }
 
@@ -423,22 +424,27 @@ void Emitter::emit_function(const THIRFunction *thir) {
 
 void Emitter::emit_expression_block(const THIRExprBlock *thir) {
   code << "({\n";
-  INDENTED_BLOCK()
+  EXPR_BEGIN(thir);
+  indent_level++;
   for (auto stmt : thir->statements) {
     emit_node(stmt);
   }
+  indented();
   emit_expr(thir->return_register);
   code << ";\n";
+  indent_level--;
   code << "})";
+  EXPR_TERMINATE(thir);
 }
 
 void Emitter::emit_block(const THIRBlock *thir) {
-  code << "{\n";
-  INDENTED_BLOCK();
+  indented("{\n");
+  indent_level++;
   for (auto stmt : thir->statements) {
     emit_node(stmt);
   }
-  code << "}";
+  indent_level--;
+  indented("}\n");
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
