@@ -1,0 +1,258 @@
+alias c_str :: *const u8;
+
+import dlfcn;
+
+module std {
+  extern fn printf(fmt: c_str, ...);
+  extern fn exit(code: s32);
+  extern fn strlen(c: c_str) -> s32;
+  extern fn malloc(size: u64) -> *mut void;
+  extern fn sprintf(buf: c_str, fmt: c_str, ...) -> s32;
+}
+
+trait XarBar {
+  fn printme(*mut self);
+}
+
+choice Option {
+  None,
+  Some(s32),
+}
+
+// I hacked these in to avoid using pattern matching while it's still unimplemented.
+// totally dependent on knowledge about how our compiler represents types, and how your ABI does too.
+impl Option {
+  fn is_none(mut self) -> bool {
+    discriminant := ((&mut self) as *const u8) as *const u32;
+    return *discriminant != 2;
+  }
+
+  fn get_value(mut self) -> s32 {
+    const discriminant_offset := 4;
+    mut discriminant := ((&mut self) as *const u8);
+    discriminant += discriminant_offset;
+    return *(discriminant as *const s32);
+  }
+}
+
+trait Iterator {
+  fn next(*mut self) -> Option;
+}
+
+trait Iterable {
+  fn iter(*mut self) -> Iterator;
+}
+
+struct Iter {
+  idx: s32, end: s32
+}
+
+impl Iterator for Iter {
+  fn next(*mut self) -> Option {
+    value := self.idx;
+    if self.idx < self.end {
+      self.idx++;
+      return Option::Some(value);
+    }
+    return Option::None;
+  }
+}
+
+struct Person {
+  friendliness: u8,
+  curiosity: u32,
+  name: c_str
+}
+
+impl XarBar for Person {
+  fn printme(*mut self) {
+    std::printf("%s says:\n", self.name);
+    std::printf("  '%s'\n", "\033[1;3;35mbustin on the spheres in the box\033[0m");
+  }
+}
+
+choice Choice {
+  A,
+  B(u8, u8),
+  C {
+    z: c_str,
+    y: f32, 
+    x: s32, 
+  },
+  Person(Person)
+}
+
+enum Enum {
+  A, B, C
+}
+
+fn get() -> bool {
+  return true;
+}
+
+const colors: c_str[7] = c_str.[
+  "\033[1;3;31m", // Red
+  "\033[1;3;33m", // Yellow (used for Orange and Yellow)
+  "\033[1;3;33m",
+  "\033[1;3;32m", // Green
+  "\033[1;3;34m", // Blue
+  "\033[1;3;35m", // Magenta (for Indigo/Violet)
+  "\033[1;3;35m"
+];
+
+fn rainbowize(s: c_str) {
+  mut i := 0;
+  while (s[i] != 0) {
+    color := colors[(i % 7)];
+    std::printf("%s%c"c, color, s[i]);
+    i += 1;
+  }
+  std::printf("\033[0m"c);
+}
+
+fn rainbowize_str(s: c_str) -> c_str {
+  len := std::strlen(s);
+  color_len := std::strlen(colors[0]);
+  extra := len * color_len + color_len + 1;
+  buf: *mut u8 = std::malloc(len + extra);
+  out := buf;
+
+  mut i := 0;
+  mut written := 0;
+  while (s[i] != 0) {
+    color := colors[i % 7];
+    written += std::sprintf(out + written, "%s%c", color, s[i]);
+    i += 1;
+  }
+
+  written += std::sprintf(out + written, "\033[0m");
+  (out + written)[0] = 0;
+  return buf;
+}
+
+fn print_discriminant(c: Choice) {
+  mut ptr: *const u8 = &const c;
+  std::printf("discriminant of c is %d\n", *(ptr as *const u32));
+}
+
+impl s32 {
+  fn eq(self, other: #self) -> bool {
+    // cast to prevent infinite recursion for this basic test.
+    return self as s64 == other as s32;
+  }
+}
+
+@[entry]
+fn main() -> s32 {
+  mut c := Choice::A;
+  c = .{};
+  c = Choice::B(1, 2);
+  c = Choice::C.{
+    x: 10,
+    y: 100.0,
+    z: "Hello, world!"
+  };
+
+  std::printf("bb=%d\n", if get() { return 100; });
+
+  switch 0 {
+    1: { std::printf("wrong!\n"); }
+    2: { std::printf("wrong!\n"); }
+    0: { std::printf("not wrong!\n"); }
+    else: {
+      std::printf("default case\n");
+    }
+  }
+
+  status: c_str = if 1 == 1 { return "true"c; } else { return "false"c; };
+  std::printf("1==1=%s\n", status);
+
+  // if c is Choice::B(a, b) {
+
+  // }
+
+  mut person: Person = .{
+    curiosity: 200,
+    name: "\033[31mC\033[33mo\033[33mo\033[32mp\033[34me\033[35mr\033[0m (▮▮▮▮▮▮▮▮▮▯ 90% happy)"
+  };
+
+  if !get() {
+    std::printf("Person says hello! Curiosity=%d\n", person.curiosity);
+  } else if false {
+    std::printf("Person says hello! Curiosity=%d\n", person.curiosity);
+  } else if 0 {
+    std::printf("Person says hello! Curiosity=%d\n", person.curiosity);
+  } else {
+    rainbowize("YOU NEED TO GET A LESSON IN BIG SOCK DETECTION\n");
+  }
+
+  mut i := 0;
+  while i < 10 { 
+    std::printf("i=%d, ", ++i); 
+  } 
+  
+  rainbowize("while loop done\n");
+
+  where s32: s32 {
+    std::printf("s32 == s32! WOW! WOW! WOW! WOW!\n");
+  }
+
+  result := dlfcn::dlopen("/usr/local/include/raylib.so"c, 0);
+  std::printf("result=%p (unimportant, just testing modules)\n", result);
+
+  x, y, z := person;
+  std::printf("friendliness=%d, curiosity=%d, name=%s\n", x, y, z);
+
+  where Person: XarBar {
+    person.printme();
+  }
+  
+  mut iter := Iter.{ idx: 0, end: 5 };
+
+  while {
+    opt := iter.next();
+    if opt.is_none() {
+      break;
+    } else {
+      std::printf("%s%d, ", rainbowize_str("iter="), opt.get_value());
+    }
+  }
+  std::printf("\n");
+
+  // ! We can't do this until generics work, because Option!<T> is always generic, and the typer expects that.
+  // for i in iter {
+
+  // }
+
+  lambda := fn() {
+    rainbowize("woo hoo we're in a lambda!\n");
+  };
+
+
+  fn subfunc() {
+    rainbowize("subfunction\n");
+  }
+
+  subfunc();
+
+  lambda();
+
+  struct Befriender {
+    xyz: (f32, f32, f32) = (1.0, 2.0, 3.0),
+  } 
+
+  impl Befriender {
+    fn befriend_her(self) {
+      std::printf("I hardly know her!\n");
+    }
+  }
+
+  extern fn memset(dest: *const (f32, f32, f32), value: u32, length: u64);
+
+  befriender: Befriender;
+  // befriender.befriend_her(); // ! error
+  // memset(&const befriender.xyz, 0, sizeof((f32, f32, f32)));
+  std::printf("befriender.xyz=(%f, %f, %f)\n", befriender.xyz.0, befriender.xyz.1, befriender.xyz.2);
+
+  return 0;
+}

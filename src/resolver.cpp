@@ -2,6 +2,7 @@
 #include "resolver.hpp"
 #include "emit.hpp"
 #include "thir.hpp"
+#include "type.hpp"
 
 // formerly `declare_type`
 void Resolver::declare_or_define_type(Type *type) {
@@ -26,14 +27,13 @@ void Resolver::declare_or_define_type(Type *type) {
 }
 // formerly `define_type`
 void Resolver::emit_type_definition(Type *type) {
+  if (type->base_type != Type::INVALID_TYPE) {
+    type = type->base_type;
+  }
   if (!type || emitted_types.contains(type)) {
     return;
   }
   emitted_types.insert(type);
-
-  if (type->base_type != Type::INVALID_TYPE) {
-    type = type->base_type;
-  }
 
   THIRType thir_type;
   thir_type.type = type;
@@ -136,13 +136,7 @@ void Resolver::visit_while(const THIRWhile *thir) {
   }
   visit_node(thir->block);
 }
-void Resolver::visit_switch(const THIRSwitch *thir) {
-  visit_node(thir->expression);
-  for (const auto &[cond, body] : thir->branches) {
-    visit_node(cond);
-    visit_node(body);
-  }
-}
+
 void Resolver::visit_variable(const THIRVariable *thir) {
   if (thir->value) visit_node(thir->value);
   if (thir->is_global && !emitted_global_variables.contains(thir)) {
@@ -157,27 +151,39 @@ void Resolver::visit_function(const THIRFunction *thir) {
   }
   emitted_functions.insert(thir);
 
+  const auto type = thir->type->info->as<FunctionTypeInfo>();
+  for (size_t i = 0; i < type->params_len; ++i) {
+    emit_type_definition(type->parameter_types[i]);
+  }
+
   for (const auto &param : thir->parameters) {
     if (param.default_value) {
       visit_node(param.default_value);
     }
   }
+
   if (thir->block) {
     visit_node(thir->block);
   }
+
   emitter.emit_function(thir);
 }
+
 void Resolver::visit_block(const THIRBlock *thir) {
   for (const auto &stmt : thir->statements) {
     visit_node(stmt);
   }
 }
+
 void Resolver::visit_node(const THIR *thir) {
   if (!thir) {
     throw_error("resolver got a null THIR node", {});
   }
   declare_or_define_type(thir->type);
   switch (thir->get_node_type()) {
+    case THIRNodeType::ExpressionBlock: {
+      visit_expr_block((const THIRExprBlock *)thir);
+    }
     case THIRNodeType::Program:
       visit_program((const THIRProgram *)thir);
       break;
@@ -244,8 +250,12 @@ void Resolver::visit_node(const THIR *thir) {
     case THIRNodeType::While:
       visit_while((const THIRWhile *)thir);
       break;
-    case THIRNodeType::Switch:
-      visit_switch((const THIRSwitch *)thir);
-      break;
+  }
+}
+
+void Resolver::visit_expr_block(const THIRExprBlock *thir) {
+  visit_node(thir->return_register);
+  for (const auto &stmt : thir->statements) {
+    visit_node(stmt);
   }
 }

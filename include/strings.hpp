@@ -6,11 +6,13 @@
 
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
-constexpr const char * DISCRIMINANT_KEY = "$discriminant";
-
+constexpr const char *DISCRIMINANT_KEY = "$discriminant";
+constexpr const char *OPTION_NONE_DISCRIMINANT_VALUE = "1";
+constexpr const char *THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT = "$ror{}";
+constexpr const char *THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT = "$switch_cached{}";
 // We should probably not rely on this since RangeBase is defined in the stdlib.
-constexpr const char * RANGE_TYPE_BEGIN_KEY = "begin";
-constexpr const char * RANGE_TYPE_END_KEY = "end";
+constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";
+constexpr const char *RANGE_TYPE_END_KEY = "end";
 
 constexpr auto MAIN_FMT = R"_(
 int main (int argc, char** argv) {{

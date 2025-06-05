@@ -24,6 +24,11 @@
   current_statement_list = (&$stmt_vector);                                                \
   const Defer $stmt_container_defer([&] { current_statement_list = $old_stmt_vector; });
 
+#define ENTER_RETURN_OVERRIDE($ast, $block)       \
+  ENTER_STMT_VEC(($block))                        \
+  $block.push_back(init_override_register($ast)); \
+  Defer $ovr_reg_defer([&] { return_override_register = {nullptr}; });
+
 static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath *ast) {
   if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->extensions.has_extensions()) {
     return false;
@@ -77,6 +82,16 @@ THIR *THIRGen::visit_break(ASTBreak *ast) {
 }
 
 THIR *THIRGen::visit_return(ASTReturn *ast) {
+  // For defers and block expressions, we write to a variable instead of actually returning.
+  if (return_override_register.is_not_null() && ast->expression) {
+    THIR_ALLOC(THIRBinExpr, thir, ast)
+    thir->op = TType::Assign;
+    thir->left = return_override_register.get();
+    thir->right = visit_node(ast->expression.get());
+    thir->is_statement = true;
+    return thir;
+  }
+
   THIR_ALLOC(THIRReturn, thir, ast);
   if (ast->expression) {
     thir->expression = visit_node(ast->expression.get());
@@ -170,7 +185,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     }
 
     thir->arguments.push_back(self);
-    thir->callee = visit_function_declaration(symbol->function.declaration);
+    thir->callee = visit_function_declaration_via_symbol(symbol);
   }
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -212,7 +227,7 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->left));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
@@ -229,7 +244,7 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
@@ -245,7 +260,7 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->base));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
@@ -279,37 +294,62 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
   return thir;
 }
 
-// Use THIRAggregateInitializer/Collection/Empty here.
-// Really, the AST could benefit from the seperation of those possibly.
+THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
+                          const std::vector<std::pair<InternedString, ASTExpr *>> &key_values) {
+  const auto info = type->info;
+
+  // TODO: might need more ignored things here
+  if (info->members.empty() || type->is_kind(TYPE_CHOICE)) {
+    THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
+    thir->source_range = source_range;
+    thir->type = type;
+    return thir;
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->source_range = source_range;
+  thir->type = type;
+
+  for (const auto &member : info->members) {
+    ASTExpr *initializer = nullptr;
+    for (const auto &[key, value] : key_values) {
+      if (key == member.name) {
+        initializer = value;
+        break;
+      }
+    }
+    const auto is_non_ptr_non_union_struct =
+        member.type->is_kind(TYPE_STRUCT) && member.type->extensions.has_no_extensions() &&
+        DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION);
+
+    if (initializer) {
+      thir->key_values.push_back({member.name, visit_node(initializer)});
+    } else if (member.default_value) {
+      thir->key_values.push_back({member.name, visit_node(member.default_value.get())});
+    } else if (is_non_ptr_non_union_struct) {
+      thir->key_values.push_back({member.name, initialize(source_range, member.type, {})});
+    } else {
+      THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, empty_init);
+      empty_init->source_range = source_range;
+      empty_init->type = type;
+      empty_init->type = member.type;
+      thir->key_values.push_back({member.name, empty_init});
+    }
+  }
+  return thir;
+}
+
 THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
+  const auto type = ast->resolved_type;
   switch (ast->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
-      THIR_ALLOC(THIREmptyInitializer, thir, ast);
-      return thir;
+      return initialize(ast->source_range, type, {});
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
-      const auto type = ast->resolved_type;
       if (type->kind == TYPE_STRUCT) {
-        THIR_ALLOC(THIRAggregateInitializer, thir, ast);
-        const auto info = type->info->as<StructTypeInfo>();
-        for (const auto &member : info->members) {
-          bool set = false;
-          for (size_t i = 0; i < ast->key_values.size(); ++i) {
-            const auto &[key, value] = ast->key_values[i];
-            if (key == member.name) {
-              thir->key_values.push_back({key, visit_node(value)});
-              set = true;
-              break;
-            }
-          }
-          if (!set) {
-            THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
-            empty_init->type = member.type;
-            thir->key_values.push_back({member.name, empty_init});
-          }
-        }
-        return thir;
-      } else if (type->kind == TYPE_CHOICE) {  // Choice variant instantiation.
+        return initialize(ast->source_range, type, ast->key_values);
+      } else if (type->kind == TYPE_CHOICE) {
+        // Choice variant instantiation
         const auto path = ast->target_type.get()->normal.path;
         const auto info = ast->resolved_type->info->as<ChoiceTypeInfo>();
         const auto thir = get_choice_type_instantiation_boilerplate(path);
@@ -329,6 +369,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         thir->key_values.push_back({variant_name, visit_node(&subinit)});
         return thir;
       }
+      break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
       THIR_ALLOC(THIRCollectionInitializer, thir, ast)
@@ -338,6 +379,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       return thir;
     }
   }
+  return nullptr;
 }
 
 THIR *THIRGen::visit_type_of(ASTType_Of *ast) {
@@ -353,10 +395,24 @@ THIR *THIRGen::visit_cast(ASTCast *ast) {
 }
 
 THIR *THIRGen::visit_lambda(ASTLambda *ast) {
-  // TODO: We need to insert the lambdas into the scope by their UID, so we can fetch the symbol,
-  // and get the THIRFunction* node from the declaration.
-  throw_error("visit_lambda not implemented", ast->source_range);
-  return nullptr;
+  auto symbol = ctx.scope->lookup(ast->unique_identifier);
+  if (auto thir = symbol_map[symbol]) {
+    return thir;
+  }
+  THIR_ALLOC(THIRFunction, thir, ast);
+  symbol_map[symbol] = thir;
+  thir->block = (THIRBlock *)visit_node(ast->block);
+  thir->name = ast->unique_identifier;
+  for (const auto &ast_param : ast->params->params) {
+    THIRParameter thir_param = {
+        .name = ast_param->normal.name,
+    };
+    if (ast_param->normal.default_value) {
+      thir_param.default_value = visit_node(ast_param->normal.default_value.get());
+    }
+    thir->parameters.push_back(thir_param);
+  }
+  return thir;
 }
 
 THIR *THIRGen::visit_block(ASTBlock *ast) {
@@ -425,14 +481,21 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
   }
 }
 
+THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
+  if (auto thir = symbol_map[symbol]) {
+    return thir;
+  }
+  return symbol_map[symbol] = visit_function_declaration(symbol->function.declaration);
+}
+
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  const auto symbol = ctx.scope->local_lookup(ast->name);
   THIR_ALLOC(THIRFunction, thir, ast);
-  auto symbol = ctx.scope->local_lookup(ast->name);
   symbol_map[symbol] = thir;
+
   ENTER_SCOPE(ast->scope);
   convert_function_flags(thir, (FunctionInstanceFlags)ast->flags);
   convert_function_attributes(thir, ast->attributes);
-
   for (const auto &param : ast->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
     if (param->tag == ASTParamDecl::Normal) {
@@ -479,6 +542,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
   }
+
   return thir;
 }
 
@@ -499,12 +563,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   if (ast->value) {
     thir->value = visit_node(ast->value.get());
   } else {
-    // TODO: we should have an option for initializing variable declarations with no value that lets it circumvent zero
-    // init.
-    // TODO: akin to jai's --- operator.
-    // we use this for default construction, to be more explicit.
-    THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
-    thir->value = empty_init;
+    thir->value = initialize(thir->source_range, ast->type->resolved_type, {});
   }
 
   thir->type = ast->type->resolved_type;
@@ -537,9 +596,78 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   return thir;
 }
 
+// TODO:
+/*
+  Right now, we're just going to lower this into a bunch of if-else branches.
+  This maintains the previous meaning of all the programs that exist in the language
+
+  However, with a future LLVM backend and an improvement of the behaviour of switch statements in general,
+  We're going to need a THIRSwitch, because it won't just act as an if-else (fall throughs, jump table optimizations,
+  etc)
+*/
 THIR *THIRGen::visit_switch(ASTSwitch *ast) {
-  throw_error("visit_switch not implemented", ast->source_range);
-  return nullptr;
+  // TODO: maybe we want to throw an error for this, instead of just optimizing it out.
+  if (ast->branches.empty() && !ast->default_case) {
+    return nullptr;
+  }
+
+  // this is totally redundant so, whatever, just emit it as if it were a block.
+  if (ast->branches.empty() && ast->default_case) {
+    return visit_node(ast->default_case.get());
+  }
+
+  static int idx = 0;
+
+  THIR_ALLOC(THIRVariable, cached_expr, ast);
+  cached_expr->name = std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++);
+  cached_expr->is_global = false;
+  cached_expr->type = ast->expression->resolved_type;
+  cached_expr->value = visit_node(ast->expression);
+  current_statement_list->push_back(cached_expr);
+
+  const auto get_condition_comparator = [&](size_t index) -> THIR * {
+    auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
+    auto left = cached_expr;
+    auto right = visit_node(ast->branches[index].expression);
+    if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
+      THIR_ALLOC(THIRBinExpr, binexpr, ast);
+      binexpr->left = left;
+      binexpr->right = right;
+      binexpr->op = TType::EQ;
+      binexpr->type = bool_type();
+      return binexpr;
+    } else {  // call an operator overload
+      THIR_ALLOC(THIRCall, overload_call, ast);
+      auto scope = left->type->info->scope;
+      auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
+      overload_call->callee = visit_function_declaration_via_symbol(symbol);
+      overload_call->arguments.push_back(left);
+      overload_call->arguments.push_back(right);
+      return overload_call;
+    }
+  };
+
+  THIR_ALLOC(THIRIf, first_case, ast)
+  first_case->condition = get_condition_comparator(0);
+  first_case->block = (THIRBlock *)visit_node(ast->branches[0].block);
+  first_case->is_statement = true;
+
+  THIRIf *the_if = first_case;
+  for (size_t i = 1; i < ast->branches.size(); ++i) {
+    const auto &ast_branch = ast->branches[i];
+    THIR_ALLOC(THIRIf, thir_branch, ast)
+    thir_branch->condition = get_condition_comparator(i);
+    thir_branch->block = (THIRBlock *)visit_node(ast_branch.block);
+    thir_branch->is_statement = true;
+    the_if->_else = thir_branch;
+    the_if = thir_branch;
+  }
+
+  if (ast->default_case) {
+    the_if->_else = (THIRBlock *)visit_node(ast->default_case.get());
+  }
+
+  return first_case;
 }
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {
@@ -576,8 +704,8 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
 THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast)
   // ! I put this on pause because I hadn't done `choice` types yet, and for loops depend on them.
-  THIR *initialization = nullptr;
 
+  THIRVariable *variable = nullptr;
   if (ast->right->resolved_type->implements(iterable_trait())) {
     ASTMethodCall iter_method;
     ASTDotExpr dot_iter;
@@ -592,31 +720,75 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     ASTDotExpr dot_next;
     dot_next.base = &iter_method;
     dot_next.member = {"next"};
-
     next_method.accept(&typer);
-    initialization = visit_node(&next_method);
 
+    THIR_ALLOC(THIRVariable, variable, ast);
+    variable->is_global = false;
+    variable->name = ast->left.identifier;
+    variable->value = visit_node(&next_method);
+    thir->initialization = variable;
   } else if (ast->right->resolved_type->implements(iterator_trait())) {
+    ASTMethodCall next_method;
+    ASTDotExpr dot_next;
+    dot_next.base = ast->right;
+    dot_next.member = {"next"};
+    next_method.accept(&typer);
+
+    THIR_ALLOC(THIRVariable, variable, ast);
+    variable->is_global = false;
+    variable->name = ast->left.identifier;
+    variable->value = visit_node(&next_method);
+    variable->type = variable->value->type;
+    thir->initialization = variable;
   }
 
-  thir->initialization = initialization;
+  THIR_ALLOC(THIRBinExpr, condition, ast);
+  THIR_ALLOC(THIRMemberAccess, member_access, ast);
+
+  member_access->base = variable;
+  member_access->member = DISCRIMINANT_KEY;
+  member_access->type = u32_type();
+
+  THIR_ALLOC(THIRLiteral, discriminant_literal, ast)
+  discriminant_literal->value = OPTION_NONE_DISCRIMINANT_VALUE;
+  discriminant_literal->type = u32_type();
+
+  condition->left = member_access;
+  condition->op = TType::NEQ;
+  condition->right = discriminant_literal;
+  thir->condition = condition;
+
+  THIR_ALLOC(THIRBinExpr, increment, ast)
+  increment->type = void_type();
+  increment->left = variable;
+  increment->op = TType::Assign;
+  increment->right = variable->value;
+
   thir->block = visit_node(ast->block);
   return thir;
 }
 
 THIR *THIRGen::visit_if(ASTIf *ast) {
   THIR_ALLOC(THIRIf, thir, ast)
-
-  // TODO: we need to figure out how to do block expressions via the THIR.  ({ int x = 10; x }) type sh
-  // thir->is_statement = thir->is_statement;
-
   thir->condition = visit_node(ast->condition);
-  thir->block = (THIRBlock *)visit_block(ast->block);
 
-  if (ast->_else) {
-    thir->_else = visit_else(ast->_else.get());
+  const auto finish_visiting = [&] {
+    thir->block = (THIRBlock *)visit_block(ast->block);
+    if (ast->_else) {
+      thir->_else = visit_else(ast->_else.get());
+    }
+    return thir;
+  };
+
+  if (ast->is_expression) {
+    THIR_ALLOC(THIRExprBlock, block, ast);
+    ENTER_RETURN_OVERRIDE(ast, block->statements);
+    block->return_register = return_override_register.get();
+    block->statements.push_back(finish_visiting());
+    return block;
   }
-  return thir;
+
+  return finish_visiting();
 }
 
 THIR *THIRGen::visit_else(ASTElse *ast) {
@@ -641,7 +813,8 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
   return nullptr;
 }
 
-// x, y := (0, 0);
+// x, y := (0, 0);, *x, *y := ...
+// we should refactor the syntax for this to be &const x, &mut y := ...
 void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
   auto members_iter = type->info->members.begin();

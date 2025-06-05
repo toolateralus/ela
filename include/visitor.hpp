@@ -359,7 +359,7 @@ struct OldEmitter : VisitorBase {
   void emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *path);
   void emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *path);
   void emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target,
-                                          const SwitchCase &the_while, ASTPatternMatch *path);
+                                          const SwitchBranch &the_while, ASTPatternMatch *path);
 
   void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
                                       Type *variant_type);

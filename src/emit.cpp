@@ -1,4 +1,5 @@
 #include "emit.hpp"
+#include <cctype>
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -31,8 +32,8 @@ static inline std::string type_to_string_with_extensions(const TypeExtensions &e
   }
   return ss.str();
 }
-static inline std::string c_type_string(Type *type);
-static inline std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
+static inline std::string c_type_string(const Type *type);
+static inline std::string get_function_pointer_type_string(const Type *type, Nullable<std::string> identifier,
                                                            bool type_erase_self) {
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error(
@@ -84,7 +85,7 @@ static inline std::string get_function_pointer_type_string(Type *type, Nullable<
   return ss.str();
 }
 
-static inline std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+static inline std::string get_declaration_type_signature_and_identifier(const std::string &name, const Type *type) {
   std::stringstream tss;
 
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -107,7 +108,7 @@ static inline std::string get_declaration_type_signature_and_identifier(const st
   return tss.str();
 }
 
-static inline std::string c_type_string(Type *type) {
+static inline std::string c_type_string(const Type *type) {
   auto output = std::string{};
   switch (type->kind) {
     case TYPE_DYN: {
@@ -185,8 +186,12 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   } else {
     code << '.';
   }
-
-  code << thir->member.get_str();
+  
+  if (thir->base->type->is_kind(TYPE_TUPLE)) {
+    code << '$' + thir->member.get_str();
+  } else {
+    code << thir->member.get_str();
+  }
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
@@ -194,9 +199,7 @@ void Emitter::emit_cast(const THIRCast *thir) {
   emit_expr(thir->operand);
 }
 void Emitter::emit_size_of(const THIRSizeOf *thir) {
-  code << "sizeof(";
-  c_type_string(thir->target);
-  code << ')';
+  code << "sizeof(" << c_type_string(thir->target) << ')';
 }
 
 void Emitter::emit_index(const THIRIndex *thir) {
@@ -232,19 +235,19 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
 void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
 
 void Emitter::emit_if(const THIRIf *thir) {
-  code << "if (";
+  indented("if (");
   emit_expr(thir->condition);
   code << ")";
   emit_node(thir->block);
 
   if (thir->_else) {
-    code << "else ";
+    indented("else ");
     emit_node(thir->_else);
   }
 }
 
 void Emitter::emit_while(const THIRWhile *thir) {
-  code << "while (";
+  indented("while (");
   if (thir->condition) {
     emit_expr(thir->condition);
   } else {
@@ -253,7 +256,6 @@ void Emitter::emit_while(const THIRWhile *thir) {
   code << ')';
   emit_block(thir->block);
 }
-void Emitter::emit_switch(const THIRSwitch *thir) { throw_error("emit_switch is unimplemented", thir->source_range); }
 
 void Emitter::emit_tuple(Type *type) {
   const auto type_name = c_type_string(type);
@@ -264,7 +266,7 @@ void Emitter::emit_tuple(Type *type) {
 
 void Emitter::emit_struct(Type *type) {
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
-  const auto type_name = type->basename.get_str();
+  const auto type_name = c_type_string(type);
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
     code << "typedef union " << type_name;
   } else {
@@ -303,7 +305,7 @@ void Emitter::emit_struct_body(Type *type) {
 
 void Emitter::emit_choice(Type *type) {
   ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
-  const auto choice_type_name = type->basename.get_str();
+  const auto choice_type_name = c_type_string(type);
 
   for (auto &variant : info->members) {
     if (variant.type->kind == TYPE_STRUCT) {
@@ -351,7 +353,41 @@ void Emitter::emit_enum(Type *type) {
   code << "} " << type->basename.get_str() << ";\n";
 }
 
-void Emitter::forward_declare_type(const Type *) {}
+void Emitter::forward_declare_type(const Type *type) {
+  if (type_is_valid(type->base_type)) {
+    type = type->base_type;
+  }
+  switch (type->kind) {
+    case TYPE_FUNCTION: {
+      auto info = type->info->as<FunctionTypeInfo>();
+      for (size_t i = 0; i < info->params_len; i++) {
+        forward_declare_type(info->parameter_types[i]);
+      }
+      forward_declare_type(info->return_type);
+    } break;
+    case TYPE_STRUCT: {
+      const auto info = type->info->as<StructTypeInfo>();
+      const auto name = c_type_string(type);
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+        code << "typedef union " << name << ' ' << name << ";\n";
+      } else {
+        code << "typedef struct " << name << ' ' << name << ";\n";
+      }
+    } break;
+    case TYPE_TUPLE: {
+      auto name = c_type_string(type);
+      code << "typedef struct " << name << ";\n";
+    } break;
+    case TYPE_DYN:
+    case TYPE_CHOICE: {
+      auto name = c_type_string(type);
+      code << "typedef struct " << name << ' ' << name << ";\n";
+    } break;
+    default:
+      break;
+  }
+}
+
 void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
 
 void Emitter::emit_type(const THIRType *thir) {
@@ -395,7 +431,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
   }
 
   code << c_type_string(info->return_type);
-  code << ' ' << thir->name.get_str() << '(';
+  code << ' ' << thir->name.get_str() << "(";
 
   auto param_iter = thir->parameters.begin();
 
@@ -404,7 +440,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
     code << c_type_string(info->parameter_types[i]) << ' ' << parameter.name.get_str();
     param_iter++;
     if (i < info->params_len - 1) {
-      code << ",";
+      code << ", ";
     }
   }
 
@@ -412,7 +448,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
     code << ", ...";
   }
 
-  code << ')';
+  code << ") ";
 
   if (thir->block) {
     emit_block(thir->block);
@@ -421,13 +457,32 @@ void Emitter::emit_function(const THIRFunction *thir) {
   }
 }
 
-void Emitter::emit_block(const THIRBlock *thir) {
-  code << "{\n";
-  INDENTED_BLOCK();
+void Emitter::emit_expression_block(const THIRExprBlock *thir) {
+  code << "({\n";
+  EXPR_BEGIN(thir);
+  indent_level++;
   for (auto stmt : thir->statements) {
     emit_node(stmt);
   }
-  code << "}";
+  indented();
+  emit_expr(thir->return_register);
+  code << ";\n";
+  indent_level--;
+  code << "})";
+  EXPR_TERMINATE(thir);
+}
+
+void Emitter::emit_block(const THIRBlock *thir) {
+  indented("{\n");
+  indent_level++;
+  for (auto stmt : thir->statements) {
+    // TODO: we should'nt have to filter this.
+    if (stmt->get_node_type() != THIRNodeType::Function && stmt->get_node_type() != THIRNodeType::Type) {
+      emit_node(stmt);
+    }
+  }
+  indent_level--;
+  indented("}\n");
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
@@ -467,6 +522,8 @@ void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continu
 
 void Emitter::emit_node(const THIR *thir) {
   switch (thir->get_node_type()) {
+    case THIRNodeType::ExpressionBlock:
+      return emit_expression_block((const THIRExprBlock *)thir);
     case THIRNodeType::Program:
       return emit_program((const THIRProgram *)thir);
     case THIRNodeType::Block:
@@ -511,7 +568,5 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_if((const THIRIf *)thir);
     case THIRNodeType::While:
       return emit_while((const THIRWhile *)thir);
-    case THIRNodeType::Switch:
-      return emit_switch((const THIRSwitch *)thir);
   }
 }

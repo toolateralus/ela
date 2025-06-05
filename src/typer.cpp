@@ -186,24 +186,24 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     });
   }
 
-  for (const ASTStructMember &decl : node->members) {
-    decl.type->accept(this);
-    ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr, MUT);
+  for (const ASTStructMember &member : node->members) {
+    member.type->accept(this);
+    ctx.scope->insert_variable(member.name, member.type->resolved_type, nullptr, MUT);
 
-    if (decl.default_value) {
+    if (member.default_value) {
       auto old_expected_type = expected_type;
-      expected_type = decl.type->resolved_type;
-      decl.default_value.get()->accept(this);
+      expected_type = member.type->resolved_type;
+      member.default_value.get()->accept(this);
       expected_type = old_expected_type;
     }
 
     info->members.push_back({
-        .name = decl.name,
-        .type = decl.type->resolved_type,
-        .default_value = decl.default_value,
+        .name = member.name,
+        .type = member.type->resolved_type,
+        .default_value = member.default_value,
     });
 
-    auto sym = ctx.scope->local_lookup(decl.name);
+    auto sym = ctx.scope->local_lookup(member.name);
     if (sym->is_variable()) {
       sym->flags |= SYMBOL_IS_LOCAL;
     }
@@ -875,7 +875,11 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           ss << ")\nbut got:\n  fn(";
 
           for (auto arg : node->arguments) {
-            ss << arg->resolved_type->to_string() << ", ";
+            if (type_is_valid(arg->resolved_type)) {
+              ss << arg->resolved_type->to_string() << ", ";
+            } else {
+              ss << "(null), ";
+            }
           }
           ss << ")\n";
           throw_error(ss.str(), node->source_range);
@@ -1212,7 +1216,7 @@ void Typer::visit(ASTLambda *node) {
 
   std::vector<int> param_types;
   FunctionTypeInfo info;
-
+  
   int parameter_index = 0;
   for (const auto &param : node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
@@ -1221,14 +1225,13 @@ void Typer::visit(ASTLambda *node) {
     node->block->scope->local_lookup(param->normal.name)->flags |= SYMBOL_IS_LOCAL;
     parameter_index++;
   }
-
+  
   node->block->accept(this);
   info.return_type = node->return_type->resolved_type;
   auto type = global_find_function_type_id(info, {});
   node->resolved_type = type->take_pointer_to(MUT);
 
-  // w????
-  // std::cout << node->resolved_type->to_string() << '\n';
+  ctx.scope->insert_variable(node->unique_identifier, type, node, MUT);
 }
 
 void Typer::visit(ASTStructDeclaration *node) {
@@ -2445,12 +2448,12 @@ void Typer::visit(ASTRange *node) {
 }
 
 void Typer::visit(ASTSwitch *node) {
-  node->target->accept(this);
-  auto type_id = node->target->resolved_type;
+  node->expression->accept(this);
+  auto type_id = node->expression->resolved_type;
   auto type = type_id;
 
   if (node->is_pattern_match) {
-    for (auto _case = node->cases.begin(); _case != node->cases.end(); _case++) {
+    for (auto _case = node->branches.begin(); _case != node->branches.end(); _case++) {
       auto condition = _case->expression;
       if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
         auto pattern = (ASTPatternMatch *)condition;
@@ -2474,7 +2477,7 @@ void Typer::visit(ASTSwitch *node) {
                       "doesn't implement "
                       "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
                       type->to_string()),
-          node->target->source_range);
+          node->expression->source_range);
     }
   }
 
@@ -2487,7 +2490,7 @@ void Typer::visit(ASTSwitch *node) {
   Type *return_type = void_type();
   int flags = 0;
 
-  for (const auto &_case : node->cases) {
+  for (const auto &_case : node->branches) {
     if (!node->is_pattern_match) _case.expression->accept(this);
 
     _case.block->accept(this);

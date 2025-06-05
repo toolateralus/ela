@@ -460,17 +460,17 @@ void OldResolver::visit(ASTRange *node) {
 }
 
 void OldResolver::visit(ASTSwitch *node) {
-  node->target->accept(this);
+  node->expression->accept(this);
 
-  auto type = node->target->resolved_type;
+  auto type = node->expression->resolved_type;
 
   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer() &&
-      !node->cases.empty()) {
-    visit_operator_overload(node->target, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
-                            node->cases[0].expression);
+      !node->branches.empty()) {
+    visit_operator_overload(node->expression, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
+                            node->branches[0].expression);
   }
 
-  for (const auto $case : node->cases) {
+  for (const auto $case : node->branches) {
     $case.block->accept(this);
     $case.expression->accept(this);
   }

@@ -34,9 +34,9 @@ struct Resolver {
   void visit_for(const THIRFor *thir);
   void visit_if(const THIRIf *thir);
   void visit_while(const THIRWhile *thir);
-  void visit_switch(const THIRSwitch *thir);
   void visit_variable(const THIRVariable *thir);
   void visit_type(const THIRType *thir);
   void visit_function(const THIRFunction *thir);
   void visit_block(const THIRBlock *thir);
+  void visit_expr_block(const THIRExprBlock *thir);
 };

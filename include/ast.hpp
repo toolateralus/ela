@@ -778,7 +778,7 @@ struct ASTInitializerList : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
 
-struct SwitchCase {
+struct SwitchBranch {
   ASTExpr *expression;
   ASTBlock *block;
 };
@@ -787,9 +787,9 @@ struct ASTSwitch : ASTExpr {
   bool is_statement = false;
   Type *return_type = void_type();
   bool is_pattern_match = false;
-  ASTExpr *target;
+  ASTExpr *expression;
   Nullable<ASTBlock> default_case;
-  std::vector<SwitchCase> cases;
+  std::vector<SwitchBranch> branches;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
 };

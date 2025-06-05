@@ -51,6 +51,7 @@ struct Emitter {
 
   void emit_node(const THIR *thir);
   void emit_program(const THIRProgram *thir);
+  
   void emit_bin_expr(const THIRBinExpr *thir);
   void emit_unary_expr(const THIRUnaryExpr *thir);
   void emit_literal(const THIRLiteral *thir);
@@ -68,7 +69,6 @@ struct Emitter {
   void emit_for(const THIRFor *thir);
   void emit_if(const THIRIf *thir);
   void emit_while(const THIRWhile *thir);
-  void emit_switch(const THIRSwitch *thir);
   void emit_variable(const THIRVariable *thir);
 
   void emit_struct(Type *type);
@@ -83,5 +83,5 @@ struct Emitter {
 
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);
-
+  void emit_expression_block(const THIRExprBlock *thir);
 };
