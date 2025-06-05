@@ -300,7 +300,7 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
 THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           const std::vector<std::pair<InternedString, ASTExpr *>> &key_values) {
   const auto info = type->info;
-  if (info->members.empty()) {
+  if (info->members.empty() || type->is_kind(TYPE_CHOICE)) {
     THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
     thir->source_range = source_range;
     thir->type = type;
