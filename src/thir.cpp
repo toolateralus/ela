@@ -24,6 +24,11 @@
   current_statement_list = (&$stmt_vector);                                                \
   const Defer $stmt_container_defer([&] { current_statement_list = $old_stmt_vector; });
 
+#define ENTER_RETURN_OVERRIDE($ast, $block)       \
+  ENTER_STMT_VEC(($block))                        \
+  $block.push_back(init_override_register($ast)); \
+  Defer $ovr_reg_defer([&] { return_override_register = {nullptr}; });
+
 static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath *ast) {
   if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->extensions.has_extensions()) {
     return false;
@@ -77,6 +82,16 @@ THIR *THIRGen::visit_break(ASTBreak *ast) {
 }
 
 THIR *THIRGen::visit_return(ASTReturn *ast) {
+  // For defers and block expressions, we write to a variable instead of actually returning.
+  if (return_override_register.is_not_null() && ast->expression) {
+    THIR_ALLOC(THIRBinExpr, thir, ast)
+    thir->op = TType::Assign;
+    thir->left = return_override_register.get();
+    thir->right = visit_node(ast->expression.get());
+    thir->is_statement=true;
+    return thir;
+  }
+
   THIR_ALLOC(THIRReturn, thir, ast);
   if (ast->expression) {
     thir->expression = visit_node(ast->expression.get());
@@ -579,8 +594,8 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
 THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast)
   // ! I put this on pause because I hadn't done `choice` types yet, and for loops depend on them.
-  THIR *initialization = nullptr;
 
+  THIRVariable *variable = nullptr;
   if (ast->right->resolved_type->implements(iterable_trait())) {
     ASTMethodCall iter_method;
     ASTDotExpr dot_iter;
@@ -595,31 +610,74 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     ASTDotExpr dot_next;
     dot_next.base = &iter_method;
     dot_next.member = {"next"};
-
     next_method.accept(&typer);
-    initialization = visit_node(&next_method);
 
+    THIR_ALLOC(THIRVariable, variable, ast);
+    variable->is_global = false;
+    variable->name = ast->left.identifier;
+    variable->value = visit_node(&next_method);
+    thir->initialization = variable;
   } else if (ast->right->resolved_type->implements(iterator_trait())) {
+    ASTMethodCall next_method;
+    ASTDotExpr dot_next;
+    dot_next.base = ast->right;
+    dot_next.member = {"next"};
+    next_method.accept(&typer);
+
+    THIR_ALLOC(THIRVariable, variable, ast);
+    variable->is_global = false;
+    variable->name = ast->left.identifier;
+    variable->value = visit_node(&next_method);
+    variable->type = variable->value->type;
+    thir->initialization = variable;
   }
 
-  thir->initialization = initialization;
+  THIR_ALLOC(THIRBinExpr, condition, ast);
+  THIR_ALLOC(THIRMemberAccess, member_access, ast);
+
+  member_access->base = variable;
+  member_access->member = DISCRIMINANT_KEY;
+  member_access->type = u32_type();
+
+  THIR_ALLOC(THIRLiteral, discriminant_literal, ast)
+  discriminant_literal->value = OPTION_NONE_DISCRIMINANT_VALUE;
+  discriminant_literal->type = u32_type();
+
+  condition->left = member_access;
+  condition->op = TType::NEQ;
+  condition->right = discriminant_literal;
+  thir->condition = condition;
+
+  THIR_ALLOC(THIRBinExpr, increment, ast)
+  increment->type = void_type();
+  increment->left = variable;
+  increment->op = TType::Assign;
+  increment->right = variable->value;
+
   thir->block = visit_node(ast->block);
   return thir;
 }
 
 THIR *THIRGen::visit_if(ASTIf *ast) {
-  THIR_ALLOC(THIRIf, thir, ast)
+  const auto visit_if = [&] {
+    THIR_ALLOC(THIRIf, thir, ast)
+    thir->condition = visit_node(ast->condition);
+    thir->block = (THIRBlock *)visit_block(ast->block);
+    if (ast->_else) {
+      thir->_else = visit_else(ast->_else.get());
+    }
+    return thir;
+  };
 
-  // TODO: we need to figure out how to do block expressions via the THIR.  ({ int x = 10; x }) type sh
-  // thir->is_statement = thir->is_statement;
-
-  thir->condition = visit_node(ast->condition);
-  thir->block = (THIRBlock *)visit_block(ast->block);
-
-  if (ast->_else) {
-    thir->_else = visit_else(ast->_else.get());
+  if (ast->is_expression) {
+    THIR_ALLOC(THIRExprBlock, block, ast);
+    ENTER_RETURN_OVERRIDE(ast, block->statements);
+    block->return_register = return_override_register.get();
+    block->statements.push_back(visit_if());
+    return block;
   }
-  return thir;
+
+  return visit_if();
 }
 
 THIR *THIRGen::visit_else(ASTElse *ast) {
@@ -644,7 +702,8 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
   return nullptr;
 }
 
-// x, y := (0, 0);
+// x, y := (0, 0);, *x, *y := ...
+// we should refactor the syntax for this to be &const x, &mut y := ...
 void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
   auto members_iter = type->info->members.begin();

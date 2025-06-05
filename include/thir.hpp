@@ -3,6 +3,7 @@
 #include "arena.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
+#include "strings.hpp"
 #include "type.hpp"
 #include "ast.hpp"
 #include <map>
@@ -18,6 +19,7 @@ enum struct THIRNodeType : unsigned char {
   Type,
 
   // Expressions
+  ExpressionBlock,
   BinExpr,
   UnaryExpr,
   Literal,
@@ -79,6 +81,14 @@ struct THIRVariable : THIR {
 */
 struct THIRType : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Type; }
+};
+
+// this is just a block that can return a value, and can be used as an expression.
+// this distinction is important in C, but llvm ir too probably.
+struct THIRExprBlock : THIR {
+  std::vector<THIR *> statements;
+  THIRVariable *return_register;
+  THIRNodeType get_node_type() const override { return THIRNodeType::ExpressionBlock; }
 };
 
 struct THIRBlock : THIR {
@@ -227,15 +237,18 @@ static inline T *thir_alloc() {
 
 struct THIRGen {
   THIRGen(Typer &typer, Context &ctx) : ctx(ctx), typer(typer) {}
-
   Context &ctx;
-
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
   Typer &typer;
-
   std::map<Symbol *, THIR *> symbol_map;
-
   THIR *entry_point;
+
+  // The "return override register" is used to capture the result of a block or function,
+  // mainly for things like defer, early returns, or blocks that yield values. Instead of returning
+  // directly, we write the result to this register (almost always a variable), so the correct value is
+  // available for the final return or whatever comes next.
+  Nullable<THIRVariable> return_override_register;
+  size_t return_override_register_index = 0;
 
   inline Type *iterator_trait() const {
     static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
@@ -245,6 +258,16 @@ struct THIRGen {
   inline Type *iterable_trait() const {
     static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
     return iterable_id;
+  }
+
+  inline THIRVariable *init_override_register(ASTNode *node) {
+    THIR_ALLOC(THIRVariable, override_register, node)
+    override_register->name = std::format(THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT, return_override_register_index++);
+    THIR_ALLOC(THIREmptyInitializer, empty_init, node)
+    override_register->value = empty_init;
+    override_register->type = node->resolved_type;
+    return_override_register = {override_register};
+    return override_register;
   }
 
   // This will either point to the entire THIRProgram, or, it will point to a function, either being `fn main()` or any

@@ -39,4 +39,5 @@ struct Resolver {
   void visit_type(const THIRType *thir);
   void visit_function(const THIRFunction *thir);
   void visit_block(const THIRBlock *thir);
+  void visit_expr_block(const THIRExprBlock *thir);
 };

@@ -178,6 +178,9 @@ void Resolver::visit_node(const THIR *thir) {
   }
   declare_or_define_type(thir->type);
   switch (thir->get_node_type()) {
+    case THIRNodeType::ExpressionBlock: {
+      visit_expr_block((const THIRExprBlock *)thir);
+    }
     case THIRNodeType::Program:
       visit_program((const THIRProgram *)thir);
       break;
@@ -247,5 +250,12 @@ void Resolver::visit_node(const THIR *thir) {
     case THIRNodeType::Switch:
       visit_switch((const THIRSwitch *)thir);
       break;
+  }
+}
+
+void Resolver::visit_expr_block(const THIRExprBlock *thir) {
+  visit_node(thir->return_register);
+  for (const auto &stmt : thir->statements) {
+    visit_node(stmt);
   }
 }

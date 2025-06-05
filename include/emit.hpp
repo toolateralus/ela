@@ -51,6 +51,7 @@ struct Emitter {
 
   void emit_node(const THIR *thir);
   void emit_program(const THIRProgram *thir);
+  
   void emit_bin_expr(const THIRBinExpr *thir);
   void emit_unary_expr(const THIRUnaryExpr *thir);
   void emit_literal(const THIRLiteral *thir);
@@ -83,5 +84,5 @@ struct Emitter {
 
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);
-
+  void emit_expression_block(const THIRExprBlock *thir);
 };

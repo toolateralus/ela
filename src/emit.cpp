@@ -352,6 +352,7 @@ void Emitter::emit_enum(Type *type) {
 }
 
 void Emitter::forward_declare_type(const Type *) {}
+
 void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
 
 void Emitter::emit_type(const THIRType *thir) {
@@ -421,6 +422,17 @@ void Emitter::emit_function(const THIRFunction *thir) {
   }
 }
 
+void Emitter::emit_expression_block(const THIRExprBlock *thir) {
+  code << "({\n";
+  INDENTED_BLOCK()
+  for (auto stmt : thir->statements) {
+    emit_node(stmt);
+  }
+  emit_expr(thir->return_register);
+  code << ";\n";
+  code << "})";
+}
+
 void Emitter::emit_block(const THIRBlock *thir) {
   code << "{\n";
   INDENTED_BLOCK();
@@ -467,6 +479,8 @@ void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continu
 
 void Emitter::emit_node(const THIR *thir) {
   switch (thir->get_node_type()) {
+    case THIRNodeType::ExpressionBlock:
+      return emit_expression_block((const THIRExprBlock *)thir);
     case THIRNodeType::Program:
       return emit_program((const THIRProgram *)thir);
     case THIRNodeType::Block:
