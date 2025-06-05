@@ -307,7 +307,9 @@ struct THIRGen {
     switch (node->get_node_type()) {
       case AST_NODE_STATEMENT_LIST: {
         for (const auto &ast_stmt : ((ASTStatementList *)node)->statements) {
-          visit_node(ast_stmt);
+          if (auto thir = visit_node(ast_stmt)) {
+            current_statement_list->push_back(thir);
+          }
         }
         return nullptr;
       }

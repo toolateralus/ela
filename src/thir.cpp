@@ -182,9 +182,6 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   }
 
   auto symbol = ctx.get_symbol(ast).get();
-  if (symbol->is_function()) {
-    return symbol_map[symbol];
-  }
   return symbol_map[symbol];
 }
 
