@@ -183,7 +183,7 @@ fn main() -> s32 {
   } else if 0 {
     std::printf("Person says hello! Curiosity=%d\n", person.curiosity);
   } else {
-    rainbowize("YOU NEED TO GET A LESSON IN BIG ROOSTER DETECTION\n");
+    rainbowize("YOU NEED TO GET A LESSON IN BIG SOCK DETECTION\n");
   }
 
   mut i := 0;
@@ -230,10 +230,10 @@ fn main() -> s32 {
 
 
   fn subfunc() {
-
+    rainbowize("subfunction\n");
   }
 
-  lambda();
+  subfunc();
 
   lambda();
 
