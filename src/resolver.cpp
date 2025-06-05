@@ -2,6 +2,7 @@
 #include "resolver.hpp"
 #include "emit.hpp"
 #include "thir.hpp"
+#include "type.hpp"
 
 // formerly `declare_type`
 void Resolver::declare_or_define_type(Type *type) {
@@ -26,14 +27,14 @@ void Resolver::declare_or_define_type(Type *type) {
 }
 // formerly `define_type`
 void Resolver::emit_type_definition(Type *type) {
+  if (type->base_type != Type::INVALID_TYPE) {
+    type = type->base_type;
+  }
   if (!type || emitted_types.contains(type)) {
     return;
   }
   emitted_types.insert(type);
 
-  if (type->base_type != Type::INVALID_TYPE) {
-    type = type->base_type;
-  }
 
   THIRType thir_type;
   thir_type.type = type;
@@ -151,22 +152,29 @@ void Resolver::visit_function(const THIRFunction *thir) {
   }
   emitted_functions.insert(thir);
 
+  const auto type = thir->type->info->as<FunctionTypeInfo>();
+  for (size_t i = 0; i < type->params_len; ++i) {
+    emit_type_definition(type->parameter_types[i]);
+  }
+
   for (const auto &param : thir->parameters) {
     if (param.default_value) {
       visit_node(param.default_value);
     }
   }
+
   if (thir->block) {
     visit_node(thir->block);
   }
-  printf("emitting function (via dep emitter) = '%s', node=%p\n", thir->name.get_str().c_str(), thir);
   emitter.emit_function(thir);
 }
+
 void Resolver::visit_block(const THIRBlock *thir) {
   for (const auto &stmt : thir->statements) {
     visit_node(stmt);
   }
 }
+
 void Resolver::visit_node(const THIR *thir) {
   if (!thir) {
     throw_error("resolver got a null THIR node", {});

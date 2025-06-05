@@ -185,7 +185,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     }
 
     thir->arguments.push_back(self);
-    thir->callee = visit_function_declaration(symbol->function.declaration);
+    thir->callee = visit_function_declaration_via_symbol(symbol);
   }
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -230,7 +230,7 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->left));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
@@ -247,7 +247,7 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
@@ -263,7 +263,7 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_function_declaration(symbol->function.declaration);
+    overload_call->callee = visit_function_declaration_via_symbol(symbol);
     overload_call->arguments.push_back(visit_node(ast->base));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
@@ -443,14 +443,21 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
   }
 }
 
+THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
+  if (symbol_map.contains(symbol)) {
+    return symbol_map[symbol];
+  }
+  return symbol_map[symbol] = visit_function_declaration(symbol->function.declaration);
+}
+
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  const auto symbol = ctx.scope->local_lookup(ast->name);
   THIR_ALLOC(THIRFunction, thir, ast);
-  auto symbol = ctx.scope->local_lookup(ast->name);
   symbol_map[symbol] = thir;
+
   ENTER_SCOPE(ast->scope);
   convert_function_flags(thir, (FunctionInstanceFlags)ast->flags);
   convert_function_attributes(thir, ast->attributes);
-
   for (const auto &param : ast->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
     if (param->tag == ASTParamDecl::Normal) {
@@ -497,6 +504,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
   }
+
   return thir;
 }
 
@@ -583,7 +591,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
     auto left = cached_expr;
     auto right = visit_node(ast->branches[index].expression);
-    if (operator_overload_ty == Type::INVALID_TYPE) { // normal equality comparison.
+    if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
       THIR_ALLOC(THIRBinExpr, binexpr, ast);
       binexpr->left = left;
       binexpr->right = right;
@@ -594,7 +602,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
       THIR_ALLOC(THIRCall, overload_call, ast);
       auto scope = left->type->info->scope;
       auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
-      overload_call->callee = visit_function_declaration(symbol->function.declaration);
+      overload_call->callee = visit_function_declaration_via_symbol(symbol);
       overload_call->arguments.push_back(left);
       overload_call->arguments.push_back(right);
       return overload_call;
@@ -719,9 +727,10 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 }
 
 THIR *THIRGen::visit_if(ASTIf *ast) {
-  const auto visit_if = [&] {
-    THIR_ALLOC(THIRIf, thir, ast)
-    thir->condition = visit_node(ast->condition);
+  THIR_ALLOC(THIRIf, thir, ast)
+  thir->condition = visit_node(ast->condition);
+
+  const auto finish_visiting = [&] {
     thir->block = (THIRBlock *)visit_block(ast->block);
     if (ast->_else) {
       thir->_else = visit_else(ast->_else.get());
@@ -733,11 +742,11 @@ THIR *THIRGen::visit_if(ASTIf *ast) {
     THIR_ALLOC(THIRExprBlock, block, ast);
     ENTER_RETURN_OVERRIDE(ast, block->statements);
     block->return_register = return_override_register.get();
-    block->statements.push_back(visit_if());
+    block->statements.push_back(finish_visiting());
     return block;
   }
 
-  return visit_if();
+  return finish_visiting();
 }
 
 THIR *THIRGen::visit_else(ASTElse *ast) {

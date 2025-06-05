@@ -3,6 +3,7 @@
 #include "arena.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
 #include "ast.hpp"
@@ -300,6 +301,7 @@ struct THIRGen {
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
 
   THIR *visit_program(ASTProgram *node);
+  THIR *visit_function_declaration_via_symbol(Symbol *symbol);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);
   THIR *visit_continue(ASTContinue *node);

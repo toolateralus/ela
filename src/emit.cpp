@@ -31,8 +31,8 @@ static inline std::string type_to_string_with_extensions(const TypeExtensions &e
   }
   return ss.str();
 }
-static inline std::string c_type_string(Type *type);
-static inline std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
+static inline std::string c_type_string(const Type *type);
+static inline std::string get_function_pointer_type_string(const Type *type, Nullable<std::string> identifier,
                                                            bool type_erase_self) {
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error(
@@ -84,7 +84,7 @@ static inline std::string get_function_pointer_type_string(Type *type, Nullable<
   return ss.str();
 }
 
-static inline std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+static inline std::string get_declaration_type_signature_and_identifier(const std::string &name, const Type *type) {
   std::stringstream tss;
 
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -107,7 +107,7 @@ static inline std::string get_declaration_type_signature_and_identifier(const st
   return tss.str();
 }
 
-static inline std::string c_type_string(Type *type) {
+static inline std::string c_type_string(const Type *type) {
   auto output = std::string{};
   switch (type->kind) {
     case TYPE_DYN: {
@@ -350,7 +350,37 @@ void Emitter::emit_enum(Type *type) {
   code << "} " << type->basename.get_str() << ";\n";
 }
 
-void Emitter::forward_declare_type(const Type *) {}
+void Emitter::forward_declare_type(const Type *type) {
+  if (type_is_valid(type->base_type)) {
+    type = type->base_type;
+  }
+  switch (type->kind) {
+    case TYPE_FUNCTION: {
+      auto info = type->info->as<FunctionTypeInfo>();
+      for (size_t i = 0; i < info->params_len; i++) {
+        forward_declare_type(info->parameter_types[i]);
+      }
+      forward_declare_type(info->return_type);
+    } break;
+    case TYPE_STRUCT: {
+      const auto info = type->info->as<StructTypeInfo>();
+      const auto name = c_type_string(type);
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+        code << "typedef union " << name << ' ' << name << ";\n";
+      } else {
+        code << "typedef struct " << name << ' ' << name << ";\n";
+      }
+    } break;
+    case TYPE_TUPLE:
+    case TYPE_DYN:
+    case TYPE_CHOICE: {
+      auto name = c_type_string(type);
+      code << "typedef struct " << name << ' ' << name << ";\n";
+    } break;
+    default:
+      break;
+  }
+}
 
 void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
 
@@ -374,7 +404,6 @@ void Emitter::emit_type(const THIRType *thir) {
 }
 
 void Emitter::emit_function(const THIRFunction *thir) {
-  printf("emitting function (via emitter) = '%s'\n", thir->name.get_str().c_str());
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
   if (thir->is_extern || thir->is_exported) {

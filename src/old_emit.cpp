@@ -409,7 +409,6 @@ void OldEmitter::visit(ASTTraitDeclaration *) {}
 void OldEmitter::visit(ASTAlias *) {}
 
 void OldEmitter::forward_decl_type(Type *type) {
-
   if (type->base_type != Type::INVALID_TYPE) {
     type = type->base_type;
   }
