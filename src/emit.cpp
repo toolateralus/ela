@@ -1,4 +1,5 @@
 #include "emit.hpp"
+#include <cctype>
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -185,8 +186,12 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   } else {
     code << '.';
   }
-
-  code << thir->member.get_str();
+  
+  if (thir->base->type->is_kind(TYPE_TUPLE)) {
+    code << '$' + thir->member.get_str();
+  } else {
+    code << thir->member.get_str();
+  }
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
@@ -194,9 +199,7 @@ void Emitter::emit_cast(const THIRCast *thir) {
   emit_expr(thir->operand);
 }
 void Emitter::emit_size_of(const THIRSizeOf *thir) {
-  code << "sizeof(";
-  c_type_string(thir->target);
-  code << ')';
+  code << "sizeof(" << c_type_string(thir->target) << ')';
 }
 
 void Emitter::emit_index(const THIRIndex *thir) {
@@ -263,7 +266,7 @@ void Emitter::emit_tuple(Type *type) {
 
 void Emitter::emit_struct(Type *type) {
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
-  const auto type_name = type->basename.get_str();
+  const auto type_name = c_type_string(type);
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
     code << "typedef union " << type_name;
   } else {
@@ -302,7 +305,7 @@ void Emitter::emit_struct_body(Type *type) {
 
 void Emitter::emit_choice(Type *type) {
   ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
-  const auto choice_type_name = type->basename.get_str();
+  const auto choice_type_name = c_type_string(type);
 
   for (auto &variant : info->members) {
     if (variant.type->kind == TYPE_STRUCT) {
@@ -371,7 +374,10 @@ void Emitter::forward_declare_type(const Type *type) {
         code << "typedef struct " << name << ' ' << name << ";\n";
       }
     } break;
-    case TYPE_TUPLE:
+    case TYPE_TUPLE: {
+      auto name = c_type_string(type);
+      code << "typedef struct " << name << ";\n";
+    } break;
     case TYPE_DYN:
     case TYPE_CHOICE: {
       auto name = c_type_string(type);
@@ -425,7 +431,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
   }
 
   code << c_type_string(info->return_type);
-  code << ' ' << thir->name.get_str() << " (";
+  code << ' ' << thir->name.get_str() << "(";
 
   auto param_iter = thir->parameters.begin();
 
@@ -442,7 +448,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
     code << ", ...";
   }
 
-  code << ')';
+  code << ") ";
 
   if (thir->block) {
     emit_block(thir->block);
@@ -470,7 +476,10 @@ void Emitter::emit_block(const THIRBlock *thir) {
   indented("{\n");
   indent_level++;
   for (auto stmt : thir->statements) {
-    emit_node(stmt);
+    // TODO: we should'nt have to filter this.
+    if (stmt->get_node_type() != THIRNodeType::Function && stmt->get_node_type() != THIRNodeType::Type) {
+      emit_node(stmt);
+    }
   }
   indent_level--;
   indented("}\n");

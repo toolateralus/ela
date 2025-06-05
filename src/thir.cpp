@@ -321,9 +321,14 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
             }
           }
           if (!set) {
-            THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
-            empty_init->type = member.type;
-            thir->key_values.push_back({member.name, empty_init});
+            if (member.default_value) {
+              printf("default member emitted for %s\n", member.name.get_str().c_str());
+              thir->key_values.push_back({member.name, visit_node(member.default_value.get())});
+            } else {
+              THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
+              empty_init->type = member.type;
+              thir->key_values.push_back({member.name, empty_init});
+            }
           }
         }
         return thir;
@@ -371,10 +376,24 @@ THIR *THIRGen::visit_cast(ASTCast *ast) {
 }
 
 THIR *THIRGen::visit_lambda(ASTLambda *ast) {
-  // TODO: We need to insert the lambdas into the scope by their UID, so we can fetch the symbol,
-  // and get the THIRFunction* node from the declaration.
-  throw_error("visit_lambda not implemented", ast->source_range);
-  return nullptr;
+  auto symbol = ctx.scope->lookup(ast->unique_identifier);
+  if (auto thir = symbol_map[symbol]) {
+    return thir;
+  }
+  THIR_ALLOC(THIRFunction, thir, ast);
+  symbol_map[symbol] = thir;
+  thir->block = (THIRBlock *)visit_node(ast->block);
+  thir->name = ast->unique_identifier;
+  for (const auto &ast_param : ast->params->params) {
+    THIRParameter thir_param = {
+        .name = ast_param->normal.name,
+    };
+    if (ast_param->normal.default_value) {
+      thir_param.default_value = visit_node(ast_param->normal.default_value.get());
+    }
+    thir->parameters.push_back(thir_param);
+  }
+  return thir;
 }
 
 THIR *THIRGen::visit_block(ASTBlock *ast) {
@@ -444,8 +463,8 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
 }
 
 THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
-  if (symbol_map.contains(symbol)) {
-    return symbol_map[symbol];
+  if (auto thir = symbol_map[symbol]) {
+    return thir;
   }
   return symbol_map[symbol] = visit_function_declaration(symbol->function.declaration);
 }
@@ -530,6 +549,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
     // TODO: akin to jai's --- operator.
     // we use this for default construction, to be more explicit.
     THIR_ALLOC(THIREmptyInitializer, empty_init, ast);
+    empty_init->type = ast->type->resolved_type;
     thir->value = empty_init;
   }
 
@@ -576,6 +596,11 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   // TODO: maybe we want to throw an error for this, instead of just optimizing it out.
   if (ast->branches.empty() && !ast->default_case) {
     return nullptr;
+  }
+
+  // this is totally redundant so, whatever, just emit it as if it were a block.
+  if (ast->branches.empty() && ast->default_case) {
+    return visit_node(ast->default_case.get());
   }
 
   static int idx = 0;

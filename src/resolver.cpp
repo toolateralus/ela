@@ -35,7 +35,6 @@ void Resolver::emit_type_definition(Type *type) {
   }
   emitted_types.insert(type);
 
-
   THIRType thir_type;
   thir_type.type = type;
 
@@ -166,6 +165,7 @@ void Resolver::visit_function(const THIRFunction *thir) {
   if (thir->block) {
     visit_node(thir->block);
   }
+
   emitter.emit_function(thir);
 }
 
