@@ -136,7 +136,6 @@ void Resolver::visit_while(const THIRWhile *thir) {
   }
   visit_node(thir->block);
 }
-
 void Resolver::visit_variable(const THIRVariable *thir) {
   if (thir->value) visit_node(thir->value);
   if (thir->is_global && !emitted_global_variables.contains(thir)) {
@@ -144,7 +143,6 @@ void Resolver::visit_variable(const THIRVariable *thir) {
     emitted_global_variables.insert(thir);
   }
 }
-
 void Resolver::visit_function(const THIRFunction *thir) {
   if (emitted_functions.contains(thir)) {
     return;
@@ -168,13 +166,11 @@ void Resolver::visit_function(const THIRFunction *thir) {
 
   emitter.emit_function(thir);
 }
-
 void Resolver::visit_block(const THIRBlock *thir) {
   for (const auto &stmt : thir->statements) {
     visit_node(stmt);
   }
 }
-
 void Resolver::visit_node(const THIR *thir) {
   if (!thir) {
     throw_error("resolver got a null THIR node", {});
@@ -252,7 +248,6 @@ void Resolver::visit_node(const THIR *thir) {
       break;
   }
 }
-
 void Resolver::visit_expr_block(const THIRExprBlock *thir) {
   visit_node(thir->return_register);
   for (const auto &stmt : thir->statements) {

@@ -21,6 +21,14 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
+// TODO:
+/* 
+  TODO: we can probably replace the generic panic handler with an exception. depending on how much bigger the compiler binary is.
+  TODO: use the ENTER_SCOPE macro everywhere in here. so many lines of code to do the same thing.
+  TODO: use an SET_EXPECTED_TYPE that also does an RAII for that same shit. again, a ton of code eliminated.
+*/  
+
+
 #define USE_GENERIC_PANIC_HANDLER
 
 #ifdef USE_GENERIC_PANIC_HANDLER
