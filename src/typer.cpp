@@ -3095,8 +3095,8 @@ void Typer::visit(ASTPatternMatch *node) {
   node->object->accept(this);
   node->target_type_path->accept(this);
 
-  ctx.set_scope(node->target_block->scope);
   auto old_scope = ctx.scope;
+  ctx.set_scope(node->target_block->scope);
   Defer _([&] { ctx.scope = old_scope; });
 
   auto target_type = node->target_type_path->resolved_type;

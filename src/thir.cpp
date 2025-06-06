@@ -13,10 +13,6 @@
 // this is used directly. clangd stop b*tchin
 #include "visitor.hpp"
 
-#define ENTER_SCOPE($new_scope)       \
-  const auto $old_scope_ = ctx.scope; \
-  ctx.scope = $new_scope;             \
-  const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
 
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.

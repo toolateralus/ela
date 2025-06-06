@@ -57,19 +57,14 @@ struct THIR {
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
 
-  bool is_rvalue() const {
+  bool is_temporary_value() const {
     switch (get_node_type()) {
       case THIRNodeType::Literal:
-      case THIRNodeType::BinExpr:
-      case THIRNodeType::UnaryExpr:
       case THIRNodeType::Call:
-      case THIRNodeType::MemberAccess:
       case THIRNodeType::Cast:
-      case THIRNodeType::Index:
       case THIRNodeType::ExpressionBlock:
       case THIRNodeType::Size_Of:
         return true;
-
       // These are technically rvalues, but C doesn't care, so for now, we ignore them.
       // it would be best to not do this.
       case THIRNodeType::AggregateInitializer:
