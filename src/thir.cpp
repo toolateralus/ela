@@ -489,6 +489,9 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
 }
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  if (ast->generic_parameters.size()) {
+    return nullptr;
+  }
   THIR_ALLOC(THIRFunction, thir, ast);
   Symbol *symbol;
   if (ast->declaring_type) {
@@ -584,12 +587,18 @@ void THIRGen::extract_thir_values_for_type_members(Type *type) {
 }
 
 THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
+  if (ast->generic_parameters.size()) {
+    return nullptr;
+  }
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
   return thir;
 }
 
 THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
+  if (ast->generic_parameters.size()) {
+    return nullptr;
+  }
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
   return thir;
@@ -864,6 +873,13 @@ void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
 }
 
 void THIRGen::visit_impl(ASTImpl *ast) {
+  if (ast->generic_parameters.size()) {
+    for (auto &monomorphization: ast->generic_instantiations) {
+      visit_impl((ASTImpl*)monomorphization.declaration);      
+    }
+    return;
+  }
+
   for (const auto &method : ast->methods) {
     current_statement_list->push_back(visit_node(method));
   }

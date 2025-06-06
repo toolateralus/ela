@@ -142,6 +142,7 @@ impl s32 {
   }
 }
 
+
 @[entry]
 fn main() -> s32 {
   mut c := Choice::A;
