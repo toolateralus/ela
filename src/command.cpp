@@ -28,7 +28,7 @@ int CompileCommand::compile() {
 
   lower.run<void>("typing & lowering to C", [&] {
     Typer typer{context};
-    THIRGen thir_gen(typer, context);
+    THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);
     typer.visit(root);

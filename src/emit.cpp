@@ -159,10 +159,18 @@ void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
 
 void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
   EXPR_BEGIN(thir);
-  code << ttype_get_operator_string(thir->op, thir->source_range);
-  code << '(';
-  emit_expr(thir->operand);
-  code << ')';
+  if (thir->op == TType::And && thir->operand->is_rvalue()) {
+    code << "({";
+    code << " static " << c_type_string(thir->operand->type) << " temp = {};";
+    code << " temp = ";
+    emit_expr(thir->operand);
+    code << "; &temp; })";
+  } else {
+    code << ttype_get_operator_string(thir->op, thir->source_range);
+    code << '(';
+    emit_expr(thir->operand);
+    code << ')';
+  }
   EXPR_TERMINATE(thir);
 }
 
@@ -186,7 +194,7 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   } else {
     code << '.';
   }
-  
+
   if (thir->base->type->is_kind(TYPE_TUPLE)) {
     code << '$' + thir->member.get_str();
   } else {
@@ -198,9 +206,7 @@ void Emitter::emit_cast(const THIRCast *thir) {
   code << '(' << c_type_string(thir->type) << ')';
   emit_expr(thir->operand);
 }
-void Emitter::emit_size_of(const THIRSizeOf *thir) {
-  code << "sizeof(" << c_type_string(thir->target) << ')';
-}
+void Emitter::emit_size_of(const THIRSizeOf *thir) { code << "sizeof(" << c_type_string(thir->target) << ')'; }
 
 void Emitter::emit_index(const THIRIndex *thir) {
   emit_expr(thir->base);
@@ -232,7 +238,7 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
   code << "(" << c_type_string(thir->type) << "){0}";
 }
 
-void Emitter::emit_for(const THIRFor *thir) { 
+void Emitter::emit_for(const THIRFor *thir) {
   indented("for (");
   emit_node(thir->initialization);
   emit_expr(thir->condition);

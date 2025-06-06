@@ -1,6 +1,4 @@
 #include "thir.hpp"
-#include <iostream>
-#include <ostream>
 #include <string>
 #include "ast.hpp"
 #include "core.hpp"
@@ -315,7 +313,6 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
     ASTExpr *initializer = nullptr;
     for (const auto &[key, value] : key_values) {
       if (key == member.name) {
-        std::cout << std::format("found initializer for key={} = member={}\n",  key, member.name);
         initializer = value;
         break;
       }
@@ -637,11 +634,9 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
 
   static int idx = 0;
 
-  THIR_ALLOC(THIRVariable, cached_expr, ast);
-  cached_expr->name = std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++);
-  cached_expr->is_global = false;
-  cached_expr->type = ast->expression->resolved_type;
-  cached_expr->value = visit_node(ast->expression);
+  auto cached_expr = cache_temporary(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
+                                     visit_node(ast->expression), ast->expression);
+
   current_statement_list->push_back(cached_expr);
 
   const auto get_condition_comparator = [&](size_t index) -> THIR * {
@@ -705,6 +700,24 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
   return thir;
 }
 
+THIR *THIRGen::take_address_of(THIR *operand, ASTNode *ast) {
+  THIR_ALLOC(THIRUnaryExpr, thir, ast);
+  thir->op = TType::And;
+  thir->type = operand->type->take_pointer_to(true);
+  thir->operand = operand;
+  return thir;
+}
+
+THIR *THIRGen::cache_temporary(InternedString name, THIR *value, ASTNode *ast, bool is_global) {
+  THIR_ALLOC(THIRVariable, thir, ast)
+  thir->name = name;
+  thir->is_global = is_global;
+  thir->is_statement = true;
+  thir->type = value->type;
+  thir->value = value;
+  return thir;
+}
+
 /*
   * Here's some example compiled code of how we handle iterators, in this case, a constant Range.
 
@@ -721,65 +734,71 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
   }
 */
 THIR *THIRGen::visit_for(ASTFor *ast) {
-  THIR_ALLOC(THIRFor, thir, ast)
-  // ! I put this on pause because I hadn't done `choice` types yet, and for loops depend on them.
+  THIR_ALLOC(THIRFor, thir, ast);
 
   static size_t id = 0;
-  const InternedString RESULT_KEY = std::format(THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT, id++);
+  const InternedString result_key = std::format(THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT, id++);
+  const InternedString cached_key = std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, id);
 
-  THIRVariable *variable = nullptr;
-  if (ast->right->resolved_type->implements(iterable_trait())) {
-    ASTMethodCall iter_method;
-    ASTDotExpr dot_iter;
-    dot_iter.base = ast->right;
-    dot_iter.member = {
-        .identifier = "iter",
-    };
-    iter_method.callee = &dot_iter;
-    iter_method.arguments->arguments.push_back(ast->right);
+  ENTER_SCOPE(ast->block->scope);
 
-    ASTMethodCall next_method;
-    ASTArguments args;
-    next_method.arguments = &args;
-    ASTDotExpr dot_next;
-    dot_next.member = {"next"};
-    dot_next.base = &iter_method;
-    next_method.callee = &dot_next;
-    next_method.accept(&typer);
+  // 1. Cache the iterable/expression (evaluate once)
+  THIR *iterable_value = visit_node(ast->right);
+  THIR *iterable_var = cache_temporary(cached_key, iterable_value, ast->right);
+  
+  current_statement_list->push_back(iterable_var);
 
-    THIR_ALLOC(THIRVariable, thir_var, ast);
-    variable = thir_var;
-    variable->is_global = false;
-    variable->name = RESULT_KEY;
-    variable->value = visit_node(&next_method);
-    thir->initialization = variable;
-  } else if (ast->right->resolved_type->implements(iterator_trait())) {
-    ASTMethodCall next_method;
-    ASTArguments args;
-    next_method.arguments = &args;
-    ASTDotExpr dot_next;
-    dot_next.base = ast->right;
-    dot_next.member = {"next"};
-    next_method.callee = &dot_next;
-    next_method.accept(&typer);
+  // 2. Get the iterator (call iter() or use as iterator directly)
+  THIR *iterator_var = nullptr;
+  if (iterable_var->type->implements(iterable_trait())) {
+    auto iter_symbol = iterable_var->type->info->scope->local_lookup("iter");
+    bool expects_ptr = iter_symbol && iter_symbol->function.declaration->params->params[0]->self.is_pointer;
+    THIR *iter_arg = (expects_ptr && !iterable_var->type->extensions.is_pointer()) ? take_address_of(iterable_var, ast)
+                                                                                   : iterable_var;
 
-    THIR_ALLOC(THIRVariable, thir_var, ast);
-    variable = thir_var;
-    variable->is_global = false;
-    variable->name = RESULT_KEY;
-    variable->value = visit_node(&next_method);
-    variable->type = variable->value->type;
-    thir->initialization = variable;
+    THIR_ALLOC(THIRCall, iter_call, ast);
+    iter_call->callee = visit_function_declaration_via_symbol(iter_symbol);
+    iter_call->arguments.push_back(iter_arg);
+
+    const auto *info = iter_call->callee->type->info->as<FunctionTypeInfo>();
+    iter_call->type = info->return_type;
+
+    iterator_var = cache_temporary(std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, ++id), iter_call, ast);
+    current_statement_list->push_back(iterator_var);
+  } else if (iterable_var->type->implements(iterator_trait())) {
+    iterator_var = iterable_var;
   }
 
+  // 3. Call next() on the iterator
+  auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
+  bool next_expects_ptr = next_symbol && next_symbol->function.declaration->params->params[0]->self.is_pointer;
+  THIR *next_arg = (next_expects_ptr && !iterator_var->type->extensions.is_pointer())
+                       ? take_address_of(iterator_var, ast)
+                       : iterator_var;
+
+  THIR_ALLOC(THIRCall, next_call, ast);
+  next_call->callee = visit_function_declaration_via_symbol(next_symbol);
+
+  const auto *next_info = next_call->callee->type->info->as<FunctionTypeInfo>();
+  next_call->type = next_info->return_type;
+  next_call->arguments.push_back(next_arg);
+
+  // 4. Assign next_call to a loop variable
+  THIR_ALLOC(THIRVariable, next_var, ast);
+  next_var->is_global = false;
+  next_var->name = result_key;
+  next_var->value = next_call;
+  next_var->type = next_call->type;
+  thir->initialization = next_var;
+
+  // 5. Build the loop condition: $next.index == OPTION_SOME_DISCRIMINANT_VALUE
   THIR_ALLOC(THIRBinExpr, condition, ast);
   THIR_ALLOC(THIRMemberAccess, member_access, ast);
-
-  member_access->base = variable;
+  member_access->base = next_var;
   member_access->member = DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
-  THIR_ALLOC(THIRLiteral, discriminant_literal, ast)
+  THIR_ALLOC(THIRLiteral, discriminant_literal, ast);
   discriminant_literal->value = OPTION_SOME_DISCRIMINANT_VALUE;
   discriminant_literal->type = u32_type();
 
@@ -788,39 +807,33 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   condition->right = discriminant_literal;
   thir->condition = condition;
 
-  THIR_ALLOC(THIRBinExpr, increment, ast)
+  // 6. Increment: $next = next($iterator)
+  THIR_ALLOC(THIRBinExpr, increment, ast);
   increment->type = void_type();
-  increment->left = variable;
+  increment->left = next_var;
   increment->op = TType::Assign;
-  increment->right = variable->value;
+  increment->right = next_var->value;
   thir->increment = increment;
 
-
-
-  // TODO: handle destructures.
-  THIR_ALLOC(THIRVariable, identifier_var, ast)
+  // 7. Loop variable binding (identifier only, destructure TODO)
+  THIR_ALLOC(THIRVariable, identifier_var, ast);
   identifier_var->name = ast->left.identifier;
   identifier_var->type = ast->identifier_type;
-  ENTER_SCOPE(ast->block->scope);
   auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
-  std::printf("identifier_symbol=%p\n", identifier_symbol);
   symbol_map[identifier_symbol] = identifier_var;
 
-  const auto some_type = ({
-    const Type *option = variable->type;
-    option->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
-  });
+  // Unwrap: $next.Some.$0
+  const auto some_type = next_var->type->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
+  THIR_ALLOC(THIRMemberAccess, unwrap_some, ast);
+  unwrap_some->base = next_var;
+  unwrap_some->member = "Some";
+  unwrap_some->type = some_type;
 
-  THIR_ALLOC(THIRMemberAccess, fake_unwrap_0, ast)
-  fake_unwrap_0->base = variable;
-  fake_unwrap_0->member = "Some";
-  fake_unwrap_0->type = some_type;
+  THIR_ALLOC(THIRMemberAccess, unwrap_0, ast);
+  unwrap_0->base = unwrap_some;
+  unwrap_0->member = "0";
 
-  THIR_ALLOC(THIRMemberAccess, fake_unwrap_1, ast)
-  fake_unwrap_1->base = fake_unwrap_0;
-  fake_unwrap_1->member = "0";
-
-  identifier_var->value = fake_unwrap_1;
+  identifier_var->value = unwrap_0;
 
   thir->block = visit_node(ast->block);
   THIRBlock *block = (THIRBlock *)thir->block;
@@ -881,13 +894,8 @@ void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
   auto members_iter = type->info->members.begin();
 
   THIR *base = visit_node(ast->right);
-  THIR_ALLOC(THIRVariable, cached_base, ast->right);
-  static int key = 0;
-  cached_base->name = "$destructure$" + std::to_string(key);
-  cached_base->value = base;
-  cached_base->type = type;
-  cached_base->is_global = false;
-  cached_base->is_statement = true;
+  static size_t id = 0;
+  const auto cached_base = cache_temporary("$destructure$" + std::to_string(id), base, ast->right);
   current_statement_list->push_back(cached_base);
 
   for (const DestructureElement &element : ast->elements) {

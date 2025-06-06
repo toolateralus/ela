@@ -55,6 +55,29 @@ struct THIR {
 
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
+
+  bool is_rvalue() const {
+    switch (get_node_type()) {
+      case THIRNodeType::Literal:
+      case THIRNodeType::BinExpr:
+      case THIRNodeType::UnaryExpr:
+      case THIRNodeType::Call:
+      case THIRNodeType::MemberAccess:
+      case THIRNodeType::Cast:
+      case THIRNodeType::Index:
+      case THIRNodeType::ExpressionBlock:
+      case THIRNodeType::Size_Of:
+        return true;
+
+      // These are technically rvalues, but C doesn't care, so for now, we ignore them.
+      // it would be best to not do this.
+      case THIRNodeType::AggregateInitializer:
+      case THIRNodeType::CollectionInitializer:
+      case THIRNodeType::EmptyInitializer:
+      default:
+        return false;
+    }
+  }
 };
 
 struct THIRProgram : THIR {
@@ -230,10 +253,9 @@ static inline T *thir_alloc() {
   __type *__name = thir_alloc<__type>();
 
 struct THIRGen {
-  THIRGen(Typer &typer, Context &ctx) : ctx(ctx), typer(typer) {}
+  THIRGen(Context &ctx) : ctx(ctx){}
   Context &ctx;
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
-  Typer &typer;
   std::map<Symbol *, THIR *> symbol_map;
   THIR *entry_point;
 
@@ -299,7 +321,8 @@ struct THIRGen {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-  THIR *initialize(const SourceRange &source_range, Type *type, const std::vector<std::pair<InternedString, ASTExpr *>> &key_values);
+  THIR *initialize(const SourceRange &source_range, Type *type,
+                   const std::vector<std::pair<InternedString, ASTExpr *>> &key_values);
   THIR *visit_program(ASTProgram *node);
   THIR *visit_function_declaration_via_symbol(Symbol *symbol);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
@@ -314,6 +337,9 @@ struct THIRGen {
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
   THIR *visit_expr_statement(ASTExprStatement *node);
+
+  THIR *take_address_of(THIR *node, ASTNode *ast);
+  THIR *cache_temporary(InternedString name, THIR *value, ASTNode *ast, bool is_global = false);
 
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);

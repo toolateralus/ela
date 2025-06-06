@@ -8,20 +8,22 @@ module std {
   extern fn strlen(c: c_str) -> s32;
   extern fn malloc(size: u64) -> *mut void;
   extern fn sprintf(buf: c_str, fmt: c_str, ...) -> s32;
+  fn println(str: c_str) {
+    printf("%s\n", str);
+  }
 }
 
 trait XarBar {
   fn printme(*mut self);
 }
 
-choice Option {
+choice Option!<T> {
   None,
-  Some(s32),
+  Some(T),
 }
 
-// I hacked these in to avoid using pattern matching while it's still unimplemented.
-// totally dependent on knowledge about how our compiler represents types, and how your ABI does too.
-impl Option {
+impl!<T> Option!<T> {
+  // I hacked these in to avoid using pattern matching while it's still unimplemented.
   fn is_none(mut self) -> bool {
     discriminant := ((&mut self) as *const u8) as *const u32;
     return *discriminant != 2;
@@ -35,26 +37,27 @@ impl Option {
   }
 }
 
-trait Iterator {
-  fn next(*mut self) -> Option;
+
+trait Iterator!<T> {
+  fn next(*mut self) -> Option!<T>;
 }
 
 trait Iterable {
-  fn iter(*mut self) -> Iterator;
+  fn iter(self) -> Iterator;
 }
 
-struct Iter {
-  idx: s32, end: s32
+struct Iter!<T> {
+  idx: T, end: T
 }
 
-impl Iterator for Iter {
-  fn next(*mut self) -> Option {
+impl!<T> Iterator!<T> for Iter!<T> {
+  fn next(*mut self) -> Option!<T> {
     value := self.idx;
     if self.idx < self.end {
       self.idx++;
-      return Option::Some(value);
+      return Option!<T>::Some(value);
     }
-    return Option::None;
+    return Option!<T>::None;
   }
 }
 
@@ -67,7 +70,7 @@ struct Person {
 impl XarBar for Person {
   fn printme(*mut self) {
     std::printf("%s says:\n", self.name);
-    std::printf("  '%s'\n", "\033[1;3;35mbustin on the spheres in the box\033[0m");
+    std::printf("  '%s'\n", "\033[1;3;35mbustin on the balls in the box\033[0m");
   }
 }
 
@@ -142,39 +145,68 @@ impl s32 {
   }
 }
 
+struct Generic!<T> {
+  value: T
+}
+
+impl!<T> Generic!<T> {
+  fn printme(self) {
+    where T: s32 {
+      std::printf("T=s32\n");
+    } else {
+      std::printf("T!=s32\n");
+    }
+  } 
+}
+
+struct RangeBase!<V> {
+  begin: V,
+  end:   V,
+}
+
+alias Range :: RangeBase!<s32>;
+
+impl!<V> Iterable for RangeBase!<V> {
+  fn iter(self) -> Iter!<V> {
+    return .{
+      idx: self.begin,
+      end: self.end,
+    }
+  }
+}
 
 @[entry]
 fn main() -> s32 {
   mut c := Choice::A;
+  print_discriminant(c);
   c = .{};
+  print_discriminant(c);
   c = Choice::B(1, 2);
+  print_discriminant(c);
   c = Choice::C.{
     x: 10,
     y: 100.0,
     z: "Hello, world!"
   };
+  print_discriminant(c);
 
   std::printf("bb=%d\n", if get() { return 100; });
 
   switch 0 {
-    1: { std::printf("wrong!\n"); }
-    2: { std::printf("wrong!\n"); }
-    0: { std::printf("not wrong!\n"); }
+    1: { std::println("wrong!"); }
+    2: { std::println("wrong!"); }
+    0: { std::println("not wrong!"); }
     else: {
-      std::printf("default case\n");
+      std::println("default case");
     }
   }
 
   status: c_str = if 1 == 1 { return "true"c; } else { return "false"c; };
   std::printf("1==1=%s\n", status);
 
-  // if c is Choice::B(a, b) {
-
-  // }
-
   mut person: Person = .{
     curiosity: 200,
-    name: "\033[31mC\033[33mo\033[33mo\033[32mp\033[34me\033[35mr\033[0m (▮▮▮▮▮▮▮▮▮▯ 90% happy)"
+    name: "\033[31mC\033[33mo\033[33mo\033[32mp\033[34me\033[35mr\033[0m (▮▮▮▮▮▮▮▮▮▯ 90% gay)"
   };
 
   if !get() {
@@ -184,7 +216,7 @@ fn main() -> s32 {
   } else if 0 {
     std::printf("Person says hello! Curiosity=%d\n", person.curiosity);
   } else {
-    rainbowize("YOU NEED TO GET A LESSON IN BIG SOCK DETECTION\n");
+    rainbowize("YOU NEED TO GET A LESSON IN BIG COCK DETECTION\n");
   }
 
   mut i := 0;
@@ -195,7 +227,7 @@ fn main() -> s32 {
   rainbowize("while loop done\n");
 
   where s32: s32 {
-    std::printf("s32 == s32! WOW! WOW! WOW! WOW!\n");
+    std::println("s32 == s32! WOW! WOW! WOW! WOW!");
   }
 
   result := dlfcn::dlopen("/usr/local/include/raylib.so"c, 0);
@@ -208,8 +240,23 @@ fn main() -> s32 {
     person.printme();
   }
   
-  mut iter := Iter.{ idx: 0, end: 5 };
+  mut iter := Iter!<s32>.{ idx: 0, end: 5 };
+  std::printf("iter.idx=%d, iter.end=%d\n", iter.idx, iter.end);
+  
+  std::printf("iterator loop: (0 to 10 (exclusive)):\n");
+  iter: Iter!<s32> = .{
+    idx: 0,
+    end: 10,
+  };
+  for i in iter {
+    std::printf("i=%d, ", i);
+  }
+  std::printf("\niterable loop: (0..10(exclusive))\n");
+  for i in 0..10 {
+    std::printf("i=%d, ", i);
+  }
 
+  iter.idx=0;
   while {
     opt := iter.next();
     if opt.is_none() {
@@ -218,10 +265,13 @@ fn main() -> s32 {
       std::printf("%s%d, ", rainbowize_str("iter="), opt.get_value());
     }
   }
-  std::printf("\n");
 
-  // ! We can't do this until generics work, because Option!<T> is always generic, and the typer expects that.
-  // for i in iter {
+  std::println("end while loop");
+
+
+
+  // ! NYI
+  // if c is Choice::B(a, b) {
 
   // }
 
@@ -229,31 +279,41 @@ fn main() -> s32 {
     rainbowize("woo hoo we're in a lambda!\n");
   };
 
-
   fn subfunc() {
-    rainbowize("subfunction\n");
+    rainbowize("in a subfunction\n");
   }
 
   subfunc();
-
   lambda();
 
-  struct Befriender {
+  struct Fucker {
     xyz: (f32, f32, f32) = (1.0, 2.0, 3.0),
-  } 
+  }
 
-  impl Befriender {
-    fn befriend_her(self) {
-      std::printf("I hardly know her!\n");
+  impl Fucker {
+    fn fuck_her(mut self) {
+      rainbowize("(in impl within a function) fucker? I hardly know er!\n");
+      std::printf("fucker(self).xyz=(%f, %f, %f)\n", self.xyz.0, self.xyz.1, self.xyz.2);    
     }
   }
 
-  extern fn memset(dest: *const (f32, f32, f32), value: u32, length: u64);
+  fucker: Fucker;
+  fucker.fuck_her();
 
-  befriender: Befriender;
-  befriender.befriend_her();
-  // memset(&const befriender.xyz, 0, sizeof((f32, f32, f32)));
-  std::printf("befriender.xyz=(%f, %f, %f)\n", befriender.xyz.0, befriender.xyz.1, befriender.xyz.2);
+  std::printf("fucker.xyz=(%f, %f, %f)\n", fucker.xyz.0, fucker.xyz.1, fucker.xyz.2);
 
+  generic: Generic!<s32> = .{
+    value: 100
+  };
+
+  generic.printme();
+
+  fn generic_function!<T>(t: T) -> T {
+    return t;
+  }
+
+  // gen_v := generic_function(10); // ! not working, need to resolve THIRFunction* when calling a generic.
+
+  std::printf("generic.value=%d\n", generic.value);
   return 0;
 }
