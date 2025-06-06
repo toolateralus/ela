@@ -490,6 +490,9 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->generic_parameters.size()) {
+    for (auto &monomorphization: ast->generic_instantiations) {
+      visit_function_declaration((ASTFunctionDeclaration*)monomorphization.declaration);
+    }
     return nullptr;
   }
   THIR_ALLOC(THIRFunction, thir, ast);
