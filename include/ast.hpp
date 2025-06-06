@@ -701,7 +701,7 @@ struct ASTDyn_Of : ASTExpr {
 };
 
 struct ASTType_Of : ASTExpr {
-  ASTExpr *target;
+  ASTType *target;
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
   void accept(VisitorBase *visitor) override;
 };
@@ -905,8 +905,6 @@ struct StructPattern {
   if x is Choice::Variant{ v: mut $v, y: mut $y } { ... }
 */
 struct ASTPatternMatch : ASTExpr {
-  /* This needs a scope to store possibly destructured variables. */
-  Scope *scope;
   ~ASTPatternMatch() {}
   ASTPatternMatch() {}
   ASTPatternMatch(const ASTPatternMatch &other) {
@@ -955,6 +953,9 @@ struct ASTPatternMatch : ASTExpr {
     StructPattern struct_pattern;
     TuplePattern tuple_pattern;
   };
+
+  // This is where the destructured variables will get placed, and where their lifetimes will be valid etc.
+  ASTBlock *target_block;
 
   ASTNodeType get_node_type() const override { return AST_NODE_PATTERN_MATCH; }
   void accept(VisitorBase *visitor) override;

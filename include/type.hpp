@@ -13,6 +13,7 @@
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
+#include "strings.hpp"
 
 // fwd
 struct Type;
@@ -251,6 +252,7 @@ Type *s16_type();
 Type *s32_type();
 Type *s64_type();
 Type *u8_type();
+Type *u8_ptr_type();
 Type *u16_type();
 Type *u32_type();
 Type *u64_type();
@@ -315,7 +317,7 @@ struct Type {
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
-  Type *choice_parent=nullptr;
+  Type *choice_parent = nullptr;
 
   inline void set_base(const InternedString &base) { this->basename = base; }
   inline void set_ext(const TypeExtensions &ext) { this->extensions = ext; }
@@ -428,4 +430,70 @@ static inline std::string get_unmangled_name(const Type *type) {
   output += base;
 
   return output;
+}
+
+static inline constexpr size_t get_reflection_type_flags(Type *type) {
+  int kind_flags = 0;
+  switch (type->kind) {
+    case TYPE_SCALAR: {
+      auto sint =
+          type == s32_type() || type == s8_type() || type == s16_type() || type == s32_type() || type == s64_type();
+      auto uint = type == u8_type() || type == u16_type() || type == u32_type() || type == u64_type();
+      auto floating_pt = type == f32_type() || type == f64_type();
+      if (sint) {
+        kind_flags |= TYPE_FLAGS_SIGNED;
+      } else if (uint) {
+        kind_flags |= TYPE_FLAGS_UNSIGNED;
+      }
+      if (sint || uint) {
+        kind_flags |= TYPE_FLAGS_INTEGER;
+      } else if (floating_pt) {
+        kind_flags |= TYPE_FLAGS_FLOAT;
+      } else if (type == bool_type()) {
+        kind_flags |= TYPE_FLAGS_BOOL;
+      }
+    } break;
+    case TYPE_FUNCTION: {
+      kind_flags = TYPE_FLAGS_FUNCTION;
+    } break;
+    case TYPE_STRUCT: {
+      kind_flags = TYPE_FLAGS_STRUCT;
+      auto info = type->info->as<StructTypeInfo>();
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+        kind_flags = TYPE_FLAGS_UNION;
+      }
+    } break;
+    case TYPE_ENUM: {
+      kind_flags = TYPE_FLAGS_ENUM;
+    } break;
+    case TYPE_TUPLE: {
+      kind_flags = TYPE_FLAGS_TUPLE;
+    } break;
+    case TYPE_CHOICE: {
+      kind_flags = TYPE_FLAGS_CHOICE;
+    } break;
+    case TYPE_TRAIT: {
+      kind_flags = TYPE_FLAGS_TRAIT;
+    } break;
+    case TYPE_DYN: {
+      kind_flags = TYPE_FLAGS_DYN;
+    } break;
+  }
+
+  // TODO: shouldn't this only account for the back extension?
+  // if i have *const u8[1], an array of pointers, we shouldn't get both flags.
+  for (const auto &ext : type->extensions.extensions) {
+    switch (ext.type) {
+      case TYPE_EXT_POINTER_MUT:
+      case TYPE_EXT_POINTER_CONST:
+        // TODO: add specific type flags for mut / const pointers?
+        kind_flags |= TYPE_FLAGS_POINTER;
+        break;
+      case TYPE_EXT_ARRAY:
+        kind_flags |= TYPE_FLAGS_ARRAY;
+        break;
+    }
+  }
+
+  return kind_flags;
 }

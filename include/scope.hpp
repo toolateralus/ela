@@ -10,7 +10,6 @@
 
 extern jstl::Arena scope_arena;
 
-
 struct Value {
   enum {
     INTEGER,
@@ -56,7 +55,7 @@ struct Value {
     val.boolean = (str.get_str() == "true");
     return val;
   }
-  
+
   Value operator-() const {
     if (tag == INTEGER) {
       return Value{.tag = INTEGER, .integer = -integer};
@@ -199,9 +198,9 @@ struct Value {
     if (tag == INTEGER && other.tag == INTEGER) {
       return Value{.tag = BOOLEAN, .boolean = integer < other.integer};
     } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) <
-                              (other.tag == FLOATING ? other.floating : other.integer)};
+      return Value{
+          .tag = BOOLEAN,
+          .boolean = (tag == FLOATING ? floating : integer) < (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for less than comparison", {});
     return {};
@@ -211,9 +210,9 @@ struct Value {
     if (tag == INTEGER && other.tag == INTEGER) {
       return Value{.tag = BOOLEAN, .boolean = integer > other.integer};
     } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) >
-                              (other.tag == FLOATING ? other.floating : other.integer)};
+      return Value{
+          .tag = BOOLEAN,
+          .boolean = (tag == FLOATING ? floating : integer) > (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for greater than comparison", {});
     return {};
@@ -329,7 +328,8 @@ struct Symbol {
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTChoiceDeclaration> choice; // ? Why is this here? Just to confirm the type is a child of a choice type?
+      Nullable<ASTChoiceDeclaration>
+          choice;  // ? Why is this here? Just to confirm the type is a child of a choice type?
       Nullable<ASTNode> declaration;
       TypeKind kind;
     } type;
@@ -421,10 +421,18 @@ struct Scope {
   inline size_t fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function() && !sym.is_type())
-        fields++;
+      if (!sym.is_function() && !sym.is_type()) fields++;
     }
     return fields;
+  }
+
+  void insert_local_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
+                             ASTNode *decl = nullptr) {
+    auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
+    sym.flags |= SYMBOL_IS_LOCAL;
+    sym.scope = this;
+    symbols.insert_or_assign(name, sym);
+    ordered_symbols.push_back(name);
   }
 
   void insert_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
@@ -486,7 +494,6 @@ struct Scope {
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-
 
     return type;
   }

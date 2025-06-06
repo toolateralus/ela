@@ -200,6 +200,9 @@ struct DeferBlock {
   DeferBlockType type;
 };
 
+/* 
+void emit_dependencies_for_reflection(OldResolver *dep_resolver, Type *id);
+
 struct OldResolver;
 
 struct OldEmitter : VisitorBase {
@@ -431,11 +434,10 @@ struct OldResolver : VisitorBase {
     }
   };
 };
+*/
 
 struct GenericInstantiationErrorUserData {
   std::string message = "";
   SourceRange definition_range = {};
   jmp_buf save_state;
 };
-
-void emit_dependencies_for_reflection(OldResolver *dep_resolver, Type *id);

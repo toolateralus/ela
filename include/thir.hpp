@@ -8,6 +8,7 @@
 #include "type.hpp"
 #include "ast.hpp"
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
@@ -252,8 +253,18 @@ static inline T *thir_alloc() {
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();
 
+struct ReflectionInfo {
+  // const Type type_info_for_this_type = {...}; global variable.
+  THIRVariable *definition;
+  // &type_info_of_this_type, unary address of expression getting a pointer to that stable memory.
+  THIRUnaryExpr *reference;
+
+  bool created = false;
+  bool has_been_created() const { return created; }
+};
+
 struct THIRGen {
-  THIRGen(Context &ctx) : ctx(ctx){}
+  THIRGen(Context &ctx) : ctx(ctx) {}
   Context &ctx;
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
   std::map<Symbol *, THIR *> symbol_map;
@@ -265,6 +276,9 @@ struct THIRGen {
   // available for the final return or whatever comes next.
   Nullable<THIRVariable> return_override_register;
   size_t return_override_register_index = 0;
+
+  // Here, the variable is the original, and the unary expression is the address-of you can use to refer to the type.
+  std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
 
   inline Type *iterator_trait() const {
     static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
@@ -339,7 +353,9 @@ struct THIRGen {
   THIR *visit_expr_statement(ASTExprStatement *node);
 
   THIR *take_address_of(THIR *node, ASTNode *ast);
-  THIR *cache_temporary(InternedString name, THIR *value, ASTNode *ast, bool is_global = false);
+  THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
+  THIR *make_str(const InternedString &value, const SourceRange &src_range);
+  THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
 
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);
@@ -469,4 +485,9 @@ struct THIRGen {
         return nullptr;
     }
   }
+
+  THIR *get_method_struct(const std::string &name, Type *type);
+  THIR *get_field_struct(const std::string &name, Type *type, Type *parent_type);
+  ReflectionInfo create_reflection_type_struct(Type *type);
+  THIR *to_reflection_type_struct(Type *type);
 };

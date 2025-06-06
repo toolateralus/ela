@@ -1,5 +1,4 @@
 #include "emit.hpp"
-#include <cctype>
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"

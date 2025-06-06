@@ -1,8 +1,30 @@
 #pragma once
 #include <string>
+
+/* 
+  Originally (and still) called 'strings.hpp' this is just a file for constants.
+*/
+
 /*
   this is used for std::format() with the type id to get the reflected upon type info.
 */
+
+constexpr size_t TYPE_FLAGS_INTEGER = 1 << 0;
+constexpr size_t TYPE_FLAGS_FLOAT = 1 << 1;
+constexpr size_t TYPE_FLAGS_BOOL = 1 << 2;
+constexpr size_t TYPE_FLAGS_STRUCT = 1 << 3;
+constexpr size_t TYPE_FLAGS_CHOICE = 1 << 4;
+constexpr size_t TYPE_FLAGS_ENUM = 1 << 5;
+constexpr size_t TYPE_FLAGS_TUPLE = 1 << 6;
+constexpr size_t TYPE_FLAGS_ARRAY = 1 << 7;
+constexpr size_t TYPE_FLAGS_FUNCTION = 1 << 8;
+constexpr size_t TYPE_FLAGS_POINTER = 1 << 9;
+constexpr size_t TYPE_FLAGS_SIGNED = 1 << 10;
+constexpr size_t TYPE_FLAGS_UNSIGNED = 1 << 11;
+constexpr size_t TYPE_FLAGS_TRAIT = 1 << 12;
+constexpr size_t TYPE_FLAGS_DYN = 1 << 13;
+constexpr size_t TYPE_FLAGS_UNION = 1 << 14;
+
 
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
@@ -15,6 +37,7 @@ constexpr const char *THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT = "$ror{}";
 constexpr const char *THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT = "$switch_cached{}";
 constexpr const char *THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT = "$for_iter{}";
 constexpr const char *THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT = "$for_cached{}";
+constexpr const char *TYPE_INFO_IDENTIFIER_FORMAT = "$typeinfo{}";
 
 // We should probably not rely on this since RangeBase is defined in the stdlib.
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";

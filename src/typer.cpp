@@ -188,7 +188,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   for (const ASTStructMember &member : node->members) {
     member.type->accept(this);
-    ctx.scope->insert_variable(member.name, member.type->resolved_type, nullptr, MUT);
+    ctx.scope->insert_local_variable(member.name, member.type->resolved_type, nullptr, MUT);
 
     if (member.default_value) {
       auto old_expected_type = expected_type;
@@ -202,11 +202,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
         .type = member.type->resolved_type,
         .default_value = member.default_value,
     });
-
-    auto sym = ctx.scope->local_lookup(member.name);
-    if (sym->is_variable()) {
-      sym->flags |= SYMBOL_IS_LOCAL;
-    }
   }
 }
 
@@ -443,8 +438,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
-      ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability, param);
-      ctx.scope->local_lookup(normal.name)->flags |= SYMBOL_IS_LOCAL;
+      ctx.scope->insert_local_variable(normal.name, param->resolved_type, nullptr, param->mutability, param);
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
       auto type = get_self_type();
@@ -452,8 +446,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
         type = type->take_pointer_to(param->mutability);
       }
 
-      ctx.scope->insert_variable("self", type, nullptr, param->mutability, param);
-      ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
+      ctx.scope->insert_local_variable("self", type, nullptr, param->mutability, param);
       info.parameter_types[info.params_len] = type;
     }
 
@@ -776,9 +769,7 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
 
   InternedString varname = "$$temp$$" + std::to_string(depth++);
   path.push_segment(varname);
-  ctx.scope->insert_variable(varname, left_type, nullptr, MUT);
-  ctx.scope->local_lookup(varname)->flags |= SYMBOL_IS_LOCAL;
-
+  ctx.scope->insert_local_variable(varname, left_type, nullptr, MUT);
   Defer erase_temp_symbol([&] {
     depth--;
     ctx.scope->erase("$$temp$$");
@@ -1216,16 +1207,16 @@ void Typer::visit(ASTLambda *node) {
 
   std::vector<int> param_types;
   FunctionTypeInfo info;
-  
+
   int parameter_index = 0;
   for (const auto &param : node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
     info.params_len++;
-    node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr, param->mutability, param);
-    node->block->scope->local_lookup(param->normal.name)->flags |= SYMBOL_IS_LOCAL;
+    node->block->scope->insert_local_variable(param->normal.name, param->resolved_type, nullptr, param->mutability,
+                                              param);
     parameter_index++;
   }
-  
+
   node->block->accept(this);
   info.return_type = node->return_type->resolved_type;
   auto type = global_find_function_type_id(info, {});
@@ -1379,9 +1370,11 @@ void Typer::visit(ASTVariable *node) {
   }
 
   auto variable_type = node->type->resolved_type;
-  ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node->mutability, node);
+
   if (node->is_local) {
-    ctx.scope->local_lookup(node->name)->flags |= SYMBOL_IS_LOCAL;
+    ctx.scope->insert_local_variable(node->name, variable_type, node->value.get(), node->mutability, node);
+  } else {
+    ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node->mutability, node);
   }
 
   if (variable_type == void_type()) {
@@ -1557,8 +1550,7 @@ void Typer::visit(ASTFor *node) {
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     auto iden = node->left.identifier;
-    ctx.scope->insert_variable(iden, iter_ty, nullptr, CONST);
-    ctx.scope->local_lookup(iden)->flags |= SYMBOL_IS_LOCAL;
+    ctx.scope->insert_local_variable(iden, iter_ty, nullptr, CONST);
   } else {
     auto type = iter_ty;
 
@@ -1588,8 +1580,7 @@ void Typer::visit(ASTFor *node) {
       if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
         type_id = type_id->take_pointer_to(destructure.mutability);
       }
-      ctx.scope->insert_variable(iden, type_id, nullptr, MUT);
-      ctx.scope->local_lookup(iden)->flags |= SYMBOL_IS_LOCAL;
+      ctx.scope->insert_local_variable(iden, type_id, nullptr, MUT);
       i++;
     }
   }
@@ -1610,11 +1601,8 @@ void Typer::visit(ASTIf *node) {
   auto condition = node->condition;
   if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
     auto pattern = (ASTPatternMatch *)condition;
-    auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
-    node->block->scope->parent = pattern->scope;
+    pattern->target_block = node->block;
     condition->accept(this);
-    ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                            // HACKING IT IN!
   } else {
     condition->accept(this);
   }
@@ -1663,11 +1651,8 @@ void Typer::visit(ASTWhile *node) {
     auto condition = node->condition.get();
     if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
       auto pattern = (ASTPatternMatch *)condition;
-      auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
-      node->block->scope->parent = pattern->scope;
+      pattern->target_block = node->block;
       condition->accept(this);
-      ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                              // HACKING IT IN!
     } else {
       condition->accept(this);
     }
@@ -2453,15 +2438,12 @@ void Typer::visit(ASTSwitch *node) {
   auto type = type_id;
 
   if (node->is_pattern_match) {
-    for (auto _case = node->branches.begin(); _case != node->branches.end(); _case++) {
-      auto condition = _case->expression;
+    for (auto branch = node->branches.begin(); branch != node->branches.end(); branch++) {
+      auto condition = branch->expression;
       if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
         auto pattern = (ASTPatternMatch *)condition;
-        auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
-        _case->block->scope->parent = pattern->scope;
+        pattern->target_block = branch->block;
         condition->accept(this);
-        ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                                // HACKING IT IN!
       } else {
         condition->accept(this);
       }
@@ -2640,10 +2622,7 @@ void Typer::visit(ASTDestructure *node) {
     }
 
     element.type = type;
-    ctx.scope->insert_variable(element.identifier, type, symbol->variable.initial_value.get(), element.mutability);
-
-    ctx.scope->local_lookup(element.identifier)->flags |= SYMBOL_IS_LOCAL;
-
+    ctx.scope->insert_local_variable(element.identifier, type, symbol->variable.initial_value.get(), element.mutability);
     ++i;
   }
 };
@@ -3115,7 +3094,7 @@ void Typer::visit(ASTPatternMatch *node) {
   node->object->accept(this);
   node->target_type_path->accept(this);
 
-  ctx.set_scope(node->scope);
+  ctx.set_scope(node->target_block->scope);
   auto old_scope = ctx.scope;
   Defer _([&] { ctx.scope = old_scope; });
 
@@ -3154,9 +3133,8 @@ void Typer::visit(ASTPatternMatch *node) {
         }
 
         part.resolved_type = type_id;
-        node->scope->insert_variable(part.var_name, type_id, nullptr, part.mutability);
-        auto sym = node->scope->local_lookup(part.var_name);
-        sym->flags |= SYMBOL_IS_LOCAL;
+
+        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability);
       }
     } break;
     case ASTPatternMatch::TUPLE: {
@@ -3181,9 +3159,7 @@ void Typer::visit(ASTPatternMatch *node) {
           type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
         }
         part.resolved_type = type_id;
-        node->scope->insert_variable(part.var_name, type_id, nullptr, part.mutability);
-        auto sym = node->scope->local_lookup(part.var_name);
-        sym->flags |= SYMBOL_IS_LOCAL;
+        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability);
         index++;
       }
     } break;

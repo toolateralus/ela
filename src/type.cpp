@@ -582,6 +582,12 @@ Type *u16_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
   return type;
 }
+
+Type *u8_ptr_type() {
+  static Type *type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+  return type;
+}
+
 Type *u8_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;

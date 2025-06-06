@@ -1,6 +1,8 @@
 #include "thir.hpp"
+#include <format>
 #include <string>
 #include "ast.hpp"
+#include "constexpr.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -381,10 +383,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   return nullptr;
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) {
-  throw_error("visit_type_of not implemented", ast->source_range);
-  return nullptr;
-}
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { return to_reflection_type_struct(ast->target->resolved_type); }
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
@@ -634,8 +633,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
 
   static int idx = 0;
 
-  auto cached_expr = cache_temporary(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
-                                     visit_node(ast->expression), ast->expression);
+  auto cached_expr = make_variable(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
+                                   visit_node(ast->expression), ast->expression);
 
   current_statement_list->push_back(cached_expr);
 
@@ -708,8 +707,11 @@ THIR *THIRGen::take_address_of(THIR *operand, ASTNode *ast) {
   return thir;
 }
 
-THIR *THIRGen::cache_temporary(InternedString name, THIR *value, ASTNode *ast, bool is_global) {
-  THIR_ALLOC(THIRVariable, thir, ast)
+THIRVariable *THIRGen::make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global) {
+  THIR_ALLOC_NO_SRC_RANGE(THIRVariable, thir)
+  if (ast) {
+    thir->source_range = ast->source_range;
+  }
   thir->name = name;
   thir->is_global = is_global;
   thir->is_statement = true;
@@ -744,8 +746,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
   // 1. Cache the iterable/expression (evaluate once)
   THIR *iterable_value = visit_node(ast->right);
-  THIR *iterable_var = cache_temporary(cached_key, iterable_value, ast->right);
-  
+  THIR *iterable_var = make_variable(cached_key, iterable_value, ast->right);
+
   current_statement_list->push_back(iterable_var);
 
   // 2. Get the iterator (call iter() or use as iterator directly)
@@ -763,7 +765,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     const auto *info = iter_call->callee->type->info->as<FunctionTypeInfo>();
     iter_call->type = info->return_type;
 
-    iterator_var = cache_temporary(std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, ++id), iter_call, ast);
+    iterator_var = make_variable(std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, ++id), iter_call, ast);
     current_statement_list->push_back(iterator_var);
   } else if (iterable_var->type->implements(iterator_trait())) {
     iterator_var = iterable_var;
@@ -798,9 +800,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   member_access->member = DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
-  THIR_ALLOC(THIRLiteral, discriminant_literal, ast);
-  discriminant_literal->value = OPTION_SOME_DISCRIMINANT_VALUE;
-  discriminant_literal->type = u32_type();
+  THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type());
 
   condition->left = member_access;
   condition->op = TType::EQ;
@@ -895,7 +895,7 @@ void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
 
   THIR *base = visit_node(ast->right);
   static size_t id = 0;
-  const auto cached_base = cache_temporary("$destructure$" + std::to_string(id), base, ast->right);
+  const auto cached_base = make_variable("$destructure$" + std::to_string(id), base, ast->right);
   current_statement_list->push_back(cached_base);
 
   for (const DestructureElement &element : ast->elements) {
@@ -968,4 +968,60 @@ void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
       }
     }
   }
+}
+
+THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
+  (void)name;
+  (void)type;
+  return nullptr;
+}
+THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
+  (void)name;
+  (void)type;
+  (void)parent_type;
+  return nullptr;
+}
+
+ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
+  ReflectionInfo info;
+  info.created = true;
+  static Type *type_type = ctx.scope->find_type_id("Type", {});
+  info.definition =
+      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+  return info;
+}
+
+THIR *THIRGen::to_reflection_type_struct(Type *type) {
+  if (!type) {
+    throw_error("internal compiler error: encountered a null type while emitting THIR for a reflection object.", {});
+  }
+
+  /*
+    Has this type already been emitted to a struct?
+    if so, reference it.
+  */
+  ReflectionInfo &reflection_info = reflected_upon_types[type];
+  if (reflection_info.has_been_created()) {
+    return reflection_info.reference;
+  }
+
+  reflection_info = create_reflection_type_struct(type);
+  return reflection_info.reference;
+}
+
+THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_range) {
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->source_range = src_range;
+  thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type())});
+  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())),
+                                                     src_range, u64_type())});
+  return thir;
+}
+
+THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type) {
+  THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, thir);
+  thir->source_range = src_range;
+  thir->value = value;
+  thir->type = type;
+  return thir;
 }

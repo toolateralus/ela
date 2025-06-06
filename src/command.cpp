@@ -16,6 +16,26 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 }
 
 int CompileCommand::compile() {
+  
+  // TODO: this won't work because we use text based includes.
+  // We need to scan the main file, then recursively any imported file, to check for included files that are
+  // newer than the binary. This would be a nice little way to run things without recompiling every run.
+  if (false) {
+    const auto input_file = input_path;
+    const auto output_file = output_path;
+    std::filesystem::file_time_type input_file_write_time = {};
+    std::filesystem::file_time_type output_file_write_time = {};
+    if (std::filesystem::exists(input_file)) {
+      input_file_write_time = std::filesystem::last_write_time(input_file);
+    }
+    if (std::filesystem::exists(output_file)) {
+      output_file_write_time = std::filesystem::last_write_time(output_file);
+      if (input_file_write_time <= output_file_write_time) {
+        return 0;
+      }
+    }
+  }
+
   init_type_system();
   Context context{};
   original_path = std::filesystem::current_path();
