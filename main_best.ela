@@ -240,21 +240,18 @@ fn main() -> s32 {
     person.printme();
   }
   
-  mut iter := Iter!<s32>.{ idx: 0, end: 5 };
+  mut iter := Iter!<s32>.{ idx: 0, end: 10};
   std::printf("iter.idx=%d, iter.end=%d\n", iter.idx, iter.end);
   
-  std::printf("iterator loop: (0 to 10 (exclusive)):\n");
-  iter: Iter!<s32> = .{
-    idx: 0,
-    end: 10,
-  };
+  rainbowize("iterator loop: (0 to 10 (exclusive)):\n");
   for i in iter {
     std::printf("i=%d, ", i);
   }
-  std::printf("\niterable loop: (0..10(exclusive))\n");
+  rainbowize("\niterable loop: (0..10(exclusive))\n");
   for i in 0..10 {
     std::printf("i=%d, ", i);
   }
+  rainbowize("\ndone with for loop iterators\n");
 
   iter.idx=0;
   while {
@@ -262,13 +259,11 @@ fn main() -> s32 {
     if opt.is_none() {
       break;
     } else {
-      std::printf("%s%d, ", rainbowize_str("iter="), opt.get_value());
+      std::printf("%s%d, ", rainbowize_str("while iter="), opt.get_value());
     }
   }
 
   std::println("end while loop");
-
-
 
   // ! NYI
   // if c is Choice::B(a, b) {
@@ -312,8 +307,22 @@ fn main() -> s32 {
     return t;
   }
 
+
+  none := Option!<s32>::None;
+
+  if none is Option!<s32>::None {
+    std::println("was none");
+  }
+
+  some := Option!<s32>::Some(10);
+
+  if some is Option!<s32>::Some(&mut v) {
+    std::printf("was some, v=%d\n", *v);
+  }
+
   // gen_v := generic_function(10); // ! not working, need to resolve THIRFunction* when calling a generic.
 
   std::printf("generic.value=%d\n", generic.value);
+
   return 0;
 }
