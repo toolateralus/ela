@@ -269,7 +269,6 @@ struct THIRGen {
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
   std::map<Symbol *, THIR *> symbol_map;
   THIR *entry_point;
-
   // The "return override register" is used to capture the result of a block or function,
   // mainly for things like defer, early returns, or blocks that yield values. Instead of returning
   // directly, we write the result to this register (almost always a variable), so the correct value is
@@ -310,7 +309,12 @@ struct THIRGen {
 
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
-  THIR *visit_pattern_match(ASTPatternMatch *node);
+
+  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope, std::vector<THIR *> &statements,
+                                          Type *variant_type, const InternedString &variant_name);
+  THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
+  THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
+
   THIR *visit_dyn_of(ASTDyn_Of *node);
   THIR *visit_type_of(ASTType_Of *node);
   THIR *visit_block(ASTBlock *node);
@@ -356,6 +360,8 @@ struct THIRGen {
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
   THIR *make_str(const InternedString &value, const SourceRange &src_range);
   THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
+
+  THIR *make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
 
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);
@@ -434,7 +440,11 @@ struct THIRGen {
       case AST_NODE_SWITCH:
         return visit_switch((ASTSwitch *)node);
       case AST_NODE_PATTERN_MATCH:
-        return visit_pattern_match((ASTPatternMatch *)node);
+        throw_error(
+            "INTERNAL COMPILER ERROR:THIR :: you cannot visit a PatternMatch without explicitly calling into it, with "
+            "the list of statements it needs to unload into.",
+            node->source_range);
+        return nullptr;
       // Statement nodes
       case AST_NODE_BLOCK:
         return visit_block((ASTBlock *)node);
@@ -490,4 +500,5 @@ struct THIRGen {
   THIR *get_field_struct(const std::string &name, Type *type, Type *parent_type);
   ReflectionInfo create_reflection_type_struct(Type *type);
   THIR *to_reflection_type_struct(Type *type);
+  void emit_destructure_for_pattern_match(ASTPatternMatch *pattern_match, std::vector<THIR *> &statements);
 };

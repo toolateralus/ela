@@ -35,9 +35,15 @@ constexpr const char *OPTION_SOME_DISCRIMINANT_VALUE = "2";
 
 constexpr const char *THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT = "$ror{}";
 constexpr const char *THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT = "$switch_cached{}";
+
 constexpr const char *THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT = "$for_iter{}";
 constexpr const char *THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT = "$for_cached{}";
+
 constexpr const char *TYPE_INFO_IDENTIFIER_FORMAT = "$typeinfo{}";
+
+constexpr const char *THIR_PATTERN_MATCH_CACHED_KEY_FORMAT = "$patmatch{}";
+
+
 
 // We should probably not rely on this since RangeBase is defined in the stdlib.
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";

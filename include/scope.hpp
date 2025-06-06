@@ -460,12 +460,7 @@ struct Scope {
 
   Symbol *lookup(const InternedString &name);
 
-  Symbol *local_lookup(const InternedString &name) {
-    if (symbols.contains(name)) {
-      return &symbols[name];
-    }
-    return nullptr;
-  }
+  Symbol *local_lookup(const InternedString &name);
 
   void erase(const InternedString &name);
 

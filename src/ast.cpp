@@ -934,18 +934,18 @@ ASTExpr *Parser::parse_primary() {
           if (peek().type != TType::ExpressionBody) {
             expect(TType::Colon);
           }
-          node->default_case = parse_block();
+          node->default_branch = parse_block();
           if (peek().type == TType::Comma) eat();
           continue;
         }
 
-        SwitchBranch _case;
+        SwitchBranch branch;
 
         if (node->is_pattern_match) {
           NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
           pattern_match->target_type_path = parse_path();
           pattern_match->object = node->expression;
-          _case.expression = pattern_match;
+          branch.expression = pattern_match;
           if (peek().type == TType::Dot && lookahead_buf()[1].type == TType::LCurly) {
             eat();
             eat();
@@ -1013,14 +1013,14 @@ ASTExpr *Parser::parse_primary() {
             expect(TType::RParen);
           }
         } else {
-          _case.expression = parse_expr();
+          branch.expression = parse_expr();
         }
 
         if (peek().type != TType::ExpressionBody) {
           expect(TType::Colon);
         }
-        _case.block = parse_block();
-        node->branches.push_back(_case);
+        branch.block = parse_block();
+        node->branches.push_back(branch);
         if (peek().type == TType::Comma) {
           eat();
         }

@@ -788,7 +788,7 @@ struct ASTSwitch : ASTExpr {
   Type *return_type = void_type();
   bool is_pattern_match = false;
   ASTExpr *expression;
-  Nullable<ASTBlock> default_case;
+  Nullable<ASTBlock> default_branch;
   std::vector<SwitchBranch> branches;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
@@ -1129,3 +1129,4 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                                                                     \
     deferred;                                                                                                          \
   });
+  

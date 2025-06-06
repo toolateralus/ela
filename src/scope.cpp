@@ -71,6 +71,16 @@ Context::Context() {
   }
 }
 
+/*
+  TODO: optimize lookups for local and other symbols.
+*/
+Symbol *Scope::local_lookup(const InternedString &name) {
+  if (symbols.contains(name)) {
+    return &symbols[name];
+  }
+  return nullptr;
+}
+
 Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];

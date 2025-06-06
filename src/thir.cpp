@@ -1,9 +1,11 @@
 #include "thir.hpp"
+#include <deque>
 #include <format>
 #include <string>
 #include "ast.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "strings.hpp"
@@ -211,10 +213,83 @@ THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   return thir;
 }
 
-// This is gonna be tricky to do right, for nested patterns, which we 100% plan on supporting.
-THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast) {
-  throw_error("visit_pattern_match not implemented", ast->source_range);
-  return nullptr;
+void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
+                                                 std::vector<THIR *> &statements, Type *variant_type,
+                                                 const InternedString &variant_name) {
+  auto variant_member_access = make_member_access(ast->source_range, object, {{variant_type, variant_name}});
+
+  switch (ast->pattern_tag) {
+    case ASTPatternMatch::STRUCT: {
+      auto &pattern = ast->struct_pattern;
+      for (const StructPattern::Part &part : pattern.parts) {
+        THIR_ALLOC(THIRVariable, var, ast)
+        var->name = part.var_name;
+        var->type = part.resolved_type;
+        var->value =
+            make_member_access(ast->source_range, variant_member_access, {{part.resolved_type, part.field_name}});
+        if (part.semantic == PTRN_MTCH_PTR_MUT || part.semantic == PTR_MTCH_PTR_CONST) {
+          var->value = take_address_of(var->value, ast);
+        }
+        statements.insert(statements.begin(), var);
+
+        auto symbol = block_scope->lookup(part.var_name);
+        symbol_map[symbol] = var;
+      }
+    } break;
+    case ASTPatternMatch::TUPLE: {
+      auto &pattern = ast->tuple_pattern;
+      size_t index = 0;
+      for (const TuplePattern::Part &part : pattern.parts) {
+        THIR_ALLOC(THIRVariable, var, ast)
+        var->name = part.var_name;
+        var->type = part.resolved_type;
+        var->value = make_member_access(ast->source_range, variant_member_access,
+                                        {{part.resolved_type, std::to_string(index++)}});
+        if (part.semantic == PTRN_MTCH_PTR_MUT || part.semantic == PTR_MTCH_PTR_CONST) {
+          var->value = take_address_of(var->value, ast);
+        }
+        statements.insert(statements.begin(), var);
+
+        auto symbol = block_scope->lookup(part.var_name);
+        symbol_map[symbol] = var;
+      }
+    } break;
+    default:
+      return;
+  }
+}
+
+THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant) {
+  THIR_ALLOC(THIRMemberAccess, discriminant_access, ast)
+  discriminant_access->base = cached_object;
+  discriminant_access->member = DISCRIMINANT_KEY;
+  discriminant_access->type = u64_type();
+  THIR_ALLOC(THIRBinExpr, thir, ast);
+  thir->left = discriminant_access;
+  thir->op = TType::EQ;
+  thir->right = make_literal(std::to_string(discriminant), ast->source_range, u64_type());
+  return thir;
+}
+
+THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vector<THIR *> &statements) {
+  static size_t id = 0;
+
+  auto cached_object =
+      make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++), visit_node(ast->object), ast->object);
+
+  current_statement_list->push_back(cached_object);
+
+  const Type *choice_type = ast->target_type_path->resolved_type;
+  const ChoiceTypeInfo *info = choice_type->info->as<ChoiceTypeInfo>();
+  const ASTPath::Segment &segment = ast->target_type_path->segments.back();
+
+  const size_t discriminant = info->get_variant_discriminant(segment.identifier);
+  Type *variant_type = info->get_variant_type(segment.identifier);
+  const InternedString variant_name = segment.identifier;
+
+  auto condition = visit_pattern_match_condition(ast, cached_object, discriminant);
+  make_destructure_for_pattern_match(ast, cached_object, scope, statements, variant_type, variant_name);
+  return condition;
 }
 
 THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
@@ -622,13 +697,13 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
 */
 THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   // TODO: maybe we want to throw an error for this, instead of just optimizing it out.
-  if (ast->branches.empty() && !ast->default_case) {
+  if (ast->branches.empty() && !ast->default_branch) {
     return nullptr;
   }
 
   // this is totally redundant so, whatever, just emit it as if it were a block.
-  if (ast->branches.empty() && ast->default_case) {
-    return visit_node(ast->default_case.get());
+  if (ast->branches.empty() && ast->default_branch) {
+    return visit_node(ast->default_branch.get());
   }
 
   static int idx = 0;
@@ -676,8 +751,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     the_if = thir_branch;
   }
 
-  if (ast->default_case) {
-    the_if->_else = (THIRBlock *)visit_node(ast->default_case.get());
+  if (ast->default_branch) {
+    the_if->_else = (THIRBlock *)visit_node(ast->default_branch.get());
   }
 
   return first_case;
@@ -844,10 +919,19 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
 THIR *THIRGen::visit_if(ASTIf *ast) {
   THIR_ALLOC(THIRIf, thir, ast)
-  thir->condition = visit_node(ast->condition);
+
+  std::vector<THIR *> statements;
+  if (ast->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    thir->condition = visit_pattern_match((ASTPatternMatch *)ast->condition, ast->block->scope, statements);
+  } else {
+    thir->condition = visit_node(ast->condition);
+  }
 
   const auto finish_visiting = [&] {
     thir->block = (THIRBlock *)visit_block(ast->block);
+    for (const auto &stmt : statements) {
+      thir->block->statements.insert(thir->block->statements.begin(), stmt);
+    }
     if (ast->_else) {
       thir->_else = visit_else(ast->_else.get());
     }
@@ -975,6 +1059,7 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
   (void)type;
   return nullptr;
 }
+
 THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
   (void)name;
   (void)type;
@@ -1023,5 +1108,27 @@ THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_
   thir->source_range = src_range;
   thir->value = value;
   thir->type = type;
+  return thir;
+}
+
+THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
+                                  std::deque<std::pair<Type *, InternedString>> parts) {
+  THIR_ALLOC_NO_SRC_RANGE(THIRMemberAccess, thir)
+  thir->source_range = range;
+  thir->base = base;
+  auto [type, member] = parts.front();
+  thir->member = member;
+  thir->type = type;
+  parts.pop_front();
+  THIRMemberAccess *last_part = thir;
+  while (!parts.empty()) {
+    THIR_ALLOC_NO_SRC_RANGE(THIRMemberAccess, member_access);
+    auto [type, member] = parts.front();
+    parts.pop_front();
+    member_access->base = last_part;
+    member_access->member = member;
+    member_access->type = type;
+    last_part = member_access;
+  }
   return thir;
 }

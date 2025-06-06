@@ -2472,11 +2472,11 @@ void Typer::visit(ASTSwitch *node) {
   Type *return_type = void_type();
   int flags = 0;
 
-  for (const auto &_case : node->branches) {
-    if (!node->is_pattern_match) _case.expression->accept(this);
+  for (const auto &branch : node->branches) {
+    if (!node->is_pattern_match) branch.expression->accept(this);
 
-    _case.block->accept(this);
-    auto &block_cf = _case.block->control_flow;
+    branch.block->accept(this);
+    auto &block_cf = branch.block->control_flow;
     flags |= block_cf.flags;
 
     if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
@@ -2485,15 +2485,15 @@ void Typer::visit(ASTSwitch *node) {
 
     if (type_is_numerical(type)) {
       continue;
-    } else if (_case.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
-      assert_types_can_cast_or_equal(_case.expression, type_id, node->source_range, "Invalid switch case.");
+    } else if (branch.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
+      assert_types_can_cast_or_equal(branch.expression, type_id, node->source_range, "Invalid switch case.");
     }
   }
 
-  if (node->default_case) {
-    auto _case = node->default_case.get();
-    _case->accept(this);
-    auto &block_cf = _case->control_flow;
+  if (node->default_branch) {
+    auto branch = node->default_branch.get();
+    branch->accept(this);
+    auto &block_cf = branch->control_flow;
     flags |= block_cf.flags;
 
     if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
@@ -2622,7 +2622,8 @@ void Typer::visit(ASTDestructure *node) {
     }
 
     element.type = type;
-    ctx.scope->insert_local_variable(element.identifier, type, symbol->variable.initial_value.get(), element.mutability);
+    ctx.scope->insert_local_variable(element.identifier, type, symbol->variable.initial_value.get(),
+                                     element.mutability);
     ++i;
   }
 };
