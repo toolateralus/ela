@@ -1,4 +1,6 @@
 #include "thir.hpp"
+#include <iostream>
+#include <ostream>
 #include <string>
 #include "ast.hpp"
 #include "core.hpp"
@@ -6,7 +8,6 @@
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
-
 // this is used directly. clangd stop b*tchin
 #include "visitor.hpp"
 
@@ -290,7 +291,7 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
 THIR *THIRGen::visit_range(ASTRange *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
   thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, visit_node(ast->left)});
-  thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->left)});
+  thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->right)});
   return thir;
 }
 
@@ -314,6 +315,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
     ASTExpr *initializer = nullptr;
     for (const auto &[key, value] : key_values) {
       if (key == member.name) {
+        std::cout << std::format("found initializer for key={} = member={}\n",  key, member.name);
         initializer = value;
         break;
       }
@@ -490,8 +492,8 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->generic_parameters.size()) {
-    for (auto &monomorphization: ast->generic_instantiations) {
-      visit_function_declaration((ASTFunctionDeclaration*)monomorphization.declaration);
+    for (auto &monomorphization : ast->generic_instantiations) {
+      visit_function_declaration((ASTFunctionDeclaration *)monomorphization.declaration);
     }
     return nullptr;
   }
@@ -722,6 +724,9 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast)
   // ! I put this on pause because I hadn't done `choice` types yet, and for loops depend on them.
 
+  static size_t id = 0;
+  const InternedString RESULT_KEY = std::format(THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT, id++);
+
   THIRVariable *variable = nullptr;
   if (ast->right->resolved_type->implements(iterable_trait())) {
     ASTMethodCall iter_method;
@@ -734,26 +739,34 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     iter_method.arguments->arguments.push_back(ast->right);
 
     ASTMethodCall next_method;
+    ASTArguments args;
+    next_method.arguments = &args;
     ASTDotExpr dot_next;
-    dot_next.base = &iter_method;
     dot_next.member = {"next"};
+    dot_next.base = &iter_method;
+    next_method.callee = &dot_next;
     next_method.accept(&typer);
 
-    THIR_ALLOC(THIRVariable, variable, ast);
+    THIR_ALLOC(THIRVariable, thir_var, ast);
+    variable = thir_var;
     variable->is_global = false;
-    variable->name = ast->left.identifier;
+    variable->name = RESULT_KEY;
     variable->value = visit_node(&next_method);
     thir->initialization = variable;
   } else if (ast->right->resolved_type->implements(iterator_trait())) {
     ASTMethodCall next_method;
+    ASTArguments args;
+    next_method.arguments = &args;
     ASTDotExpr dot_next;
     dot_next.base = ast->right;
     dot_next.member = {"next"};
+    next_method.callee = &dot_next;
     next_method.accept(&typer);
 
-    THIR_ALLOC(THIRVariable, variable, ast);
+    THIR_ALLOC(THIRVariable, thir_var, ast);
+    variable = thir_var;
     variable->is_global = false;
-    variable->name = ast->left.identifier;
+    variable->name = RESULT_KEY;
     variable->value = visit_node(&next_method);
     variable->type = variable->value->type;
     thir->initialization = variable;
@@ -767,11 +780,11 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   member_access->type = u32_type();
 
   THIR_ALLOC(THIRLiteral, discriminant_literal, ast)
-  discriminant_literal->value = OPTION_NONE_DISCRIMINANT_VALUE;
+  discriminant_literal->value = OPTION_SOME_DISCRIMINANT_VALUE;
   discriminant_literal->type = u32_type();
 
   condition->left = member_access;
-  condition->op = TType::NEQ;
+  condition->op = TType::EQ;
   condition->right = discriminant_literal;
   thir->condition = condition;
 
@@ -780,8 +793,39 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   increment->left = variable;
   increment->op = TType::Assign;
   increment->right = variable->value;
+  thir->increment = increment;
+
+
+
+  // TODO: handle destructures.
+  THIR_ALLOC(THIRVariable, identifier_var, ast)
+  identifier_var->name = ast->left.identifier;
+  identifier_var->type = ast->identifier_type;
+  ENTER_SCOPE(ast->block->scope);
+  auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
+  std::printf("identifier_symbol=%p\n", identifier_symbol);
+  symbol_map[identifier_symbol] = identifier_var;
+
+  const auto some_type = ({
+    const Type *option = variable->type;
+    option->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
+  });
+
+  THIR_ALLOC(THIRMemberAccess, fake_unwrap_0, ast)
+  fake_unwrap_0->base = variable;
+  fake_unwrap_0->member = "Some";
+  fake_unwrap_0->type = some_type;
+
+  THIR_ALLOC(THIRMemberAccess, fake_unwrap_1, ast)
+  fake_unwrap_1->base = fake_unwrap_0;
+  fake_unwrap_1->member = "0";
+
+  identifier_var->value = fake_unwrap_1;
 
   thir->block = visit_node(ast->block);
+  THIRBlock *block = (THIRBlock *)thir->block;
+  block->statements.insert(block->statements.begin(), identifier_var);
+
   return thir;
 }
 
@@ -877,8 +921,8 @@ void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
 
 void THIRGen::visit_impl(ASTImpl *ast) {
   if (ast->generic_parameters.size()) {
-    for (auto &monomorphization: ast->generic_instantiations) {
-      visit_impl((ASTImpl*)monomorphization.declaration);      
+    for (auto &monomorphization : ast->generic_instantiations) {
+      visit_impl((ASTImpl *)monomorphization.declaration);
     }
     return;
   }

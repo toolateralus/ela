@@ -232,7 +232,15 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
   code << "(" << c_type_string(thir->type) << "){0}";
 }
 
-void Emitter::emit_for(const THIRFor *thir) { throw_error("emit_for is unimplemented", thir->source_range); }
+void Emitter::emit_for(const THIRFor *thir) { 
+  indented("for (");
+  emit_node(thir->initialization);
+  emit_expr(thir->condition);
+  code << "; ";
+  emit_expr(thir->increment);
+  code << ") ";
+  emit_node(thir->block);
+}
 
 void Emitter::emit_if(const THIRIf *thir) {
   indented("if (");
