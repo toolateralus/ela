@@ -250,7 +250,7 @@ fn main() -> s32 {
   extern fn memset(dest: *const (f32, f32, f32), value: u32, length: u64);
 
   befriender: Befriender;
-  // befriender.befriend_her(); // ! error
+  befriender.befriend_her();
   // memset(&const befriender.xyz, 0, sizeof((f32, f32, f32)));
   std::printf("befriender.xyz=(%f, %f, %f)\n", befriender.xyz.0, befriender.xyz.1, befriender.xyz.2);
 

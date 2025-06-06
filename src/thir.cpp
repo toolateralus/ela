@@ -489,8 +489,13 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
 }
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
-  const auto symbol = ctx.scope->local_lookup(ast->name);
   THIR_ALLOC(THIRFunction, thir, ast);
+  Symbol *symbol;
+  if (ast->declaring_type) {
+    symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
+  } else {
+    symbol = ctx.scope->local_lookup(ast->name);
+  }
   symbol_map[symbol] = thir;
 
   ENTER_SCOPE(ast->scope);
