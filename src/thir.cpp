@@ -13,7 +13,6 @@
 // this is used directly. clangd stop b*tchin
 #include "visitor.hpp"
 
-
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.
 #define ENTER_STMT_VEC($stmt_vector)                                                       \
@@ -269,12 +268,10 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
 
 THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vector<THIR *> &statements) {
   static size_t id = 0;
-
-  auto cached_object =
-      make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++), visit_node(ast->object), ast->object);
+  auto cached_object = make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++),
+                                     take_address_of(visit_node(ast->object), ast->object), ast->object);
 
   current_statement_list->push_back(cached_object);
-
   const Type *choice_type = ast->target_type_path->resolved_type;
   const ChoiceTypeInfo *info = choice_type->info->as<ChoiceTypeInfo>();
   const ASTPath::Segment &segment = ast->target_type_path->segments.back();
