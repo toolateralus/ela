@@ -620,6 +620,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
   }
 
+  current_statement_list->push_back(thir);
   return thir;
 }
 
