@@ -535,6 +535,7 @@ void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
 
 void Emitter::emit_node(const THIR *thir) {
+  emit_line_directive(thir);
   switch (thir->get_node_type()) {
     case THIRNodeType::ExpressionBlock:
       return emit_expression_block((const THIRExprBlock *)thir);

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdarg>
 #include "builder.hpp"
+#include "core.hpp"
 #include "thir.hpp"
 
 struct Emitter {
@@ -47,11 +48,19 @@ struct Emitter {
     }
   }
 
-  
+  inline void emit_line_directive(const THIR *thir) {
+    const static bool is_debugging = compile_command.has_flag("debug");
+    const static bool no_line = compile_command.has_flag("nl");
+    if (!is_debugging || no_line) {
+      return;
+    }
+    code << "\n#line " << std::to_string(thir->source_range.line) << " \""
+         << thir->source_range.files()[thir->source_range.file] << "\";\n";
+  }
 
   void emit_node(const THIR *thir);
   void emit_program(const THIRProgram *thir);
-  
+
   void emit_bin_expr(const THIRBinExpr *thir);
   void emit_unary_expr(const THIRUnaryExpr *thir);
   void emit_literal(const THIRLiteral *thir);
