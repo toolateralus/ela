@@ -102,8 +102,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type_argument = *generic_arg;
-      node->scope->create_type_alias(param.identifier, *generic_arg, type_argument->kind,
-                                     type_argument->declaring_node.get());
+      node->scope->create_type_alias(param.identifier, *generic_arg, type_argument->declaring_node.get());
       generic_arg++;
     }
     type = global_create_struct_type(node->name, node->scope, generic_args);
@@ -227,7 +226,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->declaring_node.get());
       generic_arg++;
     }
     type = global_create_choice_type(node->name.get_str(), node->scope, generic_args);
@@ -297,7 +296,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     switch (variant.index()) {
       case ALIAS_VARIANT_INDEX: {
         const auto &[name, type, kind, declaring_node] = std::get<ALIAS_VARIANT_INDEX>(variant);
-        info->scope->create_type_alias(name, type, kind, declaring_node);
+        info->scope->create_type_alias(name, type, declaring_node);
         info->members.push_back(TypeMember{.name = name, .type = type});
         info->scope->local_lookup(name)->type.choice = node;
       } break;
@@ -422,7 +421,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -527,7 +526,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -735,7 +734,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -1196,7 +1195,7 @@ void Typer::visit(ASTChoiceDeclaration *node) {
         param.default_value->accept(this);
       }
     }
-    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_CHOICE, node);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, node);
     return;
   }
   visit_choice_declaration(node, false);
@@ -1240,7 +1239,7 @@ void Typer::visit(ASTStructDeclaration *node) {
         param.default_value->accept(this);
       }
     }
-    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_STRUCT, node);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, node);
   } else {
     visit_struct_declaration(node, false);
   }
@@ -1738,7 +1737,7 @@ void Typer::visit(ASTCall *node) {
                               symbol->resolved_type->basename),
                   node->source_range);
     }
-    if (symbol->type.kind != TYPE_TUPLE) {
+    if (!symbol->resolved_type->is_kind(TYPE_TUPLE)) {
       throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->resolved_type->basename),
                   node->source_range);
     }
@@ -2577,7 +2576,7 @@ void Typer::visit(ASTAlias *node) {
     if (type == nullptr) {
       throw_error("cannot alias a non-existent type or symbol", node->source_range);
     }
-    ctx.scope->create_type_alias(node->name, type, type->kind, node);
+    ctx.scope->create_type_alias(node->name, type, node);
   }
   return;
 }
@@ -2690,7 +2689,7 @@ void Typer::visit(ASTTraitDeclaration *node) {
     ctx.scope->create_trait_type(node->name, node->scope, {}, node);
   } else {
     visit_trait_declaration(node, false);
-    ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_TRAIT, node);
+    ctx.scope->create_type_alias(node->name, node->resolved_type, node);
   }
   return;
 }
@@ -2908,7 +2907,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     }
   }
 
-  auto sym = Symbol::create_type(ty, trait_name, TYPE_DYN, nullptr);
+  auto sym = Symbol::create_type(ty, trait_name, nullptr);
   sym.scope = this;  // TODO: we have to fit this in modules or some stuff.
   symbols.insert_or_assign(trait_name, sym);
   return ty;

@@ -2310,7 +2310,6 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     variant.name = expect(TType::Identifier).value;
     if (peek().type == TType::Comma || peek().type == TType::RCurly) {
       variant.kind = ASTChoiceVariant::NORMAL;
-      node->variants.push_back(variant);
     } else if (peek().type == TType::LCurly) {
       variant.kind = ASTChoiceVariant::STRUCT;
       eat();
@@ -2321,16 +2320,15 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
         }
       }
       expect(TType::RCurly);
-      node->variants.push_back(variant);
     } else if (peek().type == TType::LParen) {
       variant.kind = ASTChoiceVariant::TUPLE;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
-      node->variants.push_back(variant);
     } else {
       end_node(node, range);
       throw_error("Unexpected token in choice type declaration", node->source_range);
     }
+    node->variants.push_back(variant);
     if (peek().type != TType::RCurly) expect(TType::Comma);
   }
   ctx.exit_scope();

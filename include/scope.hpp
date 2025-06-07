@@ -331,7 +331,6 @@ struct Symbol {
       Nullable<ASTChoiceDeclaration>
           choice;  // ? Why is this here? Just to confirm the type is a child of a choice type?
       Nullable<ASTNode> declaration;
-      TypeKind kind;
     } type;
   };
 
@@ -360,11 +359,10 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_type(Type *type, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+  static Symbol create_type(Type *type, const InternedString &name, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_TYPE;
-    symbol.type.kind = kind;
     symbol.type.declaration = declaration;
     symbol.resolved_type = type;
     return symbol;
@@ -451,8 +449,8 @@ struct Scope {
     ordered_symbols.push_back(name);
   }
 
-  void insert_type(Type *type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
-    auto sym = Symbol::create_type(type_id, name, kind, declaration);
+  void insert_type(Type *type_id, const InternedString &name, ASTNode *declaration) {
+    auto sym = Symbol::create_type(type_id, name, declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     ordered_symbols.push_back(name);
@@ -466,7 +464,7 @@ struct Scope {
 
   Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto type = global_create_choice_type(name, scope, {});
-    auto sym = Symbol::create_type(type, name, TYPE_CHOICE, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -476,7 +474,7 @@ struct Scope {
   Type *create_trait_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
                           ASTTraitDeclaration *declaration) {
     auto type = global_create_trait_type(name, scope, generic_args);
-    auto sym = Symbol::create_type(type, name, TYPE_TRAIT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -485,7 +483,7 @@ struct Scope {
 
   Type *create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
     auto type = global_create_struct_type(name, scope);
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -493,11 +491,10 @@ struct Scope {
     return type;
   }
 
-  void create_type_alias(const InternedString &name, Type *type_id, TypeKind kind, ASTNode *declaring_node) {
+  void create_type_alias(const InternedString &name, Type *type_id, ASTNode *declaring_node) {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = type_id;
-    symbol.type.kind = kind;
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.declaration = declaring_node;
     symbols.erase(name);
@@ -516,7 +513,7 @@ struct Scope {
 
   Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto type = global_create_enum_type(name, scope, flags);
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
@@ -532,7 +529,7 @@ struct Scope {
     auto type = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, nullptr);
+    auto sym = Symbol::create_type(type, name, nullptr);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
