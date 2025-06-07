@@ -543,6 +543,20 @@ ASTArguments *Parser::parse_arguments() {
   return args;
 }
 
+void Parser::parse_pattern_match_value_semantic(auto &part) {
+  if (peek().type == TType::And) {
+    expect(TType::And);
+    if (peek().type == TType::Mut) {
+      expect(TType::Mut);
+      part.semantic = PTRN_MTCH_PTR_MUT;
+    } else {
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
+      part.semantic = PTR_MTCH_PTR_CONST;
+    }
+  }
+}
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
@@ -570,16 +584,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             part.mutability = MUT;
           }
 
-          if (peek().type == TType::And) {
-            eat();
-            if (peek().type == TType::Mut) {
-              eat();
-              part.semantic = PTRN_MTCH_PTR_MUT;
-            } else {
-              expect(TType::Const);
-              part.semantic = PTR_MTCH_PTR_CONST;
-            }
-          }
+          parse_pattern_match_value_semantic(part);
 
           part.var_name = expect(TType::Identifier).value;
           pattern_match->struct_pattern.parts.push_back(part);
@@ -602,16 +607,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             part.mutability = MUT;
           }
 
-          if (peek().type == TType::And) {
-            eat();
-            if (peek().type == TType::Mut) {
-              eat();
-              part.semantic = PTRN_MTCH_PTR_MUT;
-            } else {
-              expect(TType::Const);
-              part.semantic = PTR_MTCH_PTR_CONST;
-            }
-          }
+          parse_pattern_match_value_semantic(part);
 
           part.var_name = expect(TType::Identifier).value;
           pattern_match->tuple_pattern.parts.push_back(part);
@@ -677,13 +673,11 @@ ASTExpr *Parser::parse_unary() {
       if (peek().type == TType::Mut) {
         mutability = MUT;
         eat();
-      } else if (peek().type == TType::Const) {
-        mutability = CONST;
-        eat();
       } else {
-        end_node(unaryexpr, range);
-        throw_error("taking an address-of a variable requires '&mut/&const' to determine the mutability of the pointer",
-                    unaryexpr->source_range);
+        if (peek().type == TType::Const) {
+          eat();
+        }
+        mutability = CONST;
       }
     }
 
@@ -1230,6 +1224,23 @@ ASTIf *Parser::parse_if() {
   return node;
 }
 
+void Parser::parse_destructure_element_value_semantic(DestructureElement &destruct) {
+  if (peek().type == TType::And) {
+    expect(TType::And);
+    if (peek().type == TType::Mut) {
+      expect(TType::Mut);
+      destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER_MUT;
+    } else {
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
+      destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER_CONST;
+    }
+  } else {
+    destruct.semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+  }
+}
+
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
@@ -1524,12 +1535,7 @@ ASTStatement *Parser::parse_statement() {
 
       while (true) {
         DestructureElement destruct;
-        if (peek().type == TType::Mul) {
-          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
-          eat();
-        } else {
-          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
-        }
+        parse_destructure_element_value_semantic(destruct);
 
         auto identifier = expect(TType::Identifier).value;
         destruct.identifier = identifier;
@@ -1550,7 +1556,7 @@ ASTStatement *Parser::parse_statement() {
         node->left_tag = ASTFor::IDENTIFIER;
         node->left.identifier = destructure[0].identifier;
 
-        if (destructure[0].semantic == VALUE_SEMANTIC_POINTER) {
+        if (is_pointer_semantic(destructure[0].semantic)) {
           end_node(node, range);
           throw_error(
               "you can only take the elements of a tuple destructure as a pointer, 'for *v in ...' is "
@@ -1730,21 +1736,12 @@ ASTDestructure *Parser::parse_destructure() {
   const auto parse_element = [&]() -> DestructureElement {
     DestructureElement element;
     element.mutability = CONST;
-
     if (peek().type == TType::Mut) {
       element.mutability = MUT;
       eat();
     }
-
-    if (peek().type == TType::Mul) {
-      element.semantic = VALUE_SEMANTIC_POINTER;
-      eat();
-    } else {
-      element.semantic = VALUE_SEMANTIC_COPY;
-    }
-
+    parse_destructure_element_value_semantic(element);
     element.identifier = expect(TType::Identifier).value;
-
     return element;
   };
 
@@ -2529,12 +2526,10 @@ void Parser::parse_pointer_extensions(ASTType *type) {
     type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
     if (peek().type == TType::Mut) {
       expect(TType::Mut);
-    } else if (peek().type == TType::Const) {
-      expect(TType::Const);
     } else {
-      throw_error(
-          "'*const/*mut' are required for all pointer types now, as a prefix. such as '*const s32', '*const *mut s64'",
-          {peek().location});
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
     }
   }
 }

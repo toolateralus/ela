@@ -919,7 +919,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
       member_access->base = cached_base;
       member_access->type = element.type;
 
-      if (element.semantic == VALUE_SEMANTIC_POINTER) {
+      if (is_pointer_semantic(element.semantic)) {
         var->value = take_address_of(member_access, ast);
       }
 
@@ -1026,11 +1026,8 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
     member_access->base = cached_base;
     member_access->type = element.type;
 
-    if (element.semantic == VALUE_SEMANTIC_POINTER) {
-      THIR_ALLOC(THIRUnaryExpr, unary, ast);
-      unary->op = TType::And;
-      unary->operand = member_access;
-      var->value = unary;
+    if (is_pointer_semantic(element.semantic)) {
+      var->value = take_address_of(member_access, ast);
     }
 
     auto symbol = ctx.scope->local_lookup(element.identifier);

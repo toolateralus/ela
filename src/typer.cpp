@@ -22,12 +22,12 @@
 #include "visitor.hpp"
 
 // TODO:
-/* 
-  TODO: we can probably replace the generic panic handler with an exception. depending on how much bigger the compiler binary is.
+/*
+  TODO: we can probably replace the generic panic handler with an exception. depending on how much bigger the compiler
+  binary is.
   TODO: use the ENTER_SCOPE macro everywhere in here. so many lines of code to do the same thing.
   TODO: use an SET_EXPECTED_TYPE that also does an RAII for that same shit. again, a ton of code eliminated.
-*/  
-
+*/
 
 #define USE_GENERIC_PANIC_HANDLER
 
@@ -1585,8 +1585,11 @@ void Typer::visit(ASTFor *node) {
       auto &destructure = node->left.destructure[i];
       auto iden = destructure.identifier;
       auto type_id = symbol->resolved_type;
-      if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
-        type_id = type_id->take_pointer_to(destructure.mutability);
+
+      if (destructure.semantic==VALUE_SEMANTIC_POINTER_MUT) {
+        type_id = type_id->take_pointer_to(MUT);
+      } else if (destructure.semantic == VALUE_SEMANTIC_POINTER_CONST) {
+        type_id = type_id->take_pointer_to(CONST);
       }
       destructure.type = type_id;
       ctx.scope->insert_local_variable(iden, type_id, nullptr, MUT);
@@ -2626,8 +2629,10 @@ void Typer::visit(ASTDestructure *node) {
     auto &element = node->elements[i];
     auto type = symbol->resolved_type;
 
-    if (element.semantic == VALUE_SEMANTIC_POINTER) {
+    if (element.semantic == VALUE_SEMANTIC_POINTER_MUT) {
       type = symbol->resolved_type->take_pointer_to(MUT);
+    } else if (element.semantic == VALUE_SEMANTIC_POINTER_CONST) {
+      type = symbol->resolved_type->take_pointer_to(CONST);
     }
 
     element.type = type;
