@@ -10,8 +10,6 @@
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
-// this is used directly. clangd stop b*tchin
-#include "visitor.hpp"
 
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.
@@ -1109,8 +1107,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   ReflectionInfo info;
   info.created = true;
   static Type *type_type = ctx.scope->find_type_id("Type", {});
-  info.definition =
-      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+  info.definition = make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+  
   return info;
 }
 
@@ -1170,5 +1168,5 @@ THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
     member_access->type = type;
     last_part = member_access;
   }
-  return thir;
+  return last_part;
 }
