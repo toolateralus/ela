@@ -8,7 +8,7 @@ void get_varargs_handlers(Context *c) {
 
   auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
   va_list_type->info->as<StructTypeInfo>()->flags |= STRUCT_IS_FORWARD_DECLARED;
-  scope->insert_type(va_list_type, "va_list", TYPE_STRUCT, nullptr);
+  scope->insert_type(va_list_type, "va_list", nullptr);
 
   FunctionTypeInfo func_type_info;
   func_type_info.is_varargs = true;
@@ -67,7 +67,7 @@ Context::Context() {
     if (type_table[i]->info->scope) {
       type_table[i]->info->scope->parent = scope;
     }
-    scope->create_type_alias(type_table[i]->basename, type_table[i], type_table[i]->kind, nullptr);
+    scope->create_type_alias(type_table[i]->basename, type_table[i], nullptr);
   }
 }
 
