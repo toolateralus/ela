@@ -22,7 +22,7 @@
 static inline std::string type_to_string_with_extensions(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
   ss << base;
-  for (const auto ext : extensions.extensions) {
+  for (const auto ext : extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
       ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
@@ -45,15 +45,15 @@ static inline std::string get_function_pointer_type_string(const Type *type, Nul
 
   int pointer_depth = 0;
   TypeExtensions other_extensions;
-  for (auto ext : type->extensions.extensions) {
+  for (auto ext : type->extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT)
       pointer_depth++;
     else
-      other_extensions.extensions.push_back(ext);
+      other_extensions.push_back(ext);
   }
 
   auto type_prefix = std::string(pointer_depth, '*');
-  auto type_postfix = other_extensions.to_string();
+  auto type_postfix = extensions_to_string(other_extensions);
 
   auto info = (type->info->as<FunctionTypeInfo>());
   auto return_type = info->return_type;
@@ -95,7 +95,7 @@ static inline std::string get_declaration_type_signature_and_identifier(const st
   std::string base_type_str = c_type_string(type->base_type == Type::INVALID_TYPE ? type : type->base_type);
   std::string identifier = name;
 
-  for (const auto &ext : type->extensions.extensions) {
+  for (const auto &ext : type->extensions) {
     if (ext.type == TYPE_EXT_POINTER_MUT || ext.type == TYPE_EXT_POINTER_CONST) {
       base_type_str += "*";
     } else if (ext.type == TYPE_EXT_ARRAY) {
@@ -180,7 +180,7 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
     return;
   }
 
-  const bool is_string = thir->type == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+  const bool is_string = thir->type == global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_CONST}});
   if (is_string) {
     code << '\"';
   }
@@ -193,7 +193,7 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
 void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   emit_expr(thir->base);
 
-  if (thir->base->type->extensions.is_pointer()) {
+  if (thir->base->type->is_pointer()) {
     code << "->";
   } else {
     code << '.';

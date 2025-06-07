@@ -26,7 +26,7 @@
   Defer $ovr_reg_defer([&] { return_override_register = {nullptr}; });
 
 static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath *ast) {
-  if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->extensions.has_extensions()) {
+  if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->has_extensions()) {
     return false;
   }
 
@@ -168,12 +168,12 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     auto base_type = self->type;
 
     // auto dereference / address of logic.
-    if (!base_type->extensions.is_pointer() && requires_self_ptr) {
+    if (!base_type->is_pointer() && requires_self_ptr) {
       THIR_ALLOC(THIRUnaryExpr, thir, base)
       thir->op = TType::And;
       thir->operand = self;
       self = thir;
-    } else if (base_type->extensions.is_pointer() && !requires_self_ptr) {
+    } else if (base_type->is_pointer() && !requires_self_ptr) {
       THIR_ALLOC(THIRUnaryExpr, thir, base)
       thir->op = TType::Mul;
       thir->operand = self;
@@ -373,7 +373,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
   const auto info = type->info;
 
   // TODO: might need more ignored things here
-  if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->extensions.is_fixed_sized_array()) {
+  if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->is_fixed_sized_array()) {
     THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
     thir->source_range = source_range;
     thir->type = type;
@@ -393,7 +393,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
       }
     }
     const auto is_non_ptr_non_union_struct =
-        member.type->is_kind(TYPE_STRUCT) && member.type->extensions.has_no_extensions() &&
+        member.type->is_kind(TYPE_STRUCT) && member.type->has_no_extensions() &&
         DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION);
 
     if (initializer) {
@@ -827,7 +827,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   if (iterable_var->type->implements(iterable_trait())) {
     auto iter_symbol = iterable_var->type->info->scope->local_lookup("iter");
     bool expects_ptr = iter_symbol && iter_symbol->function.declaration->params->params[0]->self.is_pointer;
-    THIR *iter_arg = (expects_ptr && !iterable_var->type->extensions.is_pointer()) ? take_address_of(iterable_var, ast)
+    THIR *iter_arg = (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast)
                                                                                    : iterable_var;
 
     THIR_ALLOC(THIRCall, iter_call, ast);
@@ -846,7 +846,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
   bool next_expects_ptr = next_symbol && next_symbol->function.declaration->params->params[0]->self.is_pointer;
-  THIR *next_arg = (next_expects_ptr && !iterator_var->type->extensions.is_pointer())
+  THIR *next_arg = (next_expects_ptr && !iterator_var->type->is_pointer())
                        ? take_address_of(iterator_var, ast)
                        : iterator_var;
 

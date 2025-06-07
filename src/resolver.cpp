@@ -16,7 +16,7 @@ void Resolver::declare_or_define_type(Type *type) {
     return;
   }
 
-  for (const auto &ext : type->extensions.extensions) {
+  for (const auto &ext : type->extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter.forward_declare_type(type);
       forward_declared_types.insert(type);

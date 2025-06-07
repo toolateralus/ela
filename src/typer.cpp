@@ -802,7 +802,7 @@ bool is_const_pointer(ASTNode *node) {
   }
 
   auto type = node->resolved_type;
-  if (type->extensions.is_const_pointer()) {
+  if (type->is_const_pointer()) {
     return true;
   }
 
@@ -903,8 +903,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
     auto self_symbol = ctx.get_symbol(self);
     auto self_type = self->resolved_type;
 
-    if (first->extensions.is_mut_pointer()) {
-      if (!self_type->extensions.is_pointer() && self_symbol && self_symbol.get()->is_const()) {
+    if (first->is_mut_pointer()) {
+      if (!self_type->is_pointer() && self_symbol && self_symbol.get()->is_const()) {
         throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.",
                     node->source_range);
       }
@@ -1035,7 +1035,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
           }
 
           auto type = arg_ty_id;
-          while (pointer_levels > 0 && type->extensions.is_pointer()) {
+          while (pointer_levels > 0 && type->is_pointer()) {
             arg_ty_id = type->get_element_type();
             type = arg_ty_id;
             pointer_levels--;
@@ -1338,7 +1338,7 @@ void Typer::visit(ASTVariable *node) {
     node->resolved_type = value_ty;
 
     // TODO: so, we just don't set the type if it can't be assigned to int??? what?
-    if (type->is_kind(TYPE_SCALAR) && type->extensions.has_no_extensions() && expr_is_literal(node->value.get())) {
+    if (type->is_kind(TYPE_SCALAR) && type->has_no_extensions() && expr_is_literal(node->value.get())) {
       auto info = (type->info->as<ScalarTypeInfo>());
       auto rule = type_conversion_rule(type, s32_type(), node->source_range);
       if (info->is_integral && rule != CONVERT_PROHIBITED && rule != CONVERT_EXPLICIT) {
@@ -1511,7 +1511,7 @@ void Typer::visit(ASTFor *node) {
   Type *iterable_type = iterable_type_id;
   node->iterable_type = iterable_type;
 
-  if (iterable_type->extensions.is_pointer()) {
+  if (iterable_type->is_pointer()) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
                             "pointer to an array, range or struct? got type {}",
                             iterable_type->to_string()),
@@ -1564,7 +1564,7 @@ void Typer::visit(ASTFor *node) {
 
     // if our iterable type returns a pointer, we "dereference" here because of the way destructuring needs to be done
     // it doesn't actually get generated as a dereference but we need to analyze the scope of the base type.
-    if (type->extensions.is_pointer()) {
+    if (type->is_pointer()) {
       type = type->get_element_type();
     }
 
@@ -1843,7 +1843,7 @@ void Typer::visit(ASTExprStatement *node) {
 }
 
 void Typer::visit(ASTType_Of *node) {
-  static auto type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
+  static auto type_ptr = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
   node->target->accept(this);
   node->resolved_type = type_ptr;
 }
@@ -1853,8 +1853,7 @@ void Typer::visit(ASTType *node) {
     return;
   }
 
-  TypeExtensions extensions;
-  extensions.extensions = accept_extensions(node->extensions);
+  TypeExtensions extensions = accept_extensions(node->extensions);
 
   if (node->kind == ASTType::SELF) {
     auto self = get_self_type();
@@ -1896,7 +1895,7 @@ void Typer::visit(ASTType *node) {
       auto extension = type->extensions;
       auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
                                                       node->source_range, this);
-      if (extensions.has_extensions()) {
+      if (extensions.size()) {
         node->resolved_type = global_find_type_id(ty, extensions);
       } else {
         node->resolved_type = ty;
@@ -1976,13 +1975,13 @@ void Typer::visit(ASTBinExpr *node) {
     if (node->left->get_node_type() == AST_NODE_UNARY_EXPR) {
       auto unary = (ASTUnaryExpr *)node->left;
       auto unary_operand_ty = unary->operand->resolved_type;
-      if (unary->op == TType::Mul && unary_operand_ty->extensions.is_const_pointer()) {
+      if (unary->op == TType::Mul && unary_operand_ty->is_const_pointer()) {
         throw_error("cannot dereference into a const pointer!", node->source_range);
       }
 
       auto left_ty = unary->operand->resolved_type;
       auto symbol = ctx.get_symbol(unary->operand);
-      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->extensions.is_mut_pointer()) {
+      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
         throw_error("cannot assign into a const variable!", node->source_range);
       }
 
@@ -1990,12 +1989,12 @@ void Typer::visit(ASTBinExpr *node) {
       auto subscript = (ASTIndex *)node->left;
 
       auto subscript_left_ty = subscript->base->resolved_type;
-      if (subscript_left_ty->extensions.is_const_pointer()) {
+      if (subscript_left_ty->is_const_pointer()) {
         throw_error("cannot subscript-assign into a const pointer!", node->source_range);
       }
 
       auto symbol = ctx.get_symbol(subscript->base);
-      if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->extensions.is_mut_pointer()) {
+      if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->is_mut_pointer()) {
         throw_error("cannot subscript-assign into a const variable!", node->source_range);
       }
 
@@ -2005,11 +2004,11 @@ void Typer::visit(ASTBinExpr *node) {
       auto symbol = ctx.get_symbol(dot->base);
       auto left_ty = dot->base->resolved_type;
 
-      if (left_ty->extensions.is_const_pointer()) {
+      if (left_ty->is_const_pointer()) {
         throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
       }
 
-      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->extensions.is_mut_pointer()) {
+      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
         throw_error("cannot dot-assign into a const variable!", node->source_range);
       }
 
@@ -2019,11 +2018,11 @@ void Typer::visit(ASTBinExpr *node) {
       while (dot->base->get_node_type() == AST_NODE_DOT_EXPR) {
         dot = (ASTDotExpr *)dot->base;
         auto left_ty = dot->base->resolved_type;
-        if (left_ty->extensions.is_const_pointer()) {
+        if (left_ty->is_const_pointer()) {
           throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
         }
         auto symbol = ctx.get_symbol(dot->base);
-        if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->extensions.is_mut_pointer()) {
+        if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
           throw_error("cannot dot-assign into a const variable!", dot->base->source_range);
         }
       }
@@ -2074,7 +2073,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 
     if (name == "deref") {
       auto type = node->resolved_type;
-      if (!type->extensions.is_pointer()) {
+      if (!type->is_pointer()) {
         throw_error(
             "'deref' operator overload must return a pointer, the compiler will auto dereference this when "
             "it's used. it allows us to assign via this function",
@@ -2093,7 +2092,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 
     if (symbol) {
       auto sym = symbol.get();
-      if (sym->is_const() && node->mutability == MUT && !op_ty->extensions.is_mut_pointer() &&
+      if (sym->is_const() && node->mutability == MUT && !op_ty->is_mut_pointer() &&
           !op_ty->is_kind(TYPE_FUNCTION)) {
         throw_error("cannot take a mutable pointer to a non-mutable variable", node->source_range);
       }
@@ -2107,7 +2106,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   if (node->op == TType::Mul) {
     auto type = operand_ty;
 
-    if (type->extensions.is_pointer()) {
+    if (type->is_pointer()) {
       node->resolved_type = type->get_element_type();
       return;
     } else {
@@ -2167,7 +2166,7 @@ void Typer::visit(ASTLiteral *node) {
         node->is_c_string = true;
       }
       if (node->is_c_string) {
-        static Type *type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+        static Type *type = global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_CONST}});
         node->resolved_type = type;
       } else {
         static Type *type = ctx.scope->find_type_id("str", {});
@@ -2184,7 +2183,7 @@ void Typer::visit(ASTLiteral *node) {
         node->resolved_type = expected_type;
         return;
       }
-      node->resolved_type = ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}});
+      node->resolved_type = ctx.scope->find_type_id("void", {{TYPE_EXT_POINTER_CONST}});
       return;
     case ASTLiteral::Char:
       if (expected_type == u8_type()) {
@@ -2211,7 +2210,7 @@ void Typer::visit(ASTDotExpr *node) {
   Scope *base_scope = base_ty->info->scope;
 
   // Implicit dereference, we look at the base scope.
-  if (base_ty->extensions.is_pointer()) {
+  if (base_ty->is_pointer()) {
     base_ty = base_ty_id = base_ty->get_element_type();
     base_scope = base_ty->info->scope;
   }
@@ -2249,7 +2248,7 @@ void Typer::visit(ASTIndex *node) {
     node->resolved_type = overload->info->as<FunctionTypeInfo>()->return_type;
 
     auto type = node->resolved_type;
-    if (!type->extensions.is_pointer()) {
+    if (!type->is_pointer()) {
       throw_error(
           "subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
           "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
@@ -2264,7 +2263,7 @@ void Typer::visit(ASTIndex *node) {
   }
 
   auto ext = left_ty->extensions;
-  if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
+  if (!is_array_extensions(ext) && !is_pointer_extensions(ext)) {
     throw_error(
         std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
                     left_ty->to_string()),
@@ -2284,7 +2283,7 @@ void Typer::visit(ASTInitializerList *node) {
 
     if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
       auto expected = expected_type;
-      if (expected && expected->extensions.is_fixed_sized_array()) {
+      if (expected && expected->is_fixed_sized_array()) {
         auto elem = expected->get_element_type();
         auto rule = type_conversion_rule(target_type, elem);
         if (rule == CONVERT_PROHIBITED) {
@@ -2301,8 +2300,8 @@ void Typer::visit(ASTInitializerList *node) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
 
-  if (target_type->extensions.is_pointer() ||
-      (target_type->is_kind(TYPE_SCALAR) && target_type->extensions.has_no_extensions())) {
+  if (target_type->is_pointer() ||
+      (target_type->is_kind(TYPE_SCALAR) && target_type->has_no_extensions())) {
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2315,7 +2314,7 @@ void Typer::visit(ASTInitializerList *node) {
   Type *target_element_type = Type::INVALID_TYPE;
   if (target_type->basename.get_str().starts_with("InitList$")) {
     target_element_type = target_type->generic_args[0];
-  } else if (target_type->extensions.is_fixed_sized_array()) {
+  } else if (target_type->is_fixed_sized_array()) {
     target_element_type = target_type->get_element_type();
   }
 
@@ -2456,7 +2455,7 @@ void Typer::visit(ASTSwitch *node) {
   }
 
   if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) &&
-      !type->extensions.is_pointer()) {
+      !type->is_pointer()) {
     auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
     if (operator_overload == Type::INVALID_TYPE) {
       throw_error(
@@ -2606,7 +2605,7 @@ void Typer::visit(ASTDestructure *node) {
   // *x, *y := *ptr_to_struct_or_tuple;
   // which achieves the same thing anyway.
 
-  if (type->extensions.has_extensions()) {
+  if (type->has_extensions()) {
     throw_error("Cannot destructure pointer or array type.", node->source_range);
   }
 
@@ -2735,7 +2734,7 @@ void Typer::visit(ASTDyn_Of *node) {
 
   auto object_type = node->object->resolved_type;
 
-  if (!object_type->extensions.is_mut_pointer()) {
+  if (!object_type->is_mut_pointer()) {
     throw_error(
         "'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a "
         "mutable pointer. eventually we'll have const dyn's",
@@ -2777,7 +2776,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   ty->traits.push_back(is_dyn_trait());
 
-  dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr,
+  dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}}), nullptr,
                                    MUT);
 
   ty->info->as<DynTypeInfo>()->trait_type = trait_type;
@@ -2793,7 +2792,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     for (auto param : declaration->params->params) {
       if (param->tag == ASTParamDecl::Self) {
         if (param->self.is_pointer) {
-          parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
+          parameters.push_back(global_find_type_id(void_type(), {{TYPE_EXT_POINTER_CONST}}));
         } else {
           throw_error(
               "cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
@@ -2839,7 +2838,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     type_info.params_len = parameters.size();
     type_info.return_type = return_type;
 
-    auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
+    auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
     dyn_info->methods.push_back({name.get_str(), function_type});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };
@@ -2946,7 +2945,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto type = dotnode->base->resolved_type;
       auto symbol = type->info->scope->local_lookup(dotnode->member.identifier);
       // Implicit dereference, we look at the base scope.
-      if (!symbol && type->extensions.is_pointer()) {
+      if (!symbol && type->is_pointer()) {
         type = type->get_element_type();
         symbol = type->info->scope->local_lookup(dotnode->member.identifier);
       }
@@ -3049,7 +3048,7 @@ void Typer::visit(ASTMethodCall *node) {
       auto dot = ast_alloc<ASTDotExpr>();
       dot->base = object;
       dot->member = ASTPath::Segment{"instance"};
-      dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
+      dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
       added_dyn_instance_argument_as_arg_0 = true;
     }
@@ -3127,9 +3126,9 @@ void Typer::visit(ASTPatternMatch *node) {
 
         auto type_id = symbol->resolved_type;
         if (part.semantic == PTR_MTCH_PTR_CONST) {
-          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
+          type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_CONST}});
         } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
-          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
+          type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
 
         part.resolved_type = type_id;
@@ -3154,9 +3153,9 @@ void Typer::visit(ASTPatternMatch *node) {
       for (auto &part : node->tuple_pattern.parts) {
         auto type_id = info->types[index];
         if (part.semantic == PTR_MTCH_PTR_CONST) {
-          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
+          type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_CONST}});
         } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
-          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
+          type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
         part.resolved_type = type_id;
         ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability);
