@@ -1054,6 +1054,7 @@ struct Parser {
   ASTEnumDeclaration *parse_enum_declaration();
 
   ASTDestructure *parse_destructure();
+  std::vector<DestructureElement> parse_destructure_elements();
   ASTVariable *parse_variable();
   std::vector<ASTGenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();

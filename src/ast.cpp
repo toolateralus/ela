@@ -1531,22 +1531,7 @@ ASTStatement *Parser::parse_statement() {
       eat();
 
       // Parse the variables in the for loop
-      std::vector<DestructureElement> destructure;
-
-      while (true) {
-        DestructureElement destruct;
-        parse_destructure_element_value_semantic(destruct);
-
-        auto identifier = expect(TType::Identifier).value;
-        destruct.identifier = identifier;
-        destructure.push_back(destruct);
-
-        if (peek().type == TType::Comma) {
-          eat();
-        } else {
-          break;
-        }
-      }
+      std::vector<DestructureElement> destructure = parse_destructure_elements();
 
       // Set the left_tag and left union based on the parsed variables
       if (destructure.size() > 1) {
@@ -1724,36 +1709,7 @@ ASTStatement *Parser::parse_statement() {
 
 ASTDestructure *Parser::parse_destructure() {
   NODE_ALLOC(ASTDestructure, node, range, _, this)
-
-  // * This lambda is just to prevent having to copy paste this.
-
-  /*
-    TODO:
-    The semantics for this, and the for loop *pointer semantic* need to be clarified.
-    It doesn't make sense, it's too subtle, sometimes its completely useless, etc.
-    It should at the very least use the &const/&mut system.
-  */
-  const auto parse_element = [&]() -> DestructureElement {
-    DestructureElement element;
-    element.mutability = CONST;
-    if (peek().type == TType::Mut) {
-      element.mutability = MUT;
-      eat();
-    }
-    parse_destructure_element_value_semantic(element);
-    element.identifier = expect(TType::Identifier).value;
-    return element;
-  };
-
-  DestructureElement element = parse_element();
-  node->elements.push_back(element);
-
-  while (peek().type == TType::Comma) {
-    eat();
-    element = parse_element();
-    node->elements.push_back(element);
-  }
-
+  node->elements = parse_destructure_elements();
   if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
     node->op = eat().type;
     node->right = parse_expr();
@@ -2692,3 +2648,27 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
+std::vector<DestructureElement> Parser::parse_destructure_elements() {
+  const auto parse_element = [&]() -> DestructureElement {
+    DestructureElement element;
+    element.mutability = CONST;
+    if (peek().type == TType::Mut) {
+      element.mutability = MUT;
+      eat();
+    }
+    parse_destructure_element_value_semantic(element);
+    element.identifier = expect(TType::Identifier).value;
+    return element;
+  };
+
+  std::vector<DestructureElement> elements;
+  DestructureElement element = parse_element();
+  elements.push_back(element);
+  while (peek().type == TType::Comma) {
+    eat();
+    element = parse_element();
+    elements.push_back(element);
+  }
+  return elements;
+}
