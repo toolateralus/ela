@@ -61,10 +61,6 @@ void Resolver::emit_type_definition(Type *type) {
       emitter.emit_type(&thir_type);
     } break;
     case TYPE_DYN: {
-      if (type->dyn_emitted) {
-        return;
-      }
-      type->dyn_emitted = true;
       const auto *info = type->info->as<DynTypeInfo>();
       declare_or_define_type(info->trait_type);
       emitter.emit_dyn_dispatch_object_struct(type);

@@ -309,11 +309,6 @@ struct Type {
   std::vector<Type *> traits{};
   Nullable<ASTNode> declaring_node;
 
-  // TODO: remove these 3 stateful booleans. totally unneccesary at this point with the rewritten emitter & resolver.
-  bool dyn_emitted = false;
-  bool fwd_decl_is_emitted = false;
-  bool tuple_is_emitted = false;
-
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
