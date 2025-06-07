@@ -23,7 +23,6 @@ ASTBlock *ASTCopier::copy_block(ASTBlock *node) {
   new_node->statements.clear();
   new_node->scope = copy_scope(new_node->scope);
   new_node->scope->symbols.clear();
-  new_node->scope->ordered_symbols.clear();
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   for (auto stmt : node->statements) {

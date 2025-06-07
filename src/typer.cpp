@@ -1568,24 +1568,17 @@ void Typer::visit(ASTFor *node) {
       type = type->get_element_type();
     }
 
-    auto scope = type->info->scope;
-    if (node->left.destructure.size() != scope->fields_count()) {
+    auto members = type->info->members;
+    if (node->left.destructure.size() != members.size()) {
       throw_error(std::format("Cannot currently partially deconstruct a struct. "
                               "expected {} identifiers to assign, got {}, for type {}",
-                              scope->symbols.size(), node->left.destructure.size(), type->to_string()),
+                              members.size(), node->left.destructure.size(), type->to_string()),
                   node->source_range);
     }
     int i = 0;
-    for (auto name : scope->ordered_symbols) {
-      auto symbol = scope->local_lookup(name);
-      if (symbol->is_function() || symbol->is_type()) {
-        continue;
-      }
-
+    for (auto [name, type_id, _, __] : members) {
       auto &destructure = node->left.destructure[i];
       auto iden = destructure.identifier;
-      auto type_id = symbol->resolved_type;
-
       if (destructure.semantic==VALUE_SEMANTIC_POINTER_MUT) {
         type_id = type_id->take_pointer_to(MUT);
       } else if (destructure.semantic == VALUE_SEMANTIC_POINTER_CONST) {
@@ -2617,26 +2610,18 @@ void Typer::visit(ASTDestructure *node) {
     throw_error("Cannot destructure pointer or array type.", node->source_range);
   }
 
-  auto scope = type->info->scope;
+  auto members = type->info->members;
   size_t i = 0;
-  for (const auto name : scope->ordered_symbols) {
-    auto symbol = scope->local_lookup(name);
-
-    if (symbol->is_function() || symbol->is_type()) continue;
-
+  for (auto [name, type, _, __] : members) {
     if (i > node->elements.size()) break;
-
     auto &element = node->elements[i];
-    auto type = symbol->resolved_type;
-
     if (element.semantic == VALUE_SEMANTIC_POINTER_MUT) {
-      type = symbol->resolved_type->take_pointer_to(MUT);
+      type = type->take_pointer_to(MUT);
     } else if (element.semantic == VALUE_SEMANTIC_POINTER_CONST) {
-      type = symbol->resolved_type->take_pointer_to(CONST);
+      type = type->take_pointer_to(CONST);
     }
-
     element.type = type;
-    ctx.scope->insert_local_variable(element.identifier, type, symbol->variable.initial_value.get(),
+    ctx.scope->insert_local_variable(element.identifier, type, nullptr,
                                      element.mutability);
     ++i;
   }
