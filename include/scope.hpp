@@ -291,6 +291,7 @@ enum Mutability : char {
   CONST,
   MUT,
 };
+
 struct Scope;
 
 struct Symbol {
@@ -326,10 +327,10 @@ struct Symbol {
       ASTModule *declaration;
     } module;
     struct {
+      // ? Why is this here? Just to confirm the type is a child of a choice type?
+      Nullable<ASTChoiceDeclaration> choice;
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTChoiceDeclaration>
-          choice;  // ? Why is this here? Just to confirm the type is a child of a choice type?
       Nullable<ASTNode> declaration;
     } type;
   };
@@ -384,7 +385,6 @@ struct ASTFunctionDeclaration;
 struct ASTTraitDeclaration;
 
 struct Scope {
-  std::vector<InternedString> ordered_symbols = {};
   std::unordered_map<InternedString, Symbol> symbols = {};
   InternedString name = "";
 
@@ -430,7 +430,6 @@ struct Scope {
     sym.flags |= SYMBOL_IS_LOCAL;
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
   void insert_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
@@ -438,7 +437,6 @@ struct Scope {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
   void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
@@ -446,14 +444,12 @@ struct Scope {
     auto sym = Symbol::create_function(name, type_id, declaration, flags);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
   void insert_type(Type *type_id, const InternedString &name, ASTNode *declaration) {
     auto sym = Symbol::create_type(type_id, name, declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
   Symbol *lookup(const InternedString &name);

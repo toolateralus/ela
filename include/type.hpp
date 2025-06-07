@@ -102,69 +102,42 @@ struct TypeExtension {
     return true;
   }
 };
+using TypeExtensions = std::vector<TypeExtension>;
 
-struct TypeExtensions {
-  // this stores things like * and [], [20] etc.
-  // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
-  std::vector<TypeExtension> extensions{};
-
-  TypeExtEnum back_type() const {
-    if (extensions.empty()) {
-      return (TypeExtEnum)-1;
-    } else {
-      return extensions.back().type;
+std::string inline extensions_to_string(const TypeExtensions &extensions) {
+  std::stringstream ss;
+  for (const auto ext : extensions) {
+    switch (ext.type) {
+      case TYPE_EXT_POINTER_MUT:
+        ss << "*mut";
+        break;
+      case TYPE_EXT_POINTER_CONST:
+        ss << "*const";
+        break;
+      case TYPE_EXT_ARRAY:
+        ss << "[" << ext.array_size << "]";
+        break;
     }
   }
+  return ss.str();
+}
 
-  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
+inline bool is_pointer_extensions(const TypeExtensions &extensions) {
+  return extensions.size() &&
+         (extensions.back().type == TYPE_EXT_POINTER_CONST || extensions.back().type == TYPE_EXT_POINTER_MUT);
+}
 
-  inline bool is_pointer() const {
-    return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT;
-  }
+inline bool is_const_pointer_extensions(const TypeExtensions &extensions) {
+  return extensions.size() && extensions.back().type == TYPE_EXT_POINTER_CONST;
+}
 
-  // this returns the number of pointers at the BACK of the extensions,
-  // so int*[]* would return 1;
-  inline int pointer_depth() const {
-    auto temp = extensions;
-    int depth = 0;
-    while (!temp.empty() && (temp.back().type == TYPE_EXT_POINTER_CONST || temp.back().type == TYPE_EXT_POINTER_MUT)) {
-      depth++;
-      temp.pop_back();
-    }
-    return depth;
-  }
+inline bool is_mut_pointer_extensions(const TypeExtensions &extensions) {
+  return extensions.size() && extensions.back().type == TYPE_EXT_POINTER_MUT;
+}
 
-  inline bool is_const_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST; }
-
-  inline bool is_mut_pointer() const { return back_type() == TYPE_EXT_POINTER_MUT; }
-
-  inline bool operator==(const TypeExtensions &other) const { return equals(other); }
-
-  inline bool equals(const TypeExtensions &other) const {
-    if (extensions != other.extensions) return false;
-    return true;
-  }
-
-  inline bool has_no_extensions() const { return extensions.empty(); }
-
-  inline bool has_extensions() const { return !has_no_extensions(); }
-
-  inline TypeExtensions append(const TypeExtensions &to_append) const {
-    auto these = *this;
-    for (const auto &ext : to_append.extensions) {
-      these.extensions.push_back({ext});
-    }
-    return these;
-  }
-
-  inline TypeExtensions without_back() const {
-    TypeExtensions these = *this;
-    these.extensions.pop_back();
-    return these;
-  }
-
-  std::string to_string() const;
-};
+inline bool is_array_extensions(const TypeExtensions &extensions) {
+  return extensions.size() && (extensions.back().type == TYPE_EXT_ARRAY);
+}
 
 using GenericParameter = InternedString;
 
@@ -303,46 +276,117 @@ struct ASTNode;
 struct Type {
   // used for mangling and stuff, not used for any comparisons, nor lookups anymore.
   size_t uid;
+
+  // 'element type' of pointer types & array types.
   Type *base_type = INVALID_TYPE;
+
+  // the generic that was monomorphized to create this concrete type.
   Type *generic_base_type = INVALID_TYPE;
+
+  // the arguments that were used to monomorphize the above generic to create this concrete type.
   std::vector<Type *> generic_args{};
+
+  // the traits that this type implements.
   std::vector<Type *> traits{};
+
+  // the AST node that was used to declare this type, if not a built-in.
   Nullable<ASTNode> declaring_node;
 
-  // TODO: remove these 3 stateful booleans. totally unneccesary at this point with the rewritten emitter & resolver.
-  bool dyn_emitted = false;
-  bool fwd_decl_is_emitted = false;
-  bool tuple_is_emitted = false;
-
-  // if this is an alias or something just get the actual real true type.
-  // probably have a better default than this.
+  // the 'kind' of this type. note that this doesn't describe anything about it being a pointer,
+  // this will always be the kind of the base type. so a `**SomeStruct` is still `KIND_STRUCT`.
   const TypeKind kind = TYPE_SCALAR;
+
+  // the parent choice type that declared this subvariant. more than often null, so TODO: this should be nullable.
   Type *choice_parent = nullptr;
 
-  inline void set_base(const InternedString &base) { this->basename = base; }
-  inline void set_ext(const TypeExtensions &ext) { this->extensions = ext; }
-  inline void set_info(TypeInfo *info) { this->info = info; }
-  inline bool is_child_of_choice_type() const { return choice_parent != nullptr; }
-  bool implements(const Type *trait);
-
   // TODO: move a lot of the querying methods from *info into here too.
+  // a specialized polymorphic type info, used for kind-specific attributes. use the 'as' method for easy casting.
   TypeInfo *info;
 
+  // the actual name of the type, without extensions and generics.
   InternedString basename{};
 
   // TODO: refactor the way type extensions work.
   // most of this should just be on the type itself,
   // especially the querying methods, it's a pain to get the extensions everywhere.
+
+  // the pointer and array size extensions, describing the type further.
+  // this stores things like * and [], [20] etc.
+  // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
   TypeExtensions extensions{};
+
+  inline TypeExtEnum back_ext_type() const {
+    if (extensions.empty()) {
+      return (TypeExtEnum)-1;
+    } else {
+      return extensions.back().type;
+    }
+  }
+
+  inline bool is_fixed_sized_array() const { return back_ext_type() == TYPE_EXT_ARRAY; }
+
+  inline bool is_pointer() const {
+    return back_ext_type() == TYPE_EXT_POINTER_CONST || back_ext_type() == TYPE_EXT_POINTER_MUT;
+  }
+
+  // this returns the number of pointers at the BACK of the extensions,
+  // so *List!<*int> would return 1;
+  inline int pointer_depth() const {
+    auto temp = extensions;
+    int depth = 0;
+    while (!temp.empty() && (temp.back().type == TYPE_EXT_POINTER_CONST || temp.back().type == TYPE_EXT_POINTER_MUT)) {
+      depth++;
+      temp.pop_back();
+    }
+    return depth;
+  }
+
+  inline bool is_const_pointer() const { return back_ext_type() == TYPE_EXT_POINTER_CONST; }
+  inline bool is_mut_pointer() const { return back_ext_type() == TYPE_EXT_POINTER_MUT; }
+
+  inline bool extensions_equals(const TypeExtensions &other) const {
+    if (extensions != other) return false;
+    return true;
+  }
+
+  inline bool has_no_extensions() const { return extensions.empty(); }
+  inline bool has_extensions() const { return !has_no_extensions(); }
+
+  // This doesn't actually modify the extensions so it shouldn't be called append.
+  // it just returns a new set.
+  inline TypeExtensions append_extension(const TypeExtensions &to_append) const {
+    auto these = this->extensions;
+    for (const auto &ext : to_append) {
+      these.push_back({ext});
+    }
+    return these;
+  }
+
+  inline TypeExtensions extensions_without_back() const {
+    TypeExtensions these = extensions;
+    these.pop_back();
+    return these;
+  }
+
+  // TODO: remove these useless methods, these only existed because these 3 fields were private for a long time, an
+  // artifact of a refactor.
+  inline void set_base(const InternedString &base) { this->basename = base; }
+  inline void set_ext(const TypeExtensions &ext) { this->extensions = ext; }
+  inline void set_info(TypeInfo *info) { this->info = info; }
+
+  inline bool is_child_of_choice_type() const { return choice_parent != nullptr; }
+
+  bool implements(const Type *trait);
 
   /*
     TODO: remove me. this is used in one place.
     Or, at least move it out of the type.
+    this is also just for function type info. we don't need this at all, just extract the contents to the one place its
+    used or whatever.
   */
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
   inline Type() = default;
-
   inline Type(size_t uid, const TypeKind kind) : uid(uid), kind(kind) {
     if (kind == TYPE_TUPLE) {
       traits.push_back(is_tuple_trait());
@@ -353,12 +397,7 @@ struct Type {
     }
   }
 
-  /*
-    check if the 'kind' is of a certain value.
-    note that 'kind' has nothing to do with pointers nor array extensions
-    this is effectively checking the 'base type' if this is a pointer.
-    use the 'extensions' and it's utilities for more thorough query.
-  */
+  // helper.
   inline bool is_kind(const TypeKind kind) const { return this->kind == kind; }
 
   /* convert it to the in-language recognizable representation of the type's name.
@@ -378,6 +417,7 @@ struct Type {
   // To have a null, yet identifyable unresolved generic type,
   // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
   // but will still effectively be a poison/invalid, but distinct and comparable value.
+  // use `type_is_valid()` to check for this as well as null, instead of `type != nullptr`
   static Type *UNRESOLVED_GENERIC;
   constexpr static Type *INVALID_TYPE = nullptr;
 };
@@ -423,7 +463,7 @@ static inline std::string get_unmangled_name(const Type *type) {
     base += ">";
   }
 
-  auto output = type->extensions.to_string();
+  auto output = extensions_to_string(type->extensions);
   if (!output.empty()) {
     output += " ";
   }
@@ -482,7 +522,7 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 
   // TODO: shouldn't this only account for the back extension?
   // if i have *const u8[1], an array of pointers, we shouldn't get both flags.
-  for (const auto &ext : type->extensions.extensions) {
+  for (const auto &ext : type->extensions) {
     switch (ext.type) {
       case TYPE_EXT_POINTER_MUT:
       case TYPE_EXT_POINTER_CONST:

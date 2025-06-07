@@ -16,7 +16,7 @@ void Resolver::declare_or_define_type(Type *type) {
     return;
   }
 
-  for (const auto &ext : type->extensions.extensions) {
+  for (const auto &ext : type->extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter.forward_declare_type(type);
       forward_declared_types.insert(type);
@@ -61,10 +61,6 @@ void Resolver::emit_type_definition(Type *type) {
       emitter.emit_type(&thir_type);
     } break;
     case TYPE_DYN: {
-      if (type->dyn_emitted) {
-        return;
-      }
-      type->dyn_emitted = true;
       const auto *info = type->info->as<DynTypeInfo>();
       declare_or_define_type(info->trait_type);
       emitter.emit_dyn_dispatch_object_struct(type);

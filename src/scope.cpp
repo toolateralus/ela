@@ -92,7 +92,6 @@ Symbol *Scope::lookup(const InternedString &name) {
 
 void Scope::erase(const InternedString &name) {
   symbols.erase(name);
-  ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
 }
 
 bool Symbol::is_generic_function() const {

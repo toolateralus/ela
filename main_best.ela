@@ -47,15 +47,15 @@ trait Iterable {
 }
 
 struct Iter!<T> {
-  idx: T, end: T
+  ptr: *const T, end: *const T
 }
 
 impl!<T> Iterator!<T> for Iter!<T> {
   fn next(*mut self) -> Option!<T> {
-    value := self.idx;
-    if self.idx < self.end {
-      self.idx++;
-      return Option!<T>::Some(value);
+    value := self.ptr;
+    if self.ptr < self.end {
+      self.ptr++;
+      return Option!<T>::Some(*value);
     }
     return Option!<T>::None;
   }
@@ -166,8 +166,24 @@ struct RangeBase!<V> {
 
 alias Range :: RangeBase!<s32>;
 
+struct RangeIter!<T> {
+  idx: T,
+  end: T,
+}
+
+impl!<T> Iterator!<T> for RangeIter!<T> {
+  fn next(*mut self) -> Option!<T> {
+    value := self.idx;
+    if self.idx < self.end {
+      self.idx++;
+      return Option!<T>::Some(value); 
+    }
+    return Option!<T>::None;
+  }
+}
+
 impl!<V> Iterable for RangeBase!<V> {
-  fn iter(self) -> Iter!<V> {
+  fn iter(self) -> RangeIter!<V> {
     return .{
       idx: self.begin,
       end: self.end,
@@ -240,8 +256,7 @@ fn main() -> s32 {
     person.printme();
   }
   
-  mut iter := Iter!<s32>.{ idx: 0, end: 10};
-  std::printf("iter.idx=%d, iter.end=%d\n", iter.idx, iter.end);
+  mut iter := RangeIter!<s32>.{ idx: 0, end: 10};
   
   rainbowize("iterator loop: (0 to 10 (exclusive)):\n");
   for i in iter {
@@ -253,7 +268,7 @@ fn main() -> s32 {
   }
   rainbowize("\ndone with for loop iterators\n");
 
-  iter.idx=0;
+  iter.idx = 0;
   while {
     opt := iter.next();
     if opt.is_none() {
@@ -264,11 +279,6 @@ fn main() -> s32 {
   }
 
   std::println("end while loop");
-
-  // ! NYI
-  // if c is Choice::B(a, b) {
-
-  // }
 
   lambda := fn() {
     rainbowize("woo hoo we're in a lambda!\n");
@@ -307,7 +317,6 @@ fn main() -> s32 {
     return t;
   }
 
-
   none := Option!<s32>::None;
 
   if none is Option!<s32>::None {
@@ -317,12 +326,36 @@ fn main() -> s32 {
   some := Option!<s32>::Some(10);
 
   if some is Option!<s32>::Some(&mut v) {
-    std::printf("was some, v=%d\n", *v);
+    std::printf("was some, v=%p\n", v);
+    *v = 100;
   }
 
+  if some is Option!<s32>::Some(v) {
+    std::printf("was some, v=%d\n", v);
+  }
+ 
   // gen_v := generic_function(10); // ! not working, need to resolve THIRFunction* when calling a generic.
-
+  // alias Some :: Option!<s32>::Some;
+  
   std::printf("generic.value=%d\n", generic.value);
+
+  struct Vec2 {
+    x: f32, y: f32
+  }
+
+  const VEC_ARRAY_LEN := 5;
+
+  array: Vec2[VEC_ARRAY_LEN];
+  iter2: Iter!<Vec2> = .{
+    ptr: array,
+    end: (array as *Vec2) + VEC_ARRAY_LEN
+  };
+
+  pointer: *s32 = &0;
+
+  for &mut x, &mut y in iter2 {
+    std::printf("x=%p, y=%p\n", x, y);
+  }
 
   return 0;
 }
