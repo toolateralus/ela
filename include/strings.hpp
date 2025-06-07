@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-/* 
+/*
   Originally (and still) called 'strings.hpp' this is just a file for constants.
 */
 
@@ -25,7 +25,6 @@ constexpr size_t TYPE_FLAGS_TRAIT = 1 << 12;
 constexpr size_t TYPE_FLAGS_DYN = 1 << 13;
 constexpr size_t TYPE_FLAGS_UNION = 1 << 14;
 
-
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
 constexpr const char *DISCRIMINANT_KEY = "$discriminant";
@@ -42,8 +41,7 @@ constexpr const char *THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT = "$for_cached{}";
 constexpr const char *TYPE_INFO_IDENTIFIER_FORMAT = "$typeinfo{}";
 
 constexpr const char *THIR_PATTERN_MATCH_CACHED_KEY_FORMAT = "$patmatch{}";
-
-
+constexpr const char *THIR_DESTRUCTURE_CAHCED_VARIABLE_KEY_FORMAT = "$destructure{}";
 
 // We should probably not rely on this since RangeBase is defined in the stdlib.
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";

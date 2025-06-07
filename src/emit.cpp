@@ -174,8 +174,13 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
 }
 
 void Emitter::emit_literal(const THIRLiteral *thir) {
-  // TODO: we gotta do more than this of course.
-  bool is_string = thir->type == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+
+  if (thir->value=="null") {
+    code << "NULL";
+    return;
+  }
+
+  const bool is_string = thir->type == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
   if (is_string) {
     code << '\"';
   }
@@ -489,7 +494,7 @@ void Emitter::emit_block(const THIRBlock *thir) {
   indented("{\n");
   indent_level++;
   for (auto stmt : thir->statements) {
-    // TODO: we should'nt have to filter this.
+    // TODO: we shouldn't have to filter this.
     if (stmt->get_node_type() != THIRNodeType::Function && stmt->get_node_type() != THIRNodeType::Type) {
       emit_node(stmt);
     }

@@ -361,7 +361,7 @@ struct THIRGen {
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);
   void visit_impl(ASTImpl *node);
-  void visit_tuple_deconstruction(ASTDestructure *node);
+  void visit_destructure(ASTDestructure *node);
   void visit_where_statement(ASTWhereStatement *node);
 
   THIR *visit_node(ASTNode *node) {
@@ -377,7 +377,7 @@ struct THIRGen {
 
       // These nodes can return many nodes, so they always return void, and push the nodes manually.
       case AST_NODE_TUPLE_DECONSTRUCTION: {
-        visit_tuple_deconstruction((ASTDestructure *)node);
+        visit_destructure((ASTDestructure *)node);
         return nullptr;
       }
       case AST_NODE_WHERE_STATEMENT: {

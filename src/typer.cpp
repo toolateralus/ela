@@ -1588,6 +1588,7 @@ void Typer::visit(ASTFor *node) {
       if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
         type_id = type_id->take_pointer_to(destructure.mutability);
       }
+      destructure.type = type_id;
       ctx.scope->insert_local_variable(iden, type_id, nullptr, MUT);
       i++;
     }

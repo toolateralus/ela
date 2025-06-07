@@ -337,6 +337,13 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
 }
 
 THIR *THIRGen::visit_literal(ASTLiteral *ast) {
+  // string literals are aggregate initializers, of 'str' type.
+  // so as long it doesnt have the 'c' suffix, and it's not a freestanding/nostdlib env.
+  if (ast->tag == ASTLiteral::String && !ast->is_c_string && !compile_command.has_flag("nostdlib") &&
+      !compile_command.has_flag("freestanding")) {
+    return make_str(ast->value, ast->source_range);
+  }
+
   THIR_ALLOC(THIRLiteral, literal, ast);
   literal->value = ast->value;
   return literal;
@@ -368,7 +375,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
   const auto info = type->info;
 
   // TODO: might need more ignored things here
-  if (info->members.empty() || type->is_kind(TYPE_CHOICE)) {
+  if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->extensions.is_fixed_sized_array()) {
     THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
     thir->source_range = source_range;
     thir->type = type;
@@ -789,21 +796,6 @@ THIRVariable *THIRGen::make_variable(const InternedString &name, THIR *value, AS
   return thir;
 }
 
-/*
-  * Here's some example compiled code of how we handle iterators, in this case, a constant Range.
-
-  RangeBase$1 $iterable = (RangeBase$1) {.begin = 0, .end = argc};
-
-  RangeIter$1 $iterator = RangeBase$1$iter(&$iterable);
-
-  for (
-    auto $next = RangeIter$1$next(&$iterator);
-    $next.index != 0;
-    $next = RangeIter$1$next(&$iterator)) {
-      s32 i = $next.Some.$0;
-      -- ! user code goes here ! --
-  }
-*/
 THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast);
 
@@ -813,13 +805,13 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
   ENTER_SCOPE(ast->block->scope);
 
-  // 1. Cache the iterable/expression (evaluate once)
+  // Cache the iterable/expression (evaluate once)
   THIR *iterable_value = visit_node(ast->right);
   THIR *iterable_var = make_variable(cached_key, iterable_value, ast->right);
 
   current_statement_list->push_back(iterable_var);
 
-  // 2. Get the iterator (call iter() or use as iterator directly)
+  // Get the iterator (call iter() or use as iterator directly)
   THIR *iterator_var = nullptr;
   if (iterable_var->type->implements(iterable_trait())) {
     auto iter_symbol = iterable_var->type->info->scope->local_lookup("iter");
@@ -840,7 +832,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     iterator_var = iterable_var;
   }
 
-  // 3. Call next() on the iterator
+  // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
   bool next_expects_ptr = next_symbol && next_symbol->function.declaration->params->params[0]->self.is_pointer;
   THIR *next_arg = (next_expects_ptr && !iterator_var->type->extensions.is_pointer())
@@ -854,7 +846,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   next_call->type = next_info->return_type;
   next_call->arguments.push_back(next_arg);
 
-  // 4. Assign next_call to a loop variable
+  // Assign next_call to a loop variable
   THIR_ALLOC(THIRVariable, next_var, ast);
   next_var->is_global = false;
   next_var->name = result_key;
@@ -862,7 +854,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   next_var->type = next_call->type;
   thir->initialization = next_var;
 
-  // 5. Build the loop condition: $next.index == OPTION_SOME_DISCRIMINANT_VALUE
+  // Build the loop condition: $next.index == OPTION_SOME_DISCRIMINANT_VALUE
   THIR_ALLOC(THIRBinExpr, condition, ast);
   THIR_ALLOC(THIRMemberAccess, member_access, ast);
   member_access->base = next_var;
@@ -876,7 +868,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   condition->right = discriminant_literal;
   thir->condition = condition;
 
-  // 6. Increment: $next = next($iterator)
+  // Increment: $next = next($iterator)
   THIR_ALLOC(THIRBinExpr, increment, ast);
   increment->type = void_type();
   increment->left = next_var;
@@ -884,29 +876,72 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   increment->right = next_var->value;
   thir->increment = increment;
 
-  // 7. Loop variable binding (identifier only, destructure TODO)
-  THIR_ALLOC(THIRVariable, identifier_var, ast);
-  identifier_var->name = ast->left.identifier;
-  identifier_var->type = ast->identifier_type;
-  auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
-  symbol_map[identifier_symbol] = identifier_var;
-
   // Unwrap: $next.Some.$0
+  // ugly ahh code.
   const auto some_type = next_var->type->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
   THIR_ALLOC(THIRMemberAccess, unwrap_some, ast);
   unwrap_some->base = next_var;
   unwrap_some->member = "Some";
   unwrap_some->type = some_type;
 
+  // atrocious looking code.
+  const auto value_type = some_type->info->members[0].type;
+  printf("typeof(Some(v))=%s\n", value_type->to_string().c_str());
+
   THIR_ALLOC(THIRMemberAccess, unwrap_0, ast);
   unwrap_0->base = unwrap_some;
   unwrap_0->member = "0";
+  unwrap_0->type = value_type;
 
-  identifier_var->value = unwrap_0;
+  if (ast->left_tag == ASTFor::DESTRUCTURE) {
+    static size_t id = 0;
 
-  thir->block = visit_node(ast->block);
-  THIRBlock *block = (THIRBlock *)thir->block;
-  block->statements.insert(block->statements.begin(), identifier_var);
+    std::vector<THIR *> statements;
+    const auto ptr_to_some = take_address_of(unwrap_0, ast);
+    // we take the address of when caching the result because 'for *x, *y in ...' needs to mutate the original.
+    THIRVariable *cached_base =
+        make_variable(std::format(THIR_DESTRUCTURE_CAHCED_VARIABLE_KEY_FORMAT, id++), ptr_to_some, ast);
+    statements.push_back(cached_base);
+    const auto type = value_type;
+    auto members_iter = type->info->members.begin();
+    for (const DestructureElement &element : ast->left.destructure) {
+      THIR_ALLOC(THIRVariable, var, ast);
+      var->name = element.identifier;
+      var->type = element.type;
+
+      THIR_ALLOC(THIRMemberAccess, member_access, ast);
+      var->value = member_access;
+
+      const auto member = *members_iter;
+      members_iter++;
+
+      member_access->member = member.name;
+      member_access->base = cached_base;
+      member_access->type = element.type;
+
+      if (element.semantic == VALUE_SEMANTIC_POINTER) {
+        var->value = take_address_of(member_access, ast);
+      }
+
+      auto symbol = ctx.scope->local_lookup(element.identifier);
+      symbol_map[symbol] = var;
+
+      statements.push_back(var);
+    }
+    thir->block = visit_node(ast->block);
+    THIRBlock *block = (THIRBlock *)thir->block;
+    block->statements.insert(block->statements.begin(), statements.begin(), statements.end());
+  } else {
+    THIR_ALLOC(THIRVariable, identifier_var, ast);
+    identifier_var->name = ast->left.identifier;
+    identifier_var->type = ast->identifier_type;
+    auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
+    symbol_map[identifier_symbol] = identifier_var;
+    identifier_var->value = unwrap_0;
+    thir->block = visit_node(ast->block);
+    THIRBlock *block = (THIRBlock *)thir->block;
+    block->statements.insert(block->statements.begin(), identifier_var);
+  }
 
   return thir;
 }
@@ -967,13 +1002,13 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
 
 // x, y := (0, 0);, *x, *y := ...
 // we should refactor the syntax for this to be &const x, &mut y := ...
-void THIRGen::visit_tuple_deconstruction(ASTDestructure *ast) {
+void THIRGen::visit_destructure(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
   auto members_iter = type->info->members.begin();
 
   THIR *base = visit_node(ast->right);
   static size_t id = 0;
-  const auto cached_base = make_variable("$destructure$" + std::to_string(id), base, ast->right);
+  const auto cached_base = make_variable("$destructure$" + std::to_string(id), take_address_of(base, ast), ast->right);
   current_statement_list->push_back(cached_base);
 
   for (const DestructureElement &element : ast->elements) {
@@ -1090,7 +1125,9 @@ THIR *THIRGen::to_reflection_type_struct(Type *type) {
 
 THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_range) {
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  static Type *str_type = ctx.scope->find_type_id("str", {{}});
   thir->source_range = src_range;
+  thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type())});
   thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())),
                                                      src_range, u64_type())});

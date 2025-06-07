@@ -1559,7 +1559,6 @@ ASTStatement *Parser::parse_statement() {
         }
       }
 
-      // Ensure the 'in' keyword is present
       if (peek().type == TType::In) {
         eat();
         auto expr = parse_expr();
