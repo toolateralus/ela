@@ -448,6 +448,19 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
+
+      // InitList is basically just a fat pointered VLA, so we use an aggregate around the VLA.
+      if (type->basename.str_ptr->starts_with("InitList$")) {
+        const size_t length = ast->values.size();
+        TypeExtension extension = {.type = TYPE_EXT_ARRAY, .array_size = length};
+        ast->resolved_type = global_find_type_id(type->generic_args[0], TypeExtensions{{extension}});
+        THIR_ALLOC(THIRAggregateInitializer, thir, ast)
+        thir->type=type;
+        thir->key_values.push_back({"data", visit_initializer_list(ast)});
+        thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type())});
+        return thir;
+      }
+
       THIR_ALLOC(THIRCollectionInitializer, thir, ast)
       for (const auto &value : ast->values) {
         thir->values.push_back(visit_node(value));
@@ -886,7 +899,6 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
   // atrocious looking code.
   const auto value_type = some_type->info->members[0].type;
-  printf("typeof(Some(v))=%s\n", value_type->to_string().c_str());
 
   THIR_ALLOC(THIRMemberAccess, unwrap_0, ast);
   unwrap_0->base = unwrap_some;

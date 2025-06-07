@@ -291,6 +291,7 @@ enum Mutability : char {
   CONST,
   MUT,
 };
+
 struct Scope;
 
 struct Symbol {
@@ -326,10 +327,10 @@ struct Symbol {
       ASTModule *declaration;
     } module;
     struct {
+      // ? Why is this here? Just to confirm the type is a child of a choice type?
+      Nullable<ASTChoiceDeclaration> choice;
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTChoiceDeclaration>
-          choice;  // ? Why is this here? Just to confirm the type is a child of a choice type?
       Nullable<ASTNode> declaration;
       TypeKind kind;
     } type;
