@@ -2786,6 +2786,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto old_scope = typer->ctx.scope;
   typer->ctx.scope = trait_info->scope;
   Defer _defer([&] { typer->ctx.scope = old_scope; });
+  
   const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
     std::vector<Type *> parameters;
     bool has_self = false;

@@ -180,7 +180,8 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
     return;
   }
 
-  const bool is_string = thir->type == global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_CONST}});
+  const bool is_string = thir->type == u8_ptr_type();
+  
   if (is_string) {
     code << '\"';
   }
@@ -455,7 +456,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
 
   for (size_t i = 0; i < info->params_len; ++i) {
     const auto parameter = *param_iter;
-    code << c_type_string(info->parameter_types[i]) << ' ' << parameter.name.get_str();
+    code << get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
     param_iter++;
     if (i < info->params_len - 1) {
       code << ", ";

@@ -159,6 +159,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   const auto member = ast->callee->member;
   const auto type_scope = base->resolved_type->info->scope;
   const auto symbol = type_scope->local_lookup(member.identifier);
+
   if (symbol->is_variable()) {
     thir->callee = visit_dot_expr(ast->callee);
   } else {
@@ -446,14 +447,13 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-
       // InitList is basically just a fat pointered VLA, so we use an aggregate around the VLA.
       if (type->basename.str_ptr->starts_with("InitList$")) {
         const size_t length = ast->values.size();
         TypeExtension extension = {.type = TYPE_EXT_ARRAY, .array_size = length};
         ast->resolved_type = global_find_type_id(type->generic_args[0], TypeExtensions{{extension}});
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
-        thir->type=type;
+        thir->type = type;
         thir->key_values.push_back({"data", visit_initializer_list(ast)});
         thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type())});
         return thir;
@@ -787,7 +787,10 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
 }
 
 THIR *THIRGen::take_address_of(THIR *operand, ASTNode *ast) {
-  THIR_ALLOC(THIRUnaryExpr, thir, ast);
+  THIR_ALLOC_NO_SRC_RANGE(THIRUnaryExpr, thir);
+  if (ast) {
+    thir->source_range = ast->source_range;
+  }
   thir->op = TType::And;
   thir->type = operand->type->take_pointer_to(true);
   thir->operand = operand;
@@ -827,8 +830,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   if (iterable_var->type->implements(iterable_trait())) {
     auto iter_symbol = iterable_var->type->info->scope->local_lookup("iter");
     bool expects_ptr = iter_symbol && iter_symbol->function.declaration->params->params[0]->self.is_pointer;
-    THIR *iter_arg = (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast)
-                                                                                   : iterable_var;
+    THIR *iter_arg =
+        (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast) : iterable_var;
 
     THIR_ALLOC(THIRCall, iter_call, ast);
     iter_call->callee = visit_function_declaration_via_symbol(iter_symbol);
@@ -846,9 +849,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
   bool next_expects_ptr = next_symbol && next_symbol->function.declaration->params->params[0]->self.is_pointer;
-  THIR *next_arg = (next_expects_ptr && !iterator_var->type->is_pointer())
-                       ? take_address_of(iterator_var, ast)
-                       : iterator_var;
+  THIR *next_arg =
+      (next_expects_ptr && !iterator_var->type->is_pointer()) ? take_address_of(iterator_var, ast) : iterator_var;
 
   THIR_ALLOC(THIRCall, next_call, ast);
   next_call->callee = visit_function_declaration_via_symbol(next_symbol);
@@ -1104,11 +1106,11 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
 }
 
 ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
+  static Type *type_type = ctx.scope->find_type_id("Type", {});
   ReflectionInfo info;
   info.created = true;
-  static Type *type_type = ctx.scope->find_type_id("Type", {});
   info.definition = make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
-  
+  info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
   return info;
 }
 

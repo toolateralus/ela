@@ -152,10 +152,11 @@ struct Generic!<T> {
 impl!<T> Generic!<T> {
   fn printme(self) {
     where T: s32 {
-      std::printf("T=s32\n");
+      std::printf("T == s32\n");
     } else {
-      std::printf("T!=s32\n");
+      std::printf("T != s32\n");
     }
+    std::printf("value=%d\n", self.value);
   } 
 }
 
@@ -310,7 +311,6 @@ fn main() -> s32 {
   generic: Generic!<s32> = .{
     value: 100
   };
-
   generic.printme();
 
   fn generic_function!<T>(t: T) -> T {
@@ -318,7 +318,6 @@ fn main() -> s32 {
   }
 
   none := Option!<s32>::None;
-
   if none is Option!<s32>::None {
     std::println("was none");
   }
@@ -333,11 +332,6 @@ fn main() -> s32 {
   if some is Option!<s32>::Some(v) {
     std::printf("was some, v=%d\n", v);
   }
- 
-  // gen_v := generic_function(10); // ! not working, need to resolve THIRFunction* when calling a generic.
-  // alias Some :: Option!<s32>::Some;
-  
-  std::printf("generic.value=%d\n", generic.value);
 
   struct Vec2 {
     x: f32, y: f32
@@ -356,6 +350,19 @@ fn main() -> s32 {
   for &mut x, &mut y in iter2 {
     std::printf("x=%p, y=%p\n", x, y);
   }
+
+  struct InitList!<T> {
+    data: *T,
+    length: u64,
+  }
+
+  fn takes_init_list(list: InitList!<s32>) {
+    for i in 0..list.length {
+      std::printf("list[i]=%d\n", list.data[i]);
+    }
+  }
+
+  takes_init_list(.[0,1,2,3]);
 
   return 0;
 }
