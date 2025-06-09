@@ -209,15 +209,9 @@ struct ASTImport : ASTModule {
 
 struct ASTBlock : ASTStatement {
   ASTNode *parent;
-  int flags = BLOCK_FLAGS_FALL_THROUGH;
-
-  // used for tuple destructures.
-  size_t temp_iden_idx = 0;
-
   // of course used for defer.
   bool has_defer = false;
   int defer_count = 0;
-
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -489,7 +483,15 @@ struct ASTWhere;
 struct ASTLambda;
 
 struct ASTFunctionDeclaration : ASTDeclaration {
-  unsigned int flags;
+  bool is_test: 1 = false;
+  bool is_method: 1 = false;
+  bool is_varargs: 1 = false;
+  bool is_exported: 1 = false;
+  bool is_forward_declared: 1 = false;
+  bool is_extern: 1 = false;
+  bool is_inline: 1 = false;
+  bool is_entry: 1 = false;
+
   bool has_defer = false;
   bool is_declared = false;
   Type *declaring_type = Type::INVALID_TYPE;

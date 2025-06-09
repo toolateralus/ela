@@ -527,25 +527,13 @@ THIR *THIRGen::visit_block(ASTBlock *ast) {
   return thir;
 }
 
-static inline void convert_function_flags(THIRFunction *reciever, FunctionInstanceFlags flags) {
-  if (HAS_FLAG(flags, FUNCTION_IS_INLINE)) {
-    reciever->is_inline = true;
-  }
-  if (HAS_FLAG(flags, FUNCTION_IS_VARARGS)) {
-    reciever->is_varargs = true;
-  }
-  if (HAS_FLAG(flags, FUNCTION_IS_EXTERN)) {
-    reciever->is_extern = true;
-  }
-  if (HAS_FLAG(flags, FUNCTION_IS_ENTRY)) {
-    reciever->is_entry = true;
-  }
-  if (HAS_FLAG(flags, FUNCTION_IS_EXPORTED)) {
-    reciever->is_exported = true;
-  }
-  if (HAS_FLAG(flags, FUNCTION_IS_TEST)) {
-    reciever->is_test = true;
-  }
+static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDeclaration *function) {
+  reciever->is_inline = function->is_inline;
+  reciever->is_varargs = function->is_varargs;
+  reciever->is_extern = function->is_extern;
+  reciever->is_entry = function->is_entry;
+  reciever->is_exported = function->is_exported;
+  reciever->is_test = function->is_test;
 }
 
 // TODO: fix the overlap between the flags and attributes. we should just have the flags, the typer
@@ -589,7 +577,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   symbol_map[symbol] = thir;
 
   ENTER_SCOPE(ast->scope);
-  convert_function_flags(thir, (FunctionInstanceFlags)ast->flags);
+  convert_function_flags(thir, ast);
   convert_function_attributes(thir, ast->attributes);
   for (const auto &param : ast->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
@@ -607,10 +595,12 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
       thir_param->name = "self";
       thir_param->type = param->resolved_type;
     }
-    if (DOESNT_HAVE_FLAG(ast->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+
+    if (!ast->is_forward_declared) {
       auto param_sym = ctx.scope->local_lookup(thir_param->name);
       symbol_map[param_sym] = thir_param;
     }
+
     thir->parameters.push_back(THIRParameter{
         .name = thir_param->name,
         .default_value = thir_param->value,

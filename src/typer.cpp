@@ -316,10 +316,10 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   for (auto attr : node->attributes) {
     switch (attr.tag) {
       case ATTRIBUTE_INLINE: {
-        node->flags |= FUNCTION_IS_INLINE;
+        node->is_inline = true;
       } break;
       case ATTRIBUTE_ENTRY: {
-        node->flags |= FUNCTION_IS_ENTRY;
+        node->is_entry = true;
       } break;
       default:
         break;
@@ -327,7 +327,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   }
 
   if (node->name == "main") {
-    node->flags |= FUNCTION_IS_ENTRY;
+    node->is_entry = true;
   }
 
   auto old_ty = expected_type;
@@ -403,10 +403,10 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   for (auto attr : node->attributes) {
     switch (attr.tag) {
       case ATTRIBUTE_INLINE: {
-        node->flags |= FUNCTION_IS_INLINE;
+        node->is_inline = true;
       } break;
       case ATTRIBUTE_ENTRY: {
-        node->flags |= FUNCTION_IS_ENTRY;
+        node->is_entry = true;
       } break;
       default:
         break;
@@ -414,7 +414,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   }
 
   if (node->name == "main") {
-    node->flags |= FUNCTION_IS_ENTRY;
+    node->is_entry = true;
   }
 
   if (generic_instantiation) {
@@ -426,7 +426,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     }
   }
 
-  if ((node->flags & (FUNCTION_IS_FORWARD_DECLARED | FUNCTION_IS_EXTERN)) == 0) {
+  if (!node->is_forward_declared && !node->is_extern) {
     node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
   }
 
@@ -440,7 +440,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   FunctionTypeInfo info;
   // Get function type id from header.
   info.return_type = node->return_type->resolved_type;
-  info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
+  info.is_varargs = node->is_varargs;
 
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
@@ -619,14 +619,16 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
       }
     } else {
-      if (HAS_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+      if (method->is_forward_declared) {
         type_scope->insert_function(method->name, method->resolved_type, method,
                                     SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
       } else {
         type_scope->insert_function(method->name, method->resolved_type, method);
       }
+
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-      if (method->flags & FUNCTION_IS_EXTERN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+
+      if (method->is_extern || method->is_forward_declared) {
         continue;
       }
     }
@@ -658,7 +660,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
           }
         }
-      } else if (DOESNT_HAVE_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+      } else if (!method->is_forward_declared) {
         method->declaring_type = target_ty;
 
         if (!method->generic_parameters.empty()) {
@@ -677,14 +679,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
           }
         } else {
-          if (HAS_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+          if (method->is_forward_declared) {
             type_scope->insert_function(method->name, method->resolved_type, method,
                                         SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
           } else {
             type_scope->insert_function(method->name, method->resolved_type, method);
           }
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-          if (method->flags & FUNCTION_IS_EXTERN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+          if (method->is_extern || method->is_forward_declared) {
             continue;
           }
         }
@@ -1285,12 +1287,12 @@ void Typer::visit(ASTEnumDeclaration *node) {
 void Typer::visit(ASTFunctionDeclaration *node) {
   for (auto attr : node->attributes) {
     if (attr.tag == ATTRIBUTE_INLINE) {
-      node->flags |= FUNCTION_IS_INLINE;
+      node->is_inline = true;
     }
   }
 
+  // TODO: actually generate a signature for a generic function so that you can compare them
   if (!node->generic_parameters.empty()) {
-    // TODO: actually generate a signature for a generic function so that you can compare them
     for (auto param : node->generic_parameters) {
       if (param.default_value) {
         param.default_value->accept(this);
@@ -1302,7 +1304,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   visit_function_header(node, false);
 
-  if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+  if (node->is_forward_declared) {
     ctx.scope->insert_function(node->name, node->resolved_type, node,
                                SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
     return;
@@ -1310,7 +1312,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   ctx.scope->insert_function(node->name, node->resolved_type, node);
 
-  if (HAS_FLAG(node->flags, FUNCTION_IS_EXTERN)) {
+  if (node->is_extern) {
     return;
   }
 
@@ -1444,7 +1446,6 @@ void Typer::visit(ASTBlock *node) {
     }
   }
 
-  node->flags = node->control_flow.flags;
   node->resolved_type = node->control_flow.type;
 }
 
@@ -1578,7 +1579,7 @@ void Typer::visit(ASTFor *node) {
     for (auto [name, type_id, _, __] : members) {
       auto &destructure = node->left.destructure[i];
       auto iden = destructure.identifier;
-      if (destructure.semantic==VALUE_SEMANTIC_POINTER_MUT) {
+      if (destructure.semantic == VALUE_SEMANTIC_POINTER_MUT) {
         type_id = type_id->take_pointer_to(MUT);
       } else if (destructure.semantic == VALUE_SEMANTIC_POINTER_CONST) {
         type_id = type_id->take_pointer_to(CONST);
@@ -2091,8 +2092,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 
     if (symbol) {
       auto sym = symbol.get();
-      if (sym->is_const() && node->mutability == MUT && !op_ty->is_mut_pointer() &&
-          !op_ty->is_kind(TYPE_FUNCTION)) {
+      if (sym->is_const() && node->mutability == MUT && !op_ty->is_mut_pointer() && !op_ty->is_kind(TYPE_FUNCTION)) {
         throw_error("cannot take a mutable pointer to a non-mutable variable", node->source_range);
       }
     }
@@ -2299,8 +2299,7 @@ void Typer::visit(ASTInitializerList *node) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
 
-  if (target_type->is_pointer() ||
-      (target_type->is_kind(TYPE_SCALAR) && target_type->has_no_extensions())) {
+  if (target_type->is_pointer() || (target_type->is_kind(TYPE_SCALAR) && target_type->has_no_extensions())) {
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2453,8 +2452,7 @@ void Typer::visit(ASTSwitch *node) {
     }
   }
 
-  if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) &&
-      !type->is_pointer()) {
+  if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer()) {
     auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
     if (operator_overload == Type::INVALID_TYPE) {
       throw_error(
@@ -2613,8 +2611,7 @@ void Typer::visit(ASTDestructure *node) {
       type = type->take_pointer_to(CONST);
     }
     element.type = type;
-    ctx.scope->insert_local_variable(element.identifier, type, nullptr,
-                                     element.mutability);
+    ctx.scope->insert_local_variable(element.identifier, type, nullptr, element.mutability);
     ++i;
   }
 };
@@ -2779,7 +2776,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto old_scope = typer->ctx.scope;
   typer->ctx.scope = trait_info->scope;
   Defer _defer([&] { typer->ctx.scope = old_scope; });
-  
+
   const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
     std::vector<Type *> parameters;
     bool has_self = false;

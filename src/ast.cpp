@@ -211,7 +211,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // --filter=* - "My Test Group" // run all but test group
 
         auto func = parser->parse_function_declaration();
-        func->flags |= FUNCTION_IS_TEST;
+        func->is_test = true;
 
         if (compile_command.has_flag("test")) {
           return func;
@@ -335,7 +335,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           decl->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
           auto func = static_cast<ASTFunctionDeclaration*>(node);
-          func->flags |= FUNCTION_IS_EXPORTED;
+          func->is_exported = true;
         }
         return node;
     }},
@@ -1449,7 +1449,7 @@ ASTStatement *Parser::parse_statement() {
       while (peek().type != TType::RCurly) {
         if (peek().type == TType::Fn) {
           auto function = parse_function_declaration();
-          function->flags |= FUNCTION_IS_EXTERN;
+          function->is_extern = true;
           node->statements.push_back(function);
         } else {
           auto variable = parse_variable();
@@ -1462,7 +1462,7 @@ ASTStatement *Parser::parse_statement() {
       return node;
     } else if (peek().type == TType::Fn) {  // single extern fn
       auto function = parse_function_declaration();
-      function->flags |= FUNCTION_IS_EXTERN;
+      function->is_extern = true;
       return function;
     } else {  // single extern variable
       auto variable = parse_variable();
@@ -1816,7 +1816,7 @@ ASTParamsDecl *Parser::parse_parameters() {
             "Only use this for #foreign functions.",
             range);
       }
-      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
+      current_func_decl.get()->is_varargs = true;
       params->is_varargs = true;
       continue;
     }
@@ -1955,7 +1955,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   }
 
   if (peek().type == TType::Semi) {
-    node->flags |= FUNCTION_IS_FORWARD_DECLARED;
+    node->is_forward_declared = true;
     ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
     end_node(node, range);
     current_func_decl = last_func_decl;
@@ -1965,7 +1965,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   ctx.set_scope();
 
   if (node->params->has_self) {
-    node->flags |= FUNCTION_IS_METHOD;
+    node->is_method = true;
   }
 
   node->block = parse_block();
