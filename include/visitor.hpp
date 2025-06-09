@@ -1,12 +1,8 @@
 #pragma once
 
 #include <csetjmp>
-#include <deque>
-#include <set>
 #include <vector>
-
 #include "ast.hpp"
-#include "builder.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
@@ -72,11 +68,8 @@ struct VisitorBase {
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
-  bool in_call = false;
   Type *expected_type = Type::INVALID_TYPE;
-
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
-
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);

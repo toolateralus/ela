@@ -271,15 +271,6 @@ struct Value {
   }
 };
 
-enum SymbolFlags {
-  SYMBOL_IS_VARIABLE = 1 << 0,
-  SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_IS_FORWARD_DECLARED = 1 << 2,
-  SYMBOL_IS_TYPE = 1 << 3,
-  SYMBOL_IS_MODULE = 1 << 4,
-  SYMBOL_IS_LOCAL = 1 << 5,
-};
-
 struct ASTNode;
 struct ASTStructDeclaration;
 struct ASTFunctionDeclaration;
@@ -297,17 +288,16 @@ struct Scope;
 struct Symbol {
   InternedString name;
   Type *resolved_type = Type::INVALID_TYPE;
-  int flags = SYMBOL_IS_VARIABLE;
 
   Mutability mutability = CONST;
   Scope *scope;
 
-  bool is_function() const { return HAS_FLAG(flags, SYMBOL_IS_FUNCTION); }
-  bool is_variable() const { return HAS_FLAG(flags, SYMBOL_IS_VARIABLE); }
-  bool is_type() const { return HAS_FLAG(flags, SYMBOL_IS_TYPE); }
-  bool is_module() const { return HAS_FLAG(flags, SYMBOL_IS_MODULE); }
-  bool is_forward_declared() const { return HAS_FLAG(flags, SYMBOL_IS_FORWARD_DECLARED); }
-  bool is_local() const { return HAS_FLAG(flags, SYMBOL_IS_LOCAL); }
+  bool is_variable : 1 = false;
+  bool is_function : 1 = false;
+  bool is_forward_declared : 1 = false;
+  bool is_type : 1 = false;
+  bool is_module : 1 = false;
+  bool is_local : 1 = false;
 
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }
@@ -343,19 +333,18 @@ struct Symbol {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = type;
-    symbol.flags = SYMBOL_IS_VARIABLE;
+    symbol.is_variable = true;
     symbol.variable.initial_value = initial_value;
     symbol.variable.declaration = decl;
     symbol.mutability = mutability;
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration,
-                                SymbolFlags flags) {
+  static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration) {
     Symbol symbol;
     symbol.resolved_type = type;
     symbol.name = name;
-    symbol.flags = flags;
+    symbol.is_function = true;
     symbol.function.declaration = declaration;
     return symbol;
   }
@@ -363,7 +352,7 @@ struct Symbol {
   static Symbol create_type(Type *type, const InternedString &name, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
-    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.is_type = true;
     symbol.type.declaration = declaration;
     symbol.resolved_type = type;
     return symbol;
@@ -372,7 +361,7 @@ struct Symbol {
   static Symbol create_module(const InternedString &name, ASTModule *declaration) {
     Symbol symbol;
     symbol.name = name;
-    symbol.flags = SYMBOL_IS_MODULE;
+    symbol.is_module = true;
     symbol.module.declaration = declaration;
     return symbol;
   }
@@ -419,7 +408,7 @@ struct Scope {
   inline size_t fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function() && !sym.is_type()) fields++;
+      if (!sym.is_function && !sym.is_type) fields++;
     }
     return fields;
   }
@@ -427,7 +416,7 @@ struct Scope {
   void insert_local_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
                              ASTNode *decl = nullptr) {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
-    sym.flags |= SYMBOL_IS_LOCAL;
+    sym.is_local = true;
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
   }
@@ -439,9 +428,15 @@ struct Scope {
     symbols.insert_or_assign(name, sym);
   }
 
-  void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
-                       SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    auto sym = Symbol::create_function(name, type_id, declaration, flags);
+  void forward_declare_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
+    auto sym = Symbol::create_function(name, type_id, declaration);
+    sym.is_forward_declared = true;
+    sym.scope = this;
+    symbols.insert_or_assign(name, sym);
+  }
+
+  void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
+    auto sym = Symbol::create_function(name, type_id, declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
   }
@@ -491,7 +486,7 @@ struct Scope {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = type_id;
-    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.is_type = true;
     symbol.type.declaration = declaring_node;
     symbols.erase(name);
     symbol.scope = this;
@@ -502,7 +497,7 @@ struct Scope {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = default_id;
-    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.is_type = true;
     symbol.scope = this;
     symbols.insert_or_assign(name, symbol);
   }
@@ -533,7 +528,7 @@ struct Scope {
 
   Type *find_type_id(const InternedString &name, const TypeExtensions &ext) {
     auto symbol = lookup(name);
-    if (!symbol || !symbol->is_type()) {
+    if (!symbol || !symbol->is_type) {
       if (parent) {
         return parent->find_type_id(name, ext);
       } else {

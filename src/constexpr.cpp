@@ -6,7 +6,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
   switch (node->get_node_type()) {
     case AST_NODE_PATH: {
       auto symbol = ctx.get_symbol((ASTPath *)node).get();
-      if (!symbol || symbol->is_function()) {
+      if (!symbol || symbol->is_function) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
 

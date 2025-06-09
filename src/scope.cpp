@@ -95,7 +95,7 @@ void Scope::erase(const InternedString &name) {
 }
 
 bool Symbol::is_generic_function() const {
-  if (!is_function()) return false;
+  if (!is_function) return false;
 
   auto &declaration = this->function.declaration;
 

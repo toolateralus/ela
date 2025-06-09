@@ -160,7 +160,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   const auto type_scope = base->resolved_type->info->scope;
   const auto symbol = type_scope->local_lookup(member.identifier);
 
-  if (symbol->is_variable()) {
+  if (symbol->is_variable) {
     thir->callee = visit_dot_expr(ast->callee);
   } else {
     // Push the self argument

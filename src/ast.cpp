@@ -1389,7 +1389,7 @@ ASTStatement *Parser::parse_statement() {
 
     auto symbol = ctx.scope->lookup(module_name);
 
-    if (symbol && symbol->is_module()) {
+    if (symbol && symbol->is_module) {
       printf("importing existing module %s\n", module_name.get_str().c_str());
       import->scope = ((ASTModule *)symbol->module.declaration)->scope;
       return import;
@@ -1936,7 +1936,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   auto has_definition = false;
   {
     auto sym = ctx.scope->local_lookup(name);
-    if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
+    if (sym && (sym->is_forward_declared) == 0) {
       has_definition = true;
     }
   }
@@ -1956,7 +1956,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
 
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
-    ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
+    ctx.scope->local_lookup(name)->is_forward_declared = true;
     end_node(node, range);
     current_func_decl = last_func_decl;
     return node;

@@ -434,7 +434,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   }
 
   for (const auto &[name, symbol] : scope->symbols) {
-    if (symbol.is_variable()) {
+    if (symbol.is_variable) {
       info->members.push_back(TypeMember{
           .name = name,
           .type = symbol.resolved_type,
@@ -815,7 +815,7 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
   if (!scope) return Type::INVALID_TYPE;
 
   if (auto symbol = scope->local_lookup(op_str)) {
-    if (symbol->is_function() && type_is_valid(symbol->resolved_type)) {
+    if (symbol->is_function && type_is_valid(symbol->resolved_type)) {
       return symbol->resolved_type;
     }
   }

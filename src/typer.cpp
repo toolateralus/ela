@@ -6,6 +6,7 @@
 #include <iostream>
 #include <linux/limits.h>
 #include <ranges>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -368,7 +369,7 @@ Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *
   auto symbol = ctx.scope->lookup(base);
 
   // Probably not a generic type?
-  if (!symbol || !symbol->is_type()) {
+  if (!symbol || !symbol->is_type) {
     return Type::INVALID_TYPE;
   }
 
@@ -601,9 +602,13 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
 
     visit_function_header(method, false);
-    type_scope->insert_function(method->name, method->resolved_type, method,
-                                SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
-    impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+
+    type_scope->insert_function(method->name, method->resolved_type, method);
+    auto &symbol = type_scope->symbols[method->name];
+    symbol.is_forward_declared = true;
+    symbol.is_function = true;
+
+    impl_scope.symbols[method->name] = symbol;
   }
 
   for (const auto &method : node->methods) {
@@ -613,15 +618,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
 
     if (auto symbol = type_scope->local_lookup(method->name)) {
-      if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
+      if (!symbol->is_forward_declared) {
         throw_error("Redefinition of method", method->source_range);
       } else {
-        symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
+        symbol->is_forward_declared = false;
       }
     } else {
       if (method->is_forward_declared) {
-        type_scope->insert_function(method->name, method->resolved_type, method,
-                                    SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+        type_scope->forward_declare_function(method->name, method->resolved_type, method);
       } else {
         type_scope->insert_function(method->name, method->resolved_type, method);
       }
@@ -673,15 +677,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         visit_function_header(method, false);
 
         if (auto symbol = type_scope->local_lookup(method->name)) {
-          if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
+          if (!symbol->is_forward_declared) {
             throw_error("Redefinition of method", method->source_range);
           } else {
-            symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
+            symbol->is_forward_declared = false;
           }
         } else {
           if (method->is_forward_declared) {
-            type_scope->insert_function(method->name, method->resolved_type, method,
-                                        SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+            type_scope->forward_declare_function(method->name, method->resolved_type, method);
           } else {
             type_scope->insert_function(method->name, method->resolved_type, method);
           }
@@ -748,9 +751,6 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
 }
 
 void Typer::compiler_mock_associated_function_call_visit_impl(Type *left_type, const InternedString &method_name) {
-  auto old_call_state = in_call;
-  in_call = true;
-  Defer _([&] { in_call = old_call_state; });
   ASTCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -765,9 +765,6 @@ void Typer::compiler_mock_associated_function_call_visit_impl(Type *left_type, c
 }
 
 void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const InternedString &method_name) {
-  auto old_call_state = in_call;
-  in_call = true;
-  Defer _([&] { in_call = old_call_state; });
   ASTMethodCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -1305,8 +1302,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
   visit_function_header(node, false);
 
   if (node->is_forward_declared) {
-    ctx.scope->insert_function(node->name, node->resolved_type, node,
-                               SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+    ctx.scope->forward_declare_function(node->name, node->resolved_type, node);
     return;
   }
 
@@ -1688,7 +1684,7 @@ void Typer::visit(ASTCall *node) {
   }
   auto symbol = ctx.get_symbol(node->callee).get();
 
-  if (symbol && symbol->is_function()) {
+  if (symbol && symbol->is_function) {
     if (!type) {
       type = symbol->resolved_type;
     }
@@ -1725,7 +1721,7 @@ void Typer::visit(ASTCall *node) {
       node->callee->resolved_type = func_decl->resolved_type;
     }
 
-  } else if (symbol && symbol->is_type()) {
+  } else if (symbol && symbol->is_type) {
     if (!symbol->type.choice) {
       throw_error(std::format("type {} must be a choice variant to use '(..)' constructor for now",
                               symbol->resolved_type->basename),
@@ -1875,7 +1871,7 @@ void Typer::visit(ASTType *node) {
 
     if (!symbol) {
       throw_error("use of undeclared type", node->source_range);
-    } else if (!symbol->is_type()) {
+    } else if (!symbol->is_type) {
       throw_error("cannot use a non-type symbol as a type", node->source_range);
     }
 
@@ -1959,7 +1955,7 @@ void Typer::visit(ASTBinExpr *node) {
 
         // we assume this is mutable since we made it past that?
         auto symbol = ctx.get_symbol(path).get();
-        if (symbol && symbol->is_variable()) {
+        if (symbol && symbol->is_variable) {
           symbol->variable.initial_value = node->right;
         } else {
           throw_error("Cannot assign to non-variable symbol", node->source_range);
@@ -2359,7 +2355,7 @@ void Typer::visit(ASTInitializerList *node) {
         if (!symbol)
           throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
 
-        if (symbol->is_function()) {
+        if (symbol->is_function) {
           throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
                       value->source_range);
         }
@@ -2620,7 +2616,7 @@ void Typer::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     auto symbol_nullable = ctx.get_symbol(node->target);
 
-    if (symbol_nullable.is_null() || !symbol_nullable.get()->is_type()) {
+    if (symbol_nullable.is_null() || !symbol_nullable.get()->is_type) {
       throw_error("generic `impl![...]` can only be used on types.", node->source_range);
     }
 
@@ -2685,7 +2681,7 @@ void Typer::visit(ASTModule *node) {
   ctx.set_scope(old_scope);
 
   if (auto mod = ctx.scope->lookup(node->module_name)) {
-    if (!mod->is_module()) {
+    if (!mod->is_module) {
       throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
     }
     for (auto &[name, sym] : node->scope->symbols) {
@@ -2835,7 +2831,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   };
 
   for (const auto &[name, sym] : trait_info->scope->symbols) {
-    if (sym.is_function() && !sym.is_generic_function()) {
+    if (sym.is_function && !sym.is_generic_function()) {
       insert_function(name, sym.function.declaration);
     }
   };
@@ -2866,7 +2862,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
         auto right_ty_info = constraint.second->resolved_type->info->as<TraitTypeInfo>();
 
         for (const auto &[name, sym] : right_ty_info->scope->symbols) {
-          if (!sym.is_function() || sym.is_generic_function()) {
+          if (!sym.is_function || sym.is_generic_function()) {
             continue;
           }
 
@@ -2910,7 +2906,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         if (index == path->length() - 1) return symbol;
 
         if (!part.generic_arguments.empty()) {
-          if (symbol->is_type()) {
+          if (symbol->is_type) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
                                       part.get_resolved_generics());
@@ -2919,9 +2915,9 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
           } else
             return nullptr;
         } else {
-          if (symbol->is_module()) {
+          if (symbol->is_module) {
             scope = symbol->module.declaration->scope;
-          } else if (symbol->is_type()) {
+          } else if (symbol->is_type) {
             auto resolved_type = symbol->resolved_type;
             scope = resolved_type->info->scope;
           } else {
@@ -2966,7 +2962,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
         if (index == path->length() - 1) return symbol->scope;
 
         if (!part.generic_arguments.empty()) {
-          if (symbol->is_type()) {
+          if (symbol->is_type) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
                                       part.get_resolved_generics());
@@ -2975,9 +2971,9 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
           } else
             return nullptr;
         } else {
-          if (symbol->is_module()) {
+          if (symbol->is_module) {
             scope = symbol->module.declaration->scope;
-          } else if (symbol->is_type()) {
+          } else if (symbol->is_type) {
             auto resolved_type = symbol->resolved_type;
             scope = resolved_type->info->scope;
           } else {
@@ -3001,7 +2997,7 @@ void Typer::visit(ASTMethodCall *node) {
 
   bool added_dyn_instance_argument_as_arg_0 = false;
 
-  if (func_sym && func_sym->is_function()) {
+  if (func_sym && func_sym->is_function) {
     type = func_sym->resolved_type;
 
     auto declaring_node = func_sym->function.declaration;
@@ -3187,21 +3183,21 @@ void Typer::visit(ASTPath *node) {
         generic_args.push_back(arg->resolved_type);
       }
       ASTDeclaration *instantiation = nullptr;
-      if (symbol->is_type()) {
+      if (symbol->is_type) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = visit_generic(decl, generic_args, node->source_range);
         auto type = instantiation->resolved_type;
         scope = type->info->scope;
         previous_type = type;
-      } else if (symbol->is_function()) {
+      } else if (symbol->is_function) {
         instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
       }
       segment.resolved_type = instantiation->resolved_type;
 
     } else {
-      if (symbol->is_module()) {
+      if (symbol->is_module) {
         scope = symbol->module.declaration->scope;
-      } else if (symbol->is_type()) {
+      } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
@@ -3251,9 +3247,9 @@ void Typer::visit_path_for_call(ASTPath *node) {
         generic_args.push_back(arg->resolved_type);
       }
       ASTDeclaration *decl;
-      if (symbol->is_type()) {
+      if (symbol->is_type) {
         decl = (ASTDeclaration *)symbol->type.declaration.get();
-      } else if (symbol->is_function()) {
+      } else if (symbol->is_function) {
         decl = symbol->function.declaration;
       } else {
         throw_error("use of generic arguments only for types and functions currently.", node->source_range);
@@ -3263,16 +3259,16 @@ void Typer::visit_path_for_call(ASTPath *node) {
         return;
       }
       auto instantiation = visit_generic(decl, generic_args, node->source_range);
-      if (symbol->is_type()) {
+      if (symbol->is_type) {
         auto type = instantiation->resolved_type;
         scope = type->info->scope;
         previous_type = type;
       }
       segment.resolved_type = instantiation->resolved_type;
     } else {
-      if (symbol->is_module()) {
+      if (symbol->is_module) {
         scope = symbol->module.declaration->scope;
-      } else if (symbol->is_type()) {
+      } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
