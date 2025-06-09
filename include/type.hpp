@@ -69,27 +69,6 @@ enum TypeExtEnum {
   TYPE_EXT_ARRAY,
 };
 
-
-
-
-enum FunctionInstanceFlags : unsigned int {
-  FUNCTION_NORMAL = 0,
-  FUNCTION_IS_TEST = 1 << 1,
-  FUNCTION_IS_METHOD = 1 << 2,
-  FUNCTION_IS_VARARGS = 1 << 3,
-  FUNCTION_IS_EXPORTED = 1 << 4,
-  FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
-  FUNCTION_IS_EXTERN = 1 << 6,
-  FUNCTION_IS_INLINE = 1 << 7,
-  FUNCTION_IS_ENTRY = 1 << 8,
-};
-
-enum StructTypeFlags {
-  STRUCT_IS_FORWARD_DECLARED = 1 << 0,
-  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
-  STRUCT_FLAG_IS_UNION = 1 << 2,
-};
-
 struct ASTExpr;
 
 std::string mangled_type_args(const std::vector<Type *> &args);
@@ -125,20 +104,20 @@ std::string inline extensions_to_string(const TypeExtensions &extensions) {
   return ss.str();
 }
 
-inline bool is_pointer_extensions(const TypeExtensions &extensions) {
+inline bool type_extensions_is_back_pointer(const TypeExtensions &extensions) {
   return extensions.size() &&
          (extensions.back().type == TYPE_EXT_POINTER_CONST || extensions.back().type == TYPE_EXT_POINTER_MUT);
 }
 
-inline bool is_const_pointer_extensions(const TypeExtensions &extensions) {
+inline bool type_extensions_is_back_const_pointer(const TypeExtensions &extensions) {
   return extensions.size() && extensions.back().type == TYPE_EXT_POINTER_CONST;
 }
 
-inline bool is_mut_pointer_extensions(const TypeExtensions &extensions) {
+inline bool type_extensions_is_back_mut_pointer(const TypeExtensions &extensions) {
   return extensions.size() && extensions.back().type == TYPE_EXT_POINTER_MUT;
 }
 
-inline bool is_array_extensions(const TypeExtensions &extensions) {
+inline bool type_extensions_is_back_array(const TypeExtensions &extensions) {
   return extensions.size() && (extensions.back().type == TYPE_EXT_ARRAY);
 }
 
@@ -205,7 +184,9 @@ struct EnumTypeInfo : TypeInfo {
 };
 
 struct StructTypeInfo : TypeInfo {
-  int flags;
+  bool is_forward_declared: 1 = false;
+  bool is_anonymous: 1 = false;
+  bool is_union: 1 = false;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
 };
@@ -502,7 +483,7 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
     case TYPE_STRUCT: {
       kind_flags = TYPE_FLAGS_STRUCT;
       auto info = type->info->as<StructTypeInfo>();
-      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+      if (info->is_union) {
         kind_flags = TYPE_FLAGS_UNION;
       }
     } break;

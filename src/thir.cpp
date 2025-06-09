@@ -393,9 +393,8 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
         break;
       }
     }
-    const auto is_non_ptr_non_union_struct =
-        member.type->is_kind(TYPE_STRUCT) && member.type->has_no_extensions() &&
-        DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION);
+    const auto is_non_ptr_non_union_struct = member.type->is_kind(TYPE_STRUCT) && member.type->has_no_extensions() &&
+                                             !member.type->info->as<StructTypeInfo>()->is_union;
 
     if (initializer) {
       thir->key_values.push_back({member.name, visit_node(initializer)});

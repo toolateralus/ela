@@ -113,7 +113,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     if (type != Type::INVALID_TYPE && type != Type::UNRESOLVED_GENERIC) {
       if (type->is_kind(TYPE_STRUCT)) {
         auto info = (type->info->as<StructTypeInfo>());
-        if (DOESNT_HAVE_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED)) {
+        if (!info->is_forward_declared) {
           throw_error("Redefinition of struct", node->source_range);
         }
       } else {
@@ -155,21 +155,21 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   // setup some flags.
   if (node->is_anonymous) {
-    info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+    info->is_anonymous = true;
   }
 
   if (node->is_union) {
-    info->flags |= STRUCT_FLAG_IS_UNION;
+    info->is_union = true;
   }
 
-  if (node->is_fwd_decl && type_just_created) {
-    info->flags |= STRUCT_IS_FORWARD_DECLARED;
+  if (node->is_forward_declared && type_just_created) {
+    info->is_forward_declared = true;
   } else {
-    info->flags &= ~STRUCT_IS_FORWARD_DECLARED;
+    info->is_forward_declared = false;
   }
 
   // if this is a forward declaration, exit out.
-  if (HAS_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED) || node->is_fwd_decl) {
+  if (info->is_forward_declared || node->is_forward_declared) {
     return;
   }
 
@@ -2258,7 +2258,7 @@ void Typer::visit(ASTIndex *node) {
   }
 
   auto ext = left_ty->extensions;
-  if (!is_array_extensions(ext) && !is_pointer_extensions(ext)) {
+  if (!type_extensions_is_back_array(ext) && !type_extensions_is_back_pointer(ext)) {
     throw_error(
         std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
                     left_ty->to_string()),

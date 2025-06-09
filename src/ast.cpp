@@ -2263,7 +2263,7 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
     }
     expect(TType::RCurly);
   } else {
-    node->is_fwd_decl = true;
+    node->is_forward_declared = true;
   }
 
   current_struct_decl = old_struct_decl_state;

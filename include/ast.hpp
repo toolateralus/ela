@@ -683,7 +683,7 @@ struct ASTStructDeclaration : ASTDeclaration {
   InternedString name;
   Scope *scope;
 
-  bool is_fwd_decl = false;
+  bool is_forward_declared = false;
   bool is_union = false;
   bool is_anonymous = false;
 

@@ -427,7 +427,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   info->scope->name = base;
   type->set_info(info);
 
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+  if (info->is_union) {
     type->traits.push_back(is_union_trait());
   } else {
     type->traits.push_back(is_struct_trait());
@@ -490,9 +490,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (is_pointer_extensions(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
-    if (is_const_pointer_extensions(extensions)) {
+    if (type_extensions_is_back_const_pointer(extensions)) {
       type->traits.push_back(is_const_pointer_trait());
     } else {
       type->traits.push_back(is_mut_pointer_trait());

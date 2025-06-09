@@ -286,7 +286,7 @@ void Emitter::emit_tuple(Type *type) {
 void Emitter::emit_struct(Type *type) {
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
   const auto type_name = c_type_string(type);
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+  if (info->is_union) {
     code << "typedef union " << type_name;
   } else {
     code << "typedef struct " << type_name;
@@ -297,7 +297,7 @@ void Emitter::emit_struct(Type *type) {
 
 void Emitter::emit_anonymous_struct(Type *type) {
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+  if (info->is_union) {
     code << "union";
   } else {
     code << "struct";
@@ -387,7 +387,7 @@ void Emitter::forward_declare_type(const Type *type) {
     case TYPE_STRUCT: {
       const auto info = type->info->as<StructTypeInfo>();
       const auto name = c_type_string(type);
-      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+      if (info->is_union) {
         code << "typedef union " << name << ' ' << name << ";\n";
       } else {
         code << "typedef struct " << name << ' ' << name << ";\n";

@@ -7,7 +7,8 @@ void get_varargs_handlers(Context *c) {
   auto scope = c->root_scope;
 
   auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
-  va_list_type->info->as<StructTypeInfo>()->flags |= STRUCT_IS_FORWARD_DECLARED;
+  va_list_type->info->as<StructTypeInfo>()->is_forward_declared = true;
+
   scope->insert_type(va_list_type, "va_list", nullptr);
 
   FunctionTypeInfo func_type_info;
@@ -90,9 +91,7 @@ Symbol *Scope::lookup(const InternedString &name) {
   return nullptr;
 }
 
-void Scope::erase(const InternedString &name) {
-  symbols.erase(name);
-}
+void Scope::erase(const InternedString &name) { symbols.erase(name); }
 
 bool Symbol::is_generic_function() const {
   if (!is_function) return false;
