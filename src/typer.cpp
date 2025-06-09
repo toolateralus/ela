@@ -2598,12 +2598,6 @@ void Typer::visit(ASTDestructure *node) {
     }
   }
 
-  // TODO: we might want to support this, where we would do
-  // *x, *y := ptr_to_struct_or_tuple;
-  // instead of having to do
-  // *x, *y := *ptr_to_struct_or_tuple;
-  // which achieves the same thing anyway.
-
   if (type->has_extensions()) {
     throw_error("Cannot destructure pointer or array type.", node->source_range);
   }

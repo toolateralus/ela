@@ -892,64 +892,45 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Unwrap: $next.Some.$0
   // ugly ahh code.
   const auto some_type = next_var->type->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
-  THIR_ALLOC(THIRMemberAccess, unwrap_some, ast);
-  unwrap_some->base = next_var;
-  unwrap_some->member = "Some";
-  unwrap_some->type = some_type;
-
-  // atrocious looking code.
   const auto value_type = some_type->info->members[0].type;
 
-  THIR_ALLOC(THIRMemberAccess, unwrap_0, ast);
-  unwrap_0->base = unwrap_some;
-  unwrap_0->member = "0";
-  unwrap_0->type = value_type;
+  auto unwrapped_some = make_member_access(ast->source_range, next_var, {{some_type, "Some"}, {value_type, "0"}});
 
   if (ast->left_tag == ASTFor::DESTRUCTURE) {
     static size_t id = 0;
-
     std::vector<THIR *> statements;
-    const auto ptr_to_some = take_address_of(unwrap_0, ast);
-    // we take the address of when caching the result because 'for *x, *y in ...' needs to mutate the original.
+
+    const auto ptr_to_some = take_address_of(unwrapped_some, ast);
+    // we take the address of when caching the result because 'for &x, &y in ...' needs to mutate the original.
     THIRVariable *cached_base =
         make_variable(std::format(THIR_DESTRUCTURE_CAHCED_VARIABLE_KEY_FORMAT, id++), ptr_to_some, ast);
     statements.push_back(cached_base);
     const auto type = value_type;
     auto members_iter = type->info->members.begin();
+
     for (const DestructureElement &element : ast->left.destructure) {
-      THIR_ALLOC(THIRVariable, var, ast);
-      var->name = element.identifier;
-      var->type = element.type;
-
-      THIR_ALLOC(THIRMemberAccess, member_access, ast);
-      var->value = member_access;
-
       const auto member = *members_iter;
+      const auto member_access = make_member_access(ast->source_range, cached_base, {{element.type, member.name}});
+      const auto variable = make_variable(element.identifier, member_access, ast);
       members_iter++;
 
-      member_access->member = member.name;
-      member_access->base = cached_base;
-      member_access->type = element.type;
-
       if (is_pointer_semantic(element.semantic)) {
-        var->value = take_address_of(member_access, ast);
+        variable->value = take_address_of(member_access, ast);
       }
 
       auto symbol = ctx.scope->local_lookup(element.identifier);
-      symbol_map[symbol] = var;
-
-      statements.push_back(var);
+      symbol_map[symbol] = variable;
+      statements.push_back(variable);
     }
+
     thir->block = visit_node(ast->block);
     THIRBlock *block = (THIRBlock *)thir->block;
     block->statements.insert(block->statements.begin(), statements.begin(), statements.end());
   } else {
-    THIR_ALLOC(THIRVariable, identifier_var, ast);
-    identifier_var->name = ast->left.identifier;
-    identifier_var->type = ast->identifier_type;
-    auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
+    const auto identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
+    const auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
     symbol_map[identifier_symbol] = identifier_var;
-    identifier_var->value = unwrap_0;
+
     thir->block = visit_node(ast->block);
     THIRBlock *block = (THIRBlock *)thir->block;
     block->statements.insert(block->statements.begin(), identifier_var);
@@ -1012,8 +993,6 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
   return nullptr;
 }
 
-// x, y := (0, 0);, *x, *y := ...
-// we should refactor the syntax for this to be &const x, &mut y := ...
 void THIRGen::visit_destructure(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
   auto members_iter = type->info->members.begin();
@@ -1109,7 +1088,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   static Type *type_type = ctx.scope->find_type_id("Type", {});
   ReflectionInfo info;
   info.created = true;
-  info.definition = make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+  info.definition =
+      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
   info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
   return info;
 }
