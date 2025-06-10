@@ -95,13 +95,21 @@ void Scope::erase(const InternedString &name) { symbols.erase(name); }
 
 bool Symbol::is_generic_function() const {
   if (!is_function) return false;
-
   auto &declaration = this->function.declaration;
-
   if (declaration->generic_parameters.size() != 0 || declaration->generic_arguments.size() != 0 ||
       declaration->generic_instantiations.size() != 0) {
     return true;
   }
 
   return false;
+}
+
+size_t Scope::methods_count() const {
+  size_t methods = 0;
+  for (const auto &[_, sym] : symbols) {
+    if (sym.is_function && sym.function.declaration->is_method) {
+      methods++;
+    }
+  }
+  return methods;
 }

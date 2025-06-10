@@ -174,14 +174,13 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
 }
 
 void Emitter::emit_literal(const THIRLiteral *thir) {
-
-  if (thir->value=="null") {
+  if (thir->value == "null") {
     code << "NULL";
     return;
   }
 
   const bool is_string = thir->type == u8_ptr_type();
-  
+
   if (is_string) {
     code << '\"';
   }
@@ -211,7 +210,12 @@ void Emitter::emit_cast(const THIRCast *thir) {
   code << '(' << c_type_string(thir->type) << ')';
   emit_expr(thir->operand);
 }
-void Emitter::emit_size_of(const THIRSizeOf *thir) { code << "sizeof(" << c_type_string(thir->target) << ')'; }
+
+void Emitter::emit_size_of(const THIRSizeOf *thir) { code << "sizeof(" << c_type_string(thir->target_type) << ')'; }
+
+void Emitter::emit_offset_of(const THIROffsetOf *thir) {
+  code << "offsetof(" << c_type_string(thir->target_type) << ", " << thir->target_field.get_str() << ')';
+}
 
 void Emitter::emit_index(const THIRIndex *thir) {
   emit_expr(thir->base);
@@ -539,9 +543,27 @@ void Emitter::emit_call(const THIRCall *thir) {
 void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
 
+using ReflectionMap = const std::unordered_map<const Type *, ReflectionInfo> &;
+
+void Emitter::emit_reflection_forward_declarations(ReflectionMap reflected_upon_types) {
+  code << "typedef struct Type Type;\n";
+  for (const auto &[_, info] : reflected_upon_types) {
+    auto &def = info.definition;
+    code << "extern Type " << def->name.get_str() << ";\n";
+  }
+}
+
+void Emitter::emit_reflection_declarations(ReflectionMap reflected_upon_types) {
+  for (const auto &[_, info] : reflected_upon_types) {
+    emit_variable(info.definition);
+  }
+}
+
 void Emitter::emit_node(const THIR *thir) {
   emit_line_directive(thir);
   switch (thir->get_node_type()) {
+    case THIRNodeType::Offset_Of:
+      return emit_offset_of((const THIROffsetOf *)thir);
     case THIRNodeType::ExpressionBlock:
       return emit_expression_block((const THIRExprBlock *)thir);
     case THIRNodeType::Program:

@@ -76,6 +76,11 @@ struct Typer : VisitorBase {
   std::string getIndent();
   void visit_path_for_call(ASTPath *node);
 
+  Type *type_ptr_list = nullptr;
+  Type *method_list = nullptr;
+  Type *field_list = nullptr;
+
+
   /*
     TODO:
     Why are these in the typer and not just globally available?
@@ -193,7 +198,7 @@ struct DeferBlock {
   DeferBlockType type;
 };
 
-/* 
+/*
 void emit_dependencies_for_reflection(OldResolver *dep_resolver, Type *id);
 
 struct OldResolver;

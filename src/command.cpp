@@ -40,21 +40,34 @@ int CompileCommand::compile() {
   Context context{};
   original_path = std::filesystem::current_path();
 
-  auto root = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  auto root = parse.run<ASTProgram *>("parsing", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
   });
 
-  lower.run<void>("typing & lowering to C", [&] {
+  lower.run<void>("typing, lowering to c", [&] {
     Typer typer{context};
     THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);
     typer.visit(root);
+    {
+      thir_gen.type_ptr_list = typer.type_ptr_list;
+      thir_gen.method_list = typer.method_list;
+      thir_gen.field_list = typer.field_list;
+    }
     thir_gen.visit_node(root);
+    emitter.emit_reflection_forward_declarations(thir_gen.reflected_upon_types);
+
+    for (const auto [type, gv]: thir_gen.reflected_upon_types) {
+      resolver.emitted_types.insert(type);
+      resolver.forward_declared_types.insert(type);
+      resolver.emitted_global_variables.insert((const THIRVariable*)gv.definition);
+    }
 
     resolver.visit_node(thir_gen.get_entry_point());
+    emitter.emit_reflection_declarations(thir_gen.reflected_upon_types);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);

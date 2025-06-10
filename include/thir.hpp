@@ -34,6 +34,7 @@ enum struct THIRNodeType : unsigned char {
   EmptyInitializer,
 
   Size_Of,
+  Offset_Of,
   // Control Flow
   Return,
   Break,
@@ -121,14 +122,15 @@ struct THIRParameter {
 };
 
 struct THIRFunction : THIR {
-  bool is_extern : 1;
-  bool is_inline : 1;
-  bool is_exported : 1;
-  bool is_test : 1;
-  bool is_varargs : 1;
-  bool is_entry : 1;
-  bool is_no_return : 1;
-  bool is_no_mangle : 1;
+  // this is for builtins, often ones that are just C macros.
+  bool is_extern : 1 = false;
+  bool is_inline : 1 = false;
+  bool is_exported : 1 = false;
+  bool is_test : 1 = false;
+  bool is_varargs : 1 = false;
+  bool is_entry : 1 = false;
+  bool is_no_return : 1 = false;
+  bool is_no_mangle : 1 = false;
 
   InternedString name;
   std::vector<THIRParameter> parameters;
@@ -179,8 +181,14 @@ struct THIRIndex : THIR {
 };
 
 struct THIRSizeOf : THIR {
-  Type *target;
+  Type *target_type;
   THIRNodeType get_node_type() const override { return THIRNodeType::Size_Of; }
+};
+
+struct THIROffsetOf : THIR {
+  Type *target_type;
+  InternedString target_field;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Offset_Of; }
 };
 
 struct THIRReturn : THIR {
@@ -264,6 +272,7 @@ struct THIRGen {
   // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
   std::map<Symbol *, THIR *> symbol_map;
   THIR *entry_point;
+
   // The "return override register" is used to capture the result of a block or function,
   // mainly for things like defer, early returns, or blocks that yield values. Instead of returning
   // directly, we write the result to this register (almost always a variable), so the correct value is
@@ -273,6 +282,12 @@ struct THIRGen {
 
   // Here, the variable is the original, and the unary expression is the address-of you can use to refer to the type.
   std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
+
+  Type *type_ptr_list = nullptr;
+  Type *method_list = nullptr;
+  Type *field_list = nullptr;
+
+  void set_reflection_types(Typer &typer);
 
   inline Type *iterator_trait() const {
     static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
@@ -305,8 +320,9 @@ struct THIRGen {
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
 
-  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope, std::vector<THIR *> &statements,
-                                          Type *variant_type, const InternedString &variant_name);
+  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
+                                          std::vector<THIR *> &statements, Type *variant_type,
+                                          const InternedString &variant_name);
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
@@ -490,6 +506,11 @@ struct THIRGen {
         return nullptr;
     }
   }
+
+  THIR *get_field_struct_list(Type *type);
+  THIR *get_methods_list(Type *type);
+  THIR *get_traits_list(Type *type);
+  THIR *get_generic_args_list(Type *type);
 
   THIR *get_method_struct(const std::string &name, Type *type);
   THIR *get_field_struct(const std::string &name, Type *type, Type *parent_type);

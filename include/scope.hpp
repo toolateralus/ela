@@ -413,6 +413,8 @@ struct Scope {
     return fields;
   }
 
+  size_t methods_count() const;
+
   void insert_local_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
                              ASTNode *decl = nullptr) {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);

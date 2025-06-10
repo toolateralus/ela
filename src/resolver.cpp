@@ -103,7 +103,10 @@ void Resolver::visit_collection_initializer(const THIRCollectionInitializer *thi
     visit_node(value);
   }
 }
-void Resolver::visit_size_of(const THIRSizeOf *thir) { declare_or_define_type(thir->target); }
+
+void Resolver::visit_size_of(const THIRSizeOf *thir) { declare_or_define_type(thir->target_type); }
+void Resolver::visit_offset_of(const THIROffsetOf *thir) { declare_or_define_type(thir->target_type); }
+
 void Resolver::visit_return(const THIRReturn *thir) {
   if (thir->expression) {
     visit_node(thir->expression);
@@ -241,6 +244,9 @@ void Resolver::visit_node(const THIR *thir) {
       break;
     case THIRNodeType::While:
       visit_while((const THIRWhile *)thir);
+      break;
+    case THIRNodeType::Offset_Of:
+      visit_offset_of((const THIROffsetOf *)thir);
       break;
   }
 }

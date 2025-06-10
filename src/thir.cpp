@@ -62,7 +62,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
 */
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
   THIR_ALLOC(THIRSizeOf, thir, ast);
-  thir->target = ast->target_type->resolved_type;
+  thir->target_type = ast->target_type->resolved_type;
   thir->type = u64_type();
   return thir;
 }
@@ -1060,50 +1060,9 @@ void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
   }
 }
 
-THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
-  (void)name;
-  (void)type;
-  return nullptr;
-}
-
-THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
-  (void)name;
-  (void)type;
-  (void)parent_type;
-  return nullptr;
-}
-
-ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
-  static Type *type_type = ctx.scope->find_type_id("Type", {});
-  ReflectionInfo info;
-  info.created = true;
-  info.definition =
-      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
-  info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
-  return info;
-}
-
-THIR *THIRGen::to_reflection_type_struct(Type *type) {
-  if (!type) {
-    throw_error("internal compiler error: encountered a null type while emitting THIR for a reflection object.", {});
-  }
-
-  /*
-    Has this type already been emitted to a struct?
-    if so, reference it.
-  */
-  ReflectionInfo &reflection_info = reflected_upon_types[type];
-  if (reflection_info.has_been_created()) {
-    return reflection_info.reference;
-  }
-
-  reflection_info = create_reflection_type_struct(type);
-  return reflection_info.reference;
-}
-
 THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_range) {
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
-  static Type *str_type = ctx.scope->find_type_id("str", {{}});
+  static Type *str_type = ctx.scope->find_type_id("str", {});
   thir->source_range = src_range;
   thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type())});
@@ -1141,3 +1100,248 @@ THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
   }
   return last_part;
 }
+
+THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
+  static Type *method_struct_type = ctx.scope->find_type_id("Method", {});
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = method_struct_type;
+  thir->key_values.push_back({
+      "name",
+      make_str(name, {}),
+  });
+  thir->key_values.push_back({
+      "pointer",
+      symbol_map[type->info->scope->lookup(name)],
+  });
+  return thir;
+}
+
+THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
+  static Type *field_struct_type = ctx.scope->find_type_id("Field", {});
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = field_struct_type;
+
+  thir->key_values.push_back({"name", make_str(name, {})});
+
+  thir->key_values.push_back({
+      "type",
+      to_reflection_type_struct(type),
+  });
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRSizeOf, size_of);
+  size_of->target_type = type;
+  thir->key_values.push_back({
+      "size",
+      size_of,
+  });
+
+  THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
+  offset_of->target_type = type;
+  offset_of->target_field = name;
+  thir->key_values.push_back({
+      "offset",
+      offset_of,
+  });
+
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    const auto info = parent_type->info->as<EnumTypeInfo>();
+    const auto member = info->find_member(name);
+    if (member && member->thir_value) {
+      thir->key_values.push_back({"enum_value", member->thir_value.get()});
+    }
+  }
+
+  return thir;
+}
+
+THIR *THIRGen::get_field_struct_list(Type *type) {
+  static Type *field_type = ctx.scope->find_type_id("Field", {});
+  const auto length = type->info->members.size();
+  THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->type = field_type->make_array_of(length);
+  for (const auto &member : type->info->members) {
+    collection->values.push_back(get_field_struct(member.name.get_str(), member.type, type));
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = field_list;
+  thir->key_values.push_back({"data", collection});
+
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+
+  thir->key_values.push_back({
+      "length",
+      length_literal,
+  });
+
+  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
+  // complete wrong collection for this, we need built-in slices like Rust.
+  thir->key_values.push_back({
+      "capacity",
+      length_literal,
+  });
+
+  return thir;
+}
+
+THIR *THIRGen::get_methods_list(Type *type) {
+  const auto length = type->info->scope->methods_count();
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+  static Type *method_type = ctx.scope->find_type_id("Method", {});
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->type = method_type->make_array_of(length);
+  for (const auto &member : type->info->members) {
+    collection->values.push_back(get_method_struct(member.name.get_str(), member.type));
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = method_list;
+  thir->key_values.push_back({"data", collection});
+  thir->key_values.push_back({
+      "length",
+      length_literal,
+  });
+  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
+  // complete wrong collection for this, we need built-in slices like Rust.
+  thir->key_values.push_back({
+      "capacity",
+      length_literal,
+  });
+  return thir;
+}
+
+THIR *THIRGen::get_traits_list(Type *type) {
+  const auto length = type->traits.size();
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+
+  static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->type = type_type->make_array_of(length);
+
+  for (const auto &trait : type->traits) {
+    collection->values.push_back(to_reflection_type_struct(trait));
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = type_ptr_list;
+  thir->key_values.push_back({"data", collection});
+  thir->key_values.push_back({
+      "length",
+      length_literal,
+  });
+  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
+  // complete wrong collection for this, we need built-in slices like Rust.
+  thir->key_values.push_back({
+      "capacity",
+      length_literal,
+  });
+  return thir;
+}
+
+THIR *THIRGen::get_generic_args_list(Type *type) {
+  const auto length = type->generic_args.size();
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+
+  static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->type = type_type->make_array_of(length);
+
+  for (const auto &type_arg : type->generic_args) {
+    collection->values.push_back(to_reflection_type_struct(type_arg));
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = type_ptr_list;
+
+  thir->key_values.push_back({"data", collection});
+  thir->key_values.push_back({
+      "length",
+      length_literal,
+  });
+
+  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
+  // complete wrong collection for this, we need built-in slices like Rust.
+  thir->key_values.push_back({
+      "capacity",
+      length_literal,
+  });
+  return thir;
+}
+
+ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
+  static Type *type_type = ctx.scope->find_type_id("Type", {});
+  ReflectionInfo info;
+  info.created = true;
+  info.definition = make_variable(
+    std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), 
+    initialize({}, type_type, {}), 
+    nullptr
+  );
+
+  info.definition->is_global = true;
+  info.definition->is_statement = true;
+
+  info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->type = type_type;
+  info.definition->value = thir;
+
+  thir->key_values.push_back({"id", make_literal(std::to_string(type->uid), {}, u64_type())});
+
+  thir->key_values.push_back({
+      "name",
+      make_str(type->basename, {}),
+  });
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRSizeOf, size_of);
+  size_of->target_type = type;
+  thir->key_values.push_back({
+      "size",
+      size_of,
+  });
+
+  thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type())});
+
+  thir->key_values.push_back({
+      "fields",
+      get_field_struct_list(type),
+  });
+
+  if (type->is_fixed_sized_array() || type->is_pointer()) {
+    thir->key_values.push_back({"element_type", to_reflection_type_struct(type->get_element_type())});
+  }
+
+  thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
+
+  thir->key_values.push_back({"traits", get_traits_list(type)});
+
+  thir->key_values.push_back({
+      "methods",
+      get_methods_list(type),
+  });
+
+  return info;
+}
+
+THIR *THIRGen::to_reflection_type_struct(Type *type) {
+  if (!type) {
+    throw_error("internal compiler error: encountered a null type while emitting THIR for a reflection object.", {});
+  }
+
+  /*
+    Has this type already been emitted to a struct?
+    if so, reference it.
+  */
+  ReflectionInfo &reflection_info = reflected_upon_types[type];
+  if (reflection_info.has_been_created()) {
+    return reflection_info.reference;
+  }
+
+  reflection_info = create_reflection_type_struct(type);
+  return reflection_info.reference;
+}
+

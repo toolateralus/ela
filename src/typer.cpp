@@ -388,7 +388,9 @@ Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *
       throw_error("Invalid target to generic args", source_range);
       break;
   }
+
   instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, source_range);
+
   return global_find_type_id(instantiation->resolved_type, {});
 }
 
@@ -1839,6 +1841,19 @@ void Typer::visit(ASTExprStatement *node) {
 }
 
 void Typer::visit(ASTType_Of *node) {
+  static bool types_initialized = false;
+  if (!types_initialized) {
+    types_initialized = true;
+    Type *type_ptr_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
+    type_ptr_list = find_generic_type_of("List", {type_ptr_type}, {});
+
+    Type *method_type = ctx.scope->find_type_id("Method", {});
+    method_list = find_generic_type_of("List", {method_type}, {});
+
+    Type *field_type = ctx.scope->find_type_id("Field", {});
+    field_list = find_generic_type_of("List", {field_type}, {});
+  }
+
   static auto type_ptr = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
   node->target->accept(this);
   node->resolved_type = type_ptr;

@@ -7,8 +7,11 @@
 struct Emitter {
   StringBuilder code{};
   int indent_level = 0;
-
   const THIRFunction *entry_point;
+
+  void emit_reflection_forward_declarations(
+      const std::unordered_map<const Type *, ReflectionInfo> &reflected_upon_types);
+  void emit_reflection_declarations(const std::unordered_map<const Type *, ReflectionInfo> &reflected_upon_types);
 
   inline void indented(const std::string &string = {}) {
     // 2 space indenting is our standard.
@@ -72,6 +75,7 @@ struct Emitter {
   void emit_collection_initializer(const THIRCollectionInitializer *thir);
   void emit_empty_initializer(const THIREmptyInitializer *thir);
   void emit_size_of(const THIRSizeOf *thir);
+  void emit_offset_of(const THIROffsetOf *thir);
   void emit_return(const THIRReturn *thir);
   void emit_break(const THIRBreak *thir);
   void emit_continue(const THIRContinue *thir);

@@ -258,7 +258,7 @@ struct ASTPath : ASTExpr {
   std::vector<ASTExpr *> *get_last_segments_generics() { return &segments.back().generic_arguments; }
 
   /*
-    Path parts are typically identifiers, and they may contain their own generic arguments.
+    Path segments are typically identifiers, and they may contain their own generic arguments.
 
     "collections::List!<s32>" -> {
       parts: [
@@ -1138,3 +1138,4 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
+  

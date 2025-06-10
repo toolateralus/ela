@@ -135,7 +135,6 @@ struct TypeInfo {
   Scope *scope = nullptr;
 
   std::vector<TypeMember> members;
-
   TypeInfo() {}
 
   template <class T>
@@ -146,6 +145,15 @@ struct TypeInfo {
 
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
+
+  inline TypeMember const *find_member(const InternedString &name) const {
+    for (auto member = members.begin(); member != members.end(); ++member) {
+      if (member->name == name) {
+        return member.base();
+      }
+    }
+    return nullptr;
+  }
 };
 
 struct TraitTypeInfo : TypeInfo {
@@ -184,9 +192,9 @@ struct EnumTypeInfo : TypeInfo {
 };
 
 struct StructTypeInfo : TypeInfo {
-  bool is_forward_declared: 1 = false;
-  bool is_anonymous: 1 = false;
-  bool is_union: 1 = false;
+  bool is_forward_declared : 1 = false;
+  bool is_anonymous : 1 = false;
+  bool is_union : 1 = false;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
 };
@@ -371,11 +379,11 @@ struct Type {
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
   inline Type() = default;
+
   inline Type(size_t uid, const TypeKind kind) : uid(uid), kind(kind) {
     if (kind == TYPE_TUPLE) {
       traits.push_back(is_tuple_trait());
     }
-
     if (kind == TYPE_FUNCTION) {
       traits.push_back(is_fn_trait());
     }
@@ -397,6 +405,10 @@ struct Type {
 
   // take a mut/const pointer to this type.
   Type *take_pointer_to(bool) const;
+
+  Type *make_array_of(size_t size) const {
+    return global_find_type_id((Type *)this, {{.type = TYPE_EXT_ARRAY, .array_size = size}});
+  }
 
   // To have a null, yet identifyable unresolved generic type,
   // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
