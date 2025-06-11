@@ -160,3 +160,56 @@ struct Flags {
 
 #define HAS_FLAG(var, flag) ((var & flag) != 0)
 #define DOESNT_HAVE_FLAG(var, flag) ((var & flag) == 0)
+
+static inline size_t calculate_strings_actual_length(const std::string_view &str_view) {
+  size_t length = 0;
+  for (size_t i = 0; i < str_view.size(); ++i) {
+    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+      switch (str_view[i + 1]) {
+        case 'n':
+        case 't':
+        case 'r':
+        case '\\':
+        case '"':
+          ++i;  // Skip the escape character
+          break;
+        case 'x':  // Hexadecimal escape sequence
+          i += 2;  // Skip \x and the next two hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'u':  // Unicode escape sequence
+          i += 4;  // Skip \u and the next four hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'U':  // Unicode escape sequence
+          i += 8;  // Skip \U and the next eight hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        default:
+          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {  // Octal escape sequence
+            ++i;                                                   // Skip the first digit
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i;  // Skip the second digit
+            }
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i;  // Skip the third digit
+            }
+          }
+          break;
+      }
+    }
+    ++length;
+  }
+  return length;
+}
+
+#define ENTER_SCOPE($new_scope)       \
+  const auto $old_scope_ = ctx.scope; \
+  ctx.scope = $new_scope;             \
+  const Defer $scope_defer([&] { ctx.scope = $old_scope_; });

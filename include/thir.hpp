@@ -3,12 +3,25 @@
 #include "arena.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
+#include "strings.hpp"
 #include "type.hpp"
 #include "ast.hpp"
+#include <map>
+#include <unordered_map>
 #include <vector>
 
 enum struct THIRNodeType : unsigned char {
-  Path,
+  // Statements
+  Program,
+  Block,
+  Variable,
+
+  Function,
+  Type,
+
+  // Expressions
+  ExpressionBlock,
   BinExpr,
   UnaryExpr,
   Literal,
@@ -21,26 +34,81 @@ enum struct THIRNodeType : unsigned char {
   EmptyInitializer,
 
   Size_Of,
-
+  Offset_Of,
+  // Control Flow
   Return,
   Break,
   Continue,
   For,
   If,
   While,
-  Switch,
-  Variable,
-  Block,
 };
 
 struct THIR {
-  THIR() {}
+  // This is purely used to handle putting semicolons after expression statements, without needing an 'expression
+  // statement' node This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper
+  // way to do this it is a bit messy, but it's far preferable to THIRStmt/THIRExpr && ThirExprStatement.
+  bool is_statement = false;
+
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
   SourceRange source_range;
+
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
+
+  bool is_temporary_value() const {
+    switch (get_node_type()) {
+      case THIRNodeType::Literal:
+      case THIRNodeType::Call:
+      case THIRNodeType::Cast:
+      case THIRNodeType::ExpressionBlock:
+      case THIRNodeType::Size_Of:
+        return true;
+      // These are technically rvalues, but C doesn't care, so for now, we ignore them.
+      // it would be best to not do this.
+      case THIRNodeType::AggregateInitializer:
+      case THIRNodeType::CollectionInitializer:
+      case THIRNodeType::EmptyInitializer:
+      default:
+        return false;
+    }
+  }
+};
+
+struct THIRProgram : THIR {
+  std::vector<THIR *> statements;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Program; }
+};
+
+struct THIRVariable : THIR {
+  InternedString name;
+  THIR *value;
+  bool is_global;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
+};
+
+/*
+  We can use this to emit various types,
+  'struct'
+  'union'
+  'choice'
+  'dyn ...'
+  tuple types.
+
+  as long as we structure it in a desugared, literal way.
+*/
+struct THIRType : THIR {
+  THIRNodeType get_node_type() const override { return THIRNodeType::Type; }
+};
+
+// this is just a block that can return a value, and can be used as an expression.
+// this distinction is important in C, but llvm ir too probably.
+struct THIRExprBlock : THIR {
+  std::vector<THIR *> statements;
+  THIRVariable *return_register;
+  THIRNodeType get_node_type() const override { return THIRNodeType::ExpressionBlock; }
 };
 
 struct THIRBlock : THIR {
@@ -48,39 +116,27 @@ struct THIRBlock : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Block; }
 };
 
-struct THIRFunction {
+struct THIRParameter {
   InternedString name;
-  // includes parameters and return type of course.
-  Type *type;
-  // Where the meat of the executable portion of the program resides.
-  THIRBlock block;
-
-  size_t id;
+  THIR *default_value;
 };
 
-struct THIRVariable : THIR {
+struct THIRFunction : THIR {
+  // this is for builtins, often ones that are just C macros.
+  bool is_extern : 1 = false;
+  bool is_inline : 1 = false;
+  bool is_exported : 1 = false;
+  bool is_test : 1 = false;
+  bool is_varargs : 1 = false;
+  bool is_entry : 1 = false;
+  bool is_no_return : 1 = false;
+  bool is_no_mangle : 1 = false;
+
   InternedString name;
-  THIR *value;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
-};
+  std::vector<THIRParameter> parameters;
 
-struct THIRContext {
-  std::vector<THIRFunction> functions;
-  std::vector<THIRVariable> global_variables;
-  inline size_t insert_function(const THIRFunction &fn) {
-    size_t id = functions.size();
-    functions.push_back(std::move(fn));
-    return id;
-  }
-};
-
-struct THIRPath : THIR {
-  enum Kind { Function, Variable } tag;
-  union {
-    THIRFunction *function;
-    THIRVariable *variable;
-  };
-  THIRNodeType get_node_type() const override { return THIRNodeType::Path; }
+  THIRBlock *block;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Function; }
 };
 
 struct THIRBinExpr : THIR {
@@ -125,8 +181,14 @@ struct THIRIndex : THIR {
 };
 
 struct THIRSizeOf : THIR {
-  Type *target;
+  Type *target_type;
   THIRNodeType get_node_type() const override { return THIRNodeType::Size_Of; }
+};
+
+struct THIROffsetOf : THIR {
+  Type *target_type;
+  InternedString target_field;
+  THIRNodeType get_node_type() const override { return THIRNodeType::Offset_Of; }
 };
 
 struct THIRReturn : THIR {
@@ -146,7 +208,7 @@ struct THIRFor : THIR {
   THIR *initialization;
   THIR *condition;
   THIR *increment;
-  THIRBlock *block;
+  THIR *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::For; }
 };
 
@@ -161,12 +223,6 @@ struct THIRWhile : THIR {
   THIR *condition;
   THIRBlock *block;
   THIRNodeType get_node_type() const override { return THIRNodeType::While; }
-};
-
-struct THIRSwitch : THIR {
-  THIR *target;
-  std::vector<std::pair<THIR *, THIRBlock *>> branches;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Switch; }
 };
 
 struct THIREmptyInitializer : THIR {
@@ -185,36 +241,103 @@ struct THIRCollectionInitializer : THIR {
 
 extern jstl::Arena thir_arena;
 
-template <class T> static inline T *thir_alloc() { return (T *)thir_arena.allocate(sizeof(T)); }
+template <class T>
+static inline T *thir_alloc() {
+  return new (thir_arena.allocate(sizeof(T))) T();
+}
 
-#define THIR_ALLOC_EXPR(__type, __name, ast)                                                                           \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
-  __type *__name = thir_alloc<__type>();                                                                               \
-  __name->source_range = ast->source_range;                                                                            \
+#define THIR_ALLOC(__type, __name, ast)                                                \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
+  __type *__name = thir_alloc<__type>();                                               \
+  __name->source_range = ast->source_range;                                            \
   __name->type = ast->resolved_type;
 
-#define THIR_ALLOC_STMT(__type, __name, ast)                                                                           \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
-  __type *__name = thir_alloc<__type>();                                                                               \
-  __name->source_range = ast->source_range;
-
-#define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                                                        \
-  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR");                                 \
+#define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                        \
+  static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();
 
-struct THIRVisitor {
-  THIRVisitor(Context &ctx) : ctx(ctx) {}
+struct ReflectionInfo {
+  // const Type type_info_for_this_type = {...}; global variable.
+  THIRVariable *definition;
+  // &type_info_of_this_type, unary address of expression getting a pointer to that stable memory.
+  THIRUnaryExpr *reference;
+
+  bool created = false;
+  bool has_been_created() const { return created; }
+};
+
+struct THIRGen {
+  THIRGen(Context &ctx) : ctx(ctx) {}
   Context &ctx;
+  // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
+  std::map<Symbol *, THIR *> symbol_map;
+  THIR *entry_point;
+
+  // The "return override register" is used to capture the result of a block or function,
+  // mainly for things like defer, early returns, or blocks that yield values. Instead of returning
+  // directly, we write the result to this register (almost always a variable), so the correct value is
+  // available for the final return or whatever comes next.
+  Nullable<THIRVariable> return_override_register;
+  size_t return_override_register_index = 0;
+
+  // Here, the variable is the original, and the unary expression is the address-of you can use to refer to the type.
+  std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
+
+  Type *type_ptr_list = nullptr;
+  Type *method_list = nullptr;
+  Type *field_list = nullptr;
+
+  void set_reflection_types(Typer &typer);
+
+  inline Type *iterator_trait() const {
+    static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
+    return iter_id;
+  }
+
+  inline Type *iterable_trait() const {
+    static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
+    return iterable_id;
+  }
+
+  inline THIRVariable *init_override_register(ASTNode *node) {
+    THIR_ALLOC(THIRVariable, override_register, node)
+    override_register->name = std::format(THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT, return_override_register_index++);
+    THIR_ALLOC(THIREmptyInitializer, empty_init, node)
+    override_register->value = empty_init;
+    override_register->type = node->resolved_type;
+    return_override_register = {override_register};
+    return override_register;
+  }
+
+  // This will either point to the entire THIRProgram, or, it will point to a function, either being `fn main()` or any
+  // `@[entry]` tagged function.
+  inline THIR *get_entry_point() const { return entry_point; }
+
+  // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
+  // typically these will just return void.
+  std::vector<THIR *> *current_statement_list;
+
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
-  THIR *visit_pattern_match(ASTPatternMatch *node);
+
+  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
+                                          std::vector<THIR *> &statements, Type *variant_type,
+                                          const InternedString &variant_name);
+  THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
+  THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
+
   THIR *visit_dyn_of(ASTDyn_Of *node);
   THIR *visit_type_of(ASTType_Of *node);
   THIR *visit_block(ASTBlock *node);
-  THIR *visit_expr_statement(ASTExprStatement *node);
   THIR *visit_bin_expr(ASTBinExpr *node);
   THIR *visit_unary_expr(ASTUnaryExpr *node);
   THIR *visit_literal(ASTLiteral *node);
+
+  void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
+                                          std::vector<THIR *> &out_args);
+
+  void extract_thir_values_for_type_members(Type *type);
+
   THIR *visit_call(ASTCall *node);
   THIR *visit_return(ASTReturn *node);
   THIR *visit_dot_expr(ASTDotExpr *node);
@@ -227,9 +350,10 @@ struct THIRVisitor {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-  THIR *visit_module(ASTModule *node);
-  THIR *visit_import(ASTImport *node);
+  THIR *initialize(const SourceRange &source_range, Type *type,
+                   const std::vector<std::pair<InternedString, ASTExpr *>> &key_values);
   THIR *visit_program(ASTProgram *node);
+  THIR *visit_function_declaration_via_symbol(Symbol *symbol);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);
   THIR *visit_continue(ASTContinue *node);
@@ -239,90 +363,158 @@ struct THIRVisitor {
   THIR *visit_else(ASTElse *node);
   THIR *visit_while(ASTWhile *node);
   THIR *visit_enum_declaration(ASTEnumDeclaration *node);
-  THIR *visit_tuple_deconstruction(ASTDestructure *node);
-  THIR *visit_impl(ASTImpl *node);
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
+  THIR *visit_expr_statement(ASTExprStatement *node);
+
+  THIR *take_address_of(THIR *node, ASTNode *ast);
+  THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
+  THIR *make_str(const InternedString &value, const SourceRange &src_range);
+  THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
+
+  THIR *make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
+
+  void visit_module(ASTModule *node);
+  void visit_import(ASTImport *node);
+  void visit_impl(ASTImpl *node);
+  void visit_destructure(ASTDestructure *node);
+  void visit_where_statement(ASTWhereStatement *node);
 
   THIR *visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
+      case AST_NODE_STATEMENT_LIST: {
+        for (const auto &ast_stmt : ((ASTStatementList *)node)->statements) {
+          if (auto thir = visit_node(ast_stmt)) {
+            current_statement_list->push_back(thir);
+          }
+        }
+        return nullptr;
+      }
+
+      // These nodes can return many nodes, so they always return void, and push the nodes manually.
+      case AST_NODE_TUPLE_DECONSTRUCTION: {
+        visit_destructure((ASTDestructure *)node);
+        return nullptr;
+      }
+      case AST_NODE_WHERE_STATEMENT: {
+        visit_where_statement((ASTWhereStatement *)node);
+        return nullptr;
+      }
+      case AST_NODE_IMPL: {
+        visit_impl((ASTImpl *)node);
+        return nullptr;
+      }
+      case AST_NODE_IMPORT: {
+        visit_import((ASTImport *)node);
+        return nullptr;
+      }
+      case AST_NODE_MODULE: {
+        visit_module((ASTModule *)node);
+        return nullptr;
+      }
+
+      // Actual nodes.
       case AST_NODE_IF:
-        return visit_if(static_cast<ASTIf *>(node));
+        return visit_if((ASTIf *)node);
       case AST_NODE_LAMBDA:
-        return visit_lambda(static_cast<ASTLambda *>(node));
+        return visit_lambda((ASTLambda *)node);
       case AST_NODE_BIN_EXPR:
-        return visit_bin_expr(static_cast<ASTBinExpr *>(node));
+        return visit_bin_expr((ASTBinExpr *)node);
       case AST_NODE_UNARY_EXPR:
-        return visit_unary_expr(static_cast<ASTUnaryExpr *>(node));
+        return visit_unary_expr((ASTUnaryExpr *)node);
       case AST_NODE_LITERAL:
-        return visit_literal(static_cast<ASTLiteral *>(node));
+        return visit_literal((ASTLiteral *)node);
       case AST_NODE_PATH:
-        return visit_path(static_cast<ASTPath *>(node));
+        return visit_path((ASTPath *)node);
       case AST_NODE_TUPLE:
-        return visit_tuple(static_cast<ASTTuple *>(node));
+        return visit_tuple((ASTTuple *)node);
       case AST_NODE_CALL:
-        return visit_call(static_cast<ASTCall *>(node));
+        return visit_call((ASTCall *)node);
       case AST_NODE_METHOD_CALL:
-        return visit_method_call(static_cast<ASTMethodCall *>(node));
+        return visit_method_call((ASTMethodCall *)node);
       case AST_NODE_DOT_EXPR:
-        return visit_dot_expr(static_cast<ASTDotExpr *>(node));
+        return visit_dot_expr((ASTDotExpr *)node);
       case AST_NODE_INDEX:
-        return visit_index(static_cast<ASTIndex *>(node));
+        return visit_index((ASTIndex *)node);
       case AST_NODE_INITIALIZER_LIST:
-        return visit_initializer_list(static_cast<ASTInitializerList *>(node));
+        return visit_initializer_list((ASTInitializerList *)node);
       case AST_NODE_SIZE_OF:
-        return visit_size_of(static_cast<ASTSize_Of *>(node));
+        return visit_size_of((ASTSize_Of *)node);
       case AST_NODE_TYPE_OF:
-        return visit_type_of(static_cast<ASTType_Of *>(node));
+        return visit_type_of((ASTType_Of *)node);
       case AST_NODE_DYN_OF:
-        return visit_dyn_of(static_cast<ASTDyn_Of *>(node));
+        return visit_dyn_of((ASTDyn_Of *)node);
       case AST_NODE_CAST:
-        return visit_cast(static_cast<ASTCast *>(node));
+        return visit_cast((ASTCast *)node);
       case AST_NODE_RANGE:
-        return visit_range(static_cast<ASTRange *>(node));
+        return visit_range((ASTRange *)node);
       case AST_NODE_SWITCH:
-        return visit_switch(static_cast<ASTSwitch *>(node));
+        return visit_switch((ASTSwitch *)node);
       case AST_NODE_PATTERN_MATCH:
-        return visit_pattern_match(static_cast<ASTPatternMatch *>(node));
+        throw_error(
+            "INTERNAL COMPILER ERROR:THIR :: you cannot visit a PatternMatch without explicitly calling into it, with "
+            "the list of statements it needs to unload into.",
+            node->source_range);
+        return nullptr;
       // Statement nodes
       case AST_NODE_BLOCK:
-        return visit_block(static_cast<ASTBlock *>(node));
+        return visit_block((ASTBlock *)node);
       case AST_NODE_FUNCTION_DECLARATION:
-        return visit_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
-      case AST_NODE_IMPL:
-        return visit_impl(static_cast<ASTImpl *>(node));
-      case AST_NODE_IMPORT:
-        return visit_import(static_cast<ASTImport *>(node));
-      case AST_NODE_MODULE:
-        return visit_module(static_cast<ASTModule *>(node));
+        return visit_function_declaration((ASTFunctionDeclaration *)node);
       case AST_NODE_RETURN:
-        return visit_return(static_cast<ASTReturn *>(node));
+        return visit_return((ASTReturn *)node);
       case AST_NODE_CONTINUE:
-        return visit_continue(static_cast<ASTContinue *>(node));
+        return visit_continue((ASTContinue *)node);
       case AST_NODE_BREAK:
-        return visit_break(static_cast<ASTBreak *>(node));
+        return visit_break((ASTBreak *)node);
       case AST_NODE_FOR:
-        return visit_for(static_cast<ASTFor *>(node));
+        return visit_for((ASTFor *)node);
       case AST_NODE_ELSE:
-        return visit_else(static_cast<ASTElse *>(node));
+        return visit_else((ASTElse *)node);
       case AST_NODE_WHILE:
-        return visit_while(static_cast<ASTWhile *>(node));
+        return visit_while((ASTWhile *)node);
       case AST_NODE_STRUCT_DECLARATION:
-        return visit_struct_declaration(static_cast<ASTStructDeclaration *>(node));
+        return visit_struct_declaration((ASTStructDeclaration *)node);
       case AST_NODE_ENUM_DECLARATION:
-        return visit_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
+        return visit_enum_declaration((ASTEnumDeclaration *)node);
       case AST_NODE_CHOICE_DECLARATION:
-        return visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
+        return visit_choice_declaration((ASTChoiceDeclaration *)node);
       case AST_NODE_VARIABLE:
-        return visit_variable(static_cast<ASTVariable *>(node));
+        return visit_variable((ASTVariable *)node);
       case AST_NODE_EXPR_STATEMENT:
-        return visit_expr_statement(static_cast<ASTExprStatement *>(node));
+        return visit_expr_statement((ASTExprStatement *)node);
       case AST_NODE_DEFER:
-        return visit_defer(static_cast<ASTDefer *>(node));
-      case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction(static_cast<ASTDestructure *>(node));
-      default:
+        return visit_defer((ASTDefer *)node);
+      case AST_NODE_PROGRAM:
+        return visit_program((ASTProgram *)node);
+
+      // Ignored nodes.
+      case AST_NODE_NOOP:
+      case AST_NODE_ALIAS:
+      case AST_NODE_TRAIT_DECLARATION:
+        return nullptr;
+
+      case AST_NODE_PARAMS_DECL:
+      case AST_NODE_TYPE:
+      case AST_NODE_PARAM_DECL:
+      case AST_NODE_ARGUMENTS:
+      case AST_NODE_WHERE:
+        throw_error(
+            "INTERNAL COMPILER ERROR: ast node not supported by thir gen. it's likely it just needs to be moved to the "
+            "ignored cases",
+            node->source_range);
         return nullptr;
     }
   }
+
+  THIR *get_field_struct_list(Type *type);
+  THIR *get_methods_list(Type *type);
+  THIR *get_traits_list(Type *type);
+  THIR *get_generic_args_list(Type *type);
+
+  THIR *get_method_struct(const std::string &name, Type *type);
+  THIR *get_field_struct(const std::string &name, Type *type, Type *parent_type);
+  ReflectionInfo create_reflection_type_struct(Type *type);
+  THIR *to_reflection_type_struct(Type *type);
+  void emit_destructure_for_pattern_match(ASTPatternMatch *pattern_match, std::vector<THIR *> &statements);
 };

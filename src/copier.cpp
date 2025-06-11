@@ -13,8 +13,7 @@ ASTProgram *ASTCopier::copy_program(ASTProgram *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
   for (auto stmt : node->statements) {
-    if (stmt->get_node_type() == AST_NODE_NOOP)
-      continue;
+    if (stmt->get_node_type() == AST_NODE_NOOP) continue;
     new_node->statements.push_back(static_cast<ASTStatement *>(copy_node(stmt)));
   }
   return new_node;
@@ -24,7 +23,6 @@ ASTBlock *ASTCopier::copy_block(ASTBlock *node) {
   new_node->statements.clear();
   new_node->scope = copy_scope(new_node->scope);
   new_node->scope->symbols.clear();
-  new_node->scope->ordered_symbols.clear();
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   for (auto stmt : node->statements) {
@@ -84,10 +82,8 @@ ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
 
 ASTVariable *ASTCopier::copy_variable(ASTVariable *node) {
   auto new_node = copy(node);
-  if (node->type)
-    new_node->type = static_cast<ASTType *>(copy_node(node->type));
-  if (node->value)
-    new_node->value = static_cast<ASTExpr *>(copy_node(node->value.get()));
+  if (node->type) new_node->type = static_cast<ASTType *>(copy_node(node->type));
+  if (node->value) new_node->value = static_cast<ASTExpr *>(copy_node(node->value.get()));
   return new_node;
 }
 ASTExprStatement *ASTCopier::copy_expr_statement(ASTExprStatement *node) {
@@ -157,8 +153,7 @@ ASTArguments *ASTCopier::copy_arguments(ASTArguments *node) {
 }
 ASTReturn *ASTCopier::copy_return(ASTReturn *node) {
   auto new_node = copy(node);
-  if (node->expression)
-    new_node->expression = static_cast<ASTExpr *>(copy_node(node->expression.get()));
+  if (node->expression) new_node->expression = static_cast<ASTExpr *>(copy_node(node->expression.get()));
   return new_node;
 }
 ASTContinue *ASTCopier::copy_continue(ASTContinue *node) { return new (ast_alloc<ASTContinue>()) ASTContinue(*node); }
@@ -188,22 +183,18 @@ ASTIf *ASTCopier::copy_if(ASTIf *node) {
   auto new_node = copy(node);
   new_node->condition = (ASTExpr *)copy_node(node->condition);
   new_node->block = copy_block(node->block);
-  if (node->_else)
-    new_node->_else = copy_else(node->_else.get());
+  if (node->_else) new_node->_else = copy_else(node->_else.get());
   return new_node;
 }
 ASTElse *ASTCopier::copy_else(ASTElse *node) {
   auto new_node = copy(node);
-  if (node->_if)
-    new_node->_if = static_cast<ASTIf *>(copy_node(node->_if.get()));
-  if (node->block)
-    new_node->block = static_cast<ASTBlock *>(copy_node(node->block.get()));
+  if (node->_if) new_node->_if = static_cast<ASTIf *>(copy_node(node->_if.get()));
+  if (node->block) new_node->block = static_cast<ASTBlock *>(copy_node(node->block.get()));
   return new_node;
 }
 ASTWhile *ASTCopier::copy_while(ASTWhile *node) {
   auto new_node = copy(node);
-  if (node->condition)
-    new_node->condition = static_cast<ASTExpr *>(copy_node(node->condition.get()));
+  if (node->condition) new_node->condition = static_cast<ASTExpr *>(copy_node(node->condition.get()));
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
 }
@@ -298,10 +289,10 @@ ASTRange *ASTCopier::copy_range(ASTRange *node) {
 }
 ASTSwitch *ASTCopier::copy_switch(ASTSwitch *node) {
   auto new_node = copy(node);
-  new_node->target = static_cast<ASTExpr *>(copy_node(node->target));
-  new_node->cases.clear();
-  for (auto &case_ : node->cases) {
-    new_node->cases.push_back(
+  new_node->expression = static_cast<ASTExpr *>(copy_node(node->expression));
+  new_node->branches.clear();
+  for (auto &case_ : node->branches) {
+    new_node->branches.push_back(
         {static_cast<ASTExpr *>(copy_node(case_.expression)), static_cast<ASTBlock *>(copy_node(case_.block))});
   }
   return new_node;
@@ -382,10 +373,10 @@ ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
 
   if (node->branch) {
     auto branch = node->branch.get();
-    new_node->branch = (WhereBranch*)ast_arena.allocate(sizeof(WhereBranch));
+    new_node->branch = (WhereBranch *)ast_arena.allocate(sizeof(WhereBranch));
     if (branch->where_stmt.is_not_null()) {
       new_node->branch.get()->where_stmt = copy_where_statement(branch->where_stmt.get());
-    } 
+    }
     if (branch->block.is_not_null()) {
       new_node->branch.get()->block = copy_block(branch->block.get());
     }
@@ -497,7 +488,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
 }
 ASTType_Of *ASTCopier::copy_type_of(ASTType_Of *node) {
   auto new_node = copy(node);
-  new_node->target = (ASTExpr *)copy_node((ASTNode *)node->target);
+  new_node->target = (ASTType *)copy_type(node->target);
   return new_node;
 }
 ASTNode *deep_copy_ast(ASTNode *root) {
@@ -593,15 +584,9 @@ ASTDyn_Of *ASTCopier::copy_dyn_of(ASTDyn_Of *node) {
 }
 ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
   auto new_node = copy(node);
-
-  new_node->scope = copy_scope(node->scope);
-  auto old_scope = current_scope;
-  current_scope = node->scope;
-
+  new_node->target_block = (ASTBlock *)copy_node(node->target_block);
   new_node->object = (ASTExpr *)copy_node(node->object);
   new_node->target_type_path = (ASTPath *)copy_node(node->target_type_path);
-
-  current_scope = old_scope;
   return new_node;
 }
 ASTPath *ASTCopier::copy_path(ASTPath *node) {

@@ -10,7 +10,6 @@
 
 extern jstl::Arena scope_arena;
 
-
 struct Value {
   enum {
     INTEGER,
@@ -56,7 +55,7 @@ struct Value {
     val.boolean = (str.get_str() == "true");
     return val;
   }
-  
+
   Value operator-() const {
     if (tag == INTEGER) {
       return Value{.tag = INTEGER, .integer = -integer};
@@ -199,9 +198,9 @@ struct Value {
     if (tag == INTEGER && other.tag == INTEGER) {
       return Value{.tag = BOOLEAN, .boolean = integer < other.integer};
     } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) <
-                              (other.tag == FLOATING ? other.floating : other.integer)};
+      return Value{
+          .tag = BOOLEAN,
+          .boolean = (tag == FLOATING ? floating : integer) < (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for less than comparison", {});
     return {};
@@ -211,9 +210,9 @@ struct Value {
     if (tag == INTEGER && other.tag == INTEGER) {
       return Value{.tag = BOOLEAN, .boolean = integer > other.integer};
     } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) >
-                              (other.tag == FLOATING ? other.floating : other.integer)};
+      return Value{
+          .tag = BOOLEAN,
+          .boolean = (tag == FLOATING ? floating : integer) > (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for greater than comparison", {});
     return {};
@@ -272,15 +271,6 @@ struct Value {
   }
 };
 
-enum SymbolFlags {
-  SYMBOL_IS_VARIABLE = 1 << 0,
-  SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_IS_FORWARD_DECLARED = 1 << 2,
-  SYMBOL_IS_TYPE = 1 << 3,
-  SYMBOL_IS_MODULE = 1 << 4,
-  SYMBOL_IS_LOCAL = 1 << 5,
-};
-
 struct ASTNode;
 struct ASTStructDeclaration;
 struct ASTFunctionDeclaration;
@@ -292,22 +282,22 @@ enum Mutability : char {
   CONST,
   MUT,
 };
+
 struct Scope;
 
 struct Symbol {
   InternedString name;
   Type *resolved_type = Type::INVALID_TYPE;
-  int flags = SYMBOL_IS_VARIABLE;
 
   Mutability mutability = CONST;
   Scope *scope;
 
-  bool is_function() const { return HAS_FLAG(flags, SYMBOL_IS_FUNCTION); }
-  bool is_variable() const { return HAS_FLAG(flags, SYMBOL_IS_VARIABLE); }
-  bool is_type() const { return HAS_FLAG(flags, SYMBOL_IS_TYPE); }
-  bool is_module() const { return HAS_FLAG(flags, SYMBOL_IS_MODULE); }
-  bool is_forward_declared() const { return HAS_FLAG(flags, SYMBOL_IS_FORWARD_DECLARED); }
-  bool is_local() const { return HAS_FLAG(flags, SYMBOL_IS_LOCAL); }
+  bool is_variable : 1 = false;
+  bool is_function : 1 = false;
+  bool is_forward_declared : 1 = false;
+  bool is_type : 1 = false;
+  bool is_module : 1 = false;
+  bool is_local : 1 = false;
 
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }
@@ -327,11 +317,11 @@ struct Symbol {
       ASTModule *declaration;
     } module;
     struct {
+      // ? Why is this here? Just to confirm the type is a child of a choice type?
+      Nullable<ASTChoiceDeclaration> choice;
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTChoiceDeclaration> choice;
       Nullable<ASTNode> declaration;
-      TypeKind kind;
     } type;
   };
 
@@ -343,28 +333,26 @@ struct Symbol {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = type;
-    symbol.flags = SYMBOL_IS_VARIABLE;
+    symbol.is_variable = true;
     symbol.variable.initial_value = initial_value;
     symbol.variable.declaration = decl;
     symbol.mutability = mutability;
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration,
-                                SymbolFlags flags) {
+  static Symbol create_function(const InternedString &name, Type *type, ASTFunctionDeclaration *declaration) {
     Symbol symbol;
     symbol.resolved_type = type;
     symbol.name = name;
-    symbol.flags = flags;
+    symbol.is_function = true;
     symbol.function.declaration = declaration;
     return symbol;
   }
 
-  static Symbol create_type(Type *type, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+  static Symbol create_type(Type *type, const InternedString &name, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
-    symbol.flags = SYMBOL_IS_TYPE;
-    symbol.type.kind = kind;
+    symbol.is_type = true;
     symbol.type.declaration = declaration;
     symbol.resolved_type = type;
     return symbol;
@@ -373,7 +361,7 @@ struct Symbol {
   static Symbol create_module(const InternedString &name, ASTModule *declaration) {
     Symbol symbol;
     symbol.name = name;
-    symbol.flags = SYMBOL_IS_MODULE;
+    symbol.is_module = true;
     symbol.module.declaration = declaration;
     return symbol;
   }
@@ -386,7 +374,6 @@ struct ASTFunctionDeclaration;
 struct ASTTraitDeclaration;
 
 struct Scope {
-  std::vector<InternedString> ordered_symbols = {};
   std::unordered_map<InternedString, Symbol> symbols = {};
   InternedString name = "";
 
@@ -421,10 +408,19 @@ struct Scope {
   inline size_t fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function() && !sym.is_type())
-        fields++;
+      if (!sym.is_function && !sym.is_type) fields++;
     }
     return fields;
+  }
+
+  size_t methods_count() const;
+
+  void insert_local_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
+                             ASTNode *decl = nullptr) {
+    auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
+    sym.is_local = true;
+    sym.scope = this;
+    symbols.insert_or_assign(name, sym);
   }
 
   void insert_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
@@ -432,38 +428,36 @@ struct Scope {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
-  void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
-                       SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    auto sym = Symbol::create_function(name, type_id, declaration, flags);
+  void forward_declare_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
+    auto sym = Symbol::create_function(name, type_id, declaration);
+    sym.is_forward_declared = true;
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
   }
 
-  void insert_type(Type *type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
-    auto sym = Symbol::create_type(type_id, name, kind, declaration);
+  void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
+    auto sym = Symbol::create_function(name, type_id, declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
-    ordered_symbols.push_back(name);
+  }
+
+  void insert_type(Type *type_id, const InternedString &name, ASTNode *declaration) {
+    auto sym = Symbol::create_type(type_id, name, declaration);
+    sym.scope = this;
+    symbols.insert_or_assign(name, sym);
   }
 
   Symbol *lookup(const InternedString &name);
 
-  Symbol *local_lookup(const InternedString &name) {
-    if (symbols.contains(name)) {
-      return &symbols[name];
-    }
-    return nullptr;
-  }
+  Symbol *local_lookup(const InternedString &name);
 
   void erase(const InternedString &name);
 
   Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto type = global_create_choice_type(name, scope, {});
-    auto sym = Symbol::create_type(type, name, TYPE_CHOICE, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -473,7 +467,7 @@ struct Scope {
   Type *create_trait_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
                           ASTTraitDeclaration *declaration) {
     auto type = global_create_trait_type(name, scope, generic_args);
-    auto sym = Symbol::create_type(type, name, TYPE_TRAIT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -482,19 +476,19 @@ struct Scope {
 
   Type *create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
     auto type = global_create_struct_type(name, scope);
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
+
     return type;
   }
 
-  void create_type_alias(const InternedString &name, Type *type_id, TypeKind kind, ASTNode *declaring_node) {
+  void create_type_alias(const InternedString &name, Type *type_id, ASTNode *declaring_node) {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = type_id;
-    symbol.type.kind = kind;
-    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.is_type = true;
     symbol.type.declaration = declaring_node;
     symbols.erase(name);
     symbol.scope = this;
@@ -505,14 +499,14 @@ struct Scope {
     Symbol symbol;
     symbol.name = name;
     symbol.resolved_type = default_id;
-    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.is_type = true;
     symbol.scope = this;
     symbols.insert_or_assign(name, symbol);
   }
 
   Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto type = global_create_enum_type(name, scope, flags);
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
@@ -528,7 +522,7 @@ struct Scope {
     auto type = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    auto sym = Symbol::create_type(type, name, TYPE_STRUCT, nullptr);
+    auto sym = Symbol::create_type(type, name, nullptr);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
@@ -536,7 +530,7 @@ struct Scope {
 
   Type *find_type_id(const InternedString &name, const TypeExtensions &ext) {
     auto symbol = lookup(name);
-    if (!symbol || !symbol->is_type()) {
+    if (!symbol || !symbol->is_type) {
       if (parent) {
         return parent->find_type_id(name, ext);
       } else {

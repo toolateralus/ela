@@ -7,8 +7,9 @@ void get_varargs_handlers(Context *c) {
   auto scope = c->root_scope;
 
   auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
-  va_list_type->info->as<StructTypeInfo>()->flags |= STRUCT_IS_FORWARD_DECLARED;
-  scope->insert_type(va_list_type, "va_list", TYPE_STRUCT, nullptr);
+  va_list_type->info->as<StructTypeInfo>()->is_forward_declared = true;
+
+  scope->insert_type(va_list_type, "va_list", nullptr);
 
   FunctionTypeInfo func_type_info;
   func_type_info.is_varargs = true;
@@ -67,8 +68,18 @@ Context::Context() {
     if (type_table[i]->info->scope) {
       type_table[i]->info->scope->parent = scope;
     }
-    scope->create_type_alias(type_table[i]->basename, type_table[i], type_table[i]->kind, nullptr);
+    scope->create_type_alias(type_table[i]->basename, type_table[i], nullptr);
   }
+}
+
+/*
+  TODO: optimize lookups for local and other symbols.
+*/
+Symbol *Scope::local_lookup(const InternedString &name) {
+  if (symbols.contains(name)) {
+    return &symbols[name];
+  }
+  return nullptr;
 }
 
 Symbol *Scope::lookup(const InternedString &name) {
@@ -80,20 +91,25 @@ Symbol *Scope::lookup(const InternedString &name) {
   return nullptr;
 }
 
-void Scope::erase(const InternedString &name) {
-  symbols.erase(name);
-  ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
-}
+void Scope::erase(const InternedString &name) { symbols.erase(name); }
 
 bool Symbol::is_generic_function() const {
-  if (!is_function()) return false;
-
+  if (!is_function) return false;
   auto &declaration = this->function.declaration;
-
   if (declaration->generic_parameters.size() != 0 || declaration->generic_arguments.size() != 0 ||
       declaration->generic_instantiations.size() != 0) {
     return true;
   }
 
   return false;
+}
+
+size_t Scope::methods_count() const {
+  size_t methods = 0;
+  for (const auto &[_, sym] : symbols) {
+    if (sym.is_function && sym.function.declaration->is_method) {
+      methods++;
+    }
+  }
+  return methods;
 }

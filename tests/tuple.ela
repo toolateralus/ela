@@ -67,7 +67,7 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
 }
 
 #test fn test_tuple_destructure_with_ptr() {
-  *x, *y := (10, 20);
+  &mut x, &mut y := (10, 20);
 
   *x = 100;
   *y = 200;

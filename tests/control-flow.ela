@@ -136,7 +136,7 @@
     ++i;
   }
 
-  for *x, *y in list.iter_mut() {
+  for &mut x, &mut y in list.iter_mut() {
     (*x) *= 2;
     (*y) *= 2;
   }
@@ -167,7 +167,7 @@ import fmt::*;
     ++i;
   }
 
-  for *x, *y in list.iter_mut() {
+  for &mut x, &mut y in list.iter_mut() {
     (*x) *= 2;
     (*y) *= 2;
   }

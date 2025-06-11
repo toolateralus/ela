@@ -1,7 +1,6 @@
 #include "type.hpp"
 
 #include <cstddef>
-#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -9,6 +8,7 @@
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
+#include "strings.hpp"
 
 Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
 
@@ -25,7 +25,7 @@ Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   std::stringstream ss;
   ss << "fn ";
-  ss << ext.to_string() << ' ';
+  ss << extensions_to_string(ext) << ' ';
   ss << "(";
 
   for (size_t i = 0; i < params_len; ++i) {
@@ -73,7 +73,7 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
   const auto cmp_info_ptr = &info;
 
   for (Type *type : type_table) {
-    if (type->kind == TYPE_FUNCTION && type->extensions == type_extensions &&
+    if (type->kind == TYPE_FUNCTION && type->extensions_equals(type_extensions) &&
         type->type_info_equals(cmp_info_ptr, TYPE_FUNCTION)) {
       return type;
     }
@@ -84,7 +84,7 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
 
   auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
 
-  if (type_extensions.has_extensions()) {
+  if (type_extensions.size()) {
     base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
   }
 
@@ -92,21 +92,19 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
 }
 
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
-  if (!type_is_valid(base_t))
-    return Type::INVALID_TYPE;
+  if (!type_is_valid(base_t)) return Type::INVALID_TYPE;
 
-  if (!type_extensions.has_extensions())
-    return base_t;
+  if (!type_extensions.size()) return base_t;
 
   auto extensions_copy = type_extensions;
 
   if (base_t && type_is_valid(base_t->base_type)) {
-    extensions_copy = base_t->extensions.append(extensions_copy);
+    extensions_copy = base_t->append_extension(extensions_copy);
     base_t = base_t->base_type;
   }
 
   for (const auto &type : type_table) {
-    if (type->base_type == base_t && extensions_copy.extensions == type->extensions.extensions) {
+    if (type->base_type == base_t && extensions_copy == type->extensions) {
       return type;
     }
   }
@@ -151,8 +149,7 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
 
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions) {
   for (auto &type : type_table) {
-    if (!type->is_kind(TYPE_TUPLE))
-      continue;
+    if (!type->is_kind(TYPE_TUPLE)) continue;
 
     auto info = (type->info->as<TupleTypeInfo>());
 
@@ -161,7 +158,7 @@ Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions
     }
 
     // Found a matching type with the same extensions. Return it.
-    if (type->extensions == type_extensions) {
+    if (type->extensions_equals(type_extensions)) {
       return type;
     } else {
       if (type_is_valid(type->base_type)) {
@@ -184,14 +181,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // * Same exact type. no cast needed.
-  if (from == to)
-    return CONVERT_NONE_NEEDED;
+  if (from == to) return CONVERT_NONE_NEEDED;
 
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
-  if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() && to->is_kind(TYPE_SCALAR) &&
-      to->extensions.has_no_extensions()) {
+  if (from->is_kind(TYPE_SCALAR) && from->has_no_extensions() && to->is_kind(TYPE_SCALAR) && to->has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
       if (numerical_type_safe_to_upcast(from, to)) {
         return CONVERT_IMPLICIT;
@@ -201,7 +196,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       // !!!! I ADDED THE PARENTHESIS ON THE SECOND EXPRESSION HERE :: !!!!!
       // ! This may cause bugs!
     } else if ((from == bool_type() && type_is_numerical(to)) ||
-               (to == bool_type() && type_is_numerical(from))) { // Convert booleans to number types explicitly
+               (to == bool_type() && type_is_numerical(from))) {  // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -209,21 +204,21 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
-  const auto from_is_scalar_ptr = from->extensions.is_mut_pointer();
-  const auto to_is_non_ptr_number = type_is_numerical(to) && to->extensions.has_no_extensions();
+  const auto from_is_scalar_ptr = from->is_mut_pointer();
+  const auto to_is_non_ptr_number = type_is_numerical(to) && to->has_no_extensions();
 
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
     return CONVERT_IMPLICIT;
   }
 
   // allow casting from number types to pointers explicitly
-  if (type_is_numerical(from) && to->extensions.is_pointer()) {
+  if (type_is_numerical(from) && to->is_pointer()) {
     return CONVERT_EXPLICIT;
   }
 
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow in if (...)
   // cast all numerical types and pointers to booleans implicitly.
-  if ((type_is_numerical(from) || from->extensions.is_pointer()) && to == bool_type()) {
+  if ((type_is_numerical(from) || from->is_pointer()) && to == bool_type()) {
     return CONVERT_IMPLICIT;
   }
 
@@ -231,9 +226,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     return CONVERT_EXPLICIT;
   }
 
-  const auto operands_are_pointers = (from->extensions.is_const_pointer() && to->extensions.is_const_pointer()) ||
-                                     (from->extensions.is_mut_pointer() && to->extensions.is_mut_pointer()) ||
-                                     (from->extensions.is_mut_pointer() && to->extensions.is_const_pointer());
+  const auto operands_are_pointers = (from->is_const_pointer() && to->is_const_pointer()) ||
+                                     (from->is_mut_pointer() && to->is_mut_pointer()) ||
+                                     (from->is_mut_pointer() && to->is_const_pointer());
 
   bool elements_cast = false;
   if (operands_are_pointers) {
@@ -242,16 +237,14 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     auto conversion = type_conversion_rule(from_elem, to_elem);
     if (conversion == CONVERT_NONE_NEEDED ||
         (conversion == CONVERT_IMPLICIT &&
-         (from->extensions.pointer_depth() ==
-          to->extensions.pointer_depth()))) { // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
+         (from->pointer_depth() == to->pointer_depth()))) {  // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
       elements_cast = true;
     }
   }
 
-  const auto dest_is_u8_or_void_ptr =
-      to->extensions.is_pointer() && (to->base_type == u8_type() || to->base_type == void_type());
+  const auto dest_is_u8_or_void_ptr = to->is_pointer() && (to->base_type == u8_type() || to->base_type == void_type());
 
-  const auto implicit_cast_void_pointer_to_any_ptr = to->extensions.is_pointer() && (from->base_type == void_type());
+  const auto implicit_cast_void_pointer_to_any_ptr = to->is_pointer() && (from->base_type == void_type());
 
   // Handling casting function pointers:
   /*
@@ -261,7 +254,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   */
   if (operands_are_pointers && to->is_kind(TYPE_FUNCTION) && from->is_kind(TYPE_FUNCTION)) {
     // Wrong number of pointer extensions.
-    if (to->extensions.pointer_depth() != from->extensions.pointer_depth()) {
+    if (to->pointer_depth() != from->pointer_depth()) {
       return CONVERT_PROHIBITED;
     }
 
@@ -307,11 +300,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     const auto implicit_fixed_array_to_ptr_cast = [&]() {
       // not array, return.
-      if (!from->extensions.is_fixed_sized_array())
-        return false;
+      if (!from->is_fixed_sized_array()) return false;
 
-      if (!to->extensions.is_pointer())
-        return false;
+      if (!to->is_pointer()) return false;
 
       auto element_ty_ptr = from->get_element_type()->take_pointer_to(MUT);
       auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
@@ -326,21 +317,21 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   // We basically have to allow *const to *mut to allow for pointer arithmetic,
   // you can't traverse a const array without this.
-  if (from->extensions.is_const_pointer() && to->extensions.is_mut_pointer()) {
+  if (from->is_const_pointer() && to->is_mut_pointer()) {
     return CONVERT_EXPLICIT;
   }
 
   // TODO: this allows two way casting of enums to their underlying type. Is this what we want?
   // It kinda ruins the safety aspect of having strongly typed enums.
   {
-    if (from->is_kind(TYPE_ENUM) && from->extensions.has_no_extensions()) {
+    if (from->is_kind(TYPE_ENUM) && from->has_no_extensions()) {
       auto enum_info = (from->info->as<EnumTypeInfo>());
       return type_conversion_rule(enum_info->underlying_type, to, source_range);
     }
 
     // TODO: do a runtime bounds check on explicit casting of an integer to an enum type?
     // You can get segfaults from that easily.
-    if (to->is_kind(TYPE_ENUM) && to->extensions.has_no_extensions()) {
+    if (to->is_kind(TYPE_ENUM) && to->has_no_extensions()) {
       auto enum_info = (to->info->as<EnumTypeInfo>());
       return type_conversion_rule(from, enum_info->underlying_type, source_range);
     }
@@ -351,10 +342,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     // this allows int[] to cast to s8[] etc;
     // this kind of behaviour perhaps will cause problems later down the line, the more C like we become,
     // we can't simple reinterpret a u64[] dynamic array as a s8[]
-    if (from->extensions.has_extensions() && to->extensions.has_extensions() &&
-        from->extensions.extensions.back() == to->extensions.extensions.back()) {
-      auto from_base = global_find_type_id(from->base_type, from->extensions.without_back());
-      auto to_base = global_find_type_id(to->base_type, to->extensions.without_back());
+    if (from->has_extensions() && to->has_extensions() && from->extensions.back() == to->extensions.back()) {
+      auto from_base = global_find_type_id(from->base_type, from->extensions_without_back());
+      auto to_base = global_find_type_id(to->base_type, to->extensions_without_back());
       return type_conversion_rule(from_base, to_base, source_range);
     }
   }
@@ -363,8 +353,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  if (this->kind != kind)
-    return false;
+  if (this->kind != kind) return false;
 
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
@@ -374,8 +363,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
       return false;
     }
 
-    if (finfo->params_len != sinfo->params_len)
-      return false;
+    if (finfo->params_len != sinfo->params_len) return false;
 
     for (size_t i = 0; i < finfo->params_len; ++i)
       if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
@@ -388,7 +376,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-/* 
+/*
   Get a display name of this type, in a readable manner to users.
   Unmangles.
 */
@@ -439,10 +427,19 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   info->scope->name = base;
   type->set_info(info);
 
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+  if (info->is_union) {
     type->traits.push_back(is_union_trait());
   } else {
     type->traits.push_back(is_struct_trait());
+  }
+
+  for (const auto &[name, symbol] : scope->symbols) {
+    if (symbol.is_variable) {
+      info->members.push_back(TypeMember{
+          .name = name,
+          .type = symbol.resolved_type,
+      });
+    }
   }
 
   return type;
@@ -493,9 +490,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (extensions.is_pointer() && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
-    if (extensions.is_const_pointer()) {
+    if (type_extensions_is_back_const_pointer(extensions)) {
       type->traits.push_back(is_const_pointer_trait());
     } else {
       type->traits.push_back(is_mut_pointer_trait());
@@ -513,13 +510,13 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 }
 
 Type *Type::get_element_type() const {
-  if (!extensions.is_pointer() && !extensions.is_fixed_sized_array()) {
+  if (!is_pointer() && !is_fixed_sized_array()) {
     throw_error(
         std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
                     to_string()),
         {});
   }
-  auto extensions = this->extensions.without_back();
+  auto extensions = extensions_without_back();
   if (is_kind(TYPE_TUPLE)) {
     auto info = (this->info->as<TupleTypeInfo>());
     return global_find_type_id(info->types, extensions);
@@ -530,7 +527,7 @@ Type *Type::get_element_type() const {
 // used for anonymous structs etc.
 Token get_unique_identifier() {
   static int num = 0;
-  auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier, TFamily::Identifier);
+  auto tok = Token({}, ANONYMOUS_TYPE_PREFIX + std::to_string(num), TType::Identifier, TFamily::Identifier);
   num++;
   return tok;
 }
@@ -580,6 +577,12 @@ Type *u16_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
   return type;
 }
+
+Type *u8_ptr_type() {
+  static Type *type = global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_CONST}});
+  return type;
+}
+
 Type *u8_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
@@ -652,15 +655,13 @@ void init_type_system() {
 }
 
 bool type_is_numerical(const Type *t) {
-  if (!t->is_kind(TYPE_SCALAR))
-    return false;
+  if (!t->is_kind(TYPE_SCALAR)) return false;
   return t == s32_type() || t == s8_type() || t == s16_type() || t == s32_type() || t == s64_type() || t == u8_type() ||
          t == u16_type() || t == u32_type() || t == u64_type() || t == f32_type() || t == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
-  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
-    return false;
+  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) return false;
 
   auto from_info = (from->info->as<ScalarTypeInfo>());
   auto to_info = (to->info->as<ScalarTypeInfo>());
@@ -671,24 +672,6 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   }
 
   return from_info->size <= to_info->size;
-}
-
-std::string TypeExtensions::to_string() const {
-  std::stringstream ss;
-  for (const auto ext : extensions) {
-    switch (ext.type) {
-      case TYPE_EXT_POINTER_MUT:
-        ss << "*mut";
-        break;
-      case TYPE_EXT_POINTER_CONST:
-        ss << "*const";
-        break;
-      case TYPE_EXT_ARRAY:
-        ss << "[" << ext.array_size << "]";
-        break;
-    }
-  }
-  return ss.str();
 }
 
 Type *global_create_tuple_type(const std::vector<Type *> &types) {
@@ -708,6 +691,10 @@ Type *global_create_tuple_type(const std::vector<Type *> &types) {
 
   for (size_t i = 0; i < types.size(); ++i) {
     info->scope->insert_variable(std::to_string(i), types[i], nullptr, MUT);
+    info->members.push_back(TypeMember{
+        .name = "$" + std::to_string(i),
+        .type = types[i],
+    });
   }
 
   return type;
@@ -731,7 +718,7 @@ InternedString get_tuple_type_name(const std::vector<Type *> &types) {
 
 Type *Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
-  ext.extensions.push_back({.type = is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST, .array_size = 0});
+  ext.push_back({.type = is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST, .array_size = 0});
   return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type *)this : base_type, ext);
 }
 
@@ -739,7 +726,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
   switch (op) {
     case TType::LBrace:
-    // TODO: This needs to be 'index'/'index_mut'
+      // TODO: This needs to be 'index'/'index_mut'
       return "subscript";
 
     // Do we want this? might be useful for stuff like Array implementations etc.
@@ -819,17 +806,16 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
 
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
 
-  if (op_str == "subscript" && (type->extensions.is_mut_pointer() || mutability == MUT)) {
+  if (op_str == "subscript" && (type->is_mut_pointer() || mutability == MUT)) {
     op_str = "subscript_mut";
   }
 
   auto scope = type->info->scope;
 
-  if (!scope)
-    return Type::INVALID_TYPE;
+  if (!scope) return Type::INVALID_TYPE;
 
   if (auto symbol = scope->local_lookup(op_str)) {
-    if (symbol->is_function() && type_is_valid(symbol->resolved_type)) {
+    if (symbol->is_function && type_is_valid(symbol->resolved_type)) {
       return symbol->resolved_type;
     }
   }
@@ -928,17 +914,19 @@ Type *is_const_pointer_trait() {
 }
 
 Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const {
-  int variant_index = get_variant_index(variant_name);
-  if (variant_index == -1) {
-    return nullptr;
+  for (size_t i = 0; i < members.size(); ++i) {
+    if (members[i].name == variant_name) {
+      return members[i].type;
+    }
   }
-  return variants[variant_index].type;
+  return nullptr;
 }
 
-int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const {
-  for (size_t i = 0; i < variants.size(); ++i) {
-    if (variants[i].name == variant_name) {
-      return i;
+int ChoiceTypeInfo::get_variant_discriminant(const InternedString &variant_name) const {
+  for (size_t i = 0; i < members.size(); ++i) {
+    if (members[i].name == variant_name) {
+      // We return +1 so that default constructed choice types never have a value that can be pattern matched.
+      return i + 1;
     }
   }
   return -1;

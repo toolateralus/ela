@@ -37,8 +37,6 @@ static void remove_body(Parser *parser) {
   while (depth > 0) {
     if (parser->peek().type == TType::LCurly) depth++;
     if (parser->peek().type == TType::RCurly) depth--;
-    if (parser->peek().type == TType::LCurly) depth++;
-    if (parser->peek().type == TType::RCurly) depth--;
     parser->eat();
   }
 }
@@ -211,7 +209,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // --filter=* - "My Test Group" // run all but test group
 
         auto func = parser->parse_function_declaration();
-        func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
+        func->is_test = true;
 
         if (compile_command.has_flag("test")) {
           return func;
@@ -307,7 +305,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           decl->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
           auto func = static_cast<ASTFunctionDeclaration*>(node);
-          func->flags |= FUNCTION_IS_EXPORTED;
+          func->is_exported = true;
         }
         return node;
     }},
@@ -334,14 +332,15 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
+    // TODO: make this a keyword.
     {.identifier = "static",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto statement = parser->parse_statement();
         if (auto decl = dynamic_cast<ASTVariable *>(statement)) {
           decl->is_static = true;
-        } else if (auto decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
-          decl->flags |= FUNCTION_IS_STATIC;
+        } else {
+          throw_error("static is only valid for variables, global or local.", statement->source_range);
         }
         return statement;
     }},
@@ -515,6 +514,20 @@ ASTArguments *Parser::parse_arguments() {
   return args;
 }
 
+void Parser::parse_pattern_match_value_semantic(auto &part) {
+  if (peek().type == TType::And) {
+    expect(TType::And);
+    if (peek().type == TType::Mut) {
+      expect(TType::Mut);
+      part.semantic = PTRN_MTCH_PTR_MUT;
+    } else {
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
+      part.semantic = PTR_MTCH_PTR_CONST;
+    }
+  }
+}
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
@@ -523,7 +536,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     /* Pattern matching / destructuring Choice types. */
     if (op.type == TType::Is) {
       NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
-      pattern_match->scope = create_child(ctx.scope);
       eat();
       pattern_match->target_type_path = parse_path();
       pattern_match->object = left;
@@ -543,16 +555,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             part.mutability = MUT;
           }
 
-          if (peek().type == TType::And) {
-            eat();
-            if (peek().type == TType::Mut) {
-              eat();
-              part.semantic = PTRN_MTCH_PTR_MUT;
-            } else {
-              expect(TType::Const);
-              part.semantic = PTR_MTCH_PTR_CONST;
-            }
-          }
+          parse_pattern_match_value_semantic(part);
 
           part.var_name = expect(TType::Identifier).value;
           pattern_match->struct_pattern.parts.push_back(part);
@@ -575,16 +578,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
             part.mutability = MUT;
           }
 
-          if (peek().type == TType::And) {
-            eat();
-            if (peek().type == TType::Mut) {
-              eat();
-              part.semantic = PTRN_MTCH_PTR_MUT;
-            } else {
-              expect(TType::Const);
-              part.semantic = PTR_MTCH_PTR_CONST;
-            }
-          }
+          parse_pattern_match_value_semantic(part);
 
           part.var_name = expect(TType::Identifier).value;
           pattern_match->tuple_pattern.parts.push_back(part);
@@ -650,13 +644,11 @@ ASTExpr *Parser::parse_unary() {
       if (peek().type == TType::Mut) {
         mutability = MUT;
         eat();
-      } else if (peek().type == TType::Const) {
-        mutability = CONST;
-        eat();
       } else {
-        end_node(unaryexpr, range);
-        throw_error("taking an address-of a variable requires '&mut/&const' to determine the mutability of the pointer",
-                    unaryexpr->source_range);
+        if (peek().type == TType::Const) {
+          eat();
+        }
+        mutability = CONST;
       }
     }
 
@@ -897,7 +889,7 @@ ASTExpr *Parser::parse_primary() {
         node->is_pattern_match = true;
       }
 
-      node->target = parse_expr();
+      node->expression = parse_expr();
       expect(TType::LCurly);
 
       while (peek().type != TType::RCurly) {
@@ -907,20 +899,18 @@ ASTExpr *Parser::parse_primary() {
           if (peek().type != TType::ExpressionBody) {
             expect(TType::Colon);
           }
-          node->default_case = parse_block();
+          node->default_branch = parse_block();
           if (peek().type == TType::Comma) eat();
           continue;
         }
 
-        SwitchCase _case;
+        SwitchBranch branch;
 
         if (node->is_pattern_match) {
           NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
-          pattern_match->scope = create_child(ctx.scope);
           pattern_match->target_type_path = parse_path();
-          pattern_match->object = node->target;
-          _case.expression = pattern_match;
-
+          pattern_match->object = node->expression;
+          branch.expression = pattern_match;
           if (peek().type == TType::Dot && lookahead_buf()[1].type == TType::LCurly) {
             eat();
             eat();
@@ -988,14 +978,14 @@ ASTExpr *Parser::parse_primary() {
             expect(TType::RParen);
           }
         } else {
-          _case.expression = parse_expr();
+          branch.expression = parse_expr();
         }
 
         if (peek().type != TType::ExpressionBody) {
           expect(TType::Colon);
         }
-        _case.block = parse_block();
-        node->cases.push_back(_case);
+        branch.block = parse_block();
+        node->branches.push_back(branch);
         if (peek().type == TType::Comma) {
           eat();
         }
@@ -1248,6 +1238,23 @@ ASTIf *Parser::parse_if() {
   return node;
 }
 
+void Parser::parse_destructure_element_value_semantic(DestructureElement &destruct) {
+  if (peek().type == TType::And) {
+    expect(TType::And);
+    if (peek().type == TType::Mut) {
+      expect(TType::Mut);
+      destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER_MUT;
+    } else {
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
+      destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER_CONST;
+    }
+  } else {
+    destruct.semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+  }
+}
+
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
@@ -1323,7 +1330,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto variable = parse_variable();
     variable->is_constexpr = true;
-    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST);
+    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST, variable);
     return variable;
   }
 
@@ -1396,7 +1403,7 @@ ASTStatement *Parser::parse_statement() {
 
     auto symbol = ctx.scope->lookup(module_name);
 
-    if (symbol && symbol->is_module()) {
+    if (symbol && symbol->is_module) {
       printf("importing existing module %s\n", module_name.get_str().c_str());
       import->scope = ((ASTModule *)symbol->module.declaration)->scope;
       return import;
@@ -1456,7 +1463,7 @@ ASTStatement *Parser::parse_statement() {
       while (peek().type != TType::RCurly) {
         if (peek().type == TType::Fn) {
           auto function = parse_function_declaration();
-          function->flags |= FUNCTION_IS_EXTERN;
+          function->is_extern = true;
           node->statements.push_back(function);
         } else {
           auto variable = parse_variable();
@@ -1469,7 +1476,7 @@ ASTStatement *Parser::parse_statement() {
       return node;
     } else if (peek().type == TType::Fn) {  // single extern fn
       auto function = parse_function_declaration();
-      function->flags |= FUNCTION_IS_EXTERN;
+      function->is_extern = true;
       return function;
     } else {  // single extern variable
       auto variable = parse_variable();
@@ -1538,27 +1545,7 @@ ASTStatement *Parser::parse_statement() {
       eat();
 
       // Parse the variables in the for loop
-      std::vector<DestructureElement> destructure;
-
-      while (true) {
-        DestructureElement destruct;
-        if (peek().type == TType::Mul) {
-          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
-          eat();
-        } else {
-          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
-        }
-
-        auto identifier = expect(TType::Identifier).value;
-        destruct.identifier = identifier;
-        destructure.push_back(destruct);
-
-        if (peek().type == TType::Comma) {
-          eat();
-        } else {
-          break;
-        }
-      }
+      std::vector<DestructureElement> destructure = parse_destructure_elements();
 
       // Set the left_tag and left union based on the parsed variables
       if (destructure.size() > 1) {
@@ -1568,7 +1555,7 @@ ASTStatement *Parser::parse_statement() {
         node->left_tag = ASTFor::IDENTIFIER;
         node->left.identifier = destructure[0].identifier;
 
-        if (destructure[0].semantic == VALUE_SEMANTIC_POINTER) {
+        if (is_pointer_semantic(destructure[0].semantic)) {
           end_node(node, range);
           throw_error(
               "you can only take the elements of a tuple destructure as a pointer, 'for *v in ...' is "
@@ -1577,7 +1564,6 @@ ASTStatement *Parser::parse_statement() {
         }
       }
 
-      // Ensure the 'in' keyword is present
       if (peek().type == TType::In) {
         eat();
         auto expr = parse_expr();
@@ -1737,45 +1723,7 @@ ASTStatement *Parser::parse_statement() {
 
 ASTDestructure *Parser::parse_destructure() {
   NODE_ALLOC(ASTDestructure, node, range, _, this)
-
-  // * This lambda is just to prevent having to copy paste this.
-
-  /*
-    TODO:
-    The semantics for this, and the for loop *pointer semantic* need to be clarified.
-    It doesn't make sense, it's too subtle, sometimes its completely useless, etc.
-    It should at the very least use the &const/&mut system.
-  */
-  const auto parse_element = [&]() -> DestructureElement {
-    DestructureElement element;
-    element.mutability = CONST;
-
-    if (peek().type == TType::Mut) {
-      element.mutability = MUT;
-      eat();
-    }
-
-    if (peek().type == TType::Mul) {
-      element.semantic = VALUE_SEMANTIC_POINTER;
-      eat();
-    } else {
-      element.semantic = VALUE_SEMANTIC_COPY;
-    }
-
-    element.identifier = expect(TType::Identifier).value;
-
-    return element;
-  };
-
-  DestructureElement element = parse_element();
-  node->elements.push_back(element);
-
-  while (peek().type == TType::Comma) {
-    eat();
-    element = parse_element();
-    node->elements.push_back(element);
-  }
-
+  node->elements = parse_destructure_elements();
   if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
     node->op = eat().type;
     node->right = parse_expr();
@@ -1883,14 +1831,25 @@ ASTParamsDecl *Parser::parse_parameters() {
             "Only use this for #foreign functions.",
             range);
       }
-      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
+      current_func_decl.get()->is_varargs = true;
       params->is_varargs = true;
       continue;
     }
 
     auto next = peek();
-    // parse self parameters.
-    if (next.type == TType::Mul || next.value == "self") {
+    if (next.type == TType::Mut && lookahead_buf()[1].value == "self") {
+      param->tag = ASTParamDecl::Self;
+      param->self.is_pointer = false;
+      param->mutability = MUT;
+      params->has_self = true;
+      params->params.push_back(param);
+      eat();
+      eat();  // eat the dang tokens.
+      if (peek().type != TType::RParen) {
+        expect(TType::Comma);
+      }
+      continue;
+    } else if (next.type == TType::Mul || next.value == "self") {  // parse self parameters.
       Mutability mutability = CONST;
       bool is_pointer = false;
 
@@ -1992,7 +1951,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   auto has_definition = false;
   {
     auto sym = ctx.scope->local_lookup(name);
-    if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
+    if (sym && (sym->is_forward_declared) == 0) {
       has_definition = true;
     }
   }
@@ -2011,8 +1970,8 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   }
 
   if (peek().type == TType::Semi) {
-    node->flags |= FUNCTION_IS_FORWARD_DECLARED;
-    ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
+    node->is_forward_declared = true;
+    ctx.scope->local_lookup(name)->is_forward_declared = true;
     end_node(node, range);
     current_func_decl = last_func_decl;
     return node;
@@ -2021,7 +1980,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   ctx.set_scope();
 
   if (node->params->has_self) {
-    node->flags |= FUNCTION_IS_METHOD;
+    node->is_method = true;
   }
 
   node->block = parse_block();
@@ -2343,7 +2302,7 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
     }
     expect(TType::RCurly);
   } else {
-    node->is_fwd_decl = true;
+    node->is_forward_declared = true;
   }
 
   current_struct_decl = old_struct_decl_state;
@@ -2402,7 +2361,6 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     variant.name = expect(TType::Identifier).value;
     if (peek().type == TType::Comma || peek().type == TType::RCurly) {
       variant.kind = ASTChoiceVariant::NORMAL;
-      node->variants.push_back(variant);
     } else if (peek().type == TType::LCurly) {
       variant.kind = ASTChoiceVariant::STRUCT;
       eat();
@@ -2413,16 +2371,15 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
         }
       }
       expect(TType::RCurly);
-      node->variants.push_back(variant);
     } else if (peek().type == TType::LParen) {
       variant.kind = ASTChoiceVariant::TUPLE;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
-      node->variants.push_back(variant);
     } else {
       end_node(node, range);
       throw_error("Unexpected token in choice type declaration", node->source_range);
     }
+    node->variants.push_back(variant);
     if (peek().type != TType::RCurly) expect(TType::Comma);
   }
   ctx.exit_scope();
@@ -2574,12 +2531,10 @@ void Parser::parse_pointer_extensions(ASTType *type) {
     type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
     if (peek().type == TType::Mut) {
       expect(TType::Mut);
-    } else if (peek().type == TType::Const) {
-      expect(TType::Const);
     } else {
-      throw_error(
-          "'*const/*mut' are required for all pointer types now, as a prefix. such as '*const s32', '*const *mut s64'",
-          {peek().location});
+      if (peek().type == TType::Const) {
+        expect(TType::Const);
+      }
     }
   }
 }
@@ -2742,3 +2697,27 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
+std::vector<DestructureElement> Parser::parse_destructure_elements() {
+  const auto parse_element = [&]() -> DestructureElement {
+    DestructureElement element;
+    element.mutability = CONST;
+    if (peek().type == TType::Mut) {
+      element.mutability = MUT;
+      eat();
+    }
+    parse_destructure_element_value_semantic(element);
+    element.identifier = expect(TType::Identifier).value;
+    return element;
+  };
+
+  std::vector<DestructureElement> elements;
+  DestructureElement element = parse_element();
+  elements.push_back(element);
+  while (peek().type == TType::Comma) {
+    eat();
+    element = parse_element();
+    elements.push_back(element);
+  }
+  return elements;
+}

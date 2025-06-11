@@ -71,7 +71,7 @@ enum ASTNodeType {
   AST_NODE_TUPLE_DECONSTRUCTION,
   AST_NODE_WHERE,
   AST_NODE_PATTERN_MATCH,
-  AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
+  AST_NODE_STATEMENT_LIST,  // Used just to return a bunch of statments from a single directive.s
 
   AST_NODE_WHERE_STATEMENT,
 };
@@ -139,7 +139,8 @@ enum AttributeTag {
   ATTRIBUTE_PUB,
   // @[no_mangle]                           : don't mangle a symbols name ever.
   ATTRIBUTE_NO_MANGLE,
-  // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this function will never return control flow back to the caller, when called.
+  // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this
+  // function will never return control flow back to the caller, when called.
   ATTRIBUTE_NO_RETURN,
 };
 
@@ -161,9 +162,8 @@ struct ASTStatementList : ASTStatement {
 
 inline static std::string block_flags_to_string(int flags) {
   std::string result;
-#define X(flag)                                                                                                        \
-  if (flags & flag)                                                                                                    \
-    result += #flag " ";
+#define X(flag) \
+  if (flags & flag) result += #flag " ";
   X(BLOCK_FLAGS_FALL_THROUGH)
   X(BLOCK_FLAGS_RETURN)
   X(BLOCK_FLAGS_CONTINUE)
@@ -209,15 +209,9 @@ struct ASTImport : ASTModule {
 
 struct ASTBlock : ASTStatement {
   ASTNode *parent;
-  int flags = BLOCK_FLAGS_FALL_THROUGH;
-
-  // used for tuple destructures.
-  size_t temp_iden_idx = 0;
-
   // of course used for defer.
   bool has_defer = false;
   int defer_count = 0;
-
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -264,7 +258,7 @@ struct ASTPath : ASTExpr {
   std::vector<ASTExpr *> *get_last_segments_generics() { return &segments.back().generic_arguments; }
 
   /*
-    Path parts are typically identifiers, and they may contain their own generic arguments.
+    Path segments are typically identifiers, and they may contain their own generic arguments.
 
     "collections::List!<s32>" -> {
       parts: [
@@ -402,13 +396,19 @@ struct ASTLiteral : ASTExpr {
 
 enum ValueSemantic {
   VALUE_SEMANTIC_COPY,
-  VALUE_SEMANTIC_POINTER,
+  VALUE_SEMANTIC_POINTER_CONST,
+  VALUE_SEMANTIC_POINTER_MUT,
 };
+
+static constexpr inline bool is_pointer_semantic(const ValueSemantic semantic) {
+  return semantic == VALUE_SEMANTIC_POINTER_CONST || semantic == VALUE_SEMANTIC_POINTER_MUT;
+}
 
 struct DestructureElement {
   ValueSemantic semantic;
   InternedString identifier;
   Mutability mutability;
+  Type *type;
 };
 
 struct ASTDestructure : ASTStatement {
@@ -483,7 +483,15 @@ struct ASTWhere;
 struct ASTLambda;
 
 struct ASTFunctionDeclaration : ASTDeclaration {
-  size_t flags = 0;
+  bool is_test: 1 = false;
+  bool is_method: 1 = false;
+  bool is_varargs: 1 = false;
+  bool is_exported: 1 = false;
+  bool is_forward_declared: 1 = false;
+  bool is_extern: 1 = false;
+  bool is_inline: 1 = false;
+  bool is_entry: 1 = false;
+
   bool has_defer = false;
   bool is_declared = false;
   Type *declaring_type = Type::INVALID_TYPE;
@@ -630,13 +638,13 @@ struct ASTIf : ASTExpr {
   bool is_expression = false;
   ASTExpr *condition;
   ASTBlock *block;
-  Nullable<ASTElse> _else; // just an else.
+  Nullable<ASTElse> _else;  // just an else.
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IF; }
 };
 
 struct ASTElse : ASTStatement {
-  Nullable<ASTIf> _if; // conditional else.
+  Nullable<ASTIf> _if;  // conditional else.
   Nullable<ASTBlock> block;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ELSE; }
@@ -675,11 +683,11 @@ struct ASTStructDeclaration : ASTDeclaration {
   InternedString name;
   Scope *scope;
 
-  bool is_fwd_decl = false;
+  bool is_forward_declared = false;
   bool is_union = false;
   bool is_anonymous = false;
 
-  std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
+  std::vector<ASTStructDeclaration *> subtypes;  // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;
 
   void accept(VisitorBase *visitor) override;
@@ -700,7 +708,7 @@ struct ASTDyn_Of : ASTExpr {
 };
 
 struct ASTType_Of : ASTExpr {
-  ASTExpr *target;
+  ASTType *target;
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
   void accept(VisitorBase *visitor) override;
 };
@@ -778,7 +786,7 @@ struct ASTInitializerList : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
 
-struct SwitchCase {
+struct SwitchBranch {
   ASTExpr *expression;
   ASTBlock *block;
 };
@@ -787,9 +795,9 @@ struct ASTSwitch : ASTExpr {
   bool is_statement = false;
   Type *return_type = void_type();
   bool is_pattern_match = false;
-  ASTExpr *target;
-  Nullable<ASTBlock> default_case;
-  std::vector<SwitchCase> cases;
+  ASTExpr *expression;
+  Nullable<ASTBlock> default_branch;
+  std::vector<SwitchBranch> branches;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
 };
@@ -799,7 +807,7 @@ struct ASTNoop : ASTStatement {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic aliases?
+struct ASTAlias : ASTStatement {  // TODO: Implement where clauses for generic aliases?
   InternedString name;
   ASTNode *source_node;
   std::vector<ASTExpr *> generic_arguments;
@@ -905,8 +913,6 @@ struct StructPattern {
   if x is Choice::Variant{ v: mut $v, y: mut $y } { ... }
 */
 struct ASTPatternMatch : ASTExpr {
-  /* This needs a scope to store possibly destructured variables. */
-  Scope *scope;
   ~ASTPatternMatch() {}
   ASTPatternMatch() {}
   ASTPatternMatch(const ASTPatternMatch &other) {
@@ -956,12 +962,15 @@ struct ASTPatternMatch : ASTExpr {
     TuplePattern tuple_pattern;
   };
 
+  // This is where the destructured variables will get placed, and where their lifetimes will be valid etc.
+  ASTBlock *target_block;
+
   ASTNodeType get_node_type() const override { return AST_NODE_PATTERN_MATCH; }
   void accept(VisitorBase *visitor) override;
 };
 
 struct WhereBranch;
-struct ASTWhereStatement: ASTStatement {
+struct ASTWhereStatement : ASTStatement {
   /*
     Allow for negative checks for early returns.
     where! $Type: $Trait {
@@ -982,9 +991,7 @@ struct ASTWhereStatement: ASTStatement {
   // if this has any else clauses, this will be occupied.
   Nullable<WhereBranch> branch;
 
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_WHERE_STATEMENT;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_WHERE_STATEMENT; }
 
   virtual void accept(VisitorBase *visitor) override;
 };
@@ -1014,17 +1021,17 @@ struct DirectiveRoutine {
 // make sure that this precedence scheme makes sense.
 enum Precedence {
   PRECEDENCE_LOWEST,
-  PRECEDENCE_ASSIGNMENT,    // =, :=
-  PRECEDENCE_LOGICALOR,     // ||
-  PRECEDENCE_LOGICALAND,    // &&
-  PRECEDENCE_EQUALITY,      // ==, !=
-  PRECEDENCE_RELATIONAL,    // <, >, <=, >=
-  PRECEDENCE_BITWISEOR,     // |
-  PRECEDENCE_BITWISEXOR,    // ^
-  PRECEDENCE_BITWISEAND,    // &
-  PRECEDENCE_SHIFT,         // <<, >>
-  PRECEDENCE_ADDITIVE,      // +, -
-  PRECEDENCE_MULTIPLICATIVE // *, /, %
+  PRECEDENCE_ASSIGNMENT,     // =, :=
+  PRECEDENCE_LOGICALOR,      // ||
+  PRECEDENCE_LOGICALAND,     // &&
+  PRECEDENCE_EQUALITY,       // ==, !=
+  PRECEDENCE_RELATIONAL,     // <, >, <=, >=
+  PRECEDENCE_BITWISEOR,      // |
+  PRECEDENCE_BITWISEXOR,     // ^
+  PRECEDENCE_BITWISEAND,     // &
+  PRECEDENCE_SHIFT,          // <<, >>
+  PRECEDENCE_ADDITIVE,       // +, -
+  PRECEDENCE_MULTIPLICATIVE  // *, /, %
   // these aren't handled here, but this is the continuation
   // unary
   // posfix
@@ -1048,6 +1055,7 @@ struct Typer;
 struct Parser {
   ASTIf *parse_if();
   ASTProgram *parse_program();
+  void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
@@ -1060,6 +1068,7 @@ struct Parser {
   ASTEnumDeclaration *parse_enum_declaration();
 
   ASTDestructure *parse_destructure();
+  std::vector<DestructureElement> parse_destructure_elements();
   ASTVariable *parse_variable();
   std::vector<ASTGenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
@@ -1068,6 +1077,7 @@ struct Parser {
 
   ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);
+  void parse_pattern_match_value_semantic(auto &part);
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
@@ -1121,7 +1131,8 @@ struct Parser {
   static std::vector<DirectiveRoutine> directive_routines;
 };
 
-template <class T> static inline T *ast_alloc(size_t n = 1) {
+template <class T>
+static inline T *ast_alloc(size_t n = 1) {
   auto node = new (ast_arena.allocate(sizeof(T) * n)) T();
   node->declaring_block = Parser::current_block;
   return node;
@@ -1129,15 +1140,16 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
 
 ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args);
 
-#define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
-  type *node = ast_alloc<type>();                                                                                      \
-  auto range = parser->begin_node();                                                                                   \
+#define NODE_ALLOC(type, node, range, defer, parser) \
+  type *node = ast_alloc<type>();                    \
+  auto range = parser->begin_node();                 \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  type *node = ast_alloc<type>();                                                                                      \
-  auto range = parser->begin_node();                                                                                   \
-  Defer defer([&] {                                                                                                    \
-    parser->end_node(node, range);                                                                                     \
-    deferred;                                                                                                          \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred) \
+  type *node = ast_alloc<type>();                                          \
+  auto range = parser->begin_node();                                       \
+  Defer defer([&] {                                                        \
+    parser->end_node(node, range);                                         \
+    deferred;                                                              \
   });
+  

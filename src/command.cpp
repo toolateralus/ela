@@ -1,6 +1,9 @@
 #include "core.hpp"
 #include "error.hpp"
+#include "resolver.hpp"
 #include "strings.hpp"
+#include "thir.hpp"
+#include "emit.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
@@ -13,76 +16,120 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 }
 
 int CompileCommand::compile() {
+  
+  // TODO: this won't work because we use text based includes.
+  // We need to scan the main file, then recursively any imported file, to check for included files that are
+  // newer than the binary. This would be a nice little way to run things without recompiling every run.
+  if (false) {
+    const auto input_file = input_path;
+    const auto output_file = output_path;
+    std::filesystem::file_time_type input_file_write_time = {};
+    std::filesystem::file_time_type output_file_write_time = {};
+    if (std::filesystem::exists(input_file)) {
+      input_file_write_time = std::filesystem::last_write_time(input_file);
+    }
+    if (std::filesystem::exists(output_file)) {
+      output_file_write_time = std::filesystem::last_write_time(output_file);
+      if (input_file_write_time <= output_file_write_time) {
+        return 0;
+      }
+    }
+  }
+
   init_type_system();
   Context context{};
   original_path = std::filesystem::current_path();
 
-  auto root = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  auto root = parse.run<ASTProgram *>("parsing", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
   });
 
-  lower.run<void>("typing & lowering to C", [&] {
-    Typer type_visitor{context};
-    type_visitor.visit(root);
+  lower.run<void>("typing, lowering to c", [&] {
+    Typer typer{context};
+    THIRGen thir_gen(context);
+    Emitter emitter;
+    Resolver resolver(emitter);
+    typer.visit(root);
+    {
+      thir_gen.type_ptr_list = typer.type_ptr_list;
+      thir_gen.method_list = typer.method_list;
+      thir_gen.field_list = typer.field_list;
+    }
+    thir_gen.visit_node(root);
+    emitter.emit_reflection_forward_declarations(thir_gen.reflected_upon_types);
 
-    Emitter emit(context, type_visitor);
-    Resolver dep_resolver(context, &emit);
-    emit.dep_emitter = &dep_resolver;
-
-    static const auto testing = compile_command.has_flag("test");
-    const bool is_freestanding =
-        compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
-
-    if (!is_freestanding) {
-      emit.code << "#define USE_STD_LIB 1\n";
-    } else {
-      if (compile_command.has_flag("test")) {
-        throw_error(
-            "You cannot use unit tests in a freestanding or nostlib "
-            "environment due to lack of exception handling",
-            {});
-      }
+    for (const auto [type, gv]: thir_gen.reflected_upon_types) {
+      resolver.emitted_types.insert(type);
+      resolver.forward_declared_types.insert(type);
+      resolver.emitted_global_variables.insert((const THIRVariable*)gv.definition);
     }
 
-    if (compile_command.has_flag("test-verbose")) {
-      emit.code << "#define TEST_VERBOSE;\n";
-      std ::cout << "adding TEST_VERBOSE\n";
-    }
-
-    if (testing) {
-      emit.code << "#define TESTING\n";
-    }
-
-    root->accept(&dep_resolver);
-    root->accept(&emit);
+    resolver.visit_node(thir_gen.get_entry_point());
+    emitter.emit_reflection_declarations(thir_gen.reflected_upon_types);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
-
-    std::string program;
-    if (compile_command.has_flag("test")) {
-      output << "#define TESTING\n";
-    }
-
     output << BOILERPLATE_C_CODE << '\n';
+    output << emitter.code.str();
 
-    const bool uses_reflection = emit.reflected_upon_types.size();
+    // Emitter emit(context, type_visitor);
+    // Resolver dep_resolver(context, &emit);
+    // emit.dep_emitter = &dep_resolver;
 
-    if (uses_reflection) {
-      output << "typedef struct Type Type;\n";
-      output << emit.reflection_externs.str();
-    }
+    // static const auto testing = compile_command.has_flag("test");
+    // const bool is_freestanding =
+    //     compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
-    output << emit.code.str();
+    // if (!is_freestanding) {
+    //   emit.code << "#define USE_STD_LIB 1\n";
+    // } else {
+    //   if (compile_command.has_flag("test")) {
+    //     throw_error(
+    //         "You cannot use unit tests in a freestanding or nostlib "
+    //         "environment due to lack of exception handling",
+    //         {});
+    //   }
+    // }
 
-    if (uses_reflection) {
-      output << emit.reflection_initialization.str();
-    }
+    // if (compile_command.has_flag("test-verbose")) {
+    //   emit.code << "#define TEST_VERBOSE;\n";
+    //   std ::cout << "adding TEST_VERBOSE\n";
+    // }
 
-    output.flush();
-    output.close();
+    // if (testing) {
+    //   emit.code << "#define TESTING\n";
+    // }
+
+    // root->accept(&dep_resolver);
+    // root->accept(&emit);
+
+    // std::filesystem::current_path(compile_command.original_path);
+    // std::ofstream output(compile_command.output_path);
+
+    // std::string program;
+    // if (compile_command.has_flag("test")) {
+    //   output << "#define TESTING\n";
+    // }
+
+    // output << BOILERPLATE_C_CODE << '\n';
+
+    // const bool uses_reflection = emit.reflected_upon_types.size();
+
+    // if (uses_reflection) {
+    //   output << "typedef struct Type Type;\n";
+    //   output << emit.reflection_externs.str();
+    // }
+
+    // output << emit.code.str();
+
+    // if (uses_reflection) {
+    //   output << emit.reflection_initialization.str();
+    // }
+
+    // output.flush();
+    // output.close();
   });
 
   if (has_flag("no-compile")) {
