@@ -1615,7 +1615,8 @@ ASTStatement *Parser::parse_statement() {
         tok.type == TType::And && (lookahead_buf()[1].type == TType::Const || lookahead_buf()[1].type == TType::Mut) &&
         lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma;
 
-    if (is_simple_const_destructure || is_simple_mut_destructure || is_simple_const_referential_destructure || is_complex_referential_destructure) {
+    if (is_simple_const_destructure || is_simple_mut_destructure || is_simple_const_referential_destructure ||
+        is_complex_referential_destructure) {
       return parse_destructure();
     }
 
