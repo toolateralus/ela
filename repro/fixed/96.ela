@@ -1,5 +1,5 @@
 impl!<T> List!<T> {
-  alias Ordering_Predicate :: fn * (*const T, *const T) -> bool;
+  type Ordering_Predicate :: fn * (*const T, *const T) -> bool;
 
   fn order_by_2(self, predicate: Ordering_Predicate) -> List!<T> {
     new_list := self.clone();

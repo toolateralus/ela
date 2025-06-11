@@ -159,7 +159,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   const auto name_string =
       std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name));
 
-  ss << "(Field) { " << name_string << std::format(".type = {}, ", to_reflection_type_struct(type, context));
+  ss << "(Field) { " << name_string << std::format("._type = {}, ", to_reflection_type_struct(type, context));
 
   if (type->extensions.is_pointer()) {
     ss << std::format(".size = sizeof(void*), ");
@@ -1191,7 +1191,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     node->is_emitted = true;
   }
   size_t n = 0;
-  code << "typedef enum {\n";
+  code << "typedef enum: " << type_to_string(node->underlying_type) << " {\n";
   indent_level++;
   auto scope = node->resolved_type->info->scope;
   for (const auto &[key, value] : node->key_values) {

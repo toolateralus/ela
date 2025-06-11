@@ -8,7 +8,7 @@ choice Math {
   causes nasty nasty C errors.
 
   So, 
-  in the below example, we extract an 'x' variable, from the 'x' choice type.
+  in the below example, we extract an 'x' variable, from the 'x' choice _type.
   this just breaks C because in C, you can do things like:
 
   `int x = x;`

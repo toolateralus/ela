@@ -29,7 +29,7 @@ fn main() {
     println(ch);
   }
 
-  // we can iterate over its length, with a Range type. Range also implements Iterable.
+  // we can iterate over its length, with a Range _type. Range also implements Iterable.
   std::printf("string.length loop\n");
   for i in 0..string.length {
     // string types all implement the Index trait, so they can be 'subscripted'.
@@ -43,7 +43,7 @@ fn main() {
     std::printf("%c\n", ch);
   }
 
-  // iter_mut will always return a *mut T (mutable pointer to the element type of the Iterator).
+  // iter_mut will always return a *mut T (mutable pointer to the element _type of the Iterator).
   // we can safely modify the value of these pointers while traversing.
 
   // ! for ch in string.iter_mut() { *ch = 0; }
@@ -62,7 +62,7 @@ fn main() {
   }
 
 
-  // If we wanted to create a custom iterator, we just need a type that implements `trait Iterator`.
+  // If we wanted to create a custom iterator, we just need a _type that implements `trait Iterator`.
   struct CustomIter {
     count: s32,
   }
@@ -88,9 +88,9 @@ fn main() {
   /* 
     the data arguments for the formatting function (printlnf in this case, but format() and fmt::printf() too), 
     as shown below, often take a tuple (even if a single value).
-    The alternative is that the single argument implements Format. then, the type doesn't need to be encased in a tuple.
+    The alternative is that the single argument implements Format. then, the _type doesn't need to be encased in a tuple.
 
-    The format library can print any type, without a Format implementation. 
+    The format library can print any _type, without a Format implementation. 
     However, it does this with runtime reflection, which is slower than a hardcoded impl, 
     and customization is limited. So, implementing Format can be desirable in many cases.
   */
@@ -126,7 +126,7 @@ fn main() {
   /* 
     Switch statements:
 
-    Any type that implements Eq 
+    Any _type that implements Eq 
       (or a self == operator "fn eq(self, other: #self) -> bool")
     can be used in a switch,
 

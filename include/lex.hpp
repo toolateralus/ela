@@ -105,7 +105,7 @@ enum struct TType {
   Size_Of,
   Type_Of,
 
-  Alias,
+  Type,
   Import,
   Module,
 
@@ -194,7 +194,7 @@ static inline std::string TTypeToString(TType type) {
 
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
-    TTYPE_CASE(Alias);
+    TTYPE_CASE(Type);
     TTYPE_CASE(Import);
     TTYPE_CASE(Module);
     TTYPE_CASE(Return);
@@ -295,7 +295,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"mut", TType::Mut},
     {"module", TType::Module},
     {"import", TType::Import},
-    {"alias", TType::Alias},
+    {"type", TType::Type},
     {"extern", TType::Extern},
     // control flow
     {"in", TType::In},

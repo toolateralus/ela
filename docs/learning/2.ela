@@ -4,10 +4,10 @@ fn main() {
   /* 
     Pattern matching
 
-    To cover pattern matching, we must first confront the first user-defined type definition we've discussed. Structs are mostly
-    self explanatory, but here we have a `choice` type.
+    To cover pattern matching, we must first confront the first user-defined _type definition we've discussed. Structs are mostly
+    self explanatory, but here we have a `choice` _type.
 
-    It is a type safe discriminated union, aka tagged union, rust 'enum'.
+    It is a _type safe discriminated union, aka tagged union, rust 'enum'.
     
     for reference, a choice 'variant' is one of its members, seen as each A, B, and C below.
 
@@ -15,7 +15,7 @@ fn main() {
   */
 
   choice Choice {
-    // Bare, with no data. often called a 'Marker' variant, as it just marks the state of the choice type with no associated data.
+    // Bare, with no data. often called a 'Marker' variant, as it just marks the state of the choice _type with no associated data.
     A,
     // `Tuple` style, where the value of the variant is a tuple. This can have 0, 1, or any arbitrary number of subtypes. 
     // This is probably the most common variant kind you'll see.
@@ -30,19 +30,19 @@ fn main() {
     Instantiating choice types is easy. We basically can act like our variants are subtypes, although there is a strict caveat to that
     line of thinking; 
 
-    A choice type's variant can never exist as a standalone value, that is, not encapsulated in it's parent 'choice' type.
+    A choice _type's variant can never exist as a standalone value, that is, not encapsulated in it's parent 'choice' _type.
 
     so, i couldn't say
 
     x: Choice::A = ...;
 
-    because it's not truly a distinct type, due to some technical reasons.
+    because it's not truly a distinct _type, due to some technical reasons.
 
     long story short, knowing at runtime how to create the discriminated union 
     from a subtype or variant, would add additional code and complexity to the compiler.
     We don't see that as a primary focus right now.
 
-    Anyway, we can still think of them as subtypes, and to instantiate them, we'd treat it just like we would a type in am module. 
+    Anyway, we can still think of them as subtypes, and to instantiate them, we'd treat it just like we would a _type in am module. 
     (with the exception of tuples, they are more akin to a a constructor)
   */
 
@@ -56,7 +56,7 @@ fn main() {
 
   /* 
     awesome. So, now we have some instances of choice types. But, how do we read from them, mutate them, and identify which variant occupies
-    the parent 'Choice' encapsulating type?
+    the parent 'Choice' encapsulating _type?
 
     To do so, we have a pattern matching mechanism, each an extension to the `if`, `while`, and `switch` statements.
   */

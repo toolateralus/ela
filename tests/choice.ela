@@ -90,7 +90,7 @@ fn choice_as_param(math: Math) {
   if math is Math::Vector2.{x: _, y: _1} {
     // pass.
   } else {
-    assert("failed to pattern match parameter choice type", false);
+    assert("failed to pattern match parameter choice _type", false);
   }
 }
 

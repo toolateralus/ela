@@ -4,7 +4,7 @@
 /* 
   We don't actually have to have 'generic specialization' for this to occur:
   we just need to store impl's on scopes, instead of dumping all the symbols into
-  the type's scope. Then, we can do a lookup and find a suitable function to call
+  the _type's scope. Then, we can do a lookup and find a suitable function to call
   from all the impls/interfaces provided.
 
   this, of course, is a form of specialization.

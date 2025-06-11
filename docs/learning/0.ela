@@ -10,7 +10,7 @@ import fmt::{
 };
 
 fn main() {
-  // fmt::println can accept any type. here it's taking 'str', a immutable, static-lifetime string. mostly identical to Rust's 'str' type,
+  // fmt::println can accept any _type. here it's taking 'str', a immutable, static-lifetime string. mostly identical to Rust's 'str' _type,
   // except it's null terminated for simpler C FFI.
   println("Hello, World! | Здравствуйте, Мир!");
 }

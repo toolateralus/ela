@@ -54,7 +54,7 @@
 }
 
 /* 
-  subscript assign will never work on a 'str' type ;; it's in the .data section, i.e it's a C string literal.
+  subscript assign will never work on a 'str' _type ;; it's in the .data section, i.e it's a C string literal.
 */
 #test fn subscript_string() {
   mut s := String::from("0,1,2,3,4");

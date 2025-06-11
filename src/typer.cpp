@@ -7,6 +7,7 @@
 #include <linux/limits.h>
 #include <ranges>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -24,17 +25,17 @@
 #define USE_GENERIC_PANIC_HANDLER
 
 #ifdef USE_GENERIC_PANIC_HANDLER
-#define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
-  GenericInstantiationErrorUserData data_name;                                                                         \
-  set_panic_handler(generic_instantiation_panic_handler);                                                              \
-  set_error_user_data(&data_name);                                                                                     \
-  Defer defer_##uid([] { reset_panic_handler(); });                                                                    \
-  if (setjmp(data_name.save_state) == 0) {                                                                             \
+#define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) \
+  GenericInstantiationErrorUserData data_name;                     \
+  set_panic_handler(generic_instantiation_panic_handler);          \
+  set_error_user_data(&data_name);                                 \
+  Defer defer_##uid([] { reset_panic_handler(); });                \
+  if (setjmp(data_name.save_state) == 0) {                         \
     /* clang-format off */\
-    block                                                                                            \
-    /* clang-format on */                                                                                              \
-  } else {                                                                                                             \
-    handle_generic_error(&data_name, source_range);                                                                    \
+    block                                        \
+    /* clang-format on */                                          \
+  } else {                                                         \
+    handle_generic_error(&data_name, source_range);                \
   }
 #else
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
@@ -340,8 +341,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   }
   block->accept(this);
   auto control_flow = block->control_flow;
-  if (control_flow.type == Type::INVALID_TYPE)
-    control_flow.type = void_type();
+  if (control_flow.type == Type::INVALID_TYPE) control_flow.type = void_type();
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE))
     throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK))
@@ -536,9 +536,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   node->target->accept(this);
 
   if (node->target->resolved_type == Type::UNRESOLVED_GENERIC) {
-    throw_error("the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> "
-                "MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`",
-                node->source_range);
+    throw_error(
+        "the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> "
+        "MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`",
+        node->source_range);
   }
 
   node->scope->name = "$" + std::to_string(node->target->resolved_type->uid) + "impl";
@@ -711,8 +712,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   if (id != Type::INVALID_TYPE) {
     auto type = id;
     if (type->is_kind(TYPE_TRAIT)) {
-      if (!generic_instantiation)
-        throw_error("re-definition of trait type.", node->source_range);
+      if (!generic_instantiation) throw_error("re-definition of trait type.", node->source_range);
     } else {
       throw_error("re-definition of a type", node->source_range);
     }
@@ -792,8 +792,7 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
 }
 
 bool is_const_pointer(ASTNode *node) {
-  if (node == nullptr)
-    return false;
+  if (node == nullptr) return false;
 
   if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
     return is_const_pointer(subscript->base);
@@ -816,7 +815,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   auto params_ct = params->params.size();
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
-  { // Check the other parameters, besides self.
+  {  // Check the other parameters, besides self.
     for (size_t arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
@@ -828,14 +827,14 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           assert_types_can_cast_or_equal(
               node->arguments[arg_index], param->resolved_type, node->arguments[arg_index]->source_range,
               std::format("unexpected argument type.. parameter #{} of function",
-                          arg_index + 1)); // +1 here to make it 1-based indexing for user. more intuitive
+                          arg_index + 1));  // +1 here to make it 1-based indexing for user. more intuitive
 
         } else if (param->normal.default_value) {
           auto old_scope = ctx.scope;
           ctx.scope = function->scope;
           // No argument provided, use the default value
           expected_type = param->resolved_type;
-          param->normal.default_value.get()->accept(this); // Type-check the default value
+          param->normal.default_value.get()->accept(this);  // Type-check the default value
           ctx.scope = old_scope;
         } else {
           // No argument provided and no default value, throw an error
@@ -905,9 +904,10 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
                     node->source_range);
       }
       if (is_const_pointer(self)) {
-        throw_error("cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however "
-                    "you obtained this pointer)",
-                    node->source_range);
+        throw_error(
+            "cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however "
+            "you obtained this pointer)",
+            node->source_range);
       }
     }
   }
@@ -966,7 +966,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
         }
       }
 
-    } else { // Infer generic parameter(S) from arguments.
+    } else {  // Infer generic parameter(S) from arguments.
 
       /*
         ! This is the cause of repro 106.
@@ -1248,6 +1248,21 @@ void Typer::visit(ASTEnumDeclaration *node) {
   }
 
   auto elem_type = Type::INVALID_TYPE;
+
+  if (node->underlying_type_ast) {
+    node->underlying_type_ast->accept(this);
+    auto underlying_type = node->underlying_type_ast->resolved_type;
+
+    if (!underlying_type->is_kind(TYPE_SCALAR) || !underlying_type->info->as<ScalarTypeInfo>()->is_integral) {
+      throw_error(
+          "Enums must use an integer for it's underlying type. use a 'choice' type for a discriminated union which can "
+          "use any data type in a range of styles.",
+          node->underlying_type_ast->source_range);
+    }
+
+    elem_type = underlying_type;
+  }
+
   auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
   enum_ty_id->declaring_node = node;
   auto enum_type = ctx.scope->find_type_id(node->name, {});
@@ -1259,16 +1274,15 @@ void Typer::visit(ASTEnumDeclaration *node) {
     info->scope->insert_variable(key, node_ty, value, CONST);
     if (elem_type == Type::INVALID_TYPE) {
       elem_type = node_ty;
-    } else {
-      assert_types_can_cast_or_equal(value, elem_type, node->source_range, "inconsistent types in enum declaration.");
     }
+    // TODO: coerce downcasts, assert types are valid.
   }
 
   if (elem_type == void_type()) {
     throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
   }
 
-  node->element_type = elem_type;
+  node->underlying_type = elem_type;
   info->underlying_type = elem_type;
   node->resolved_type = enum_type;
 }
@@ -1338,9 +1352,10 @@ void Typer::visit(ASTVariable *node) {
   }
 
   if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE || keywords.contains(node->name.get_str())) {
-    throw_error("Invalid variable declaration: a type or keyword exists with "
-                "that name,",
-                node->source_range);
+    throw_error(
+        "Invalid variable declaration: a type or keyword exists with "
+        "that name,",
+        node->source_range);
   }
 
   node->type->accept(this);
@@ -1403,9 +1418,9 @@ void Typer::visit(ASTBlock *node) {
     // Handle 'no_return' calls.
     // TODO: probably add a never type so the analysis here is much cheaper.
     if (statement->get_node_type() == AST_NODE_EXPR_STATEMENT) {
-      auto expr_stmt = (ASTExprStatement*)statement;
+      auto expr_stmt = (ASTExprStatement *)statement;
       if (expr_stmt->expression->get_node_type() == AST_NODE_CALL) {
-        auto call = (ASTCall*)expr_stmt->expression;
+        auto call = (ASTCall *)expr_stmt->expression;
         auto symbol = ctx.get_symbol(call->callee).get();
 
         if (!symbol || !symbol->function.declaration) {
@@ -1414,18 +1429,15 @@ void Typer::visit(ASTBlock *node) {
 
         auto &function = symbol->function;
 
-        for (auto attr: function.declaration->attributes) {
+        for (auto attr : function.declaration->attributes) {
           if (attr.tag == ATTRIBUTE_NO_RETURN) {
-            stmnt_cf = {
-              BLOCK_FLAGS_RETURN,
-              expected_type
-            };
+            stmnt_cf = {BLOCK_FLAGS_RETURN, expected_type};
             break;
           }
         }
       }
     }
-    
+
     auto &block_cf = node->control_flow;
     block_cf.flags |= stmnt_cf.flags;
 
@@ -1511,7 +1523,7 @@ void Typer::visit(ASTFor *node) {
   Type *iter_ty = Type::INVALID_TYPE;
   auto scope = iterable_type->info->scope;
 
-  if (iterable_type->implements(iterable_trait())) { // can return an iterator.
+  if (iterable_type->implements(iterable_trait())) {  // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
 
     compiler_mock_method_call_visit_impl(iterable_type_id, "iter");
@@ -1526,7 +1538,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = symbol->resolved_type->info->as<FunctionTypeInfo>()->return_type;
     auto option = iter_ty;
     iter_ty = option->generic_args[0];
-  } else if (iterable_type->implements(iterator_trait())) { // directly an iterator.
+  } else if (iterable_type->implements(iterator_trait())) {  // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterator_type = iterable_type_id;
 
@@ -1538,9 +1550,10 @@ void Typer::visit(ASTFor *node) {
     auto option = iter_ty;
     iter_ty = option->generic_args[0];
   } else {
-    throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
-                "'Iterator!<T>' trait. ",
-                node->source_range);
+    throw_error(
+        "cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
+        "'Iterator!<T>' trait. ",
+        node->source_range);
   }
 
   node->identifier_type = iter_ty;
@@ -1600,11 +1613,11 @@ void Typer::visit(ASTIf *node) {
   auto condition = node->condition;
   if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
     auto pattern = (ASTPatternMatch *)condition;
-    auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
+    auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
     node->block->scope->parent = pattern->scope;
     condition->accept(this);
-    ctx.scope = old_scope; // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                           // HACKING IT IN!
+    ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
+                            // HACKING IT IN!
   } else {
     condition->accept(this);
   }
@@ -1620,7 +1633,7 @@ void Typer::visit(ASTIf *node) {
 
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
-  
+
   if (node->_else.is_not_null()) {
     auto _else = node->_else.get();
     _else->accept(this);
@@ -1629,7 +1642,7 @@ void Typer::visit(ASTIf *node) {
   } else {
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
-  
+
   node->control_flow = control_flow;
   node->resolved_type = control_flow.type;
 
@@ -1653,11 +1666,11 @@ void Typer::visit(ASTWhile *node) {
     auto condition = node->condition.get();
     if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
       auto pattern = (ASTPatternMatch *)condition;
-      auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
+      auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
       node->block->scope->parent = pattern->scope;
       condition->accept(this);
-      ctx.scope = old_scope; // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                             // HACKING IT IN!
+      ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
+                              // HACKING IT IN!
     } else {
       condition->accept(this);
     }
@@ -1727,9 +1740,9 @@ void Typer::visit(ASTCall *node) {
 
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
-      throw_error(
-          std::format("type {} must be a choice variant to use '(..)' constructor for now", symbol->resolved_type->basename),
-          node->source_range);
+      throw_error(std::format("type {} must be a choice variant to use '(..)' constructor for now",
+                              symbol->resolved_type->basename),
+                  node->source_range);
     }
     if (symbol->type.kind != TYPE_TUPLE) {
       throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->resolved_type->basename),
@@ -1824,20 +1837,21 @@ void Typer::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   switch (node->expression->get_node_type()) {
     case AST_NODE_SWITCH: {
-      auto _switch = static_cast<ASTSwitch*>(node->expression);
+      auto _switch = static_cast<ASTSwitch *>(node->expression);
       node->control_flow = _switch->control_flow;
       node->resolved_type = _switch->resolved_type;
       node->resolved_type = _switch->resolved_type;
       break;
     }
     case AST_NODE_IF: {
-      auto _if = static_cast<ASTIf*>(node->expression);
+      auto _if = static_cast<ASTIf *>(node->expression);
       node->control_flow = _if->control_flow;
       node->resolved_type = _if->resolved_type;
       node->resolved_type = _if->resolved_type;
       break;
     }
-    default: break;
+    default:
+      break;
   }
 }
 
@@ -2074,9 +2088,10 @@ void Typer::visit(ASTUnaryExpr *node) {
     if (name == "deref") {
       auto type = node->resolved_type;
       if (!type->extensions.is_pointer()) {
-        throw_error("'deref' operator overload must return a pointer, the compiler will auto dereference this when "
-                    "it's used. it allows us to assign via this function",
-                    node->source_range);
+        throw_error(
+            "'deref' operator overload must return a pointer, the compiler will auto dereference this when "
+            "it's used. it allows us to assign via this function",
+            node->source_range);
       }
       node->resolved_type = type->get_element_type();
     }
@@ -2200,9 +2215,10 @@ void Typer::visit(ASTDotExpr *node) {
   auto base_ty = base_ty_id;
 
   if (!base_ty) {
-    throw_error("internal compiler error: un-typed variable on lhs of dot "
-                "expression?",
-                node->source_range);
+    throw_error(
+        "internal compiler error: un-typed variable on lhs of dot "
+        "expression?",
+        node->source_range);
   }
 
   Scope *base_scope = base_ty->info->scope;
@@ -2247,11 +2263,12 @@ void Typer::visit(ASTIndex *node) {
 
     auto type = node->resolved_type;
     if (!type->extensions.is_pointer()) {
-      throw_error("subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
-                  "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
-                  "example: subscript :: fn(self*, index: u32) -> s32* { return &self.data[index]; }\n"
-                  "obviously this is somewhat limiting. we have yet to find a better solution to this.",
-                  node->source_range);
+      throw_error(
+          "subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
+          "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
+          "example: subscript :: fn(self*, index: u32) -> s32* { return &self.data[index]; }\n"
+          "obviously this is somewhat limiting. we have yet to find a better solution to this.",
+          node->source_range);
     }
 
     node->resolved_type = type->get_element_type();
@@ -2298,7 +2315,8 @@ void Typer::visit(ASTInitializerList *node) {
   }
 
   if (target_type->extensions.is_pointer() ||
-      (target_type->is_kind(TYPE_SCALAR) && target_type->extensions.has_no_extensions())) { // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
+      (target_type->is_kind(TYPE_SCALAR) &&
+       target_type->extensions.has_no_extensions())) {  // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2415,9 +2433,10 @@ void Typer::visit(ASTRange *node) {
              conversion_rule_right_to_left == CONVERT_IMPLICIT) {
     left = node->left->resolved_type = right;
   } else {
-    throw_error("Can only use ranges when both types are implicitly castable to each other. Range will always take the "
-                "left side's type",
-                node->source_range);
+    throw_error(
+        "Can only use ranges when both types are implicitly castable to each other. Range will always take the "
+        "left side's type",
+        node->source_range);
   }
 
   node->resolved_type = find_generic_type_of("RangeBase", {left}, node->source_range);
@@ -2438,11 +2457,11 @@ void Typer::visit(ASTSwitch *node) {
       auto condition = _case->expression;
       if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
         auto pattern = (ASTPatternMatch *)condition;
-        auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
+        auto old_scope = ctx.scope;  // ! We should not have to manually set this scope here!!!!
         _case->block->scope->parent = pattern->scope;
         condition->accept(this);
-        ctx.scope = old_scope; // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
-                               // HACKING IT IN!
+        ctx.scope = old_scope;  // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
+                                // HACKING IT IN!
       } else {
         condition->accept(this);
       }
@@ -2472,8 +2491,7 @@ void Typer::visit(ASTSwitch *node) {
   int flags = 0;
 
   for (const auto &_case : node->cases) {
-    if (!node->is_pattern_match)
-      _case.expression->accept(this);
+    if (!node->is_pattern_match) _case.expression->accept(this);
 
     _case.block->accept(this);
     auto &block_cf = _case.block->control_flow;
@@ -2580,9 +2598,10 @@ void Typer::visit(ASTDestructure *node) {
 
     if (node->op == TType::ColonEquals) {
       if (symbol) {
-        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
-                    "the identifiers",
-                    node->source_range);
+        throw_error(
+            "redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
+            "the identifiers",
+            node->source_range);
       }
       ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
 
@@ -2611,11 +2630,9 @@ void Typer::visit(ASTDestructure *node) {
   for (const auto name : scope->ordered_symbols) {
     auto symbol = scope->local_lookup(name);
 
-    if (symbol->is_function() || symbol->is_type())
-      continue;
+    if (symbol->is_function() || symbol->is_type()) continue;
 
-    if (i > node->elements.size())
-      break;
+    if (i > node->elements.size()) break;
 
     auto destructure = node->elements[i];
     auto type = symbol->resolved_type;
@@ -2704,9 +2721,10 @@ void Typer::visit(ASTModule *node) {
     }
     for (auto &[name, sym] : node->scope->symbols) {
       if (mod->scope->local_lookup(name)) {
-        throw_error("redefinition of symbol in module append declaration (a module already existed, and we were adding "
-                    "symbols to it.)",
-                    node->source_range);
+        throw_error(
+            "redefinition of symbol in module append declaration (a module already existed, and we were adding "
+            "symbols to it.)",
+            node->source_range);
       }
       mod->scope->symbols[name] = sym;
     }
@@ -2723,10 +2741,11 @@ void Typer::visit(ASTDyn_Of *node) {
       node->trait_type = ast_alloc<ASTType>();
       node->trait_type->resolved_type = type->info->as<DynTypeInfo>()->trait_type;
     } else {
-      throw_error("if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, "
-                  "etc), you must pass the trait type as the second parameter to 'dynof'\nSo, if you wanted a "
-                  "'dyn Format', youd use 'dynof(my_instance, Format)'",
-                  node->source_range);
+      throw_error(
+          "if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, "
+          "etc), you must pass the trait type as the second parameter to 'dynof'\nSo, if you wanted a "
+          "'dyn Format', youd use 'dynof(my_instance, Format)'",
+          node->source_range);
     }
   } else {
     node->trait_type->accept(this);
@@ -2737,9 +2756,10 @@ void Typer::visit(ASTDyn_Of *node) {
   auto object_type = node->object->resolved_type;
 
   if (!object_type->extensions.is_mut_pointer()) {
-    throw_error("'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a "
-                "mutable pointer. eventually we'll have const dyn's",
-                node->source_range);
+    throw_error(
+        "'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a "
+        "mutable pointer. eventually we'll have const dyn's",
+        node->source_range);
   }
 
   auto type = node->trait_type->resolved_type;
@@ -2786,11 +2806,8 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   auto old_scope = typer->ctx.scope;
   typer->ctx.scope = trait_info->scope;
-  Defer _defer([&]{
-    typer->ctx.scope = old_scope;
-  });
+  Defer _defer([&] { typer->ctx.scope = old_scope; });
   const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
-
     std::vector<Type *> parameters;
     bool has_self = false;
     for (auto param : declaration->params->params) {
@@ -2798,9 +2815,10 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
         if (param->self.is_pointer) {
           parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
         } else {
-          throw_error("cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
-                      "parameter, as we don't know the type of the 'self' at compile time definitively.",
-                      range);
+          throw_error(
+              "cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
+              "parameter, as we don't know the type of the 'self' at compile time definitively.",
+              range);
         }
         has_self = true;
       } else {
@@ -2816,9 +2834,10 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
         // There's an exception here for trait typed parameters.
         auto parameter_type = param->resolved_type;
         if (parameter_type->is_kind(TYPE_TRAIT)) {
-          throw_error("you cannot take a 'dyn' of an trait that uses other traits as parameter constraints.\n"
-                      "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
-                      range);
+          throw_error(
+              "you cannot take a 'dyn' of an trait that uses other traits as parameter constraints.\n"
+              "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
+              range);
         }
 
         parameters.push_back(param->resolved_type);
@@ -2826,9 +2845,10 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     }
 
     if (declaration->return_type->kind == ASTType::SELF) {
-      throw_error("just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
-                  "because we would have to return it as a type erased *const void. return the concrete type.",
-                  range);
+      throw_error(
+          "just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
+          "because we would have to return it as a type erased *const void. return the concrete type.",
+          range);
     }
 
     declaration->return_type->accept(typer);
@@ -2840,7 +2860,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
-    dyn_info->methods.push_back({name.get_str(), function_type/* , declaration */});
+    dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };
 
@@ -2855,7 +2875,6 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     if (declaration->where_clause) {
       auto where = declaration->where_clause.get();
       for (const auto &constraint : where->constraints) {
-        
         constraint.first->accept(typer);
         constraint.second->accept(typer);
 
@@ -2863,7 +2882,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
           continue;
         }
 
-        if  (constraint.first->get_node_type() != AST_NODE_TYPE) {
+        if (constraint.first->get_node_type() != AST_NODE_TYPE) {
           continue;
         }
         auto type = (ASTType *)constraint.first;
@@ -2895,7 +2914,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   }
 
   auto sym = Symbol::create_type(ty, trait_name, TYPE_DYN, nullptr);
-  sym.scope = this; // TODO: we have to fit this in modules or some stuff.
+  sym.scope = this;  // TODO: we have to fit this in modules or some stuff.
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }
@@ -2916,11 +2935,9 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
-        if (!symbol)
-          return nullptr;
+        if (!symbol) return nullptr;
 
-        if (index == path->length() - 1)
-          return symbol;
+        if (index == path->length() - 1) return symbol;
 
         if (!part.generic_arguments.empty()) {
           if (symbol->is_type()) {
@@ -2956,7 +2973,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       return symbol;
     }
     default:
-      return nullptr; // TODO: verify this isn't strange.
+      return nullptr;  // TODO: verify this isn't strange.
   }
   return nullptr;
 }
@@ -2974,11 +2991,9 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
-        if (!symbol)
-          return nullptr;
+        if (!symbol) return nullptr;
 
-        if (index == path->length() - 1)
-          return symbol->scope;
+        if (index == path->length() - 1) return symbol->scope;
 
         if (!part.generic_arguments.empty()) {
           if (symbol->is_type()) {
@@ -3003,7 +3018,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       }
     } break;
     default:
-      return nullptr; // TODO: verify this isn't strange.
+      return nullptr;  // TODO: verify this isn't strange.
   }
   return nullptr;
 }
@@ -3114,10 +3129,11 @@ void Typer::visit(ASTPatternMatch *node) {
       break;
     case ASTPatternMatch::STRUCT: {
       if (!variant_type->is_kind(TYPE_STRUCT)) {
-        throw_error("cannot use { $field: $var, ... } destructure on a non-struct-style choice variant.\nfor tuple "
-                    "style <Variant(), Variant(f32, s32)>,\nuse the tuple destructure syntax. <Choice::Tuple(x, y)>. "
-                    "for markers, such as <Variant>, dont use any destructure.",
-                    node->source_range);
+        throw_error(
+            "cannot use { $field: $var, ... } destructure on a non-struct-style choice variant.\nfor tuple "
+            "style <Variant(), Variant(f32, s32)>,\nuse the tuple destructure syntax. <Choice::Tuple(x, y)>. "
+            "for markers, such as <Variant>, dont use any destructure.",
+            node->source_range);
       }
 
       auto info = variant_type->info->as<StructTypeInfo>();
@@ -3144,11 +3160,12 @@ void Typer::visit(ASTPatternMatch *node) {
     } break;
     case ASTPatternMatch::TUPLE: {
       if (!variant_type->is_kind(TYPE_TUPLE)) {
-        throw_error("cannot use ($var, $var) destructure on a non-tuple-style choice variant.\nfor struct "
-                    "style <Variant {x: f32, y: f32} >,\nuse the struct destructure syntax. <Choice::Variant { x: x, "
-                    "y: mut y)>. "
-                    "for markers, such as <Variant>, dont use any destructure.",
-                    node->source_range);
+        throw_error(
+            "cannot use ($var, $var) destructure on a non-tuple-style choice variant.\nfor struct "
+            "style <Variant {x: f32, y: f32} >,\nuse the struct destructure syntax. <Choice::Variant { x: x, "
+            "y: mut y)>. "
+            "for markers, such as <Variant>, dont use any destructure.",
+            node->source_range);
       }
       auto info = variant_type->info->as<TupleTypeInfo>();
       if (node->tuple_pattern.parts.size() > info->types.size()) {
@@ -3317,9 +3334,10 @@ std::string print_where_predicate(ASTExpr *predicate) {
       } else if (op == TType::Or) {
         return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
       } else {
-        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
-                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
-                    bin->source_range);
+        throw_error(
+            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+            bin->source_range);
       }
     } break;
     case AST_NODE_TYPE: {

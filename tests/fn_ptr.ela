@@ -2,7 +2,7 @@ fn function_pointer_helper(x: s32, y: s32) -> s32 { return x * y; }
 
 // #error "Still broken!";
 
-alias FunctionPointer :: fn* (s32, s32) -> s32;
+type FunctionPointer :: fn* (s32, s32) -> s32;
 
 #test fn test_function_pointer_alias() {
   ptr := &mut function_pointer_helper;
