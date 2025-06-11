@@ -212,6 +212,8 @@ struct ASTBlock : ASTStatement {
   // of course used for defer.
   bool has_defer = false;
   int defer_count = 0;
+
+  size_t temp_iden_idx;
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -1046,7 +1048,7 @@ struct Typer;
   Defer $stmt_list_defer([&]{ current_statement_list = $old_list; });\
   current_statement_list = &$list;
 
-#define ENTER_SCOPE($scope)\
+#define AST_ENTER_SCOPE($scope)\
   auto $old_scope=ctx.scope;\
   Defer $scope_defer([&] { ctx.scope=$old_scope; });\
   ctx.scope=$scope;

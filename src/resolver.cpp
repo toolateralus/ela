@@ -7,7 +7,7 @@
 #include <set>
 
 void Resolver::declare_type(Type *type) {
-  auto extensions = type->extensions.extensions;
+  auto extensions = type->extensions;
 
   // TODO:
   // ! @Cooper-Pilot
@@ -65,7 +65,7 @@ void Resolver::define_type(Type *type) {
       auto trait_type = info->trait_type;
       auto trait_info = trait_type->info->as<TraitTypeInfo>();
       for (auto [name, sym] : trait_info->scope->symbols) {
-        if (sym.is_function() && !sym.is_generic_function()) {
+        if (sym.is_function && !sym.is_generic_function()) {
           auto declaration = sym.function.declaration;
           for (auto param : declaration->params->params) {
             if (type_is_valid(param->resolved_type)) {
@@ -115,13 +115,13 @@ void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id) {
   }
 
   auto type = id;
-  if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
+  if (type->is_pointer() || type->is_fixed_sized_array()) {
     type = type->get_element_type();
   }
   auto scope = type->info->scope;
 
   for (auto &[name, symbol] : scope->symbols) {
-    if (symbol.is_function() && !symbol.is_generic_function()) {
+    if (symbol.is_function && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
     } else if (type_is_valid(symbol.resolved_type)) {
       emit_dependencies_for_reflection(dep_resolver, symbol.resolved_type);
@@ -167,13 +167,13 @@ void Resolver::visit(ASTProgram *node) {
 
   auto emit_symbol = [&](InternedString name) {
     if (auto sym = ctx.root_scope->local_lookup(name)) {
-      if (sym->is_variable()) {
+      if (sym->is_variable) {
         auto ast = sym->variable.declaration.get();
         ast->accept(this);
         ast->accept(emitter);
-      } else if (sym->is_function()) {
+      } else if (sym->is_function) {
         sym->function.declaration->accept(this);
-      } else if (sym->is_type()) {
+      } else if (sym->is_type) {
         define_type(sym->resolved_type);
       }
     }
@@ -313,18 +313,18 @@ void Resolver::visit(ASTPath *node) {
     ASTDeclaration *instantiation = nullptr;
     if (!seg.generic_arguments.empty()) {
       auto generic_args = emitter->typer.get_generic_arg_types(seg.generic_arguments);
-      if (symbol->is_type()) {
+      if (symbol->is_type) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
         auto type = instantiation->resolved_type;
         scope = type->info->scope;
-      } else if (symbol->is_function()) {
+      } else if (symbol->is_function) {
         instantiation = find_generic_instance(symbol->function.declaration->generic_instantiations, generic_args);
       }
     } else {
-      if (symbol->is_module()) {
+      if (symbol->is_module) {
         scope = symbol->module.declaration->scope;
-      } else if (symbol->is_type()) {
+      } else if (symbol->is_type) {
         scope = symbol->resolved_type->info->scope;
       }
     }
@@ -332,17 +332,17 @@ void Resolver::visit(ASTPath *node) {
     if (instantiation) {
       instantiation->accept(this);
       instantiation->accept(emitter);
-    } else if (symbol->is_variable() && symbol->variable.declaration) {
+    } else if (symbol->is_variable && symbol->variable.declaration) {
       // for global variables
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
         symbol->variable.declaration.get()->accept(this);
         symbol->variable.declaration.get()->accept(emitter);
       }
-    } else if (symbol->is_function() && symbol->function.declaration) {
+    } else if (symbol->is_function && symbol->function.declaration) {
       // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
-    } else if (symbol->is_type()) {
+    } else if (symbol->is_type) {
       if (auto decl = symbol->type.declaration.get()) {
         decl->accept(this);
         decl->accept(emitter);
@@ -460,21 +460,21 @@ void Resolver::visit(ASTRange *node) {
 }
 
 void Resolver::visit(ASTSwitch *node) {
-  node->target->accept(this);
+  node->expression->accept(this);
 
-  auto type = node->target->resolved_type;
+  auto type = node->expression->resolved_type;
 
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer() &&
-      !node->cases.empty()) {
-    visit_operator_overload(node->target, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
-                            node->cases[0].expression);
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer() &&
+      !node->branches.empty()) {
+    visit_operator_overload(node->expression, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
+                            node->branches[0].expression);
   }
 
-  for (const auto $case : node->cases) {
+  for (const auto $case : node->branches) {
     $case.block->accept(this);
     $case.expression->accept(this);
   }
-  if (auto default_case = node->default_case.get()) {
+  if (auto default_case = node->default_branch.get()) {
     default_case->accept(this);
   }
 }
@@ -579,8 +579,8 @@ void Resolver::visit(ASTDyn_Of *node) {
           std::format("Internal compiler error: couldn't find method {} in dynof({})", name, element_type->to_string()),
           node->source_range);
     }
-    if (!sym->is_function() || sym->is_generic_function()) {
-      printf("%d\n", sym->flags);
+
+    if (!sym->is_function || sym->is_generic_function()) {
       throw_error(std::format("Internal compiler error: {} is not a valid method in dynof", name), node->source_range);
     }
     auto decl = sym->function.declaration;

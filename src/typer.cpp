@@ -1252,6 +1252,12 @@ void Typer::visit(ASTEnumDeclaration *node) {
   }
 
   auto underlying_type = Type::INVALID_TYPE;
+
+  if (node->underlying_type_ast) {
+    node->underlying_type_ast->accept(this);
+    underlying_type = node->underlying_type_ast->resolved_type;
+  }
+
   auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
   enum_ty_id->declaring_node = node;
   auto enum_type = ctx.scope->find_type_id(node->name, {});
@@ -1267,18 +1273,13 @@ void Typer::visit(ASTEnumDeclaration *node) {
       assert_types_can_cast_or_equal(value, underlying_type, node->source_range,
                                      "inconsistent types in enum declaration.");
     }
-    info->members.push_back({
-        .name = key,
-        .type = underlying_type,
-        .default_value = value,
-    });
   }
 
   if (underlying_type == void_type()) {
     throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
   }
 
-  node->element_type = underlying_type;
+  node->underlying_type = underlying_type;
   info->underlying_type = underlying_type;
   node->resolved_type = enum_type;
 }
@@ -1602,13 +1603,7 @@ void Typer::visit(ASTFor *node) {
 
 void Typer::visit(ASTIf *node) {
   auto condition = node->condition;
-  if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
-    auto pattern = (ASTPatternMatch *)condition;
-    pattern->target_block = node->block;
-    condition->accept(this);
-  } else {
-    condition->accept(this);
-  }
+  condition->accept(this);
 
   auto cond_ty = node->condition->resolved_type;
   auto conversion_rule = type_conversion_rule(cond_ty, bool_type());
@@ -1652,13 +1647,7 @@ void Typer::visit(ASTElse *node) {
 void Typer::visit(ASTWhile *node) {
   if (node->condition.is_not_null()) {
     auto condition = node->condition.get();
-    if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
-      auto pattern = (ASTPatternMatch *)condition;
-      pattern->target_block = node->block;
-      condition->accept(this);
-    } else {
-      condition->accept(this);
-    }
+    condition->accept(this);
   }
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
@@ -1841,19 +1830,6 @@ void Typer::visit(ASTExprStatement *node) {
 }
 
 void Typer::visit(ASTType_Of *node) {
-  static bool types_initialized = false;
-  if (!types_initialized) {
-    types_initialized = true;
-    Type *type_ptr_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
-    type_ptr_list = find_generic_type_of("List", {type_ptr_type}, {});
-
-    Type *method_type = ctx.scope->find_type_id("Method", {});
-    method_list = find_generic_type_of("List", {method_type}, {});
-
-    Type *field_type = ctx.scope->find_type_id("Field", {});
-    field_list = find_generic_type_of("List", {field_type}, {});
-  }
-
   static auto type_ptr = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
   node->target->accept(this);
   node->resolved_type = type_ptr;
@@ -2310,7 +2286,9 @@ void Typer::visit(ASTInitializerList *node) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
 
-  if (target_type->is_pointer() || (target_type->is_kind(TYPE_SCALAR) && target_type->has_no_extensions())) {
+  if (target_type->is_pointer() ||
+      (target_type->is_kind(TYPE_SCALAR) &&
+       target_type->has_no_extensions())) {  // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2453,13 +2431,7 @@ void Typer::visit(ASTSwitch *node) {
   if (node->is_pattern_match) {
     for (auto branch = node->branches.begin(); branch != node->branches.end(); branch++) {
       auto condition = branch->expression;
-      if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
-        auto pattern = (ASTPatternMatch *)condition;
-        pattern->target_block = branch->block;
-        condition->accept(this);
-      } else {
-        condition->accept(this);
-      }
+      condition->accept(this);
     }
   }
 
@@ -2613,16 +2585,15 @@ void Typer::visit(ASTDestructure *node) {
 
   auto members = type->info->members;
   size_t i = 0;
+
   for (auto [name, type, _, __] : members) {
     if (i > node->elements.size()) break;
-    auto &element = node->elements[i];
-    if (element.semantic == VALUE_SEMANTIC_POINTER_MUT) {
+    auto destructure = node->elements[i];
+    if (is_pointer_semantic(destructure.semantic)) {
       type = type->take_pointer_to(MUT);
-    } else if (element.semantic == VALUE_SEMANTIC_POINTER_CONST) {
-      type = type->take_pointer_to(CONST);
     }
-    element.type = type;
-    ctx.scope->insert_local_variable(element.identifier, type, nullptr, element.mutability);
+    destructure.type = type;
+    ctx.scope->insert_local_variable(destructure.identifier, type, nullptr, destructure.mutability);
     ++i;
   }
 };
@@ -2787,7 +2758,6 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto old_scope = typer->ctx.scope;
   typer->ctx.scope = trait_info->scope;
   Defer _defer([&] { typer->ctx.scope = old_scope; });
-
   const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
     std::vector<Type *> parameters;
     bool has_self = false;
@@ -2841,7 +2811,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
-    dyn_info->methods.push_back({name.get_str(), function_type});
+    dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };
 
@@ -2895,7 +2865,8 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   }
 
   auto sym = Symbol::create_type(ty, trait_name, nullptr);
-  sym.scope = this;  // TODO: we have to fit this in modules or some stuff.
+  // TODO: we have to fit this in modules or some stuff.
+  sym.scope = this;  
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }

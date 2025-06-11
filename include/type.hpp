@@ -298,6 +298,10 @@ struct Type {
   // the actual name of the type, without extensions and generics.
   InternedString basename{};
 
+  bool fwd_decl_is_emitted=false;
+  bool tuple_is_emitted=false;
+  bool dyn_emitted=false;
+
   // TODO: refactor the way type extensions work.
   // most of this should just be on the type itself,
   // especially the querying methods, it's a pain to get the extensions everywhere.
