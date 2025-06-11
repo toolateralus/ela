@@ -1603,7 +1603,13 @@ void Typer::visit(ASTFor *node) {
 
 void Typer::visit(ASTIf *node) {
   auto condition = node->condition;
-  condition->accept(this);
+  if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    auto pattern = (ASTPatternMatch *)condition;
+    pattern->target_block = node->block;
+    condition->accept(this);
+  } else {
+    condition->accept(this);
+  }
 
   auto cond_ty = node->condition->resolved_type;
   auto conversion_rule = type_conversion_rule(cond_ty, bool_type());
@@ -1647,7 +1653,13 @@ void Typer::visit(ASTElse *node) {
 void Typer::visit(ASTWhile *node) {
   if (node->condition.is_not_null()) {
     auto condition = node->condition.get();
-    condition->accept(this);
+    if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+      auto pattern = (ASTPatternMatch *)condition;
+      pattern->target_block = node->block;
+      condition->accept(this);
+    } else {
+      condition->accept(this);
+    }
   }
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
@@ -2431,72 +2443,78 @@ void Typer::visit(ASTSwitch *node) {
   if (node->is_pattern_match) {
     for (auto branch = node->branches.begin(); branch != node->branches.end(); branch++) {
       auto condition = branch->expression;
-      condition->accept(this);
+      if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+        auto pattern = (ASTPatternMatch *)condition;
+        pattern->target_block = node->block;
+        condition->accept(this);
+      } else {
+        condition->accept(this);
+      }
     }
   }
+}
 
-  if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer()) {
-    auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
-    if (operator_overload == Type::INVALID_TYPE) {
-      throw_error(
-          std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum, non-choice type that "
-                      "doesn't implement "
-                      "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
-                      type->to_string()),
-          node->expression->source_range);
-    }
+if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer()) {
+  auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
+  if (operator_overload == Type::INVALID_TYPE) {
+    throw_error(std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum, non-choice type that "
+                            "doesn't implement "
+                            "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
+                            type->to_string()),
+                node->expression->source_range);
+  }
+}
+
+auto old_expected_type = expected_type;
+if (!node->is_statement) {
+  expected_type = Type::INVALID_TYPE;
+}
+Defer _([&] { expected_type = old_expected_type; });
+
+Type *return_type = void_type();
+int flags = 0;
+
+for (const auto &branch : node->branches) {
+  if (!node->is_pattern_match) branch.expression->accept(this);
+
+  branch.block->accept(this);
+  auto &block_cf = branch.block->control_flow;
+  flags |= block_cf.flags;
+
+  if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
+    return_type = block_cf.type;
   }
 
-  auto old_expected_type = expected_type;
-  if (!node->is_statement) {
-    expected_type = Type::INVALID_TYPE;
+  if (type_is_numerical(type)) {
+    continue;
+  } else if (branch.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
+    assert_types_can_cast_or_equal(branch.expression, type_id, node->source_range, "Invalid switch case.");
   }
-  Defer _([&] { expected_type = old_expected_type; });
+}
 
-  Type *return_type = void_type();
-  int flags = 0;
+if (node->default_branch) {
+  auto branch = node->default_branch.get();
+  branch->accept(this);
+  auto &block_cf = branch->control_flow;
+  flags |= block_cf.flags;
 
-  for (const auto &branch : node->branches) {
-    if (!node->is_pattern_match) branch.expression->accept(this);
-
-    branch.block->accept(this);
-    auto &block_cf = branch.block->control_flow;
-    flags |= block_cf.flags;
-
-    if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
-      return_type = block_cf.type;
-    }
-
-    if (type_is_numerical(type)) {
-      continue;
-    } else if (branch.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
-      assert_types_can_cast_or_equal(branch.expression, type_id, node->source_range, "Invalid switch case.");
-    }
+  if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
+    return_type = block_cf.type;
   }
+} else {
+  flags |= BLOCK_FLAGS_FALL_THROUGH;
+}
 
-  if (node->default_branch) {
-    auto branch = node->default_branch.get();
-    branch->accept(this);
-    auto &block_cf = branch->control_flow;
-    flags |= block_cf.flags;
-
-    if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
-      return_type = block_cf.type;
-    }
-  } else {
-    flags |= BLOCK_FLAGS_FALL_THROUGH;
+node->resolved_type = node->return_type = return_type;
+if (node->is_statement) {
+  node->control_flow = ControlFlow{flags, return_type};
+} else {
+  if (HAS_FLAG(flags, BLOCK_FLAGS_BREAK)) {
+    throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
+  } else if (HAS_FLAG(flags, BLOCK_FLAGS_CONTINUE)) {
+    throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
   }
-
-  node->resolved_type = node->return_type = return_type;
-  if (node->is_statement) {
-    node->control_flow = ControlFlow{flags, return_type};
-  } else {
-    if (HAS_FLAG(flags, BLOCK_FLAGS_BREAK)) {
-      throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
-    } else if (HAS_FLAG(flags, BLOCK_FLAGS_CONTINUE)) {
-      throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
-    }
-  }
+}
 }
 
 void Typer::visit(ASTTuple *node) {
@@ -2866,7 +2884,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   auto sym = Symbol::create_type(ty, trait_name, nullptr);
   // TODO: we have to fit this in modules or some stuff.
-  sym.scope = this;  
+  sym.scope = this;
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }
