@@ -1599,17 +1599,23 @@ ASTStatement *Parser::parse_statement() {
   }
 
   {  // Variable declarations.
-    bool is_const_multiple_assign = (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
-                                    (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
-                                     lookahead_buf()[2].type == TType::Comma);
+    const bool is_simple_const_destructure = tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma;
 
-    bool is_mut_multiple_assign =
+    const bool is_simple_mut_destructure =
         (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
          lookahead_buf()[2].type == TType::Comma) ||
         (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul &&
          lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
 
-    if (is_const_multiple_assign || is_mut_multiple_assign) {
+    const bool is_simple_const_referential_destructure = tok.type == TType::And &&
+                                                         lookahead_buf()[1].type == TType::Identifier &&
+                                                         lookahead_buf()[2].type == TType::Comma;
+
+    const bool is_complex_referential_destructure =
+        tok.type == TType::And && (lookahead_buf()[1].type == TType::Const || lookahead_buf()[1].type == TType::Mut) &&
+        lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma;
+
+    if (is_simple_const_destructure || is_simple_mut_destructure || is_simple_const_referential_destructure || is_complex_referential_destructure) {
       return parse_destructure();
     }
 
@@ -2255,7 +2261,7 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
       const bool is_anonymous_type_keyword = peeked == TType::Struct || peeked == TType::Union;
       if (is_anonymous_type_keyword) {
         ASTStructDeclaration *decl = parse_struct_declaration();
-        decl->is_anonymous=true;
+        decl->is_anonymous = true;
         node->subtypes.push_back(decl);
       }
       if (peek().type == TType::Directive) {
