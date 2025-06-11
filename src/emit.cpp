@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <format>
 #include <functional>
 #include <iterator>
@@ -162,8 +163,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     if (parent_type->is_kind(TYPE_TUPLE)) {
       ss << std::format(
           ".offset = offsetof({}, {})",
-          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
-          "$" + name);
+          type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
     } else {
       ss << std::format(
           ".offset = offsetof({}, {})",
@@ -542,7 +542,7 @@ void Emitter::visit(ASTFor *node) {
   code << '\n';
   code << indent() << "for (auto $next = ";
   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator);\n";
-  code << "$next.index != 0; ";
+  code << "$next.index != 1; ";
   code << "$next = ";
   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator)) {\n";
 
@@ -567,14 +567,8 @@ void Emitter::visit(ASTFor *node) {
 
     code << indent() << "auto " << temp_id << " = $next.Some.$0;\n";
 
-    auto is_tuple = type->is_kind(TYPE_TUPLE);
-
     int i = 0;
     for (auto &[name, sym_type, _, __] : type->info->members) {
-      if (is_tuple) {
-        name = "$" + name.get_str();
-      }
-
       auto &destruct = node->left.destructure[i];
       auto iden = destruct.identifier;
       emit_line_directive(node);
@@ -1234,7 +1228,6 @@ void Emitter::visit(ASTProgram *) {
 
   if ((has_user_defined_main || testing) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
     auto env_scope = ctx.scope->find_type_id("Env", {})->info->scope;
-
     code << "void ela_run_global_initializers() {\n";
     const auto global_init = global_initializer_builder.str();
     code << global_init;
@@ -1375,15 +1368,7 @@ void Emitter::visit(ASTDestructure *node) {
 
   emit_line_directive(node);
 
-  auto is_tuple = type->is_kind(TYPE_TUPLE);
-
   for (auto [name, sym_type, _, __] : type->info->members) {
-    if (is_tuple) {
-      // tuples just have .0 .1 .2 .3 which isn't valid in
-      // C, so we have to prefix it with a cash.
-      name = "$" + name.get_str();
-    }
-
     if (index > node->elements.size()) break;
 
     auto semantic = node->elements[index].semantic;
@@ -2493,8 +2478,7 @@ void Emitter::visit(ASTSwitch *node) {
 void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
   parenthesized(type_to_string(type));
 
-  if (type->is_kind(TYPE_STRUCT) && type->has_no_extensions() &&
-      type->info->as<StructTypeInfo>()->is_union) {
+  if (type->is_kind(TYPE_STRUCT) && type->has_no_extensions() && type->info->as<StructTypeInfo>()->is_union) {
     code << "{}";
     return;
   }

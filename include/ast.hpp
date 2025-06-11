@@ -150,7 +150,7 @@ struct Attribute {
 };
 
 struct ASTStatement : ASTNode {
-  std::vector<Attribute> attributes;
+  std::vector<Attribute> attributes = {};
   virtual ASTNodeType get_node_type() const = 0;
 };
 

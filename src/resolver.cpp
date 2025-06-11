@@ -333,14 +333,11 @@ void Resolver::visit(ASTPath *node) {
       instantiation->accept(this);
       instantiation->accept(emitter);
     } else if (symbol->is_variable && symbol->variable.declaration) {
-      // for global variables
-      auto decl = symbol->variable.declaration.get();
-      if (!decl->declaring_block) {
+      if (!symbol->is_local) {
         symbol->variable.declaration.get()->accept(this);
         symbol->variable.declaration.get()->accept(emitter);
       }
     } else if (symbol->is_function && symbol->function.declaration) {
-      // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
     } else if (symbol->is_type) {
       if (auto decl = symbol->type.declaration.get()) {
