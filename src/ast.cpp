@@ -1158,11 +1158,11 @@ ASTType *Parser::parse_type() {
   // slice and array types.
   if (next_type == TType::LBrace) {
     eat();
-    auto expr = parse_expr();
+    auto type = parse_type();
     // array type.
     if (peek().type == TType::Semi) {
       eat();
-      auto type = parse_type();
+      auto expr = parse_expr();
       expect(TType::RBrace);
       node = type;
       node->extensions.push_back(ASTTypeExtension{

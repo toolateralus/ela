@@ -18,7 +18,7 @@ union _Vec2 {
     y: s32,
     z: s32,
   },
-  values: [3; s32],
+  values: [s32; 3],
 }
 
 impl _Vec2 {

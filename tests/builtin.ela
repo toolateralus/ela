@@ -4,7 +4,7 @@
 }
 
 #test fn test_array() {
-  array : [11; s32] = .[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  array : [s32; 11] = .[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   for i in 0..11 {
     assert("array element failed to init", i == array[i]);
@@ -23,7 +23,7 @@
 }
 
 #test fn test_multidimensional_arrays() {
-  array: [5; [5; s32]];
+  array: [[s32; 5]; 5];
   for x in 0..5 {
     for y in 0..5 {
       array[x][y] = x * y;

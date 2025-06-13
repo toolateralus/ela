@@ -101,7 +101,7 @@ fn choice_as_param(math: Math) {
 #test fn complex_types() {
   choice ArrayAndFunctionPtrTest {
     Struct {
-      f: [3; f32]
+      f: [f32; 3]
     },
     FnPtr {
       f: fn ()
