@@ -20,12 +20,12 @@ impl!<T> List!<T> {
 }
 
 /* 
-  for some reason, if we don't use self.data[idx] when swapping,
+  for some reason, if we don't use self.data![idx] when swapping,
   we get a *stack smashing detected*
-  There must be something fundamentally wrong with how our subscript operators
+  There must be something fundamentally wrong with how our index operators
   are implmented,
 
-  possibly it's just the List!<T> subscript operator.
+  possibly it's just the List!<T> index operator.
 */
 fn main() { 
   mut list: List!<s64>;

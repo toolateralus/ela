@@ -133,7 +133,7 @@ struct Array {
 #test fn test_subscript() {
   mut arr: [s32; 100];
   arr[50] = 0;
-  assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+  assert("index 50 on s32[100] failed to == 0", arr[50] == 0);
   n: s32;
   ++n;
 }

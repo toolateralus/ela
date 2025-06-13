@@ -8,7 +8,7 @@ struct Test_Enumerator!<Index, Value_Type> {
 
 impl!<Value_Type> Enumerator!<(u32, Value_Type)> for Test_Enumerator!<u32, Value_Type> {
   fn current(self) -> (u32, Value_Type) {
-    return (self.index, self.slice.data[self.index]);
+    return (self.index, self.slice.data![self.index]);
   }
   fn done(self) -> bool {
     return self.index >= self.slice.length;

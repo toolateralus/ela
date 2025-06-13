@@ -661,6 +661,7 @@ struct ASTWhile : ASTStatement {
 
 struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
+  bool is_pointer_subscript=false;
   ASTExpr *base;
   ASTExpr *index;
   void accept(VisitorBase *visitor) override;

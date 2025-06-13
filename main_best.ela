@@ -358,7 +358,7 @@ fn main() -> s32 {
 
   fn takes_init_list(list: InitList!<s32>) {
     for i in 0..list.length {
-      std::printf("list[i]=%d\n", list.data[i]);
+      std::printf("list[i]=%d\n", list.data![i]);
     }
   }
 

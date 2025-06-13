@@ -795,8 +795,8 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
 bool is_const_pointer(ASTNode *node) {
   if (node == nullptr) return false;
 
-  if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
-    return is_const_pointer(subscript->base);
+  if (auto index = dynamic_cast<ASTIndex *>(node)) {
+    return is_const_pointer(index->base);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
   }
@@ -1982,16 +1982,16 @@ void Typer::visit(ASTBinExpr *node) {
       }
 
     } else if (node->left->get_node_type() == AST_NODE_INDEX) {
-      auto subscript = (ASTIndex *)node->left;
+      auto index = (ASTIndex *)node->left;
 
-      auto subscript_left_ty = subscript->base->resolved_type;
+      auto subscript_left_ty = index->base->resolved_type;
       if (subscript_left_ty->is_const_pointer()) {
-        throw_error("cannot subscript-assign into a const pointer!", node->source_range);
+        throw_error("cannot index-assign into a const pointer!", node->source_range);
       }
 
-      auto symbol = ctx.get_symbol(subscript->base);
+      auto symbol = ctx.get_symbol(index->base);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->is_mut_pointer()) {
-        throw_error("cannot subscript-assign into a const variable!", node->source_range);
+        throw_error("cannot index-assign into a const variable!", node->source_range);
       }
 
     } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
@@ -2233,6 +2233,15 @@ void Typer::visit(ASTIndex *node) {
   node->index->accept(this);
   auto left_ty = node->base->resolved_type;
 
+
+  if (node->is_pointer_subscript && !left_ty->is_pointer()) {
+    throw_error("tried to use the pointer index operator (`![..]`) on a non-pointer", node->source_range);
+  }
+
+  if (!node->is_pointer_subscript && left_ty->is_pointer()) {
+    throw_error("you must use the `![..]` pointer subscript operator, instead of a normal index operator, when doing subscripts on pointers.", node->source_range);
+  }
+
   auto symbol = ctx.get_symbol(node->base);
 
   Mutability mutability = symbol ? symbol.get()->mutability : CONST;
@@ -2241,13 +2250,13 @@ void Typer::visit(ASTIndex *node) {
   if (overload != Type::INVALID_TYPE) {
     node->is_operator_overload = true;
     node->resolved_type = overload->info->as<FunctionTypeInfo>()->return_type;
-
     auto type = node->resolved_type;
+
     if (!type->is_pointer()) {
       throw_error(
-          "subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
+          "index methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
           "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
-          "example: subscript :: fn(self*, index: u32) -> s32* { return &self.data[index]; }\n"
+          "example: index :: fn(self*, index: u32) -> s32* { return &self.data![index]; }\n"
           "obviously this is somewhat limiting. we have yet to find a better solution to this.",
           node->source_range);
     }
@@ -2260,7 +2269,7 @@ void Typer::visit(ASTIndex *node) {
   auto ext = left_ty->extensions;
   if (!type_extensions_is_back_array(ext) && !type_extensions_is_back_pointer(ext)) {
     throw_error(
-        std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
+        std::format("cannot index into non-array, non-pointer type that doesn't implement the `Index` trait. {}",
                     left_ty->to_string()),
         node->source_range);
   }

@@ -1269,7 +1269,7 @@ void Emitter::visit(ASTDotExpr *node) {
 void Emitter::visit(ASTIndex *node) {
   auto left_ty = node->base->resolved_type;
   if (left_ty && node->is_operator_overload) {
-    code << "(*";  // always dereference via subscript. for `type[10] = 10` and such.
+    code << "(*";  // always dereference via index. for `type[10] = 10` and such.
     call_operator_overload(node->source_range, OPERATION_INDEX, TType::LBrace, node->base, node->index);
     code << ")";
 

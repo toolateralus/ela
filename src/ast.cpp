@@ -689,10 +689,10 @@ ASTPath *Parser::parse_path() {
 ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
   auto range = begin_node();
-  // build dot and subscript expressions
-  while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::LParen ||
-         peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Range ||
-         peek().type == TType::As) {
+  // build dot and index expressions
+  while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::PtrSubscript ||
+         peek().type == TType::LParen || peek().type == TType::Increment || peek().type == TType::Decrement ||
+         peek().type == TType::Range || peek().type == TType::As) {
     if (peek().type == TType::LParen) {
       NODE_ALLOC(ASTCall, call, range, _, this);
       call->callee = left;
@@ -708,17 +708,22 @@ ASTExpr *Parser::parse_postfix() {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
-        auto path = dynamic_cast<ASTPath *>(left);
-        if (!path) {
+        ASTType *target_type = nullptr;
+        if (auto path = dynamic_cast<ASTPath *>(left)) {
+          target_type = ast_alloc<ASTType>();
+          target_type->normal.path = path;
+        } else if (auto type = dynamic_cast<ASTType *>(left)) {
+          target_type = type;
+        } else {
           throw_error(
-              "can only use an initializer list on a path, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, etc.",
+              "can only use an initializer list on a path or type, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, "
+              "etc.",
               left->source_range);
         }
         if (peek().type == TType::LCurly) {
           eat();  // eat {
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
-          init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.path = path;
+          init_list->target_type = target_type;
           if (peek().type == TType::RCurly) {
             init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
           } else {
@@ -738,8 +743,7 @@ ASTExpr *Parser::parse_postfix() {
         } else if (peek().type == TType::LBrace) {
           eat();  // eat [
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
-          init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.path = path;
+          init_list->target_type = target_type;
           init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
           while (peek().type != TType::RBrace) {
             init_list->values.push_back(parse_expr());
@@ -770,13 +774,14 @@ ASTExpr *Parser::parse_postfix() {
       unary->operand = left;
       unary->op = eat().type;
       return unary;
-    } else if (peek().type == TType::LBrace) {
-      NODE_ALLOC(ASTIndex, subscript, range, _, this)
-      subscript->base = left;
+    } else if (peek().type == TType::LBrace || peek().type == TType::PtrSubscript) {
+      NODE_ALLOC(ASTIndex, index, range, _, this)
+      index->base = left;
+      index->is_pointer_subscript = peek().type == TType::PtrSubscript;
       eat();
-      subscript->index = parse_expr();
+      index->index = parse_expr();
       expect(TType::RBrace);
-      left = subscript;
+      left = index;
     } else if (peek().type == TType::Range) {
       NODE_ALLOC(ASTRange, node, range, _, this)
       eat();
@@ -1093,6 +1098,9 @@ ASTExpr *Parser::parse_primary() {
       }
 
       return expr;
+    }
+    case TType::LBrace: {
+      return parse_type();
     }
     default: {
       auto error_range = begin_node();
@@ -1704,9 +1712,11 @@ ASTStatement *Parser::parse_statement() {
         (next.type == TType::Increment || (next.type == TType::Decrement && next_next.type != TType::Semi)) ||
         tok.type == TType::Increment || tok.type == TType::Decrement;
 
-    // subscript assignment or dot assign/ call statement.
+    // index assignment or dot assign/ call statement.
+    // also for pointer arithmetic expressions ![]
     const bool is_identifier_with_lbrace_or_dot =
-        tok.type == TType::Identifier && (next.type == TType::LBrace || next.type == TType::Dot);
+        tok.type == TType::Identifier &&
+        (next.type == TType::LBrace || next.type == TType::Dot || next.type == TType::PtrSubscript);
 
     const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
 
