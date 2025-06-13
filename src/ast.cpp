@@ -1170,9 +1170,12 @@ ASTType *Parser::parse_type() {
           .expression = expr,
       });
     } else {
-      // TODO: implement slice types.
-      end_node(node, range);
-      throw_error("slice types not implemented yet", range);
+      expect(TType::RBrace);
+      auto slice = ast_alloc<ASTType>();
+      slice->kind=ASTType::NORMAL;
+      slice->normal.path = ast_alloc<ASTPath>();
+      slice->normal.path->push_segment("Slice", {type});
+      return slice;
     }
     return node;
   }
