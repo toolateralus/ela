@@ -1095,7 +1095,6 @@ struct Parser {
 
   void parse_pointer_extensions(ASTType *type);
   std::vector<ASTType *> parse_parameter_types();
-  void append_type_extensions(ASTType *&type);
   ASTType *parse_function_type();
 
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);

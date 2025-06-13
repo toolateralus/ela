@@ -18,7 +18,7 @@ fn Funky() -> s32 {
 }
 
 #test fn test_fn_alias() {
-  type func :: fn* () -> s32;
+  type func :: fn () -> s32;
   f: func = &mut Funky;
   assert("function pointer failed", f() == 102);
 }

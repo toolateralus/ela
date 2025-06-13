@@ -2,7 +2,7 @@
 
 #test fn test_initializer_lists() {
   scalar: s32;
-  fixed: s32[3] = .[0, 1, 2];
+  fixed: [3; s32] = .[0, 1, 2];
 }
 
 struct XarBarInitListTestStruct {

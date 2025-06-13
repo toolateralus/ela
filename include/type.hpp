@@ -397,7 +397,7 @@ struct Type {
   inline bool is_kind(const TypeKind kind) const { return this->kind == kind; }
 
   /* convert it to the in-language recognizable representation of the type's name.
-      - fn *(s32, s32) -> *mut void;
+      - fn(s32, s32) -> *mut void;
       - s32[10];
       - List!<(s32, s32)>
     and so on.

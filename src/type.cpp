@@ -19,7 +19,7 @@ Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
   we get this for:
     function :: fn(s32) {}
     fn := &function;
-    typeof(fn) == "fn * (s32) -> void*";
+    typeof(fn) == "fn (s32) -> void*";
     the void* is wrong obviously, the * gets appended twice.
 */
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {

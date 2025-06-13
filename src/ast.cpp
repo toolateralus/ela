@@ -289,7 +289,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         NODE_ALLOC(ASTType, type, range, defer, parser);
         parser->parse_pointer_extensions(type);
         type->kind = ASTType::SELF;
-        parser->append_type_extensions(type);
         return type;
     }},
 
@@ -1156,6 +1155,28 @@ ASTType *Parser::parse_type() {
       break;
   }
 
+  // slice and array types.
+  if (next_type == TType::LBrace) {
+    eat();
+    auto expr = parse_expr();
+    // array type.
+    if (peek().type == TType::Semi) {
+      eat();
+      auto type = parse_type();
+      expect(TType::RBrace);
+      node = type;
+      node->extensions.push_back(ASTTypeExtension{
+          .type = TYPE_EXT_ARRAY,
+          .expression = expr,
+      });
+    } else {
+      // TODO: implement slice types.
+      end_node(node, range);
+      throw_error("slice types not implemented yet", range);
+    }
+    return node;
+  }
+
   if (next_type == TType::Dyn) {
     node->normal.is_dyn = true;
     eat();
@@ -1170,7 +1191,6 @@ ASTType *Parser::parse_type() {
       if (peek().type == TType::Comma) eat();
     }
     expect(TType::RParen);
-    append_type_extensions(node);
     return node;
   }
 
@@ -1194,7 +1214,6 @@ ASTType *Parser::parse_type() {
     node->normal.path = parse_path();
   }
   node->normal.path->source_range = range;
-  append_type_extensions(node);
   end_node(node, range);
   return node;
 }
@@ -2469,21 +2488,6 @@ std::vector<ASTType *> Parser::parse_parameter_types() {
   return param_types;
 }
 
-void Parser::append_type_extensions(ASTType *&node) {
-  while (true) {
-    if (peek().type == TType::LBrace) {
-      expect(TType::LBrace);
-      if (peek().type != TType::RBrace) {
-        auto expression = parse_expr();
-        node->extensions.insert(node->extensions.begin(), {TYPE_EXT_ARRAY, expression});
-      }
-      expect(TType::RBrace);
-    } else {
-      break;
-    }
-  }
-}
-
 ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations,
                                       const std::vector<Type *> &gen_args) {
   for (auto &instantiation : instantiations) {
@@ -2501,10 +2505,13 @@ ASTType *Parser::parse_function_type() {
 
   if (peek().type == TType::Mul) {
     eat();
-    output_type->extensions.insert(output_type->extensions.begin(), {TYPE_EXT_POINTER_MUT});
+    end_node(output_type, range);
+    throw_warning((WarningFlags)0,
+                  "`fn ()` syntax is deprecated. function types are always pointers, when expressed as an annotated "
+                  "type (TODO MAKE THIS WARNING MAKE MORE SENSE)",
+                  range);
   }
-
-  append_type_extensions(output_type);
+  output_type->extensions.insert(output_type->extensions.begin(), {TYPE_EXT_POINTER_MUT});
   FunctionTypeInfo info{};
   output_type->function.parameter_types = parse_parameter_types();
   if (peek().type == TType::Arrow) {

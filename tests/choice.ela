@@ -101,10 +101,10 @@ fn choice_as_param(math: Math) {
 #test fn complex_types() {
   choice ArrayAndFunctionPtrTest {
     Struct {
-      f: f32[3]
+      f: [3; f32]
     },
     FnPtr {
-      f: fn * ()
+      f: fn ()
     }
   }
   mut c: ArrayAndFunctionPtrTest = ArrayAndFunctionPtrTest::Struct.{f: .[4.0, 1.0, 2.0]}

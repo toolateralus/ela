@@ -133,7 +133,7 @@ static inline std::string wrapgen_get_type_name(CXType type) {
       }
       args += wrapgen_get_type_name(clang_getArgType(proto_type, i));
     }
-    return "fn*(" + args + ") -> " + returnType;
+    return "fn(" + args + ") -> " + returnType;
   }
 
   if (type.kind == CXType_Pointer) {
@@ -143,7 +143,7 @@ static inline std::string wrapgen_get_type_name(CXType type) {
 
   if (type.kind == CXType_ConstantArray) {
     long long arraySize = clang_getArraySize(type);
-    std::string result = wrapgen_get_type_name(clang_getArrayElementType(type)) + "[" + std::to_string(arraySize) + "]";
+    std::string result = "[" + std::to_string(arraySize) + "; " + wrapgen_get_type_name(clang_getArrayElementType(type)) + "]";
     return result;
   }
 
@@ -219,7 +219,7 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         args += wrapgen_get_type_name(clang_getArgType(pointeeType, i));
       }
 
-      data->output << "alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+      data->output << "alias " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
     } else if (underlyingType.kind == CXType_FunctionProto) {
       std::string returnType = wrapgen_get_type_name(clang_getResultType(underlyingType));
       std::string args;
@@ -230,7 +230,7 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         }
         args += wrapgen_get_type_name(clang_getArgType(underlyingType, i));
       }
-      data->output << "alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+      data->output << "alias " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
     } else {
       data->output << "alias " << typeName << " :: " << underlyingTypeName << ";\n";
     }
