@@ -2065,6 +2065,12 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
   expect(TType::LCurly);
 
   int last_value = -1;
+
+  // Create a dummy scope that gets discarded so that enum variants can refer to other, already declared enum variants in this enum.
+  auto old_scope = ctx.scope;
+  Defer $scope([&] { ctx.scope = old_scope; });
+  ctx.scope = create_child(ctx.scope);
+
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
@@ -2089,6 +2095,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
       eat();
     }
 
+    ctx.scope->insert_local_variable(iden, s32_type(), value, CONST);
     node->key_values.push_back({iden, value});
   }
   end_node(node, range);

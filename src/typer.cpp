@@ -1262,8 +1262,8 @@ void Typer::visit(ASTEnumDeclaration *node) {
   enum_type->declaring_node = node;
   auto info = enum_type->info->as<EnumTypeInfo>();
 
-
-  for (const auto &[key, value] : node->key_values) {
+ 
+  for (auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
     info->scope->insert_variable(key, node_ty, value, CONST);
@@ -2234,13 +2234,15 @@ void Typer::visit(ASTIndex *node) {
   node->index->accept(this);
   auto left_ty = node->base->resolved_type;
 
-
   if (node->is_pointer_subscript && !left_ty->is_pointer()) {
     throw_error("tried to use the pointer index operator (`![..]`) on a non-pointer", node->source_range);
   }
 
   if (!node->is_pointer_subscript && left_ty->is_pointer()) {
-    throw_error("you must use the `![..]` pointer subscript operator, instead of a normal index operator, when doing subscripts on pointers.", node->source_range);
+    throw_error(
+        "you must use the `![..]` pointer subscript operator, instead of a normal index operator, when doing "
+        "subscripts on pointers.",
+        node->source_range);
   }
 
   auto symbol = ctx.get_symbol(node->base);
