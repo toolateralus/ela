@@ -1155,6 +1155,18 @@ ASTType *Parser::parse_type() {
       break;
   }
 
+  if (next_type == TType::Mut && lookahead_buf()[1].type == TType::LBrace) {
+    eat();
+    eat();
+    auto type = parse_type();
+    expect(TType::RBrace);
+    auto slice = ast_alloc<ASTType>();
+    slice->kind = ASTType::NORMAL;
+    slice->normal.path = ast_alloc<ASTPath>();
+    slice->normal.path->push_segment("SliceMut", {type});
+    return slice;
+  }
+
   // slice and array types.
   if (next_type == TType::LBrace) {
     eat();
@@ -1172,7 +1184,7 @@ ASTType *Parser::parse_type() {
     } else {
       expect(TType::RBrace);
       auto slice = ast_alloc<ASTType>();
-      slice->kind=ASTType::NORMAL;
+      slice->kind = ASTType::NORMAL;
       slice->normal.path = ast_alloc<ASTPath>();
       slice->normal.path->push_segment("Slice", {type});
       return slice;
