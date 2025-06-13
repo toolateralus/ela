@@ -1,4 +1,4 @@
 fn main() { 
   // the emit for this is toootaly broooken.
-  f: s32[10][10];
+  f: [[s32; 10]; 10];
 }
