@@ -292,7 +292,7 @@ void Resolver::visit(ASTIndex *node) {
 
 void Resolver::visit(ASTPath *node) {
   auto type = node->resolved_type;
-  if (type && type->kind == TYPE_ENUM) {
+  if (type && type->kind == TYPE_ENUM && type->declaring_node) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
   }

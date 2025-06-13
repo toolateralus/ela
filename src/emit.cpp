@@ -823,10 +823,16 @@ void Emitter::visit(ASTVariable *node) {
   emit_line_directive(node);
   auto name = emit_symbol(ctx.scope->lookup(node->name));
 
+  // We exclude initializer lists, and array types. this is because arrays are not assignable in C, and init lists have
+  // temporary memory that would go out of scope after the global ini function
+  const bool is_init_list = node->type->resolved_type->basename.str_ptr->starts_with("InitList");
+  const bool is_array = node->type->resolved_type->is_fixed_sized_array();
+
   // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get
   // global static initializers. We have to somehow tell the dependency emitter to forward declare it as extern at the
   // correct moment.
-  const bool is_global_variable = !node->is_local && !node->is_constexpr; /*  || node->is_static; */
+  const bool is_global_variable =
+      !node->is_local && !node->is_constexpr && !is_init_list && !is_array; /*  || node->is_static; */
 
   // if (node->is_static) {
   //   node->type->accept(dep_emitter);

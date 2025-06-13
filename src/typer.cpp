@@ -1258,15 +1258,16 @@ void Typer::visit(ASTEnumDeclaration *node) {
     underlying_type = node->underlying_type_ast->resolved_type;
   }
 
-  auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
-  enum_ty_id->declaring_node = node;
-  auto enum_type = ctx.scope->find_type_id(node->name, {});
+  auto enum_type = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  enum_type->declaring_node = node;
   auto info = enum_type->info->as<EnumTypeInfo>();
+
 
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
     info->scope->insert_variable(key, node_ty, value, CONST);
+    info->members.push_back({key, node_ty});
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
     } else {
