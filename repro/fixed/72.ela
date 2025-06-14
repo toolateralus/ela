@@ -4,8 +4,8 @@
 
 fn main() { 
   // this is an insane example of how broken the freaking parser is in accordance to types
-  // as well as the typer not caring whether a symbol is a type or not.
+  // as well as the typer not caring whether a symbol is a _type or not.
   s: str = .{
-    data: "strdup"c, // we inherit the type from this symbol?
+    data: "strdup"c, // we inherit the _type from this symbol?
   };
 }

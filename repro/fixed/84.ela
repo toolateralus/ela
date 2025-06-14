@@ -7,5 +7,5 @@ fn main() {
 
   // ! there is a problem with StringBuilder and As_Char_Slice![u32]
   // ! where slices have to be null terminated, or they'll spew junk.
-  assert("builder.get_string().data[0] != 'c'", builder.get_string().data[0] == 'c');
+  assert("builder.get_string().data![0] != 'c'", builder.get_string().data![0] == 'c');
 }

@@ -1,4 +1,4 @@
-alias fun :: fn* (s32, s32) -> s32;
+type fun :: fn (s32, s32) -> s32;
 
 extern fn fun_return_fun() -> fun;
 

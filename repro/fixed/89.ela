@@ -9,7 +9,7 @@ fn main() {
 	a.next.next = &mut a;
 }
 
-/* Member "next" not found in type "thing"
+/* Member "next" not found in _type "thing"
         at: /home/cooper/repos/languages/ela/repro/89.ela:9:3
 fn main() {
         a: thing!<s32>;

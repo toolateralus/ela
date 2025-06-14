@@ -1,4 +1,4 @@
-alias Lambda :: fn *(s32, s32) -> s32;
+type Lambda :: fn(s32, s32) -> s32;
 
 fn takes_lambda(lambda: Lambda, a: s32, b: s32) -> s32{
   return lambda(a, b);

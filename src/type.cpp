@@ -19,7 +19,7 @@ Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
   we get this for:
     function :: fn(s32) {}
     fn := &function;
-    typeof(fn) == "fn * (s32) -> void*";
+    typeof(fn) == "fn (s32) -> void*";
     the void* is wrong obviously, the * gets appended twice.
 */
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
@@ -727,7 +727,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   switch (op) {
     case TType::LBrace:
       // TODO: This needs to be 'index'/'index_mut'
-      return "subscript";
+      return "index";
 
     // Do we want this? might be useful for stuff like Array implementations etc.
     // However, it feels like bringing in the complexity of C++'s
@@ -806,8 +806,8 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
 
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
 
-  if (op_str == "subscript" && (type->is_mut_pointer() || mutability == MUT)) {
-    op_str = "subscript_mut";
+  if (op_str == "index" && (type->is_mut_pointer() || mutability == MUT)) {
+    op_str = "index_mut";
   }
 
   auto scope = type->info->scope;

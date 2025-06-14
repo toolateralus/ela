@@ -795,8 +795,8 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
 bool is_const_pointer(ASTNode *node) {
   if (node == nullptr) return false;
 
-  if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
-    return is_const_pointer(subscript->base);
+  if (auto index = dynamic_cast<ASTIndex *>(node)) {
+    return is_const_pointer(index->base);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
   }
@@ -1252,33 +1252,35 @@ void Typer::visit(ASTEnumDeclaration *node) {
   }
 
   auto underlying_type = Type::INVALID_TYPE;
-  auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
-  enum_ty_id->declaring_node = node;
-  auto enum_type = ctx.scope->find_type_id(node->name, {});
+
+  if (node->underlying_type_ast) {
+    node->underlying_type_ast->accept(this);
+    underlying_type = node->underlying_type_ast->resolved_type;
+  }
+
+  auto enum_type = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  enum_type->declaring_node = node;
   auto info = enum_type->info->as<EnumTypeInfo>();
 
-  for (const auto &[key, value] : node->key_values) {
+ 
+  for (auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
     info->scope->insert_variable(key, node_ty, value, CONST);
+    info->members.push_back({key, node_ty});
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
     } else {
       assert_types_can_cast_or_equal(value, underlying_type, node->source_range,
                                      "inconsistent types in enum declaration.");
     }
-    info->members.push_back({
-        .name = key,
-        .type = underlying_type,
-        .default_value = value,
-    });
   }
 
   if (underlying_type == void_type()) {
     throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
   }
 
-  node->element_type = underlying_type;
+  node->underlying_type = underlying_type;
   info->underlying_type = underlying_type;
   node->resolved_type = enum_type;
 }
@@ -1419,13 +1421,10 @@ void Typer::visit(ASTBlock *node) {
       if (expr_stmt->expression->get_node_type() == AST_NODE_CALL) {
         auto call = (ASTCall *)expr_stmt->expression;
         auto symbol = ctx.get_symbol(call->callee).get();
-
-        if (!symbol || !symbol->function.declaration) {
+        if (!symbol || !symbol->is_function || !symbol->function.declaration) {
           continue;
         }
-
         auto &function = symbol->function;
-
         for (auto attr : function.declaration->attributes) {
           if (attr.tag == ATTRIBUTE_NO_RETURN) {
             stmnt_cf = {BLOCK_FLAGS_RETURN, expected_type};
@@ -1841,19 +1840,6 @@ void Typer::visit(ASTExprStatement *node) {
 }
 
 void Typer::visit(ASTType_Of *node) {
-  static bool types_initialized = false;
-  if (!types_initialized) {
-    types_initialized = true;
-    Type *type_ptr_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
-    type_ptr_list = find_generic_type_of("List", {type_ptr_type}, {});
-
-    Type *method_type = ctx.scope->find_type_id("Method", {});
-    method_list = find_generic_type_of("List", {method_type}, {});
-
-    Type *field_type = ctx.scope->find_type_id("Field", {});
-    field_list = find_generic_type_of("List", {field_type}, {});
-  }
-
   static auto type_ptr = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
   node->target->accept(this);
   node->resolved_type = type_ptr;
@@ -1997,16 +1983,16 @@ void Typer::visit(ASTBinExpr *node) {
       }
 
     } else if (node->left->get_node_type() == AST_NODE_INDEX) {
-      auto subscript = (ASTIndex *)node->left;
+      auto index = (ASTIndex *)node->left;
 
-      auto subscript_left_ty = subscript->base->resolved_type;
+      auto subscript_left_ty = index->base->resolved_type;
       if (subscript_left_ty->is_const_pointer()) {
-        throw_error("cannot subscript-assign into a const pointer!", node->source_range);
+        throw_error("cannot index-assign into a const pointer!", node->source_range);
       }
 
-      auto symbol = ctx.get_symbol(subscript->base);
+      auto symbol = ctx.get_symbol(index->base);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->is_mut_pointer()) {
-        throw_error("cannot subscript-assign into a const variable!", node->source_range);
+        throw_error("cannot index-assign into a const variable!", node->source_range);
       }
 
     } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
@@ -2248,6 +2234,17 @@ void Typer::visit(ASTIndex *node) {
   node->index->accept(this);
   auto left_ty = node->base->resolved_type;
 
+  if (node->is_pointer_subscript && !left_ty->is_pointer()) {
+    throw_error("tried to use the pointer index operator (`![..]`) on a non-pointer", node->source_range);
+  }
+
+  if (!node->is_pointer_subscript && left_ty->is_pointer()) {
+    throw_error(
+        "you must use the `![..]` pointer subscript operator, instead of a normal index operator, when doing "
+        "subscripts on pointers.",
+        node->source_range);
+  }
+
   auto symbol = ctx.get_symbol(node->base);
 
   Mutability mutability = symbol ? symbol.get()->mutability : CONST;
@@ -2256,13 +2253,13 @@ void Typer::visit(ASTIndex *node) {
   if (overload != Type::INVALID_TYPE) {
     node->is_operator_overload = true;
     node->resolved_type = overload->info->as<FunctionTypeInfo>()->return_type;
-
     auto type = node->resolved_type;
+
     if (!type->is_pointer()) {
       throw_error(
-          "subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
+          "index methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
           "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
-          "example: subscript :: fn(self*, index: u32) -> s32* { return &self.data[index]; }\n"
+          "example: index :: fn(self*, index: u32) -> s32* { return &self.data![index]; }\n"
           "obviously this is somewhat limiting. we have yet to find a better solution to this.",
           node->source_range);
     }
@@ -2275,7 +2272,7 @@ void Typer::visit(ASTIndex *node) {
   auto ext = left_ty->extensions;
   if (!type_extensions_is_back_array(ext) && !type_extensions_is_back_pointer(ext)) {
     throw_error(
-        std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
+        std::format("cannot index into non-array, non-pointer type that doesn't implement the `Index` trait. {}",
                     left_ty->to_string()),
         node->source_range);
   }
@@ -2310,7 +2307,9 @@ void Typer::visit(ASTInitializerList *node) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
 
-  if (target_type->is_pointer() || (target_type->is_kind(TYPE_SCALAR) && target_type->has_no_extensions())) {
+  if (target_type->is_pointer() ||
+      (target_type->is_kind(TYPE_SCALAR) &&
+       target_type->has_no_extensions())) {  // !! I ADDED PARENTHESIS HERE IT MAY CAUSE BUGS
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
@@ -2613,16 +2612,15 @@ void Typer::visit(ASTDestructure *node) {
 
   auto members = type->info->members;
   size_t i = 0;
+
   for (auto [name, type, _, __] : members) {
     if (i > node->elements.size()) break;
-    auto &element = node->elements[i];
-    if (element.semantic == VALUE_SEMANTIC_POINTER_MUT) {
+    auto destructure = node->elements[i];
+    if (is_pointer_semantic(destructure.semantic)) {
       type = type->take_pointer_to(MUT);
-    } else if (element.semantic == VALUE_SEMANTIC_POINTER_CONST) {
-      type = type->take_pointer_to(CONST);
     }
-    element.type = type;
-    ctx.scope->insert_local_variable(element.identifier, type, nullptr, element.mutability);
+    destructure.type = type;
+    ctx.scope->insert_local_variable(destructure.identifier, type, nullptr, destructure.mutability);
     ++i;
   }
 };
@@ -2787,7 +2785,6 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   auto old_scope = typer->ctx.scope;
   typer->ctx.scope = trait_info->scope;
   Defer _defer([&] { typer->ctx.scope = old_scope; });
-
   const auto insert_function = [&](const InternedString &name, ASTFunctionDeclaration *declaration) {
     std::vector<Type *> parameters;
     bool has_self = false;
@@ -2841,7 +2838,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
-    dyn_info->methods.push_back({name.get_str(), function_type});
+    dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };
 
@@ -2895,7 +2892,8 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
   }
 
   auto sym = Symbol::create_type(ty, trait_name, nullptr);
-  sym.scope = this;  // TODO: we have to fit this in modules or some stuff.
+  // TODO: we have to fit this in modules or some stuff.
+  sym.scope = this;
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }

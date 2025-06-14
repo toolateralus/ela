@@ -117,7 +117,7 @@ struct Node {
 }
 
 struct Array {
-  ptr: Node[10]
+  ptr: [Node; 10]
 }
 
 #test fn test_chained_dot_subscript() {
@@ -131,9 +131,9 @@ struct Array {
 }
 
 #test fn test_subscript() {
-  mut arr: s32[100];
+  mut arr: [s32; 100];
   arr[50] = 0;
-  assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+  assert("index 50 on s32[100] failed to == 0", arr[50] == 0);
   n: s32;
   ++n;
 }
@@ -159,12 +159,12 @@ struct XaryuStruct {
 }
 
 #test fn test_comp_assign_non_iden() {
-  mut arr: f32[12];
+  mut arr: [f32; 12];
   arr[0] = 10;
   arr[0] += 10;
   assert("omp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
 
-  xarbars:  XaryuStruct[1];
+  xarbars:  [XaryuStruct; 1];
   xarbars[0].f = 10.0;
   xarbars[0].f += 10.0;
   assert("omp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);

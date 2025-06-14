@@ -73,7 +73,7 @@ struct Strakt {
 
 #test fn test_dyn_from_array() {
   mut x := 0;
-  mut array: dyn DynInterface[100];
+  mut array: [dyn DynInterface; 100];
   array[0] = dynof(&mut x);
   assert("dyn call from array failed", array[0].scrut() == 100.0);
 }

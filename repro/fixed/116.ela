@@ -23,7 +23,7 @@ fn main() {
   mut widget: Widget!<f32>;
   mut formatter: s32;
 
-  // ! For some reason when the generic type for Widget in this where is different (certain types) 
+  // ! For some reason when the generic _type for Widget in this where is different (certain types) 
   // ! than the one for the actual widget,
   // ! It crashes because the path for println has a generic argument that's just null and empty???
   where widget: Widget!<s64> {

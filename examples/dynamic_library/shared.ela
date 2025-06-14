@@ -25,4 +25,4 @@ impl DrawContext {
   }
 }
 
-alias UpdateFunction :: fn *(*mut DrawContext);
+type UpdateFunction :: fn(*mut DrawContext);

@@ -49,7 +49,7 @@ impl Neg!<Vec2> for Vec2 {
 }
 
 impl Vec2 {
-  fn subscript(*const self, index: s32) -> *const f32 {
+  fn index(*const self, index: s32) -> *const f32 {
     if index == 0 {
       return &const self.x;
     } else {
@@ -57,7 +57,7 @@ impl Vec2 {
     }
   }
 
-  fn subscript_mut(*mut self, index: s32) -> *mut f32 {
+  fn index_mut(*mut self, index: s32) -> *mut f32 {
     if index == 0 {
       return &mut self.x;
     } else {

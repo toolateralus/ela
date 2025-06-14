@@ -2,12 +2,12 @@ enum S {
   S1,
 }
 /* 
-  /usr/local/lib/ela/bootstrap/lib.ela:157:3: error: unknown type name 'S'
+  /usr/local/lib/ela/bootstrap/lib.ela:157:3: error: unknown _type name 'S'
     157 |   S $0;
         |   ^
   1 error generated.
 */
-alias Tuple :: (S, s32);
+type Tuple :: (S, s32);
 
 fn main() {
   t: Tuple;

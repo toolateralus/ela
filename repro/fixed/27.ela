@@ -1,8 +1,8 @@
-alias Alias :: s64;
+type Alias :: s64;
 
-// Impl on an alias crashes.
+// Impl on an type crashes.
 // probably a null scope.
-// we should error for this, you probably don't need to impl an alias, that makes no sense.
+// we should error for this, you probably don't need to impl an type, that makes no sense.
 impl Alias {
   fn from(n: s32) -> #self {
     return n as #self;

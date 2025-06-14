@@ -150,7 +150,7 @@ struct Attribute {
 };
 
 struct ASTStatement : ASTNode {
-  std::vector<Attribute> attributes;
+  std::vector<Attribute> attributes = {};
   virtual ASTNodeType get_node_type() const = 0;
 };
 
@@ -220,7 +220,7 @@ struct ASTBlock : ASTStatement {
 
 struct ASTProgram : ASTNode {
   size_t end_of_bootstrap_index = -1;
-  std::vector<ASTStatement *> statements;
+  std::vector<ASTNode *> statements;
   Scope *scope;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
@@ -659,6 +659,7 @@ struct ASTWhile : ASTStatement {
 
 struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
+  bool is_pointer_subscript=false;
   ASTExpr *base;
   ASTExpr *index;
   void accept(VisitorBase *visitor) override;
@@ -724,7 +725,8 @@ struct ASTTraitDeclaration : ASTDeclaration {
 
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
-  Type *element_type;
+  Type *underlying_type;
+  ASTType *underlying_type_ast;
   InternedString name;
   std::vector<std::pair<InternedString, ASTExpr *>> key_values;
   void accept(VisitorBase *visitor) override;
@@ -1040,6 +1042,17 @@ static inline Precedence get_operator_precedence(Token token);
 
 struct Typer;
 
+#define ENTER_AST_STATEMENT_LIST($list)\
+  auto $old_list = current_statement_list;\
+  Defer $stmt_list_defer([&]{ current_statement_list = $old_list; });\
+  current_statement_list = &$list;
+
+#define AST_ENTER_SCOPE($scope)\
+  auto $old_scope=ctx.scope;\
+  Defer $scope_defer([&] { ctx.scope=$old_scope; });\
+  ctx.scope=$scope;
+
+
 struct Parser {
   ASTIf *parse_if();
   ASTProgram *parse_program();
@@ -1081,7 +1094,6 @@ struct Parser {
 
   void parse_pointer_extensions(ASTType *type);
   std::vector<ASTType *> parse_parameter_types();
-  void append_type_extensions(ASTType *&type);
   ASTType *parse_function_type();
 
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
@@ -1112,6 +1124,8 @@ struct Parser {
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl_decl = nullptr;
   Nullable<ASTTraitDeclaration> current_trait_decl = nullptr;
+
+  std::vector<ASTNode *> *current_statement_list;
 
   static Nullable<ASTBlock> current_block;
   static std::vector<DirectiveRoutine> directive_routines;

@@ -1,7 +1,7 @@
 fn main() { 
   mut list : List!<s32>;
   list.initialize(11);
-  // subscript assignment via the operator overload is just totally broken.
+  // index assignment via the operator overload is just totally broken.
   list[10] = 10;
   assert("", list[10]==10);
 }

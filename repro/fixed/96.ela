@@ -1,14 +1,14 @@
 impl!<T> List!<T> {
-  alias Ordering_Predicate :: fn * (*const T, *const T) -> bool;
+  type Ordering_Predicate :: fn (*const T, *const T) -> bool;
 
   fn order_by_2(self, predicate: Ordering_Predicate) -> List!<T> {
     new_list := self.clone();
     for i in 0..new_list.length {
       for j in (i+1)..new_list.length {
-        if predicate(&const new_list.data[i], &const new_list.data[j]) {
-          temp := new_list.data[i];
-          new_list.data[i] = new_list[j];
-          new_list.data[j] = temp;
+        if predicate(&const new_list.data![i], &const new_list.data![j]) {
+          temp := new_list.data![i];
+          new_list.data![i] = new_list[j];
+          new_list.data![j] = temp;
         }
       }
     }

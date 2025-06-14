@@ -13,12 +13,12 @@ impl Union {
 }
 
 union _Vec2 {
-  #anon :: struct {
+  struct {
     x: s32,
     y: s32,
     z: s32,
   },
-  values: s32[3],
+  values: [s32; 3],
 }
 
 impl _Vec2 {
@@ -47,7 +47,7 @@ impl _Vec2 {
 
 
 struct AnonSubUnion {
-  #anon :: union {
+  union {
     a: s32,
   }
 }

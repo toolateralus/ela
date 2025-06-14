@@ -1,4 +1,4 @@
-alias Tuple :: (s32, *const Type);
+type Tuple :: (s32, *const Type);
 
 // ! We can not do this, unless we have some scratch field like
 // * _: Tuple;

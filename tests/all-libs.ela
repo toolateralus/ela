@@ -14,7 +14,6 @@ import arena;
 import compiler;
 import dlfcn;
 import elexify;
-import event;
 import fmt;
 import fs;
 import interned;

@@ -4,7 +4,7 @@
 }
 
 #test fn test_array() {
-  array : s32[11] = .[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  array : [s32; 11] = .[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   for i in 0..11 {
     assert("array element failed to init", i == array[i]);
@@ -23,7 +23,7 @@
 }
 
 #test fn test_multidimensional_arrays() {
-  array: s32[5][5];
+  array: [[s32; 5]; 5];
   for x in 0..5 {
     for y in 0..5 {
       array[x][y] = x * y;
@@ -54,10 +54,10 @@
 }
 
 /* 
-  subscript assign will never work on a 'str' type ;; it's in the .data section, i.e it's a C string literal.
+  index assign will never work on a 'str' _type ;; it's in the .data section, i.e it's a C string literal.
 */
 #test fn subscript_string() {
   mut s := String::from("0,1,2,3,4");
   s[0] = 10;
-  assert("subscript assign str failed", s[0] == 10);
+  assert("index assign str failed", s[0] == 10);
 }

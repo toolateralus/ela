@@ -137,7 +137,9 @@ struct StringBuilder {
     return os;
   }
 
-  inline StringBuilder &operator<<(const char *str) { return *this << std::string(str); }
+  inline StringBuilder &operator<<(const char *str) { 
+    return *this << std::string(str); 
+  }
 
   inline StringBuilder &operator<<(char c) {
     if (current->length < block_length) {

@@ -90,7 +90,7 @@ fn choice_as_param(math: Math) {
   if math is Math::Vector2.{x: _, y: _1} {
     // pass.
   } else {
-    assert("failed to pattern match parameter choice type", false);
+    assert("failed to pattern match parameter choice _type", false);
   }
 }
 
@@ -101,10 +101,10 @@ fn choice_as_param(math: Math) {
 #test fn complex_types() {
   choice ArrayAndFunctionPtrTest {
     Struct {
-      f: f32[3]
+      f: [f32; 3]
     },
     FnPtr {
-      f: fn * ()
+      f: fn ()
     }
   }
   mut c: ArrayAndFunctionPtrTest = ArrayAndFunctionPtrTest::Struct.{f: .[4.0, 1.0, 2.0]}

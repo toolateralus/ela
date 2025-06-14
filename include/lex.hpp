@@ -79,8 +79,8 @@ enum struct TType {
   False,
   Null,
   Varargs,
-  Directive,   // #
-  ColonEquals, //  :=
+  Directive,    // #
+  ColonEquals,  //  :=
 
   Struct,
   Enum,
@@ -93,19 +93,23 @@ enum struct TType {
   Switch,
   Fn,
 
-  GenericBrace,   // '!<' for ![T, T1]
-  As,             // 'as' for casting
-  ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
+  GenericBrace,  // '!<' for ![T, T1]
+
+  PtrSubscript,  // '![', an explicit operator for pointer arithmetic. with how much implicit typing and index
+                 // overloading we have, we need to distinguish the 2, to prevent subtle bugs.
+
+  As,              // 'as' for casting
+  ExpressionBody,  // => for expr body, implicit return expr where a block was otherwise expected.
   Defer,
 
-  Impl,  // impl
-  Trait, // trait
+  Impl,   // impl
+  Trait,  // trait
   Where,
 
   Size_Of,
   Type_Of,
 
-  Alias,
+  Type,
   Import,
   Module,
 
@@ -123,8 +127,8 @@ enum struct TType {
   Extern,
 };
 
-#define TTYPE_CASE(type)                                                                                               \
-  case TType::type:                                                                                                    \
+#define TTYPE_CASE(type) \
+  case TType::type:      \
     return #type
 
 static inline std::string TTypeToString(TType type) {
@@ -194,7 +198,7 @@ static inline std::string TTypeToString(TType type) {
 
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
-    TTYPE_CASE(Alias);
+    TTYPE_CASE(Type);
     TTYPE_CASE(Import);
     TTYPE_CASE(Module);
     TTYPE_CASE(Return);
@@ -228,6 +232,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Dyn_Of);
     TTYPE_CASE(Choice);
     TTYPE_CASE(Is);
+    TTYPE_CASE(PtrSubscript);
   }
   return "Unknown";
 }
@@ -295,7 +300,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"mut", TType::Mut},
     {"module", TType::Module},
     {"import", TType::Import},
-    {"alias", TType::Alias},
+    {"type", TType::Type},
     {"extern", TType::Extern},
     // control flow
     {"in", TType::In},
@@ -333,58 +338,60 @@ static std::unordered_map<std::string, TType> keywords{
 
 };
 
-static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},
-                                                        {":", TType::Colon},
-                                                        {"@", TType::Attribute},
-                                                        {":=", TType::ColonEquals},
-                                                        {"...", TType::Varargs},
-                                                        {"#", TType::Directive},
-                                                        {".", TType::Dot},
-                                                        {"!", TType::LogicalNot},
-                                                        {"~", TType::Not},
-                                                        {"::", TType::DoubleColon},
-                                                        {"->", TType::Arrow},
-                                                        {"..", TType::Range},
-                                                        {"+", TType::Add},
-                                                        {"-", TType::Sub},
-                                                        {"*", TType::Mul},
-                                                        {"/", TType::Div},
-                                                        {"%", TType::Modulo},
-                                                        {"=", TType::Assign},
-                                                        {",", TType::Comma},
-                                                        {";", TType::Semi},
-                                                        {"(", TType::LParen},
-                                                        {")", TType::RParen},
-                                                        {"{", TType::LCurly},
-                                                        {"}", TType::RCurly},
-                                                        {"|", TType::Or},
-                                                        {"&", TType::And},
-                                                        {"||", TType::LogicalOr},
-                                                        {"&&", TType::LogicalAnd},
-                                                        {"<<", TType::SHL},
-                                                        {"^", TType::Xor},
-                                                        {"<", TType::LT},
-                                                        {">", TType::GT},
-                                                        {"==", TType::EQ},
-                                                        {"!=", TType::NEQ},
-                                                        {"<=", TType::LE},
-                                                        {">=", TType::GE},
-                                                        {"[", TType::LBrace},
-                                                        {"]", TType::RBrace},
-                                                        {"++", TType::Increment},
-                                                        {"--", TType::Decrement},
-                                                        {"+=", TType::CompAdd},
-                                                        {"-=", TType::CompSub},
-                                                        {"*=", TType::CompMul},
-                                                        {"/=", TType::CompDiv},
-                                                        {"%=", TType::CompMod},
-                                                        {"&=", TType::CompAnd},
-                                                        {"|=", TType::CompOr},
-                                                        {"^=", TType::CompXor},
-                                                        {"<<=", TType::CompSHL},
-                                                        {">>=", TType::CompSHR},
-                                                        {"!<", TType::GenericBrace}};
-
+static std::unordered_map<std::string, TType> operators{
+    {"=>", TType::ExpressionBody},
+    {":", TType::Colon},
+    {"@", TType::Attribute},
+    {":=", TType::ColonEquals},
+    {"...", TType::Varargs},
+    {"#", TType::Directive},
+    {".", TType::Dot},
+    {"!", TType::LogicalNot},
+    {"~", TType::Not},
+    {"::", TType::DoubleColon},
+    {"->", TType::Arrow},
+    {"..", TType::Range},
+    {"+", TType::Add},
+    {"-", TType::Sub},
+    {"*", TType::Mul},
+    {"/", TType::Div},
+    {"%", TType::Modulo},
+    {"=", TType::Assign},
+    {",", TType::Comma},
+    {";", TType::Semi},
+    {"(", TType::LParen},
+    {")", TType::RParen},
+    {"{", TType::LCurly},
+    {"}", TType::RCurly},
+    {"|", TType::Or},
+    {"&", TType::And},
+    {"||", TType::LogicalOr},
+    {"&&", TType::LogicalAnd},
+    {"<<", TType::SHL},
+    {"^", TType::Xor},
+    {"<", TType::LT},
+    {">", TType::GT},
+    {"==", TType::EQ},
+    {"!=", TType::NEQ},
+    {"<=", TType::LE},
+    {">=", TType::GE},
+    {"[", TType::LBrace},
+    {"]", TType::RBrace},
+    {"++", TType::Increment},
+    {"--", TType::Decrement},
+    {"+=", TType::CompAdd},
+    {"-=", TType::CompSub},
+    {"*=", TType::CompMul},
+    {"/=", TType::CompDiv},
+    {"%=", TType::CompMod},
+    {"&=", TType::CompAnd},
+    {"|=", TType::CompOr},
+    {"^=", TType::CompXor},
+    {"<<=", TType::CompSHL},
+    {">>=", TType::CompSHR},
+    {"!<", TType::GenericBrace},
+    {"![", TType::PtrSubscript},
+};
 
 void throw_error(const std::string &message, const SourceRange &source_range);
 
@@ -401,7 +408,7 @@ static inline std::string ttype_get_operator_string(TType type, const SourceRang
   if (type == TType::CompSHR) {
     return ">>=";
   }
-  
+
   throw_error("invalid operator?", range);
   return {};
 }

@@ -1,0 +1,24 @@
+--------------------------------------------------------------------------------------------------------------------
+--- changelog for syntax, major breaking changes, feature additions/removals, etc.                              ----
+--- minor bugfixes and internal changes that don't affect the user will not be logged here.                     ----
+--- major bugfixes may or may not show up here. commit history is your most reliable source for that right now  ----
+--------------------------------------------------------------------------------------------------------------------
+
+-------- (toolateralus): 6/13/2025, 11:27 AM: ----------------------------------------------------------------------
+- Added `[T]` slice type syntax. mutable slices are `mut [T]`
+
+- Added `[T; N]` array syntax. clears up a lot of ambiguity that had 
+    existed between pointers, fn ptrs, and array types.
+
+- Deprecated the `*` from the old `fn * ()` syntax. any time you refer to a function as an annotated type, 
+    such as a field, parameter, etc, it's automatically a function pointer.
+
+- Added the `![idx]` pointer arithmetic operator. clears up a ton of surface for subtle, hard to detect bugs when indexing self, and accidentaly a self *. or many of 
+    the other areas where you can have index overloads, and also pointer arithmetic on many implicitly declared things.
+    also, it's just much more clear for an operation that can be so unsafe.
+--------------------------------------------------------------------------------------------------------------------
+
+-------- (toolateralus): 6/13/2025, 5:25:20 PM ---------------------------------------------------------------------
+- Added the ability for enumerators to reference other enumerators in an enum declaration. 
+    useful for making an 'All' flag, or what have  you.
+--------------------------------------------------------------------------------------------------------------------

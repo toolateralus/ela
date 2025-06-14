@@ -6,13 +6,13 @@ struct V2 {
 
 fn returns_tuple() -> (s32, s32) {
   // when the 'expected_type' in the typer is set to the tuple for the
-  // return type, we don't unset it when inferring arguments, and since 
-  // the argument is a tuple type, it assumes that it's type checking against
+  // return _type, we don't unset it when inferring arguments, and since 
+  // the argument is a tuple _type, it assumes that it's _type checking against
   // (s32, s32) when it needs to just drop that notion and re-do it.
   fmt::printlnf("%, %", (V2.{x: 100.0, y: 100.0}, 100.0));
 
-  // where .{} argument doens't clear the expected type for the parameter, and
-  // it assumes it's expected type is a pointer, 
+  // where .{} argument doens't clear the expected _type for the parameter, and
+  // it assumes it's expected _type is a pointer, 
   // and we don't allow .{} to work on pointers.
   return (0, 0);
 }

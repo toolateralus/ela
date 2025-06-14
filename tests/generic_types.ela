@@ -11,9 +11,9 @@ impl!<T> GenericStruct!<T> {
 
 #test fn test_generic_struct() {
   mut int_adder: GenericStruct!<s32> = .{a: 5, b: 6};
-  assert("generic type failure", int_adder.add() == 5 + 6);
+  assert("generic _type failure", int_adder.add() == 5 + 6);
   mut float_adder: GenericStruct!<f32> = .{a: 1.23, b: 4.56};
-  assert("generic type failure", float_adder.add() == 1.23 + 4.56);
+  assert("generic _type failure", float_adder.add() == 1.23 + 4.56);
 }
 
 union GenericUnion!<T, T1> {
@@ -24,7 +24,7 @@ union GenericUnion!<T, T1> {
 #test fn test_generic_union() {
   mut int_adder: GenericUnion!<s32, f32>;
   int_adder.a = 11;
-  assert("generic type failure", int_adder.a == 5 + 6);
+  assert("generic _type failure", int_adder.a == 5 + 6);
   int_adder.b = 1.23 + 4.56;
-  assert("generic type failure", int_adder.b == 1.23 + 4.56);
+  assert("generic _type failure", int_adder.b == 1.23 + 4.56);
 }

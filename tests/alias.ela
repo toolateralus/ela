@@ -1,15 +1,15 @@
 
 #test fn test_type_alias() {
-  alias XaryuBarSchnar :: s32;
+  type XaryuBarSchnar :: s32;
   i: XaryuBarSchnar = 0;
-  assert("type alias failed", i == 0);
+  assert("_type type failed", i == 0);
 }
 
 #test fn test_ptr_alias() {
-  alias int_ptr :: *mut s32;
+  type int_ptr :: *mut s32;
   p: *mut s32 = std::c::malloc(sizeof(s32));
   other: int_ptr  = p;
-  assert("alias failed to equal pointed to type field.", p == other);
+  assert("type failed to equal pointed to _type field.", p == other);
   std::c::free(p);
 }
 
@@ -18,7 +18,7 @@ fn Funky() -> s32 {
 }
 
 #test fn test_fn_alias() {
-  alias func :: fn* () -> s32;
+  type func :: fn () -> s32;
   f: func = &mut Funky;
   assert("function pointer failed", f() == 102);
 }
