@@ -312,6 +312,7 @@ ASTDestructure *ASTCopier::copy_destructure(ASTDestructure *node) {
     DestructureElement new_destruct;
     new_destruct.semantic = destruct.semantic;
     new_destruct.identifier = destruct.identifier;
+    new_destruct.type = destruct.type;
     new_node->elements.push_back(new_destruct);
   }
   new_node->right = static_cast<ASTExpr *>(copy_node(node->right));

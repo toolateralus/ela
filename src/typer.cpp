@@ -2596,13 +2596,13 @@ void Typer::visit(ASTDestructure *node) {
             "the identifiers",
             node->source_range);
       }
-      ctx.scope->insert_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
+      ctx.scope->insert_local_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
     } else {
       if (!symbol) {
         throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
                     node->source_range);
       }
-      ctx.scope->insert_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
+      ctx.scope->insert_local_variable(element.identifier, Type::INVALID_TYPE, nullptr, element.mutability);
     }
   }
 
@@ -2615,7 +2615,7 @@ void Typer::visit(ASTDestructure *node) {
 
   for (auto [name, type, _, __] : members) {
     if (i > node->elements.size()) break;
-    auto destructure = node->elements[i];
+    auto &destructure = node->elements[i];
     if (is_pointer_semantic(destructure.semantic)) {
       type = type->take_pointer_to(MUT);
     }
