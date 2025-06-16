@@ -2399,8 +2399,6 @@ void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const 
         }
         code << variant_name.get_str() << ".$" << std::to_string(index++) << ");\n";
       }
-    } else if (variant_type == void_type()) {
-      return;
     }
   }
 

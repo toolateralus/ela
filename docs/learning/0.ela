@@ -3,14 +3,13 @@
   but I'll choose the most 'idiomatic' and high level version.
 */
 
-
-// format library.
+// import the format library, specifically, just the 'println' function from it.
 import fmt::{
   println
 };
 
 fn main() {
-  // fmt::println can accept any _type. here it's taking 'str', a immutable, static-lifetime string. mostly identical to Rust's 'str' _type,
+  // fmt::println can accept any type. here it's taking 'str', a immutable, static-lifetime string. mostly identical to Rust's 'str' type,
   // except it's null terminated for simpler C FFI.
   println("Hello, World! | Здравствуйте, Мир!");
 }

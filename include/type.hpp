@@ -22,6 +22,8 @@ struct Scope;
 struct Context;
 
 extern std::vector<Type *> type_table;
+extern std::vector<Type *> function_type_table;
+
 extern jstl::Arena type_info_arena;
 
 enum ConversionRule {
@@ -298,9 +300,9 @@ struct Type {
   // the actual name of the type, without extensions and generics.
   InternedString basename{};
 
-  bool fwd_decl_is_emitted=false;
-  bool tuple_is_emitted=false;
-  bool dyn_emitted=false;
+  bool fwd_decl_is_emitted = false;
+  bool tuple_is_emitted = false;
+  bool dyn_emitted = false;
 
   // TODO: refactor the way type extensions work.
   // most of this should just be on the type itself,
@@ -341,7 +343,12 @@ struct Type {
   inline bool is_mut_pointer() const { return back_ext_type() == TYPE_EXT_POINTER_MUT; }
 
   inline bool extensions_equals(const TypeExtensions &other) const {
-    if (extensions != other) return false;
+    if (other.size() != extensions.size()) return false;
+    for (size_t i = 0; i < other.size(); ++i) {
+      if (other[i] != extensions[i]) {
+        return false;
+      }
+    }
     return true;
   }
 

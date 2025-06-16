@@ -72,7 +72,7 @@ std::string FunctionTypeInfo::to_string() const {
 Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
   const auto cmp_info_ptr = &info;
 
-  for (Type *type : type_table) {
+  for (Type *type : function_type_table) {
     if (type->kind == TYPE_FUNCTION && type->extensions_equals(type_extensions) &&
         type->type_info_equals(cmp_info_ptr, TYPE_FUNCTION)) {
       return type;
@@ -88,7 +88,11 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
     base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
   }
 
-  return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+  auto type = global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+
+  function_type_table.push_back(type);
+
+  return type;
 }
 
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
@@ -353,27 +357,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  if (this->kind != kind) return false;
+  if (this->kind != kind || kind != TYPE_FUNCTION) return false;
 
-  if (kind == TypeKind::TYPE_FUNCTION) {
-    auto finfo = static_cast<const FunctionTypeInfo *>(info);
-    auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
+  auto finder_info = static_cast<const FunctionTypeInfo *>(info);
+  auto self_info = static_cast<const FunctionTypeInfo *>(this->info);
 
-    if (finfo->is_varargs != sinfo->is_varargs) {
-      return false;
-    }
-
-    if (finfo->params_len != sinfo->params_len) return false;
-
-    for (size_t i = 0; i < finfo->params_len; ++i)
-      if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
-        return false;
-      }
-
-    return finfo->return_type == sinfo->return_type;
+  if (finder_info->return_type != self_info->return_type || finder_info->is_varargs != self_info->is_varargs ||
+      finder_info->params_len != self_info->params_len) {
+    return false;
   }
 
-  return false;
+  return std::memcmp(finder_info->parameter_types, self_info->parameter_types,
+                     finder_info->params_len * sizeof(Type *)) == 0;
 }
 
 /*
@@ -490,7 +485,8 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) &&
+      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
     if (type_extensions_is_back_const_pointer(extensions)) {
       type->traits.push_back(is_const_pointer_trait());
