@@ -438,6 +438,11 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   }
 
   node->return_type->accept(this);
+
+  if (node->return_type->resolved_type->is_fixed_sized_array()) {
+    throw_error("cannot return a fixed sized array from a function! the memory would be invalid immediately!", node->source_range);
+  }
+
   node->params->accept(this);
 
   FunctionTypeInfo info;
