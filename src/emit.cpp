@@ -2200,17 +2200,21 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
     newline();
   }
 
-  code << "if (";
+  static size_t idx = 0;
+  const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
+  code << type_to_string(object_type) << " " << patmatch_target << " = ";
   pattern->object->accept(this);
-  if (is_pointer) {
-    code << "->";
-  } else {
-    code << ".";
-  }
+  code << ";\n";
 
+  code << "if (";
+  if (is_pointer) {
+    code << patmatch_target << "->";
+  } else {
+    code << patmatch_target << ".";
+  }
   code << "index == " << variant_index << ") {\n";
-  // within the if block
-  emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+
+  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type, object_type);
   the_if->block->accept(this);
   // exiting the if block.
   code << "}\n";
@@ -2242,30 +2246,37 @@ void Emitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch 
   const auto object_type = pattern->object->resolved_type;
   const auto is_pointer = object_type->is_pointer();
 
-  code << "while (";
+  static size_t idx = 0;
+  const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
+
+  code << "while (true) {\n";
+  code << type_to_string(object_type) << " " << patmatch_target << " = ";
   pattern->object->accept(this);
+  code << ";\n";
+
+  code << "if (";
   if (is_pointer) {
-    code << "->";
+    code << patmatch_target << "->";
   } else {
-    code << ".";
+    code << patmatch_target << ".";
   }
   code << "index == " << variant_index << ") {\n";
+
   // ? within the while's block
 
-  emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type, object_type);
   // the_if->block->scope->parent = ctx.scope;
   the_while->block->accept(this);
 
   // ? exiting the while's block.
-  code << "}\n";
+  code << "} else break; \n}\n";
+
 }
 
-void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
-                                             Type *variant_type) {
-  const auto object_type = object->resolved_type;
-  const auto is_pointer = object_type->is_pointer();
+void Emitter::emit_pattern_match_destructure(const std::string &temp_register, const std::string &variant_name,
+                                             ASTPatternMatch *pattern, Type *variant_type, Type *register_type) {
+  const auto is_pointer = register_type->is_pointer();
 
-  /* I'm just gonna use auto in here cause im lazy. */
   if (variant_type->is_kind(TYPE_STRUCT)) {
     for (StructPattern::Part &part : pattern->struct_pattern.parts) {
       auto type = part.resolved_type;
@@ -2275,7 +2286,7 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
       */
       if (type->is_fixed_sized_array()) {
         // mut doesn't really matter here.
-        type = type->get_element_type()->take_pointer_to(MUT);
+        type = type->get_element_type()->take_pointer_to(true);
       }
 
       code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
@@ -2283,12 +2294,11 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
         code << "&";
       };
       code << "(";
-      object->accept(this);
 
       if (is_pointer) {
-        code << "->";
+        code << temp_register << "->";
       } else {
-        code << ".";
+        code << temp_register << ".";
       }
 
       code << variant_name << "." << part.field_name.get_str() << ");\n";
@@ -2311,11 +2321,10 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
         code << "&";
       }
       code << "(";
-      object->accept(this);
       if (is_pointer) {
-        code << "->";
+        code << temp_register << "->";
       } else {
-        code << ".";
+        code << temp_register << ".";
       }
       code << variant_name << ".$" << std::to_string(index++) << ");\n";
     }

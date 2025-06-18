@@ -361,8 +361,8 @@ struct Emitter : VisitorBase {
   void emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target,
                                           const SwitchBranch &the_while, ASTPatternMatch *path);
 
-  void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
-                                      Type *variant_type);
+  void emit_pattern_match_destructure(const std::string &temp_register, const std::string &variant_name, ASTPatternMatch *pattern,
+                                      Type *variant_type, Type *register_type);
 
   void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);

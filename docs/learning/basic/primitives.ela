@@ -301,10 +301,9 @@ fn result() {
   if ok_result.is_ok() {
     std::printf("Was Ok! whoo oooh!\n");
   }
-  
+
   // again, check out the api, paths listed in the `option()` tutorials ending, helpers are available.
 }
-
 
 @[entry]
 fn primitives_tutorial() {
