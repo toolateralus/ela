@@ -18,7 +18,6 @@ void Lexer::get_token(State &state) {
   size_t &lines = state.line;
   size_t &col = state.col;
   std::stringstream token;
-
   while (pos < len) {
     token.clear();
 
@@ -54,19 +53,35 @@ void Lexer::get_token(State &state) {
 
     // multi line comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
-      pos += 2;
-      col += 2;
-      while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
-        if (input[pos] == '\n') {
+      int depth = 1;
+      pos+=2;
+      col+=2;
+      while (pos+1<len && depth>0) {
+        if (pos + 1 < len && input[pos] == '/' && input[pos+1] == '*') {
+          depth++;
+          pos+=2;
+          col+=2;
+          continue;
+        }
+        if (pos + 1 < len && input[pos] == '*' && input[pos+1] == '/') {
+          depth--;
+          col+=2;
+          pos+=2;
+          continue;
+        }
+
+        if (input[pos]=='\n') {
           lines++;
-          col = 1; // Reset column position at the start of a new line
+          col=1;
         } else {
           col++;
         }
         pos++;
+
+        if (depth==0) {
+          break;
+        }
       }
-      pos += 2;
-      col += 2;
       continue;
     }
 

@@ -394,7 +394,7 @@ Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *
   return global_find_type_id(instantiation->resolved_type, {});
 }
 
-void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
+void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where_clause, bool generic_instantiation,
                                   std::vector<Type *> generic_args) {
   // Setup context.
   auto old_scope = ctx.scope;
@@ -415,7 +415,6 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
         break;
     }
   }
-
   if (node->name == "main") {
     node->is_entry = true;
   }
@@ -433,7 +432,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
   }
 
-  if (node->where_clause) {
+  if (node->where_clause && visit_where_clause) {
     node->where_clause.get()->accept(this);
   }
 
@@ -608,7 +607,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       continue;
     }
 
-    visit_function_header(method, false);
+    visit_function_header(method, false, false, {});
 
     type_scope->insert_function(method->name, method->resolved_type, method);
     auto &symbol = type_scope->symbols[method->name];
@@ -636,9 +635,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       } else {
         type_scope->insert_function(method->name, method->resolved_type, method);
       }
-
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-
       if (method->is_extern || method->is_forward_declared) {
         continue;
       }
@@ -681,7 +678,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
           continue;
         }
 
-        visit_function_header(method, false);
+        visit_function_header(method, false, false, {});
 
         if (auto symbol = type_scope->local_lookup(method->name)) {
           if (!symbol->is_forward_declared) {
@@ -1083,7 +1080,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 }
 
 // #undef USE_GENERIC_PANIC_HANDLER
-
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range) {
 #ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
@@ -1121,7 +1117,7 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Typ
           visit_struct_declaration((ASTStructDeclaration *)instantiation, true, args);
         } break;
         case AST_NODE_FUNCTION_DECLARATION: {
-          visit_function_header((ASTFunctionDeclaration *)instantiation, true, args);
+          visit_function_header((ASTFunctionDeclaration *)instantiation, true, true, args);
           auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
           func->generic_arguments = args;
           visit_function_body(func);
@@ -1308,7 +1304,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
     return;
   }
 
-  visit_function_header(node, false);
+  visit_function_header(node, true, false, {});
 
   if (node->is_forward_declared) {
     ctx.scope->forward_declare_function(node->name, node->resolved_type, node);
