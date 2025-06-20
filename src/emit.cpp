@@ -2173,6 +2173,27 @@ void Emitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitiali
   code << "}";
 }
 
+std::string Emitter::declare_temporary_for_pattern_match(bool is_pointer, Type *object_type, ASTPatternMatch *pattern) {
+  static size_t idx = 0;
+  const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
+  if (is_pointer) {
+    code << type_to_string(object_type) << " " << patmatch_target << " = ";
+    pattern->object->accept(this);
+  } else {
+    code << type_to_string(object_type->take_pointer_to(true)) << " " << patmatch_target << " = ";
+    if (pattern->object->is_temporary_value()) {
+      code << "({ static " << type_to_string(object_type) << " __temp; __temp = ";
+      pattern->object->accept(this);
+      code << "; &__temp; })";
+    } else {
+      code << "&";
+      pattern->object->accept(this);
+    }
+  }
+  code << ";\n";
+  return patmatch_target;
+}
+
 void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern) {
   auto old_scope = ctx.scope;
   ctx.set_scope(pattern->target_block->scope);
@@ -2200,21 +2221,13 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
     newline();
   }
 
-  static size_t idx = 0;
-  const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
-  code << type_to_string(object_type) << " " << patmatch_target << " = ";
-  pattern->object->accept(this);
-  code << ";\n";
+  const auto patmatch_target = declare_temporary_for_pattern_match(is_pointer, object_type, pattern);
 
   code << "if (";
-  if (is_pointer) {
-    code << patmatch_target << "->";
-  } else {
-    code << patmatch_target << ".";
-  }
+  code << patmatch_target << "->";
   code << "index == " << variant_index << ") {\n";
 
-  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type, object_type);
+  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type);
   the_if->block->accept(this);
   // exiting the if block.
   code << "}\n";
@@ -2246,37 +2259,22 @@ void Emitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch 
   const auto object_type = pattern->object->resolved_type;
   const auto is_pointer = object_type->is_pointer();
 
-  static size_t idx = 0;
-  const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
-
   code << "while (true) {\n";
-  code << type_to_string(object_type) << " " << patmatch_target << " = ";
-  pattern->object->accept(this);
-  code << ";\n";
-
+  const auto patmatch_target = declare_temporary_for_pattern_match(is_pointer, object_type, pattern);
   code << "if (";
-  if (is_pointer) {
-    code << patmatch_target << "->";
-  } else {
-    code << patmatch_target << ".";
-  }
+  code << patmatch_target << "->";
   code << "index == " << variant_index << ") {\n";
-
   // ? within the while's block
-
-  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type, object_type);
+  emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type);
   // the_if->block->scope->parent = ctx.scope;
   the_while->block->accept(this);
 
   // ? exiting the while's block.
   code << "} else break; \n}\n";
-
 }
 
 void Emitter::emit_pattern_match_destructure(const std::string &temp_register, const std::string &variant_name,
-                                             ASTPatternMatch *pattern, Type *variant_type, Type *register_type) {
-  const auto is_pointer = register_type->is_pointer();
-
+                                             ASTPatternMatch *pattern, Type *variant_type) {
   if (variant_type->is_kind(TYPE_STRUCT)) {
     for (StructPattern::Part &part : pattern->struct_pattern.parts) {
       auto type = part.resolved_type;
@@ -2294,13 +2292,7 @@ void Emitter::emit_pattern_match_destructure(const std::string &temp_register, c
         code << "&";
       };
       code << "(";
-
-      if (is_pointer) {
-        code << temp_register << "->";
-      } else {
-        code << temp_register << ".";
-      }
-
+      code << temp_register << "->";
       code << variant_name << "." << part.field_name.get_str() << ");\n";
     }
   } else if (variant_type->is_kind(TYPE_TUPLE)) {
@@ -2321,11 +2313,7 @@ void Emitter::emit_pattern_match_destructure(const std::string &temp_register, c
         code << "&";
       }
       code << "(";
-      if (is_pointer) {
-        code << temp_register << "->";
-      } else {
-        code << temp_register << ".";
-      }
+      code << temp_register << "->";
       code << variant_name << ".$" << std::to_string(index++) << ");\n";
     }
   } else if (variant_type == void_type()) {

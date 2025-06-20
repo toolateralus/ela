@@ -17,7 +17,7 @@
   where we need to bind #self to other traits.
 
 */
-trait Trait where #self: s32 {
+trait Trait where Self: s32 {
 
 }
 

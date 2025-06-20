@@ -91,6 +91,17 @@ struct ControlFlow {
 struct ASTBlock;
 
 struct ASTNode {
+  bool is_temporary_value() const {
+    switch (get_node_type()) {
+      case AST_NODE_LITERAL:
+      case AST_NODE_CALL:
+      case AST_NODE_CAST:
+      case AST_NODE_SIZE_OF:
+        return true;
+      default:
+        return false;
+    }
+  }
   ControlFlow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
@@ -485,14 +496,14 @@ struct ASTWhere;
 struct ASTLambda;
 
 struct ASTFunctionDeclaration : ASTDeclaration {
-  bool is_test: 1 = false;
-  bool is_method: 1 = false;
-  bool is_varargs: 1 = false;
-  bool is_exported: 1 = false;
-  bool is_forward_declared: 1 = false;
-  bool is_extern: 1 = false;
-  bool is_inline: 1 = false;
-  bool is_entry: 1 = false;
+  bool is_test : 1 = false;
+  bool is_method : 1 = false;
+  bool is_varargs : 1 = false;
+  bool is_exported : 1 = false;
+  bool is_forward_declared : 1 = false;
+  bool is_extern : 1 = false;
+  bool is_inline : 1 = false;
+  bool is_entry : 1 = false;
 
   bool has_defer = false;
   bool is_declared = false;
@@ -661,7 +672,7 @@ struct ASTWhile : ASTStatement {
 
 struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
-  bool is_pointer_subscript=false;
+  bool is_pointer_subscript = false;
   ASTExpr *base;
   ASTExpr *index;
   void accept(VisitorBase *visitor) override;
@@ -1044,16 +1055,15 @@ static inline Precedence get_operator_precedence(Token token);
 
 struct Typer;
 
-#define ENTER_AST_STATEMENT_LIST($list)\
-  auto $old_list = current_statement_list;\
-  Defer $stmt_list_defer([&]{ current_statement_list = $old_list; });\
+#define ENTER_AST_STATEMENT_LIST($list)                                \
+  auto $old_list = current_statement_list;                             \
+  Defer $stmt_list_defer([&] { current_statement_list = $old_list; }); \
   current_statement_list = &$list;
 
-#define AST_ENTER_SCOPE($scope)\
-  auto $old_scope=ctx.scope;\
-  Defer $scope_defer([&] { ctx.scope=$old_scope; });\
-  ctx.scope=$scope;
-
+#define AST_ENTER_SCOPE($scope)                        \
+  auto $old_scope = ctx.scope;                         \
+  Defer $scope_defer([&] { ctx.scope = $old_scope; }); \
+  ctx.scope = $scope;
 
 struct Parser {
   ASTIf *parse_if();
@@ -1154,4 +1164,3 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
-  
