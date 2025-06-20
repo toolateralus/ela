@@ -1,5 +1,5 @@
 fn main() { 
   // The parser is unable to parse the array extension on the literal fn ptr type.
   // A workaround is using an alias for the function pointer type, but this should work.
-  x: fn (s32, s32)[10];
+  x: [fn (s32, s32); 10];
 }

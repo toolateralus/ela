@@ -1,6 +1,4 @@
 // !FEATURE
-
-
 /* 
   We don't actually have to have 'generic specialization' for this to occur:
   we just need to store impl's on scopes, instead of dumping all the symbols into
