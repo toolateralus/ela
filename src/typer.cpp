@@ -30,6 +30,11 @@
   TODO: use an SET_EXPECTED_TYPE that also does an RAII for that same shit. again, a ton of code eliminated.
 */
 
+#define ENTER_EXPECTED_TYPE($type)         \
+  auto $old_expected_type = expected_type; \
+  expected_type = $type;                   \
+  Defer $expected_type_defer([&] { expected_type = $old_expected_type; });
+
 #define USE_GENERIC_PANIC_HANDLER
 
 #ifdef USE_GENERIC_PANIC_HANDLER
@@ -215,9 +220,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
 void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                      std::vector<Type *> generic_args) {
-  auto old_scope = ctx.scope;
-  Defer _defer([&] { ctx.scope = old_scope; });
-  ctx.set_scope(node->scope);
+  AST_ENTER_SCOPE(node->scope);
 
   /* get the type, if it's a concrete declaration. */
   auto type = node->resolved_type;
@@ -283,12 +286,12 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
         variants.emplace_back(alias_tuple{variant.name, type, TYPE_TUPLE, variant.tuple});
       } break;
       case ASTChoiceVariant::STRUCT: {
-        ctx.set_scope();
+        ctx.set_scope();  // create new scope.
         for (const auto &field : variant.struct_declarations) {
           field->accept(this);
           field->resolved_type = field->type->resolved_type;
         }
-        variants.emplace_back(struct_tuple{variant.name, ctx.exit_scope()});
+        variants.emplace_back(struct_tuple{variant.name, ctx.exit_scope()});  // exit and get scope.
       } break;
     }
   }
@@ -331,14 +334,9 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
     node->is_entry = true;
   }
 
-  auto old_ty = expected_type;
-  auto old_scope = ctx.scope;
-  auto _defer = Defer([&] {
-    ctx.set_scope(old_scope);
-    expected_type = old_ty;
-  });
-  ctx.set_scope(node->scope);
-  expected_type = node->return_type->resolved_type;
+  ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
+  AST_ENTER_SCOPE(node->scope);
+
   auto block = node->block.get();
   if (!block) {
     throw_error("internal compiler error: attempting to visit body of function forward declaration.",
@@ -439,7 +437,8 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
   node->return_type->accept(this);
 
   if (node->return_type->resolved_type->is_fixed_sized_array()) {
-    throw_error("cannot return a fixed sized array from a function! the memory would be invalid immediately!", node->source_range);
+    throw_error("cannot return a fixed sized array from a function! the memory would be invalid immediately!",
+                node->source_range);
   }
 
   node->params->accept(this);
@@ -812,8 +811,9 @@ bool is_const_pointer(ASTNode *node) {
 }
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
                                         Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
-  auto old_type = expected_type;
-  Defer _([&]() { expected_type = old_type; });
+  // this just stores the old type and restores it when we exit.
+  // the actual expected type is set per parameter.
+  ENTER_EXPECTED_TYPE(nullptr);
   auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
@@ -921,8 +921,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 }
 
 void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
-  auto old_type = expected_type;
-  Defer _([&]() { expected_type = old_type; });
+  ENTER_EXPECTED_TYPE(nullptr);
   auto args_ct = node->arguments.size();
   // TODO: rewrite this. this is so hard tor read.
   if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
@@ -1207,13 +1206,7 @@ void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(lambda_unique_id++);
   node->params->accept(this);
   node->return_type->accept(this);
-
-  auto old_expected = expected_type;
-
-  Defer _([&] { expected_type = old_expected; });
-
-  expected_type = node->return_type->resolved_type;
-
+  ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
   std::vector<int> param_types;
   FunctionTypeInfo info;
 
@@ -1263,7 +1256,6 @@ void Typer::visit(ASTEnumDeclaration *node) {
   enum_type->declaring_node = node;
   auto info = enum_type->info->as<EnumTypeInfo>();
 
- 
   for (auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
@@ -1367,9 +1359,7 @@ void Typer::visit(ASTVariable *node) {
       throw_error("Cannot use a type as a value.", node->value.get()->source_range);
     }
 
-    auto old_ty = expected_type;
-    expected_type = node->type->resolved_type;
-    Defer _defer([&] { expected_type = old_ty; });
+    ENTER_EXPECTED_TYPE(node->type->resolved_type);
     node->value.get()->accept(this);
     assert_types_can_cast_or_equal(node->value.get(), node->type->resolved_type, node->source_range,
                                    "invalid type in declaration");
@@ -1474,9 +1464,7 @@ void Typer::visit(ASTParamDecl *node) {
     if (id == Type::INVALID_TYPE) {
       throw_error("Use of undeclared type.", node->source_range);
     }
-    auto old_ty = expected_type;
-    expected_type = id;
-    Defer _defer([&] { expected_type = old_ty; });
+    // what exactly is this doing? There used to be some code here that didn't do anything -- it set the expected type.
   }
 }
 
@@ -1735,10 +1723,8 @@ void Typer::visit(ASTCall *node) {
     }
     ASTTuple tuple;
     tuple.values = node->arguments->arguments;
-    auto old_expected = expected_type;
-    expected_type = symbol->resolved_type;
+    ENTER_EXPECTED_TYPE(symbol->resolved_type);
     tuple.accept(this);
-    expected_type = old_expected;
     node->resolved_type = symbol->type.choice.get()->resolved_type;
     return;
   } else {
@@ -1810,9 +1796,7 @@ void Typer::visit(ASTArguments *node) {
       node->resolved_argument_types.push_back(arg->resolved_type);
       continue;
     }
-    auto old_ty = expected_type;
-    expected_type = info->parameter_types[i];
-    Defer _defer([&] { expected_type = old_ty; });
+    ENTER_EXPECTED_TYPE(info->parameter_types[i]);
     arg->accept(this);
     node->resolved_argument_types.push_back(arg->resolved_type);
   }
@@ -1932,12 +1916,7 @@ void Typer::visit(ASTBinExpr *node) {
   node->left->accept(this);
   auto left = node->left->resolved_type;
 
-  auto old_ty = expected_type;
-  Defer _defer([&] { expected_type = old_ty; });
-
-  if (node->op == TType::Assign) {
-    expected_type = left;
-  }
+  ENTER_EXPECTED_TYPE(left);
 
   node->right->accept(this);
   auto right = node->right->resolved_type;
@@ -2364,8 +2343,6 @@ void Typer::visit(ASTInitializerList *node) {
                       value->source_range);
         }
         names.insert(id);
-        auto old = expected_type;
-        Defer _([&] { expected_type = old; });
         auto symbol = scope->local_lookup(id);
         if (!symbol)
           throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
@@ -2374,10 +2351,9 @@ void Typer::visit(ASTInitializerList *node) {
           throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
                       value->source_range);
         }
-        expected_type = symbol->resolved_type;
 
+        ENTER_EXPECTED_TYPE(symbol->resolved_type);
         value->accept(this);
-
         assert_types_can_cast_or_equal(
             value, symbol->resolved_type, value->source_range,
             std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
@@ -2396,12 +2372,10 @@ void Typer::visit(ASTInitializerList *node) {
       }
 
       for (size_t i = 0; i < values.size(); ++i) {
-        {
-          auto old = expected_type;
-          Defer _([&] { expected_type = old; });
-          expected_type = target_element_type;
-          values[i]->accept(this);
-        }
+        const auto old = expected_type;
+        expected_type = target_element_type;
+        values[i]->accept(this);
+        expected_type = old;
         assert_types_can_cast_or_equal(
             values[i], target_element_type, values[i]->source_range,
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
@@ -2532,9 +2506,8 @@ void Typer::visit(ASTTuple *node) {
   auto declaring_tuple = expected_type;
   size_t type_index = 0;
   for (const auto &v : node->values) {
-    auto old = expected_type;
-    Defer _([&] { expected_type = old; });
-
+    ENTER_EXPECTED_TYPE(nullptr);
+    
     bool declaring_type_set = false;
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
       auto info = declaring_tuple->info->as<TupleTypeInfo>();
