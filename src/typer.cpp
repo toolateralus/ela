@@ -574,9 +574,19 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto decl_node = (ASTTraitDeclaration *)trait_id->declaring_node.get();
 
     if (decl_node && decl_node->where_clause) {
-      ctx.set_scope(decl_node->scope);
-      decl_node->where_clause.get()->accept(this);
-      ctx.set_scope(node->scope);
+      // TODO: figure out why this doesn't really work right for generic impls.
+      // for some reason it doesn't report the error at the impl location.
+
+      // Again, I think that having exceptions is totally acceptable here, right now, it's rather fragile with
+      // having recursive generic panic handling logic etc.
+      
+      // it will swell and grow the size of the binary, and maybe we can improve the current system, but 
+      // it's just too fragile.
+      GENERIC_PANIC_HANDLER(data, 1, {
+        ctx.set_scope(decl_node->scope);
+        decl_node->where_clause.get()->accept(this);
+        ctx.set_scope(node->scope);
+      }, node->source_range);
     }
   }
 
@@ -2829,11 +2839,9 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
       for (const auto &constraint : where->constraints) {
         constraint.first->accept(typer);
         constraint.second->accept(typer);
-
         if (!type_is_valid(constraint.first->resolved_type) || !type_is_valid(constraint.second->resolved_type)) {
           continue;
         }
-
         if (constraint.first->get_node_type() != AST_NODE_TYPE) {
           continue;
         }
@@ -2844,9 +2852,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
         if (!constraint.second->resolved_type->is_kind(TYPE_TRAIT)) {
           continue;
         }
-
         auto right_ty_info = constraint.second->resolved_type->info->as<TraitTypeInfo>();
-
         for (const auto &[name, sym] : right_ty_info->scope->symbols) {
           if (!sym.is_function || sym.is_generic_function()) {
             continue;
