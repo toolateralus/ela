@@ -178,10 +178,47 @@ Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions
   return global_find_type_id(base_type, type_extensions);
 }
 
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
+struct StructuralTypingRule {
+  ConversionRule conversion_rule = CONVERT_PROHIBITED;
+  bool is_applicable = false;
+  static StructuralTypingRule Inapplicable() { return {}; }
+  static StructuralTypingRule Applicable(ConversionRule r) { return {r, true}; }
+};
+
+StructuralTypingRule get_structural_typing_rule(const Type *from, const Type *to) {
+  const auto from_info = from->info->as<StructTypeInfo>();
+  const auto to_info = to->info->as<StructTypeInfo>();
+
+  const bool from_is_structural = from_info->is_structural;
+  const bool to_is_structural = to_info->is_structural;
+
+  // both are nominal. no structural typing can occur, it's too unsafe.
+  if (!to_is_structural && !from_is_structural) {
+    return StructuralTypingRule::Inapplicable();
+  }
+
+  const auto &to_members = to_info->members;
+  const auto &from_members = from_info->members;
+
+  if (to_members.size() != from_members.size()) {
+    return StructuralTypingRule::Inapplicable();
+  }
+
+  for (size_t i = 0; i < to_members.size(); ++i) {
+    const auto &to_member = to_members[i];
+    const auto &from_member = from_members[i];
+    if (to_member.type != from_member.type) {
+      return StructuralTypingRule::Inapplicable();
+    }
+  }
+
+  return StructuralTypingRule::Applicable(to_is_structural ? CONVERT_IMPLICIT : CONVERT_EXPLICIT);
+}
+
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
-    throw_error("internal compiler error: type was null when checking type conversion rules", source_range);
+    throw_error("internal compiler error: type was null when checking type conversion rules", range);
   }
 
   // * Same exact type. no cast needed.
@@ -309,7 +346,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       if (!to->is_pointer()) return false;
 
       auto element_ty_ptr = from->get_element_type()->take_pointer_to(MUT);
-      auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
+      auto rule = type_conversion_rule(element_ty_ptr, to, range);
 
       return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
     }();
@@ -330,14 +367,22 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     if (from->is_kind(TYPE_ENUM) && from->has_no_extensions()) {
       auto enum_info = (from->info->as<EnumTypeInfo>());
-      return type_conversion_rule(enum_info->underlying_type, to, source_range);
+      return type_conversion_rule(enum_info->underlying_type, to, range);
     }
 
     // TODO: do a runtime bounds check on explicit casting of an integer to an enum type?
     // You can get segfaults from that easily.
     if (to->is_kind(TYPE_ENUM) && to->has_no_extensions()) {
       auto enum_info = (to->info->as<EnumTypeInfo>());
-      return type_conversion_rule(from, enum_info->underlying_type, source_range);
+      return type_conversion_rule(from, enum_info->underlying_type, range);
+    }
+  }
+
+  // if both are structs, then we might use structural typing.
+  if (from->is_kind(TYPE_STRUCT) && to->is_kind(TYPE_STRUCT)) {
+    auto rule = get_structural_typing_rule(from, to);
+    if (rule.is_applicable) {
+      return rule.conversion_rule;
     }
   }
 
@@ -349,7 +394,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (from->has_extensions() && to->has_extensions() && from->extensions.back() == to->extensions.back()) {
       auto from_base = global_find_type_id(from->base_type, from->extensions_without_back());
       auto to_base = global_find_type_id(to->base_type, to->extensions_without_back());
-      return type_conversion_rule(from_base, to_base, source_range);
+      return type_conversion_rule(from_base, to_base, range);
     }
   }
 

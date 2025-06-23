@@ -22,6 +22,7 @@ struct Scope;
 struct Context;
 
 extern std::vector<Type *> type_table;
+extern std::vector<Type *> structural_type_table;
 extern std::vector<Type *> function_type_table;
 
 extern jstl::Arena type_info_arena;
@@ -195,10 +196,21 @@ struct EnumTypeInfo : TypeInfo {
 
 struct StructTypeInfo : TypeInfo {
   bool is_forward_declared : 1 = false;
-  bool is_anonymous : 1 = false;
+  bool is_anonymous : 1 = false;   // this is for anonymous substructs!!! not for structural, unnamed types!
+  bool is_structural : 1 = false;  // _this_ is for independent unnamed structs!
   bool is_union : 1 = false;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
+
+  inline bool structural_match(std::vector<Type *> types) const {
+    if (types.size() != members.size()) return false;
+    for (size_t i = 0; i < types.size(); ++i) {
+      if (types[i] != members[i].type) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 
 struct TupleTypeInfo : TypeInfo {

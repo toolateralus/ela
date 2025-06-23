@@ -2365,6 +2365,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration() {
     name = expect(TType::Identifier).value;
   } else {
     name = get_unique_identifier().value;
+    node->is_structural=true;
   };
 
   parse_struct_body(name, range, node);

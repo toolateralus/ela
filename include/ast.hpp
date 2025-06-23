@@ -710,11 +710,12 @@ struct ASTStructDeclaration : ASTDeclaration {
   InternedString name;
   Scope *scope;
 
-  bool is_forward_declared = false;
-  bool is_union = false;
-  bool is_anonymous = false;
+  bool is_forward_declared : 1 = false;
+  bool is_union : 1 = false;
+  bool is_anonymous : 1 = false;
+  bool is_structural : 1 = false;
 
-  std::vector<ASTStructDeclaration *> subtypes;  // Right now this is only for '#anon :: struct // #anon :: union'
+  std::vector<ASTStructDeclaration *> subtypes;  // only for struct { ... } anonymous subtypes.
   std::vector<ASTStructMember> members;
 
   void accept(VisitorBase *visitor) override;

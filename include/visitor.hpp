@@ -137,6 +137,9 @@ struct Typer : VisitorBase {
   // For generics.
   void visit_function_header(ASTFunctionDeclaration *node, bool visit_where_clause, bool generic_instantiation,
                              std::vector<Type *> generic_args);
+
+  void visit_structural_type_declaration(ASTStructDeclaration *node);
+  
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<Type *> generic_args = {});
   void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,

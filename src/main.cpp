@@ -29,6 +29,7 @@ jstl::Arena ast_arena{MB(10)};
 jstl::Arena thir_arena(MB(10));
 
 std::vector<Type *> type_table{};
+std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
 
 size_t lambda_unique_id = 0;

@@ -109,10 +109,44 @@ bool expr_is_literal(const ASTExpr *expr) {
   }
 }
 
+void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
+  std::vector<Type *> members;
+  for (auto member : node->members) {
+    member.type->accept(this);
+    members.push_back(member.type->resolved_type);
+  }
+
+  for (const auto &type : structural_type_table) {
+    const StructTypeInfo *info = type->info->as<StructTypeInfo>();
+    if (info->structural_match(members)) {
+      node->resolved_type = type;
+      return;
+    }
+  }
+
+  auto type = ctx.scope->create_struct_type(node->name, node->scope, node);
+  structural_type_table.push_back(type);
+  
+  StructTypeInfo *info = type->info->as<StructTypeInfo>();
+  info->is_structural = true;
+
+  node->resolved_type = type;
+
+  for (const auto &member : node->members) {
+    type->info->members.push_back({
+        .name = member.name,
+        .type = member.type->resolved_type,
+    });
+  }
+}
+
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<Type *> generic_args) {
-  Type *type = nullptr;
+  if (node->is_structural) {
+    return visit_structural_type_declaration(node);
+  }
 
+  Type *type = nullptr;
   bool type_just_created = false;
 
   if (generic_instantiation) {
@@ -170,13 +204,9 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   });
 
   // setup some flags.
-  if (node->is_anonymous) {
-    info->is_anonymous = true;
-  }
-
-  if (node->is_union) {
-    info->is_union = true;
-  }
+  info->is_anonymous = node->is_anonymous;
+  info->is_structural = node->is_structural;
+  info->is_union = node->is_union;
 
   if (node->is_forward_declared && type_just_created) {
     info->is_forward_declared = true;
