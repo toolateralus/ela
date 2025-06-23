@@ -80,7 +80,18 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const SourceRange &
 
   if (conv_rule == CONVERT_IMPLICIT) {
     expr->resolved_type = to;
+    // TODO: would a single expression ever go through multiple implicit conversions?
+    expr->implicit_conversion = {
+        .has_value = true,
+        .from = from_t,
+        .to = to_t,
+    };
   }
+}
+
+void implicit_cast(ASTExpr *expr, Type *to) {
+  expr->implicit_conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
+  expr->resolved_type = to;
 }
 
 bool expr_is_literal(const ASTExpr *expr) {
@@ -579,14 +590,17 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
       // Again, I think that having exceptions is totally acceptable here, right now, it's rather fragile with
       // having recursive generic panic handling logic etc.
-      
-      // it will swell and grow the size of the binary, and maybe we can improve the current system, but 
+
+      // it will swell and grow the size of the binary, and maybe we can improve the current system, but
       // it's just too fragile.
-      GENERIC_PANIC_HANDLER(data, 1, {
-        ctx.set_scope(decl_node->scope);
-        decl_node->where_clause.get()->accept(this);
-        ctx.set_scope(node->scope);
-      }, node->source_range);
+      GENERIC_PANIC_HANDLER(
+          data, 1,
+          {
+            ctx.set_scope(decl_node->scope);
+            decl_node->where_clause.get()->accept(this);
+            ctx.set_scope(node->scope);
+          },
+          node->source_range);
     }
   }
 
@@ -819,6 +833,7 @@ bool is_const_pointer(ASTNode *node) {
 
   return false;
 }
+
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
                                         Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
   // this just stores the old type and restores it when we exit.
@@ -2410,10 +2425,10 @@ void Typer::visit(ASTRange *node) {
 
   // Alwyas cast to the left? or should we upcast to the largest number type?
   if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
-    right = node->right->resolved_type = left;
+    implicit_cast(node->right, right = left);
   } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED ||
              conversion_rule_right_to_left == CONVERT_IMPLICIT) {
-    left = node->left->resolved_type = right;
+    implicit_cast(node->left, left = right);
   } else {
     throw_error(
         "Can only use ranges when both types are implicitly castable to each other. Range will always take the "
@@ -2517,7 +2532,7 @@ void Typer::visit(ASTTuple *node) {
   size_t type_index = 0;
   for (const auto &v : node->values) {
     ENTER_EXPECTED_TYPE(nullptr);
-    
+
     bool declaring_type_set = false;
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
       auto info = declaring_tuple->info->as<TupleTypeInfo>();

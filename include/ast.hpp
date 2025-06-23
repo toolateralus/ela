@@ -239,8 +239,21 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
+// little 'optional' type.
+// less annoying than working with std::optional<T>
+struct Conversion {
+  bool has_value=false;
+  union {
+    struct {
+      const Type *from;
+      const Type *to;
+    };
+  };
+};
+
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
+  Conversion implicit_conversion;
 };
 
 struct ASTTypeExtension {
