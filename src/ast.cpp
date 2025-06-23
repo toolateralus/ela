@@ -1111,16 +1111,11 @@ ASTType *Parser::parse_type() {
   parse_pointer_extensions(node);
 
   next_type = peek().type;
-
   switch (next_type) {
     case TType::Union:
     case TType::Struct: {
-      auto declaration = parse_struct_declaration();
-      current_statement_list->push_back(declaration);
-      node->normal.path = ast_alloc<ASTPath>();
-      node->normal.path->push_segment({
-          declaration->name,
-      });
+      node->kind = ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION;
+      node->declaration = parse_struct_declaration();
     } break;
     case TType::Enum: {
       node->normal.path = ast_alloc<ASTPath>();
@@ -1208,8 +1203,6 @@ ASTType *Parser::parse_type() {
   if (next_type == TType::Self) {
     eat();
     node->kind = ASTType::SELF;
-  } else {
-    node->kind = ASTType::NORMAL;
   }
 
   if (node->kind == ASTType::NORMAL && !node->normal.path) {
@@ -2291,10 +2284,11 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
     std::vector<ASTNode *> directives;
     while (peek().type != TType::RCurly) {
       const auto peeked = peek().type;
-      const bool is_anonymous_type_keyword = peeked == TType::Struct || peeked == TType::Union;
-      if (is_anonymous_type_keyword) {
+      const bool is_anonymous = peeked == TType::Struct || peeked == TType::Union;
+      if (is_anonymous) {
         ASTStructDeclaration *decl = parse_struct_declaration();
         decl->is_anonymous = true;
+        decl->is_structural = false;
         node->subtypes.push_back(decl);
       }
       if (peek().type == TType::Directive) {
@@ -2365,7 +2359,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration() {
     name = expect(TType::Identifier).value;
   } else {
     name = get_unique_identifier().value;
-    node->is_structural=true;
+    node->is_structural = true;
   };
 
   parse_struct_body(name, range, node);

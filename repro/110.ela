@@ -1,0 +1,5 @@
+fn main() {
+  type TheType :: (u32, u32);
+  the_type := typeof(TheType);
+}
+  

@@ -120,13 +120,15 @@ void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
     const StructTypeInfo *info = type->info->as<StructTypeInfo>();
     if (info->structural_match(members)) {
       node->resolved_type = type;
+      node->name = type->basename;
       return;
     }
   }
 
   auto type = ctx.scope->create_struct_type(node->name, node->scope, node);
+
   structural_type_table.push_back(type);
-  
+
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
   info->is_structural = true;
 
@@ -1892,78 +1894,83 @@ void Typer::visit(ASTType *node) {
 
   TypeExtensions extensions = accept_extensions(node->extensions);
 
-  if (node->kind == ASTType::SELF) {
-    auto self = get_self_type();
-    if (self == Type::INVALID_TYPE) {
-      throw_error("Cannot locate #self type.", node->source_range);
-    }
-    auto self_w_ext = global_find_type_id(self, extensions);
-    if (self_w_ext == Type::INVALID_TYPE) {
-      throw_error("Cannot locate #self type with extensions", node->source_range);
-    }
-    node->resolved_type = self_w_ext;
-    return;
-  }
+  switch (node->kind) {
+    case ASTType::NORMAL: {
+      auto &normal_ty = node->normal;
+      normal_ty.path->accept(this);
+      auto symbol = ctx.get_symbol(normal_ty.path).get();
 
-  if (node->kind == ASTType::NORMAL) {
-    auto &normal_ty = node->normal;
-    normal_ty.path->accept(this);
-    auto symbol = ctx.get_symbol(normal_ty.path).get();
-
-    if (!symbol) {
-      throw_error("use of undeclared type", node->source_range);
-    } else if (!symbol->is_type) {
-      throw_error("cannot use a non-type symbol as a type", node->source_range);
-    }
-
-    normal_ty.path->accept(this);
-    auto base_ty = normal_ty.path->resolved_type;
-    if (!base_ty) {
-      if (normal_ty.path->resolved_type == Type::INVALID_TYPE) {
+      if (!symbol) {
         throw_error("use of undeclared type", node->source_range);
-      } else if (normal_ty.path->resolved_type == Type::UNRESOLVED_GENERIC) {
-        throw_error("use of unresolved generic type", node->source_range);
+      } else if (!symbol->is_type) {
+        throw_error("cannot use a non-type symbol as a type", node->source_range);
       }
-    }
-    node->resolved_type = global_find_type_id(base_ty, extensions);
 
-    if (node->normal.is_dyn) {
-      auto type = node->resolved_type;
-      auto extension = type->extensions;
-      auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
-                                                      node->source_range, this);
-      if (extensions.size()) {
-        node->resolved_type = global_find_type_id(ty, extensions);
+      normal_ty.path->accept(this);
+      auto base_ty = normal_ty.path->resolved_type;
+      if (!base_ty) {
+        if (normal_ty.path->resolved_type == Type::INVALID_TYPE) {
+          throw_error("use of undeclared type", node->source_range);
+        } else if (normal_ty.path->resolved_type == Type::UNRESOLVED_GENERIC) {
+          throw_error("use of unresolved generic type", node->source_range);
+        }
+      }
+      node->resolved_type = global_find_type_id(base_ty, extensions);
+
+      if (node->normal.is_dyn) {
+        auto type = node->resolved_type;
+        auto extension = type->extensions;
+        auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
+                                                        node->source_range, this);
+        if (extensions.size()) {
+          node->resolved_type = global_find_type_id(ty, extensions);
+        } else {
+          node->resolved_type = ty;
+        }
+      }
+    } break;
+    case ASTType::TUPLE: {
+      std::vector<Type *> types;
+      for (const auto &t : node->tuple_types) {
+        t->accept(this);
+        types.push_back(t->resolved_type);
+      }
+      node->resolved_type = global_find_type_id(types, extensions);
+    } break;
+    case ASTType::FUNCTION: {
+      auto &func = node->function;
+      FunctionTypeInfo info;
+      // TODO: I don' think is is ever null, ever.
+      if (func.return_type.is_not_null()) {
+        func.return_type.get()->accept(this);
+        info.return_type = func.return_type.get()->resolved_type;
       } else {
-        node->resolved_type = ty;
+        info.return_type = void_type();
       }
-    }
-
-  } else if (node->kind == ASTType::TUPLE) {
-    std::vector<Type *> types;
-    for (const auto &t : node->tuple_types) {
-      t->accept(this);
-      types.push_back(t->resolved_type);
-    }
-    node->resolved_type = global_find_type_id(types, extensions);
-  } else if (node->kind == ASTType::FUNCTION) {
-    auto &func = node->function;
-    FunctionTypeInfo info;
-    // TODO: I don' tthink is is ever null, ever.
-    if (func.return_type.is_not_null()) {
-      func.return_type.get()->accept(this);
-      info.return_type = func.return_type.get()->resolved_type;
-    } else {
-      info.return_type = void_type();
-    }
-    for (auto &param_ty : func.parameter_types) {
-      param_ty->accept(this);
-      info.parameter_types[info.params_len] = param_ty->resolved_type;
-      info.params_len++;
-    }
-    node->resolved_type = global_find_function_type_id(info, extensions);
-  } else {
-    throw_error("internal compiler error: Invalid type kind", node->source_range);
+      for (auto &param_ty : func.parameter_types) {
+        param_ty->accept(this);
+        info.parameter_types[info.params_len] = param_ty->resolved_type;
+        info.params_len++;
+      }
+      node->resolved_type = global_find_function_type_id(info, extensions);
+    } break;
+    case ASTType::SELF: {
+      auto self = get_self_type();
+      if (self == Type::INVALID_TYPE) {
+        throw_error("Cannot locate #self type.", node->source_range);
+      }
+      auto self_w_ext = global_find_type_id(self, extensions);
+      if (self_w_ext == Type::INVALID_TYPE) {
+        throw_error("Cannot locate #self type with extensions", node->source_range);
+      }
+      node->resolved_type = self_w_ext;
+    } break;
+    case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
+      node->declaration->accept(this);
+      node->resolved_type = node->declaration->resolved_type;
+    } break;
+    default:
+      throw_error("internal compiler error: Invalid type kind", node->source_range);
   }
 }
 

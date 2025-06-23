@@ -242,7 +242,7 @@ struct ASTProgram : ASTNode {
 // little 'optional' type.
 // less annoying than working with std::optional<T>
 struct Conversion {
-  bool has_value=false;
+  bool has_value = false;
   union {
     struct {
       const Type *from;
@@ -307,12 +307,15 @@ struct ASTPath : ASTExpr {
   }
 };
 
+struct ASTDeclaration;
+
 struct ASTType : ASTExpr {
   enum Kind {
     NORMAL,
     TUPLE,
     FUNCTION,
     SELF,
+    STRUCTURAL_DECLARATIVE_ASCRIPTION, // something like ` x: struct { x: f32, y: f32 } `
   } kind = NORMAL;
 
   union {
@@ -326,6 +329,7 @@ struct ASTType : ASTExpr {
     } function;
     // special info for tuple types.
     std::vector<ASTType *> tuple_types;
+    ASTDeclaration *declaration;
   };
 
   ASTType() {}
@@ -345,6 +349,8 @@ struct ASTType : ASTExpr {
       case FUNCTION:
         function = decltype(function)(other.function);
         break;
+      case STRUCTURAL_DECLARATIVE_ASCRIPTION:
+        declaration = other.declaration;
         break;
     }
   }
