@@ -2346,14 +2346,12 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
 
 ASTStructDeclaration *Parser::parse_struct_declaration() {
   NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
-
   if (peek().type == TType::Struct) {
     expect(TType::Struct);
   } else {
     node->is_union = true;
     expect(TType::Union);
   }
-
   InternedString name;
   if (peek().type == TType::Identifier) {
     name = expect(TType::Identifier).value;
@@ -2361,9 +2359,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration() {
     name = get_unique_identifier().value;
     node->is_structural = true;
   };
-
   parse_struct_body(name, range, node);
-
   return node;
 }
 

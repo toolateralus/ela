@@ -31,7 +31,7 @@ void Resolver::define_type(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {
     type = type->base_type;
   }
-  
+
   switch (type->kind) {
     case TYPE_FUNCTION: {
       auto info = type->info->as<FunctionTypeInfo>();
@@ -161,7 +161,7 @@ void Resolver::visit(ASTProgram *node) {
     }
   }
 
-  for (auto type: reflected_upon_types) {
+  for (auto type : reflected_upon_types) {
     emit_dependencies_for_reflection(this, type);
   }
 
@@ -461,8 +461,7 @@ void Resolver::visit(ASTSwitch *node) {
 
   auto type = node->expression->resolved_type;
 
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer() &&
-      !node->branches.empty()) {
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer() && !node->branches.empty()) {
     visit_operator_overload(node->expression, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
                             node->branches[0].expression);
   }

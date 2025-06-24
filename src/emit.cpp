@@ -1085,11 +1085,11 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_default_init = false;
   emit_default_value = false;
 
-  auto type = node->resolved_type;
-  auto info = (type->info->as<StructTypeInfo>());
+  const Type *type = node->resolved_type;
+  const StructTypeInfo *info = (type->info->as<StructTypeInfo>());
 
-  std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
-  auto name = info->scope->full_name();
+  const std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
+  const std::string name = info->scope->full_name();
 
   if (info->is_forward_declared || node->is_forward_declared) {
     // We don't care about extern here.
@@ -1097,27 +1097,21 @@ void Emitter::visit(ASTStructDeclaration *node) {
     return;
   }
 
-  auto previous_scope = ctx.scope;
-  ctx.set_scope(info->scope);
-  Defer _defer2([&] { ctx.set_scope(previous_scope); });
-
+  ENTER_SCOPE(info->scope);
   if (info->is_anonymous) {
     code << indent() << (node->is_union ? "union" : "struct") << " {\n";
   } else {
     code << type_tag << " " << name << " {\n";
   }
+
   indent_level++;
-
-  auto old = emit_default_init;
-
+  bool old = emit_default_init;
   emit_default_init = false;
-
   Defer _defer1([&] { emit_default_init = old; });
 
   for (const auto &subtype : node->subtypes) {
     subtype->accept(this);
   }
-
   for (const auto &member : node->members) {
     indented("");
     auto type = member.type->resolved_type;
@@ -1141,7 +1135,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
     semicolon();
     newline();
   }
-
   indent_level--;
 
   // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
