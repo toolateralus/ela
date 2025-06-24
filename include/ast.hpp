@@ -165,7 +165,7 @@ inline static std::string block_flags_to_string(int flags) {
 
 struct ASTModule : ASTStatement {
   InternedString module_name;
-  std::vector<ASTStatement *> statements;
+  std::vector<ASTNode *> statements;
   Scope *scope;
   ASTNodeType get_node_type() const override { return AST_NODE_MODULE; }
   void accept(VisitorBase *visitor) override;
@@ -293,7 +293,7 @@ struct ASTType : ASTExpr {
     TUPLE,
     FUNCTION,
     SELF,
-    STRUCTURAL_DECLARATIVE_ASCRIPTION, // something like ` x: struct { x: f32, y: f32 } `
+    STRUCTURAL_DECLARATIVE_ASCRIPTION,  // something like ` x: struct { x: f32, y: f32 } `
   } kind = NORMAL;
 
   union {
@@ -1064,12 +1064,14 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
-  ASTIf *parse_if();
-  ASTProgram *parse_program();
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
+  ASTImport *parse_import();
+  ASTModule *parse_module();
+  ASTIf *parse_if();
+  ASTProgram *parse_program();
 
   ASTTraitDeclaration *parse_trait_declaration();
   ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node);
