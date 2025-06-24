@@ -281,17 +281,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return enum_decl;
     }},
 
-    // #self, return the type of the current declaring struct or union
-    // TODO: make this a capitalized identifier, just like Rust/Swift.
-    {.identifier = "self",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTType, type, range, defer, parser);
-        parser->parse_pointer_extensions(type);
-        type->kind = ASTType::SELF;
-        return type;
-    }},
-
     // #export, for exporting a non-mangled name to a dll or C library
     // primarily.
     // Equivalent to marking a function extern "C" in C++.
@@ -308,7 +297,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return node;
     }},
-
 
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
@@ -1123,16 +1111,11 @@ ASTType *Parser::parse_type() {
   parse_pointer_extensions(node);
 
   next_type = peek().type;
-
   switch (next_type) {
     case TType::Union:
     case TType::Struct: {
-      auto declaration = parse_struct_declaration();
-      current_statement_list->push_back(declaration);
-      node->normal.path = ast_alloc<ASTPath>();
-      node->normal.path->push_segment({
-          declaration->name,
-      });
+      node->kind = ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION;
+      node->declaration = parse_struct_declaration();
     } break;
     case TType::Enum: {
       node->normal.path = ast_alloc<ASTPath>();
@@ -1217,26 +1200,16 @@ ASTType *Parser::parse_type() {
     return node;
   }
 
-  // parse #self types.
-  if (next_type == TType::Directive) {
-    auto range = begin_node();
-    auto expr = try_parse_directive_expr().get();
-    if (expr->get_node_type() != AST_NODE_TYPE) {
-      throw_error(
-          "unable to get type from directive expression where a type "
-          "was expected.",
-          range);
-    }
-    auto type = static_cast<ASTType *>(expr);
-    type->extensions.insert(type->extensions.begin(), node->extensions.begin(), node->extensions.end());
-    return type;
+  if (next_type == TType::Self) {
+    eat();
+    node->kind = ASTType::SELF;
   }
 
-  node->kind = ASTType::NORMAL;
-  if (!node->normal.path) {
+  if (node->kind == ASTType::NORMAL && !node->normal.path) {
     node->normal.path = parse_path();
+    node->normal.path->source_range = range;
   }
-  node->normal.path->source_range = range;
+
   end_node(node, range);
   return node;
 }
@@ -2066,7 +2039,8 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
 
   int last_value = -1;
 
-  // Create a dummy scope that gets discarded so that enum variants can refer to other, already declared enum variants in this enum.
+  // Create a dummy scope that gets discarded so that enum variants can refer to other, already declared enum variants
+  // in this enum.
   auto old_scope = ctx.scope;
   Defer $scope([&] { ctx.scope = old_scope; });
   ctx.scope = create_child(ctx.scope);
@@ -2310,10 +2284,11 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
     std::vector<ASTNode *> directives;
     while (peek().type != TType::RCurly) {
       const auto peeked = peek().type;
-      const bool is_anonymous_type_keyword = peeked == TType::Struct || peeked == TType::Union;
-      if (is_anonymous_type_keyword) {
+      const bool is_anonymous = peeked == TType::Struct || peeked == TType::Union;
+      if (is_anonymous) {
         ASTStructDeclaration *decl = parse_struct_declaration();
         decl->is_anonymous = true;
+        decl->is_structural = false;
         node->subtypes.push_back(decl);
       }
       if (peek().type == TType::Directive) {
@@ -2371,23 +2346,20 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
 
 ASTStructDeclaration *Parser::parse_struct_declaration() {
   NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
-
   if (peek().type == TType::Struct) {
     expect(TType::Struct);
   } else {
     node->is_union = true;
     expect(TType::Union);
   }
-
   InternedString name;
   if (peek().type == TType::Identifier) {
     name = expect(TType::Identifier).value;
   } else {
     name = get_unique_identifier().value;
+    node->is_structural = true;
   };
-
   parse_struct_body(name, range, node);
-
   return node;
 }
 

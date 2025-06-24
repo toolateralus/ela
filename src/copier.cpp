@@ -112,6 +112,9 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
   new_node->resolved_type = node->resolved_type;
 
   switch (new_node->kind) {
+    case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
+      new_node->declaration = node->declaration;
+    } break;
     case ASTType::SELF:
       break;
     case ASTType::NORMAL:
@@ -589,7 +592,7 @@ ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
   if (node->target_block) {
     new_node->target_block = (ASTBlock *)copy_node(node->target_block);
   }
-  
+
   new_node->object = (ASTExpr *)copy_node(node->object);
   new_node->target_type_path = (ASTPath *)copy_node(node->target_type_path);
   return new_node;

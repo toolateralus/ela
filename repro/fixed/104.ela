@@ -1,18 +1,14 @@
 import fmt::*;
 
-/* 
-  This was fixed and randomly stopped working again with no cahnges. I have no flipping idea.
-*/
-
 struct AltOption!<T> {
   t: T
 }
 
 impl!<T> Format for AltOption!<T> {
   fn format(*const self, formatter: *mut Formatter) {
-    if formatter.options.enum_parent_name {
+    if formatter.options.typename {
       // ! Here, when we use #self, we get StringBuilder. Very odd.
-      formatter.writer.appendf("%::", (typeof(#self).name,), formatter.options.unquoted());
+      formatter.writer.appendf("%::", (typeof(Self).name,), formatter.options.unquoted());
     }
     formatter.writer.appendf("Some(%)", (self.t, ), formatter.options);
   }

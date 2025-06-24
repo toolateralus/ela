@@ -1,0 +1,317 @@
+import fmt;
+
+fn numbers() {
+  /* 
+    There are various numerical types available:
+    signed:
+      s8, s16, s32, s64
+    unsigned:
+      u8, u16, u32, u64
+    floating point:    
+      f32 and f64
+    other:
+      char -- 32 bit unsigned char, for unicode.
+      bool -- a true/false value.
+  */
+
+  // casting UP is always safe, therefore can happen implicitly. (unless its float to int)
+  // casting DOWN is always unsafe, therefore is always explicit. i.e, s64 to s8.
+  // casting signed to unsigned, of the same size or up, is safe, and will happen implicitly.
+  mut signed64: s32 = 100;
+  unsigned64: u64 = signed64;
+  signed64 = unsigned64 as s32; // cast required here.
+}
+
+fn strings() {
+  /* 
+    there are two string types in Ela.
+    `str`, which is effectively a "C String", that is, 
+    a static lifetime, constant memory string literal, except wrapped in a struct that stores length metadata.
+
+    and then there is `String`, which is a heap allocated, mutable dynamic string.
+
+    a couple reasons that each are distinct types are so lifetime responsiblity is clearer, 
+    so that methods that expectedly mutate the `String`, aren't available for the immutable literals, and 
+    because `String` has an extra 8 byte field, capacity.
+  */
+
+  // to create a `str`, simply use a string literal.
+  string: str = "Hello, World!";
+  // then we can read length, and to access the pointer we use data.
+  fmt::printlnf("length=%, data=%", (string.length, string.data));
+
+  // to create a `String`, there are many ways, but as a "literal", we can use `from()`
+  string1: String = String::from("Hello, World!");
+
+  // this string must be freed, and all things that must be freed implement `Destroy` in ela.
+  // simply call `destroy()` at the end of the scope, or use a `defer` to do it semi-automatically, 
+  // kind of like a destructor.
+  defer string1.destroy();
+
+  // similarily, the length and data are stored in the same fashion. as well as a 'capacity', since this
+  // is a growable, dynamic string.
+  fmt::printlnf("length=%, capacity=%, data=%", (string1.length, string1.capacity, string1.data));
+
+  // advanced note:
+  {
+    /*  
+      A common dilemma:
+        How do we take a string in a function where we don't care whether it's `String`, `str`, or `*u8`?
+    
+      the answer: `AsByteSlice` trait. (in the future, this will be `AsSlice!<u8>`)
+
+
+      let's say I have a function that opens a file. for the sake of brevity, I won't implement it.
+      however, this is what our signature would look like:
+
+      NOTE: this is advanced! you won't understand this until you understand generic functions and where clauses!
+      if you don't get it-- that's ok. Move on, this is a general note.
+    */
+
+    struct File {}
+    fn open_file!<Path>(path: Path) -> Result!<File, str> 
+    where Path: AsByteSlice {
+      // destructure the data and length. 
+      // however, this function returns [u8], so you can just hold a reference to that too.
+      data, length := path.as_byte_slice();
+
+      // use the `data` here! which is a `*const u8`
+      return Result!<File, str>::Err("This function isn't implemented");
+    }
+
+    // and here, we infer `str` for the `path: Path` parameter, so AsByteSlice is satisfied.
+    open_file("the_woo_data.woohoo");
+  }
+}
+
+fn array() {
+  /* 
+    arrays, also known as fixed sized arrays, and vectors, are a core part of Ela's type system!
+    they're basically identical to any other language's stack allocated, fixed sized array (think C, Rust, etc)
+
+    as mentioned above, they're allocated on the stack, of one pre-determined size, and do not need to be freed.
+  */
+
+  // here, we declare a 10-element array of s32's. that is the length, so indexing will be 0-9.
+  // everything is zero-initialized in Ela, so there's no worry about this being junk data, like in C.
+  // the `mut` is important, as every variable is const by default in Ela.
+  mut my_array: [s32; 10];
+
+  // we can write to elements, and read them, with the 'Index' operator.
+  // here we place a 10 in the first slot, and a 20 in the second.
+  // my_array = [10, 20, 0, 0, 0, 0, 0, 0, 0, 0]
+  my_array[0] = 10; // note! the variable has be mutable to write to it!  hence the `mut` declaration.
+  my_array[1] = 20;
+
+  // here, we simply swap the two elements.
+  // now my_array = [20, 10, 0, 0, 0, 0, 0, 0, 0, 0]
+  temp := my_array[0];
+  my_array[0] = my_array[1];
+  my_array[1] = temp;
+
+  // arrays, much like in C, can implicitly be cast to a pointer, either of it's underlying type (in this case s32)
+  // or a *void / *u8 (raw byte representation)
+  underlying_type_ptr: *s32 = my_array;
+  void_ptr: *void = my_array;
+  byte_ptr: *u8 = my_array;
+  // this means memset, and other common operations have much less friction.
+
+  /* 
+    You cannot return a fixed sized array from a function, as it's stack allocated, so it would immediately be invalid.  
+    -- invalid --
+    fn get() -> [s32; 10] {
+      return .[];
+    } 
+    ------------
+  */
+}
+
+fn slices() {
+  /* 
+   Slices are (often immutable) views into a chunk of contiguous memory. 
+   Often, they are used to take a smaller part of a larger chunk of memory, and treat it as if it was a whole, without
+   copying or duplicating that memory.
+  */
+
+  /* 
+    here we get the `str` as a byte slice. in this particular case, 
+    the actual representation of the string, byte for byte, has not changed at all.
+    slices are merely a data pointer, and a length, stored in a struct, just like `str`.
+  */
+  byte_slice: [u8] = "Hello, World!".as_byte_slice();
+
+  // here, we take a 'subslice' of the above slice, effectively isolating the "World!" part of the string.
+  // we can print this by reconstructing it as a `String` and printing it.
+  sub_slice := byte_slice.slice(7..13);
+
+  // Always destroy strings, and anything that implements `Destroy`!
+  new_string_from_subslice: String = String::from(sub_slice);
+  defer new_string_from_subslice.destroy();
+
+  // print the string (memory was copied out of the slice.)
+  fmt::println(new_string_from_subslice);
+
+  // we can also just print the slice, to see element-by-element what we're working with!
+  fmt::println(sub_slice);
+
+  // slices do not need to be freed, ever, since they are just views into memory that is owned elsewhere.
+  // use this ownership semantic to your advantage in your APIs! they are a cheap way to take contiguous chunks of memory with
+  // clear memory semantics!
+}
+
+fn tuples() {
+  /* 
+    tuples in Ela work a lot like rust; they are effectively anonymous structs that can be created at any time, using a literal,
+    and will be reused if the element types match.
+  */ 
+
+  my_tuple: (s32, s32, s32) = (0, 0, 0);
+  // this is basically equivalent to
+  // my_tuple: struct { 0: s32, 1: s32, c: s32 } = .{0: 0, 1: 0, 2: 0};
+
+  /* 
+    Destructuring
+
+    this applies mostly to tuples, but any struct can also be 'destructured'
+    simply comma seperate the right amount of identifiers on the left hand side of a :=,
+    and place a value, and it will be sequentially destructured into those variables, based on the
+    order of the fields in the struct or tuple.
+  */
+  
+  // declares 3 variables, a, b, c, all type s32.
+  a, b, c := my_tuple;
+
+  // you can take destructure elements by pointer, and declare them as mutable too.
+  // a1: *s32
+  // b1: *mut s32
+  // c1: s32;
+  &a1, &mut b1, mut c1 := my_tuple;
+
+
+  /* 
+    You can also access the tuple's elements directly with a member access expression, aka `.`.
+    just use .$INDEX to get the element, such as:
+  */
+  a2 := my_tuple.0;
+
+  /* 
+    tuples are the core foundation of our `fmt` library, effectively replacing variadic arguments, or in C, the `...` args.
+    as you've probably already seen in the `strings()` example, we passed a tuple to fmt::printlnf.
+  */
+
+  // this
+  fmt::printlnf("a=%, b=%, c=%", my_tuple);
+  // is the same as
+  fmt::printlnf("a=%, b=%, c=%", (0, 0, 0));
+
+  /* 
+    This, generally, is a pretty nice way to use a formatter. 
+    However, there is one circumstance where it becomes slightly clunky.
+
+    when you want to format a single value, you have to use a tuple parenthesis syntax, `()`, 
+    as well as a trailing comma before the `)`, to differentiate it from a parenthesized expression.
+  */
+
+  // invalid:
+  // fmt::printlnf("a=%", 10);
+  // fmt::printlnf("a=%", (10));
+  
+  // valid:
+  fmt::printlnf("a=%", (10,));
+}
+
+fn option() {
+  /* 
+    the `Option` type is a very cornerstone part of the language, while not exactly a `primitive`, it is
+    certainly important and used all over the place. it is a `choice` type, which will be covered later,
+    but if you know what a 'discriminated union' is, it's that.
+
+    Option is used where a value could, or could not be present. it's "Optional".
+  */
+
+  // when it 'has' a value, we use `Some`.
+  // note that `None` and `Some` are not functions, they are `constructors` in a non-c++ meaning.
+  some_explicit: Option!<s32> = Option!<s32>::Some(10);
+  some_implicit := Some(10);
+
+  // when it doesn't, we use `None`
+  none_explicit: Option!<s32> = Option!<s32>::None;
+
+  // you'll notice we can't infer that it's an Option!<s32> here, as well as we can with the Some.
+  // that's because the `Some()` helper takes a value, and can substitute the `Option!<T>`'s `T` with 
+  // the inferred type of the value!
+  none_implicit: Option!<s32> = None();
+
+
+  // if we default construct an option, or any choice type, since everything is zero initialized in ela,
+  // this will point to neither `None` nor `Some` even though those are the only two variants of that choice.
+  // this is a safety feature, that default initialized choice types are left in an invalid, inaccessible state.
+  invalid_option: Option!<s32>;
+
+  /* 
+    To retreive the value from an `Option` and any other `choice` type, 
+    we can use pattern matching.
+
+    this is quite complex, so if you don't get it, that's ok. Later we'll dive deep into pattern matching
+    and all the different forms it takes.
+  */
+
+  // Note, this doesn't have to be exhaustive, I just put else cases here for clarity.
+  if none_explicit is Option!<s32>::None {
+    std::printf("It was none! woo hoo!\n");
+  } else {
+    std::printf("It was Some? :((((\n");
+  }
+
+  // we take the inner value by pointer here, but it's got the same
+  // combinations as any variable declaration, and destructures too.
+
+  // v, mut v, &v, &mut v, &const v
+  // are all viable here.
+  if some_explicit is Option!<s32>::Some(&mut v) {
+    fmt::printlnf("Some(%)", (*v,));
+  }
+
+  // option also has some helper methods to skip the pattern matching constructs for common paths,
+  // like `is_some()`, `unwrap()`, etc.
+  // see `lib/bootstrap/option.ela` and `lib/bootstrap/result.ela` to explore that API.
+}
+
+fn result() {
+  /* 
+    Result types are very similar to `Option` types, being that they're a discriminated union `choice` type,  
+    and they are used to store various values, but only one at a time.
+
+    However, the difference is that the `Result` is used to indicate success or error, where `Option` is used
+    to indicate the presence or absence of a value.
+
+    I will leave this brief for the sake of not repeting the Option tutorial, but all of those features apply.
+  */
+
+  // the first type argument is the success, or `Ok` value's type,
+  // and the second is the failure, or `Err` value's type.
+  err_result: Result!<s32, str> = Result!<s32, str>::Err("Something went terribly wrong!");
+  ok_result: Result!<s32, str> = Result!<s32, str>::Ok(10);
+
+  // helper functions so you don't have to pattern match just to read.
+  if err_result.is_err() {
+    std::printf("Was Err! woo hoo!\n");
+  }
+
+  if ok_result.is_ok() {
+    std::printf("Was Ok! whoo oooh!\n");
+  }
+
+  // again, check out the api, paths listed in the `option()` tutorials ending, helpers are available.
+}
+
+@[entry]
+fn primitives_tutorial() {
+  numbers();
+  strings();
+  array();
+  slices();
+  tuples();
+  option();
+  result();
+}

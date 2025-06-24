@@ -112,19 +112,16 @@ enum struct TType {
   Type,
   Import,
   Module,
-
   Attribute,
-
   Mut,
   Const,
-
   Dyn,
   Dyn_Of,
-
   Choice,
   Is,
-
   Extern,
+
+  Self,
 };
 
 #define TTYPE_CASE(type) \
@@ -233,6 +230,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Choice);
     TTYPE_CASE(Is);
     TTYPE_CASE(PtrSubscript);
+    TTYPE_CASE(Self);
   }
   return "Unknown";
 }
@@ -335,7 +333,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"choice", TType::Choice},
     // for pattern matching
     {"is", TType::Is},
-
+    {"Self", TType::Self},
 };
 
 static std::unordered_map<std::string, TType> operators{

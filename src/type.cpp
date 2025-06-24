@@ -72,7 +72,7 @@ std::string FunctionTypeInfo::to_string() const {
 Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
   const auto cmp_info_ptr = &info;
 
-  for (Type *type : type_table) {
+  for (Type *type : function_type_table) {
     if (type->kind == TYPE_FUNCTION && type->extensions_equals(type_extensions) &&
         type->type_info_equals(cmp_info_ptr, TYPE_FUNCTION)) {
       return type;
@@ -88,7 +88,11 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
     base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
   }
 
-  return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+  auto type = global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+
+  function_type_table.push_back(type);
+
+  return type;
 }
 
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
@@ -174,10 +178,47 @@ Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions
   return global_find_type_id(base_type, type_extensions);
 }
 
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
+struct StructuralTypingRule {
+  ConversionRule conversion_rule = CONVERT_PROHIBITED;
+  bool is_applicable = false;
+  static StructuralTypingRule Inapplicable() { return {}; }
+  static StructuralTypingRule Applicable(ConversionRule r) { return {r, true}; }
+};
+
+StructuralTypingRule get_structural_typing_rule(const Type *from, const Type *to) {
+  const auto from_info = from->info->as<StructTypeInfo>();
+  const auto to_info = to->info->as<StructTypeInfo>();
+
+  const bool from_is_structural = from_info->is_structural;
+  const bool to_is_structural = to_info->is_structural;
+
+  // both are nominal. no structural typing can occur, it's too unsafe.
+  if (!to_is_structural && !from_is_structural) {
+    return StructuralTypingRule::Inapplicable();
+  }
+
+  const auto &to_members = to_info->members;
+  const auto &from_members = from_info->members;
+
+  if (to_members.size() != from_members.size()) {
+    return StructuralTypingRule::Inapplicable();
+  }
+
+  for (size_t i = 0; i < to_members.size(); ++i) {
+    const auto &to_member = to_members[i];
+    const auto &from_member = from_members[i];
+    if (to_member.type != from_member.type) {
+      return StructuralTypingRule::Inapplicable();
+    }
+  }
+
+  return StructuralTypingRule::Applicable(to_is_structural ? CONVERT_IMPLICIT : CONVERT_EXPLICIT);
+}
+
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
-    throw_error("internal compiler error: type was null when checking type conversion rules", source_range);
+    throw_error("internal compiler error: type was null when checking type conversion rules", range);
   }
 
   // * Same exact type. no cast needed.
@@ -305,7 +346,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       if (!to->is_pointer()) return false;
 
       auto element_ty_ptr = from->get_element_type()->take_pointer_to(MUT);
-      auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
+      auto rule = type_conversion_rule(element_ty_ptr, to, range);
 
       return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
     }();
@@ -326,14 +367,22 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     if (from->is_kind(TYPE_ENUM) && from->has_no_extensions()) {
       auto enum_info = (from->info->as<EnumTypeInfo>());
-      return type_conversion_rule(enum_info->underlying_type, to, source_range);
+      return type_conversion_rule(enum_info->underlying_type, to, range);
     }
 
     // TODO: do a runtime bounds check on explicit casting of an integer to an enum type?
     // You can get segfaults from that easily.
     if (to->is_kind(TYPE_ENUM) && to->has_no_extensions()) {
       auto enum_info = (to->info->as<EnumTypeInfo>());
-      return type_conversion_rule(from, enum_info->underlying_type, source_range);
+      return type_conversion_rule(from, enum_info->underlying_type, range);
+    }
+  }
+
+  // if both are structs, then we might use structural typing.
+  if (from->is_kind(TYPE_STRUCT) && to->is_kind(TYPE_STRUCT)) {
+    auto rule = get_structural_typing_rule(from, to);
+    if (rule.is_applicable) {
+      return rule.conversion_rule;
     }
   }
 
@@ -345,7 +394,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (from->has_extensions() && to->has_extensions() && from->extensions.back() == to->extensions.back()) {
       auto from_base = global_find_type_id(from->base_type, from->extensions_without_back());
       auto to_base = global_find_type_id(to->base_type, to->extensions_without_back());
-      return type_conversion_rule(from_base, to_base, source_range);
+      return type_conversion_rule(from_base, to_base, range);
     }
   }
 
@@ -353,27 +402,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  if (this->kind != kind) return false;
+  if (this->kind != kind || kind != TYPE_FUNCTION) return false;
 
-  if (kind == TypeKind::TYPE_FUNCTION) {
-    auto finfo = static_cast<const FunctionTypeInfo *>(info);
-    auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
+  auto finder_info = static_cast<const FunctionTypeInfo *>(info);
+  auto self_info = static_cast<const FunctionTypeInfo *>(this->info);
 
-    if (finfo->is_varargs != sinfo->is_varargs) {
-      return false;
-    }
-
-    if (finfo->params_len != sinfo->params_len) return false;
-
-    for (size_t i = 0; i < finfo->params_len; ++i)
-      if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
-        return false;
-      }
-
-    return finfo->return_type == sinfo->return_type;
+  if (finder_info->return_type != self_info->return_type || finder_info->is_varargs != self_info->is_varargs ||
+      finder_info->params_len != self_info->params_len) {
+    return false;
   }
 
-  return false;
+  return std::memcmp(finder_info->parameter_types, self_info->parameter_types,
+                     finder_info->params_len * sizeof(Type *)) == 0;
 }
 
 /*
@@ -490,7 +530,8 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) &&
+      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
     if (type_extensions_is_back_const_pointer(extensions)) {
       type->traits.push_back(is_const_pointer_trait());

@@ -1,0 +1,12 @@
+import fmt;
+/*  
+  In Ela, `main` or `@[entry]` functions **should never return** or take arguments.
+  Use `Env::args()` to access command line arguments and `std::exit(code)` to exit the program. 
+
+  for more about `@[entry]` and other attributes, see `basic/attributes.ela` tutorial.  
+
+  Returning a value from `main` is ignored, except in special builds (`freestanding` and `nostdlib`) — more on that later.
+*/
+fn main() {
+  fmt::println("Hello, World! || Здавствуйте, Мир!");
+}

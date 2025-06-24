@@ -86,8 +86,8 @@ struct Strakt {
 }
 
 impl Strakt {
-  fn new() -> #self {
-    mut self: #self;
+  fn new() -> Self {
+    mut self: Self;
     self.obj = dynof(new(0));
     return self;
   }

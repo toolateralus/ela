@@ -4,8 +4,8 @@ type Alias :: s64;
 // probably a null scope.
 // we should error for this, you probably don't need to impl an type, that makes no sense.
 impl Alias {
-  fn from(n: s32) -> #self {
-    return n as #self;
+  fn from(n: s32) -> Self {
+    return n as Self;
   }
 }
 

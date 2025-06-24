@@ -19,8 +19,8 @@ fn main() {
   }
 
   // A basic enum. We don't have to use choice types for basic enums in this language,
-  // this is much less _type safe and casts to and from integers implicitly.
-  // This lack of _type safety is intentional. Use a choice _type with markers for better safety.
+  // this is much less type safe and casts to and from integers implicitly.
+  // This lack of type safety is intentional. Use a choice type with markers for better safety.
   // This fits C interop perfectly, though.
   enum Tag {
     Value,

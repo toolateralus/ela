@@ -1,23 +1,20 @@
-
-
 // Import all symbols from fmt.
 import fmt::*;
-
 
 /* 
   Here we'll cover some control flow, namely the 'for' loop, which includes covering Iterators.
 
-  We'll also cover some string stuff, and introduce you to how most collections look in Ela.
-  We use the 'qformat` formatter from fmt, 
-  and we use std::printf (which is just a wrapper for std::c::printf that takes a str instead of *const u8 for the format argument)
+  - We'll also cover some string stuff, and introduce you to how most collection types look in Ela.
+  - We use the 'qformat` formatter from fmt, 
+  - and we use std::printf (which is just a wrapper for std::c::printf that takes a str instead of *const u8 for the format argument)
 */
 
 fn main() {
   // Instead of varargs, format takes a tuple, which is effectively an anonymous struct.
   // String is a heap allocated string, that must be freed. hence, the deferred 'destroy' call.
 
-  // qformat is the same as format except it doesnt take a FormatOpions arg. it's deprecated since
-  // default arguments were implemented recently.
+  // qformat is the same as format except it doesnt take a FormatOpions arg. 
+  // note: it's soon to be totally deprecated as default arguments get their polish.
   string: String = qformat("% %%", ("Hello","World","!"));
 
   // the defer statement will execute at the closing bracket '}' of wherever it's used.
@@ -29,7 +26,7 @@ fn main() {
     println(ch);
   }
 
-  // we can iterate over its length, with a Range _type. Range also implements Iterable.
+  // we can iterate over its length, with a Range type. Range also implements Iterable.
   std::printf("string.length loop\n");
   for i in 0..string.length {
     // string types all implement the Index trait, so they can be 'subscripted'.
@@ -43,7 +40,7 @@ fn main() {
     std::printf("%c\n", ch);
   }
 
-  // iter_mut will always return a *mut T (mutable pointer to the element _type of the Iterator).
+  // iter_mut will always return a *mut T (mutable pointer to the element type of the Iterator).
   // we can safely modify the value of these pointers while traversing.
 
   // ! for ch in string.iter_mut() { *ch = 0; }
@@ -62,7 +59,7 @@ fn main() {
   }
 
 
-  // If we wanted to create a custom iterator, we just need a _type that implements `trait Iterator`.
+  // If we wanted to create a custom iterator, we just need a type that implements `trait Iterator`.
   struct CustomIter {
     count: s32,
   }
@@ -88,9 +85,9 @@ fn main() {
   /* 
     the data arguments for the formatting function (printlnf in this case, but format() and fmt::printf() too), 
     as shown below, often take a tuple (even if a single value).
-    The alternative is that the single argument implements Format. then, the _type doesn't need to be encased in a tuple.
+    The alternative is that the single argument implements Format. then, the type doesn't need to be encased in a tuple.
 
-    The format library can print any _type, without a Format implementation. 
+    The format library can print any type, without a Format implementation. 
     However, it does this with runtime reflection, which is slower than a hardcoded impl, 
     and customization is limited. So, implementing Format can be desirable in many cases.
   */
@@ -126,7 +123,7 @@ fn main() {
   /* 
     Switch statements:
 
-    Any _type that implements Eq 
+    Any type that implements Eq 
       (or a self == operator "fn eq(self, other: #self) -> bool")
     can be used in a switch,
 
@@ -149,8 +146,17 @@ fn main() {
   assert_eq("switch expression failed", x, "expected");
 
   // while loops are self explanatory.
+  std::printf("entering while loop\n");
+  mut while_to_break := false;
   while true {
-    continue;
+    if !while_to_break {
+      std::printf("continuing once.\n");
+      while_to_break=true;
+      continue;
+    } else {
+      std::printf("breaking from loop\n");
+      break;
+    }
   }
 
 }

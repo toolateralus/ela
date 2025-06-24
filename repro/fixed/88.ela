@@ -1,5 +1,5 @@
 struct thing {
-	next: *mut #self
+	next: *mut Self
 }
 /* Cannot locate #self _type.
         at: /home/cooper/repos/languages/ela/repro/88.ela:2:13

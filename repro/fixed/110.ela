@@ -1,4 +1,0 @@
-fn main() {
-  _type := typeof((u32, u32));
-}
-  

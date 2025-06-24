@@ -11,8 +11,8 @@
     fn static_get() -> s32;
     fn method_get(self) -> s32;
     fn method_get_ptr(*mut self) -> s32;
-    fn method_get_self(*mut self) -> #self;
-    fn static_get_self() -> #self;
+    fn method_get_self(*mut self) -> Self;
+    fn static_get_self() -> Self;
   }
 
   impl Basic for Struct {
@@ -25,10 +25,10 @@
     fn method_get_ptr(*mut self) -> s32 {
       return self.a
     }
-    fn method_get_self(*mut self) -> #self {
+    fn method_get_self(*mut self) -> Self {
       return .{a: 100};
     }
-    fn static_get_self() -> #self {
+    fn static_get_self() -> Self {
       return .{a: 100};
     }
   }
@@ -48,8 +48,8 @@
     fn static_get() -> T;
     fn method_get(self) -> T;
     fn method_get_ptr(*mut self) -> T;
-    fn method_get_self(*mut self) -> #self;
-    fn static_get_self() -> #self;
+    fn method_get_self(*mut self) -> Self;
+    fn static_get_self() -> Self;
   }
 
   struct Struct1 {
@@ -68,10 +68,10 @@
     fn method_get_ptr(*mut self) -> s32 {
       return self.a
     }
-    fn method_get_self(*mut self) -> #self {
+    fn method_get_self(*mut self) -> Self {
       return Struct1 .{a: 100};
     }
-    fn static_get_self() -> #self {
+    fn static_get_self() -> Self {
       return Struct1 .{a: 100};
     }
   }
@@ -104,11 +104,11 @@
       t: T;
       return t;
     }
-    fn method_get_self(*mut self) -> #self {
+    fn method_get_self(*mut self) -> Self {
       t: T;
       return .{n: t};
     }
-    fn static_get_self() -> #self {
+    fn static_get_self() -> Self {
       t: T;
       return .{n: t};
     }

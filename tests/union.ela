@@ -26,7 +26,7 @@ impl _Vec2 {
     assert("union equality check in method failed", n == self.x && n == self.y && n == self.z);
     assert("union equality check in method failed", n == self.values[0] && n == self.values[1] && n == self.values[2]);
   }
-  fn something() -> #self {
+  fn something() -> Self {
     return .{};
   }
 }
