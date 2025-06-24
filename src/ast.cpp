@@ -1253,6 +1253,85 @@ ASTIf *Parser::parse_if() {
   return node;
 }
 
+ASTModule *Parser::parse_module() {
+  NODE_ALLOC(ASTModule, module, range, _, this);
+  eat();
+  module->module_name = expect(TType::Identifier).value;
+  expect(TType::LCurly);
+  auto old_scope = ctx.scope;
+  ctx.set_scope();
+  module->scope = ctx.scope;
+  while (peek().type != TType::RCurly) {
+    module->statements.push_back(parse_statement());
+    if (peek().type == TType::Semi) {
+      eat();
+    }
+  }
+  ctx.set_scope(old_scope);
+  expect(TType::RCurly);
+  return module;
+}
+
+ASTImport *Parser::parse_import() {
+  expect(TType::Import);
+  NODE_ALLOC(ASTImport, import, range, _, this);
+  auto module_name = expect(TType::Identifier).value;
+
+  import->module_name = module_name;
+  if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Mul) {
+    eat();
+    eat();
+    import->tag = ASTImport::IMPORT_ALL;
+  } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::LCurly) {
+    eat();
+    eat();
+    while (peek().type != TType::RCurly) {
+      // TODO: support :: imports here too, like
+      // import mod::{submod::symbol, submod::submod::symbol};
+      import->symbols.push_back(expect(TType::Identifier).value);
+      if (peek().type != TType::RCurly) {
+        expect(TType::Comma);
+      }
+    }
+    expect(TType::RCurly);
+    import->tag = ASTImport::IMPORT_NAMED;
+  } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier) {
+    // TODO: support :: imports here also, like
+    // import mod::submod::symbol; etc
+    eat();
+    import->symbols.push_back(expect(TType::Identifier).value);
+    import->tag = ASTImport::IMPORT_NAMED;
+  }
+
+  expect(TType::Semi);
+
+  auto symbol = ctx.scope->lookup(module_name);
+
+  if (symbol && symbol->is_module) {
+    printf("importing existing module %s\n", module_name.get_str().c_str());
+    import->scope = ((ASTModule *)symbol->module.declaration)->scope;
+    return import;
+  }
+
+  auto old_scope = ctx.scope;
+  // TODO: fix the wasteful double allocation that may happen here. Create the backup scope in the import method.
+  ctx.set_scope(import->scope = create_child(ctx.root_scope));
+
+  if (this->import(module_name.get_str(), &import->scope)) {
+    while (!peek().is_eof()) {
+      import->statements.push_back(parse_statement());
+    }
+    expect(TType::Eof);
+    states.pop_back();
+    std::filesystem::current_path(states.back().path.parent_path());
+  }
+
+  old_scope->create_module(module_name, import);
+  ctx.set_scope(old_scope);
+
+  return import;
+}
+
 void Parser::parse_destructure_element_value_semantic(DestructureElement &destruct) {
   if (peek().type == TType::And) {
     expect(TType::And);
@@ -1285,6 +1364,14 @@ ASTStatement *Parser::parse_statement() {
     // ! but the way we handle semi colons is absolutely terrible.
     // ! it should be much more structured, not just wishy washy.
     return ast_alloc<ASTNoop>();
+  }
+
+  if (tok.type == TType::Import) {
+    return parse_import();
+  }
+
+  if (tok.type == TType::Module) {
+    return parse_module();
   }
 
   if (tok.type == TType::Attribute) {
@@ -1381,85 +1468,6 @@ ASTStatement *Parser::parse_statement() {
 
     end_node(statement, range);
     return statement;
-  }
-
-  if (tok.type == TType::Import) {
-    expect(TType::Import);
-    NODE_ALLOC(ASTImport, import, range, _, this);
-    auto module_name = expect(TType::Identifier).value;
-
-    import->module_name = module_name;
-    if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Mul) {
-      eat();
-      eat();
-      import->tag = ASTImport::IMPORT_ALL;
-    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::LCurly) {
-      eat();
-      eat();
-      while (peek().type != TType::RCurly) {
-        // TODO: support :: imports here too, like
-        // import mod::{submod::symbol, submod::submod::symbol};
-        import->symbols.push_back(expect(TType::Identifier).value);
-        if (peek().type != TType::RCurly) {
-          expect(TType::Comma);
-        }
-      }
-      expect(TType::RCurly);
-      import->tag = ASTImport::IMPORT_NAMED;
-    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier) {
-      // TODO: support :: imports here also, like
-      // import mod::submod::symbol; etc
-      eat();
-      import->symbols.push_back(expect(TType::Identifier).value);
-      import->tag = ASTImport::IMPORT_NAMED;
-    }
-
-    expect(TType::Semi);
-
-    auto symbol = ctx.scope->lookup(module_name);
-
-    if (symbol && symbol->is_module) {
-      printf("importing existing module %s\n", module_name.get_str().c_str());
-      import->scope = ((ASTModule *)symbol->module.declaration)->scope;
-      return import;
-    }
-
-    auto old_scope = ctx.scope;
-    // TODO: fix the wasteful double allocation that may happen here.
-    ctx.set_scope(import->scope = create_child(ctx.root_scope));
-
-    if (this->import(module_name.get_str(), &import->scope)) {
-      while (!peek().is_eof()) {
-        import->statements.push_back(parse_statement());
-      }
-      expect(TType::Eof);
-      states.pop_back();
-      std::filesystem::current_path(states.back().path.parent_path());
-    }
-
-    old_scope->create_module(module_name, import);
-    ctx.set_scope(old_scope);
-
-    return import;
-  }
-
-  if (tok.type == TType::Module) {
-    NODE_ALLOC(ASTModule, module, range, _, this);
-    eat();
-    module->module_name = expect(TType::Identifier).value;
-    expect(TType::LCurly);
-    auto old_scope = ctx.scope;
-    ctx.set_scope();
-    module->scope = ctx.scope;
-    while (peek().type != TType::RCurly) {
-      module->statements.push_back(parse_statement());
-      if (peek().type == TType::Semi) {
-        eat();
-      }
-    }
-    ctx.set_scope(old_scope);
-    expect(TType::RCurly);
-    return module;
   }
 
   /*
@@ -2659,10 +2667,8 @@ bool Parser::import(InternedString name, Scope **scope) {
   }
 
   if (!std::filesystem::exists(filename)) {
-    throw_error(std::format("Couldn't find imported module: {}\nIf you're writing a directory based module, make sure "
-                            "you have a 'lib.ela' as your lib main.",
-                            module_name),
-                {});
+    // *scope = create_child(ctx.root_scope);
+    return false;
   }
 
   import_map.insert({module_name, *scope});
