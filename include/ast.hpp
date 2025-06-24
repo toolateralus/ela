@@ -114,27 +114,7 @@ struct ASTNode {
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
 
-  inline bool is_expr() {
-    switch (get_node_type()) {
-      case AST_NODE_BIN_EXPR:
-      case AST_NODE_UNARY_EXPR:
-      case AST_NODE_LITERAL:
-      case AST_NODE_TYPE:
-      case AST_NODE_TUPLE:
-      case AST_NODE_CALL:
-      case AST_NODE_ARGUMENTS:
-      case AST_NODE_DOT_EXPR:
-      case AST_NODE_INDEX:
-      case AST_NODE_INITIALIZER_LIST:
-      case AST_NODE_CAST:
-      case AST_NODE_RANGE:
-      case AST_NODE_SWITCH:
-      case AST_NODE_PATH:
-        return true;
-      default:
-        return false;
-    }
-  }
+  bool is_expr();
 };
 
 enum AttributeTag {
@@ -251,7 +231,7 @@ struct Conversion {
 
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
-  Conversion implicit_conversion;
+  Conversion conversion;
 };
 
 struct ASTTypeExtension {

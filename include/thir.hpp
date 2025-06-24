@@ -326,6 +326,8 @@ struct THIRGen {
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
+  THIR *make_structural_typing_bitcast(Type *to, const THIR *expr);
+
   THIR *visit_dyn_of(ASTDyn_Of *node);
   THIR *visit_type_of(ASTType_Of *node);
   THIR *visit_block(ASTBlock *node);
@@ -367,7 +369,7 @@ struct THIRGen {
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
   THIR *visit_expr_statement(ASTExprStatement *node);
 
-  THIR *take_address_of(THIR *node, ASTNode *ast);
+  THIR *take_address_of(const THIR *node, ASTNode *ast);
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
   THIR *make_str(const InternedString &value, const SourceRange &src_range);
   THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
@@ -380,132 +382,9 @@ struct THIRGen {
   void visit_destructure(ASTDestructure *node);
   void visit_where_statement(ASTWhereStatement *node);
 
-  THIR *visit_node(ASTNode *node) {
-    switch (node->get_node_type()) {
-      case AST_NODE_STATEMENT_LIST: {
-        for (const auto &ast_stmt : ((ASTStatementList *)node)->statements) {
-          if (auto thir = visit_node(ast_stmt)) {
-            current_statement_list->push_back(thir);
-          }
-        }
-        return nullptr;
-      }
-
-      // These nodes can return many nodes, so they always return void, and push the nodes manually.
-      case AST_NODE_TUPLE_DECONSTRUCTION: {
-        visit_destructure((ASTDestructure *)node);
-        return nullptr;
-      }
-      case AST_NODE_WHERE_STATEMENT: {
-        visit_where_statement((ASTWhereStatement *)node);
-        return nullptr;
-      }
-      case AST_NODE_IMPL: {
-        visit_impl((ASTImpl *)node);
-        return nullptr;
-      }
-      case AST_NODE_IMPORT: {
-        visit_import((ASTImport *)node);
-        return nullptr;
-      }
-      case AST_NODE_MODULE: {
-        visit_module((ASTModule *)node);
-        return nullptr;
-      }
-
-      // Actual nodes.
-      case AST_NODE_IF:
-        return visit_if((ASTIf *)node);
-      case AST_NODE_LAMBDA:
-        return visit_lambda((ASTLambda *)node);
-      case AST_NODE_BIN_EXPR:
-        return visit_bin_expr((ASTBinExpr *)node);
-      case AST_NODE_UNARY_EXPR:
-        return visit_unary_expr((ASTUnaryExpr *)node);
-      case AST_NODE_LITERAL:
-        return visit_literal((ASTLiteral *)node);
-      case AST_NODE_PATH:
-        return visit_path((ASTPath *)node);
-      case AST_NODE_TUPLE:
-        return visit_tuple((ASTTuple *)node);
-      case AST_NODE_CALL:
-        return visit_call((ASTCall *)node);
-      case AST_NODE_METHOD_CALL:
-        return visit_method_call((ASTMethodCall *)node);
-      case AST_NODE_DOT_EXPR:
-        return visit_dot_expr((ASTDotExpr *)node);
-      case AST_NODE_INDEX:
-        return visit_index((ASTIndex *)node);
-      case AST_NODE_INITIALIZER_LIST:
-        return visit_initializer_list((ASTInitializerList *)node);
-      case AST_NODE_SIZE_OF:
-        return visit_size_of((ASTSize_Of *)node);
-      case AST_NODE_TYPE_OF:
-        return visit_type_of((ASTType_Of *)node);
-      case AST_NODE_DYN_OF:
-        return visit_dyn_of((ASTDyn_Of *)node);
-      case AST_NODE_CAST:
-        return visit_cast((ASTCast *)node);
-      case AST_NODE_RANGE:
-        return visit_range((ASTRange *)node);
-      case AST_NODE_SWITCH:
-        return visit_switch((ASTSwitch *)node);
-      case AST_NODE_PATTERN_MATCH:
-        throw_error(
-            "INTERNAL COMPILER ERROR:THIR :: you cannot visit a PatternMatch without explicitly calling into it, with "
-            "the list of statements it needs to unload into.",
-            node->source_range);
-        return nullptr;
-      // Statement nodes
-      case AST_NODE_BLOCK:
-        return visit_block((ASTBlock *)node);
-      case AST_NODE_FUNCTION_DECLARATION:
-        return visit_function_declaration((ASTFunctionDeclaration *)node);
-      case AST_NODE_RETURN:
-        return visit_return((ASTReturn *)node);
-      case AST_NODE_CONTINUE:
-        return visit_continue((ASTContinue *)node);
-      case AST_NODE_BREAK:
-        return visit_break((ASTBreak *)node);
-      case AST_NODE_FOR:
-        return visit_for((ASTFor *)node);
-      case AST_NODE_ELSE:
-        return visit_else((ASTElse *)node);
-      case AST_NODE_WHILE:
-        return visit_while((ASTWhile *)node);
-      case AST_NODE_STRUCT_DECLARATION:
-        return visit_struct_declaration((ASTStructDeclaration *)node);
-      case AST_NODE_ENUM_DECLARATION:
-        return visit_enum_declaration((ASTEnumDeclaration *)node);
-      case AST_NODE_CHOICE_DECLARATION:
-        return visit_choice_declaration((ASTChoiceDeclaration *)node);
-      case AST_NODE_VARIABLE:
-        return visit_variable((ASTVariable *)node);
-      case AST_NODE_EXPR_STATEMENT:
-        return visit_expr_statement((ASTExprStatement *)node);
-      case AST_NODE_DEFER:
-        return visit_defer((ASTDefer *)node);
-      case AST_NODE_PROGRAM:
-        return visit_program((ASTProgram *)node);
-
-      // Ignored nodes.
-      case AST_NODE_NOOP:
-      case AST_NODE_ALIAS:
-      case AST_NODE_TRAIT_DECLARATION:
-        return nullptr;
-
-      case AST_NODE_PARAMS_DECL:
-      case AST_NODE_TYPE:
-      case AST_NODE_PARAM_DECL:
-      case AST_NODE_ARGUMENTS:
-      case AST_NODE_WHERE:
-        throw_error(
-            "INTERNAL COMPILER ERROR: ast node not supported by thir gen. it's likely it just needs to be moved to the "
-            "ignored cases",
-            node->source_range);
-        return nullptr;
-    }
-  }
+  // instantiate conversions bool is needed because we recurse on these to set the
+  // operand of a cast when capturing otherwise implicit casts as explicit casts.
+  THIR *visit_node(ASTNode *node, bool instantiate_conversions = true);
 
   THIR *get_field_struct_list(Type *type);
   THIR *get_methods_list(Type *type);

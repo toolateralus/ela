@@ -2739,3 +2739,26 @@ std::vector<DestructureElement> Parser::parse_destructure_elements() {
   }
   return elements;
 }
+
+bool ASTNode::is_expr() {
+  switch (get_node_type()) {
+    case AST_NODE_BIN_EXPR:
+    case AST_NODE_UNARY_EXPR:
+    case AST_NODE_LITERAL:
+    case AST_NODE_TYPE:
+    case AST_NODE_TUPLE:
+    case AST_NODE_CALL:
+    case AST_NODE_ARGUMENTS:
+    case AST_NODE_DOT_EXPR:
+    case AST_NODE_INDEX:
+    case AST_NODE_INITIALIZER_LIST:
+    case AST_NODE_CAST:
+    case AST_NODE_RANGE:
+    case AST_NODE_SWITCH:
+    case AST_NODE_PATH:
+      return true;
+    // lazy but effective for when we forget to add something to this.
+    default:
+      return dynamic_cast<ASTExpr *>(this);
+  }
+}

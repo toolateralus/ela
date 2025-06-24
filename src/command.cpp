@@ -16,7 +16,6 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 }
 
 int CompileCommand::compile() {
-  
   // TODO: this won't work because we use text based includes.
   // We need to scan the main file, then recursively any imported file, to check for included files that are
   // newer than the binary. This would be a nice little way to run things without recompiling every run.
@@ -60,10 +59,10 @@ int CompileCommand::compile() {
     thir_gen.visit_node(root);
     emitter.emit_reflection_forward_declarations(thir_gen.reflected_upon_types);
 
-    for (const auto [type, gv]: thir_gen.reflected_upon_types) {
+    for (const auto [type, gv] : thir_gen.reflected_upon_types) {
       resolver.emitted_types.insert(type);
       resolver.forward_declared_types.insert(type);
-      resolver.emitted_global_variables.insert((const THIRVariable*)gv.definition);
+      resolver.emitted_global_variables.insert((const THIRVariable *)gv.definition);
     }
 
     resolver.visit_node(thir_gen.get_entry_point());

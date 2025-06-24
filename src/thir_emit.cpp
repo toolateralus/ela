@@ -508,6 +508,18 @@ void Emitter::emit_block(const THIRBlock *thir) {
   indented("}\n");
 }
 
+void Emitter::emit_expr(const THIR *thir) {
+  if (thir->get_node_type() == THIRNodeType::Function) {
+    auto function = static_cast<const THIRFunction *>(thir);
+    code << function->name.get_str();
+  } else if (thir->get_node_type() == THIRNodeType::Variable) {
+    auto variable = static_cast<const THIRVariable *>(thir);
+    code << variable->name.get_str();
+  } else {
+    emit_node(thir);
+  }
+}
+
 void Emitter::emit_variable(const THIRVariable *thir) {
   indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   code << " = ";

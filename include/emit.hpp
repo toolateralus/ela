@@ -39,17 +39,7 @@ struct Emitter {
   // long run.
 
   // this will call emit_node if it doesn't require extra intercepted support to emit correctly.
-  void emit_expr(const THIR *thir) {
-    if (thir->get_node_type() == THIRNodeType::Function) {
-      auto function = static_cast<const THIRFunction *>(thir);
-      code << function->name.get_str();
-    } else if (thir->get_node_type() == THIRNodeType::Variable) {
-      auto variable = static_cast<const THIRVariable *>(thir);
-      code << variable->name.get_str();
-    } else {
-      emit_node(thir);
-    }
-  }
+  void emit_expr(const THIR *thir);
 
   inline void emit_line_directive(const THIR *thir) {
     const static bool is_debugging = compile_command.has_flag("debug");

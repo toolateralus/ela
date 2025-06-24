@@ -81,7 +81,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const SourceRange &
   if (conv_rule == CONVERT_IMPLICIT) {
     expr->resolved_type = to;
     // TODO: would a single expression ever go through multiple implicit conversions?
-    expr->implicit_conversion = {
+    expr->conversion = {
         .has_value = true,
         .from = from_t,
         .to = to_t,
@@ -90,7 +90,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const SourceRange &
 }
 
 void implicit_cast(ASTExpr *expr, Type *to) {
-  expr->implicit_conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
+  expr->conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
   expr->resolved_type = to;
 }
 
@@ -126,7 +126,6 @@ void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
   }
 
   auto type = ctx.scope->create_struct_type(node->name, node->scope, node);
-
   structural_type_table.push_back(type);
 
   StructTypeInfo *info = type->info->as<StructTypeInfo>();
@@ -139,6 +138,7 @@ void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
         .name = member.name,
         .type = member.type->resolved_type,
     });
+    type->info->scope->insert_local_variable(member.name, member.type->resolved_type, nullptr, MUT);
   }
 }
 
@@ -1967,7 +1967,7 @@ void Typer::visit(ASTType *node) {
     } break;
     case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
       node->declaration->accept(this);
-      node->resolved_type = node->declaration->resolved_type;
+      node->resolved_type = global_find_type_id(node->declaration->resolved_type, extensions);
     } break;
     default:
       throw_error("internal compiler error: Invalid type kind", node->source_range);

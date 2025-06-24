@@ -138,7 +138,7 @@ fn print_discriminant(c: Choice) {
 }
 
 impl s32 {
-  fn eq(self, other: #self) -> bool {
+  fn eq(self, other: Self) -> bool {
     // cast to prevent infinite recursion for this basic test.
     return self as s64 == other as s32;
   }
