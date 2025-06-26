@@ -1163,7 +1163,7 @@ struct Parser {
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
-  ASTPath *parse_path();
+  ASTPath *parse_path(bool parsing_import_group = false);
   ASTExpr *parse_primary();
   ASTImpl *parse_impl();
 

@@ -658,11 +658,12 @@ ASTPath::Segment Parser::parse_path_segment() {
   }
 }
 
-ASTPath *Parser::parse_path() {
+ASTPath *Parser::parse_path(bool parsing_import_group) {
   NODE_ALLOC(ASTPath, path, range, defer, this);
   // If we find a double colon, then we continue.
-  while (peek().type != TType::LCurly) {  // this condition may seem strange, but it's purely in place to simplify
-                                          // parsing of import groups.
+  while (!parsing_import_group || (peek().type != TType::LCurly &&
+                                   peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
+                                                                  // place to simplify parsing of import groups.
     path->segments.push_back(parse_path_segment());
     if (peek().type == TType::DoubleColon) {
       eat();
@@ -1315,7 +1316,7 @@ ASTImport::Group Parser::parse_import_group(ASTPath *base_path) {
         eat();
       }
       if (peek().type == TType::Identifier) {
-        group.symbols.push_back(ASTImport::Symbol::Path(parse_path()));
+        group.symbols.push_back(ASTImport::Symbol::Path(parse_path(true)));
       }
     }
   } else {
@@ -1334,10 +1335,13 @@ ASTImport::Group Parser::parse_import_group(ASTPath *base_path) {
     eat();  // {
     while (peek().type != TType::RCurly) {
       if (peek().type == TType::Identifier) {
-        ASTPath *symbol_path = parse_path();
+        ASTPath *symbol_path = parse_path(true);
         // Nested group: symbol::{
         if (peek().type == TType::LCurly) {
           group.symbols.push_back(ASTImport::Symbol::Group(parse_import_group(symbol_path)));
+        } else if (peek().type==TType::Mul) {
+          eat();
+          group.symbols.push_back(ASTImport::Symbol::Group({.is_wildcard=true, .path=symbol_path}));
         } else {
           group.symbols.push_back(ASTImport::Symbol::Path(symbol_path));
         }
