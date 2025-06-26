@@ -73,13 +73,14 @@ struct Typer : VisitorBase {
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
-  std::string getIndent();
   void visit_path_for_call(ASTPath *node);
 
   Type *type_ptr_list = nullptr;
   Type *method_list = nullptr;
   Type *field_list = nullptr;
 
+  void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
+                          const SourceRange &range);
 
   /*
     TODO:
@@ -137,7 +138,7 @@ struct Typer : VisitorBase {
                              std::vector<Type *> generic_args);
 
   void visit_structural_type_declaration(ASTStructDeclaration *node);
-  
+
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<Type *> generic_args = {});
   void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,

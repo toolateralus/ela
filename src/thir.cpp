@@ -1033,11 +1033,12 @@ void THIRGen::visit_impl(ASTImpl *ast) {
   }
 }
 
-void THIRGen::visit_import(ASTImport *ast) {
-  ENTER_SCOPE(ast->scope);
-  for (const auto &ast_stmt : ast->statements) {
-    visit_node(ast_stmt);
-  }
+void THIRGen::visit_import(ASTImport *_) {
+  // ! I don't think this does anything anymore, when an import creates stuff via a file, it's handled in an ASTModule
+  // ENTER_SCOPE(ast->scope);
+  // for (const auto &ast_stmt : ast->statements) {
+  //   visit_node(ast_stmt);
+  // }
 }
 
 void THIRGen::visit_module(ASTModule *ast) {
@@ -1353,7 +1354,7 @@ THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
   deref->operand = ptr_cast;
   deref->type = to;
   deref->source_range = expr->source_range;
-  
+
   return deref;
 }
 
@@ -1368,7 +1369,7 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
 
     if (expr->conversion.to->has_no_extensions() && expr->conversion.from->has_no_extensions() &&
         (expr->conversion.to->is_kind(TYPE_STRUCT) || expr->conversion.from->is_kind(TYPE_STRUCT))) {
-      return make_structural_typing_bitcast((Type*)expr->conversion.to, result);
+      return make_structural_typing_bitcast((Type *)expr->conversion.to, result);
     }
 
     THIR_ALLOC(THIRCast, cast, node);

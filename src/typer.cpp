@@ -1809,37 +1809,6 @@ void Typer::visit(ASTCall *node) {
   node->resolved_type = info->return_type;
 }
 
-void Typer::visit(ASTImport *node) {
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  node->scope->name = node->module_name;
-  for (auto statement : node->statements) {
-    statement->accept(this);
-  }
-  ctx.set_scope(old_scope);
-  switch (node->tag) {
-    case ASTImport::IMPORT_NORMAL:
-      // do nothing
-      break;
-    case ASTImport::IMPORT_ALL: {
-      for (const auto &symbol : node->scope->symbols) {
-        ctx.scope->symbols.insert(symbol);
-      }
-    } break;
-    case ASTImport::IMPORT_NAMED: {
-      for (const auto &symbol : node->symbols) {
-        if (node->scope->local_lookup(symbol)) {
-          ctx.scope->symbols[symbol] = *node->scope->local_lookup(symbol);
-        } else {
-          throw_error(std::format("unable to import \"{}\".. not found in module \"{}\"", symbol.get_str(),
-                                  node->module_name.get_str()),
-                      node->source_range);
-        }
-      }
-    } break;
-  }
-}
-
 void Typer::visit(ASTArguments *node) {
   auto type = expected_type;
   FunctionTypeInfo *info = nullptr;
@@ -2606,7 +2575,7 @@ void Typer::visit(ASTAlias *node) {
   }
 
   if (symbol && node->source_node->get_node_type() != AST_NODE_TYPE) {
-    ctx.scope->symbols[node->name] = *symbol.get();
+    ctx.scope->create_reference(ctx.get_symbol_and_scope(node->source_node));
   } else {
     auto type = node->source_node->resolved_type;
     if (type == nullptr) {
@@ -2719,9 +2688,75 @@ void Typer::visit(ASTSize_Of *node) {
   node->resolved_type = u64_type();
 }
 
+void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
+                               const SourceRange &range) {
+  ENTER_SCOPE(module_scope);
+
+  if (group.is_wildcard) {
+    // Import all symbols from the module
+    for (const auto &[name, sym] : module_scope->symbols) {
+      import_scope->create_reference(name, module_scope);
+    }
+    return;
+  }
+
+  for (const auto &symbol : group.symbols) {
+    if (symbol.is_group) {  // Group import
+      Nullable<Symbol> submod_sym = ctx.get_symbol(symbol.group.path);
+      if (!submod_sym || !submod_sym.get()->is_module) {
+        throw_error("submodule '{}' not found in module", range);
+      }
+      auto submod = submod_sym.get();
+      visit_import_group(symbol.group, submod->module.declaration->scope, import_scope, range);
+
+    } else {  // Single symbol import
+      Nullable<Symbol> sym = ctx.get_symbol(symbol.path);
+      InternedString name = symbol.path->segments.back().identifier;
+      if (!sym) {
+        throw_error(std::format("symbol: {} not found in module", name), range);
+      }
+      import_scope->create_reference(name, module_scope);
+    }
+  }
+}
+
+void Typer::visit(ASTImport *node) {
+  const Nullable<Symbol> the_module_nullable = ctx.get_symbol(node->root_group.path);
+
+  if (!the_module_nullable) {
+    throw_error("unable to find module", node->source_range);
+  }
+
+  const Symbol *the_module = the_module_nullable.get();
+
+  // This means that we imported a single symbol.
+  if (!the_module->is_module) {
+    ctx.scope->create_reference(ctx.get_symbol_and_scope(node->root_group.path));
+    return;
+  }
+
+  Scope *module_scope = the_module->module.declaration->scope;
+
+  // propagate the module itself, when we add symbols from it, so we can access it like
+  /*
+    `
+      import api::{
+        subapi::{
+          ...
+        }
+      };
+    `
+    then we can do
+      `api::subapi::function();`
+    or whatever.
+  */
+  ctx.scope->symbols[the_module->name] = *the_module;
+
+  visit_import_group(node->root_group, module_scope, ctx.scope, node->source_range);
+}
+
 void Typer::visit(ASTModule *node) {
   auto old_scope = ctx.scope;
-
   ctx.set_scope(node->scope);
   node->scope->name = node->module_name;
   for (auto statement : node->statements) {
@@ -2736,13 +2771,12 @@ void Typer::visit(ASTModule *node) {
     for (auto &[name, sym] : node->scope->symbols) {
       if (mod->scope->local_lookup(name)) {
         throw_error(
-            "redefinition of symbol in module append declaration (a module already existed, and we were adding "
+            "redefinition of symbol in appending module declaration (a module already existed, and we were adding "
             "symbols to it.)",
             node->source_range);
       }
       mod->scope->symbols[name] = sym;
     }
-
   } else {
     ctx.scope->create_module(node->module_name, node);
   }

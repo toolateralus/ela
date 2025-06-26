@@ -171,29 +171,96 @@ struct ASTModule : ASTStatement {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTImport : ASTModule {
-  // We need to have a more complex way to represent these 'symbols', which could be any of these,
-  // where we could be ::{}, ::*, or ::identifier.
+struct ASTPath;
+struct ASTImport : ASTStatement {
+  struct Symbol;
   /*
-    import fs::{
-      file::*,
-      directory::prober::*,
-      directory::Directory::open,
-    };
-
-    import fs::file::*;
-
-    import fs::*;
+    see the examples inside of group for more basic info.
+    for an advanced example:
+    `import fmt::{FormatOptions, submodule::{A, B, C}};`
+    there are TWO groups!
   */
+  struct Group {
+    bool is_wildcard = false;
+    /*
+      The name of the module.
+      for the example: `import fmt;`
+      { fmt; } is the only group
+       and 'fmt' is the name,
+    */
+    ASTPath *path;
+    /*
+      the specific symbols, whether they're submodules, functions, types, globals etc, that are being imported.
 
-  std::vector<InternedString> symbols;
+      for an example:
 
-  enum {
-    IMPORT_NORMAL,
-    IMPORT_ALL,
-    IMPORT_NAMED,
-  } tag = IMPORT_NAMED;
+      `import fmt::{format, FormatOptions, Formatter::some_constant};`
 
+      `fmt` is the 'name`
+
+      `format`
+      `FormatOptions`
+      and
+      `Formatter::some_constant`
+      are all 'symbols' that are being imported.
+
+      this example, would be one group.
+
+      groups can and are often recursive, see the example above (on the Group def) for more info.
+    */
+    std::vector<Symbol> symbols;
+  };
+  struct Symbol {
+    bool is_group = false;
+    union {
+      ASTPath *path;
+      Group group;
+    };
+    Symbol() {}
+    ~Symbol() {}
+    Symbol(const Symbol &other) {
+      is_group = other.is_group;
+      if (is_group) {
+        new (&group) struct Group(other.group);
+      } else {
+        path = other.path;
+      }
+    }
+    Symbol &operator=(const Symbol &other) {
+      if (this != &other) {
+        if (is_group && other.is_group) {
+          group = other.group;
+        } else if (!is_group && !other.is_group) {
+          path = other.path;
+        } else {
+          if (is_group) {
+            group.~Group();
+          }
+          is_group = other.is_group;
+          if (is_group) {
+            new (&group) struct Group(other.group);
+          } else {
+            path = other.path;
+          }
+        }
+      }
+      return *this;
+    }
+    static Symbol Path(ASTPath *path) {
+      Symbol symbol;
+      symbol.is_group = false;
+      symbol.path = path;
+      return symbol;
+    }
+    static Symbol Group(Group group) {
+      Symbol symbol;
+      symbol.is_group = true;
+      new (&symbol.group) struct Group(group);
+      return symbol;
+    }
+  };
+
+  Group root_group;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPORT; }
   void accept(VisitorBase *visitor) override;
 };
@@ -1064,7 +1131,9 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
+  
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
+  ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
@@ -1164,3 +1233,4 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
+

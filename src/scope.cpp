@@ -79,15 +79,33 @@ Symbol *Scope::local_lookup(const InternedString &name) {
   if (symbols.contains(name)) {
     return &symbols[name];
   }
+
+  for (auto it = references.begin(); it != references.end(); ++it) {
+    if (it->name == name) {
+      return it->original_scope->local_lookup(name);
+    }
+  }
+
   return nullptr;
 }
 
 Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];
-  } else if (parent) {
-    return parent->lookup(name);
   }
+
+  for (auto it = references.begin(); it != references.end(); ++it) {
+    if (it->name == name) {
+      return it->original_scope->local_lookup(name);
+    }
+  }
+
+  if (parent) {
+    if (auto symbol = parent->lookup(name)) {
+      return symbol;
+    }
+  }
+
   return nullptr;
 }
 
@@ -112,4 +130,11 @@ size_t Scope::methods_count() const {
     }
   }
   return methods;
+}
+
+void Scope::create_reference(SymbolScopePair pair) {
+  references.push_back({
+    pair.scope,
+    pair.sybmol->name,
+  });
 }
