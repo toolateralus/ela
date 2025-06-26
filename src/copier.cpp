@@ -568,7 +568,7 @@ ASTImport::Group ASTCopier::copy_import_group(ASTImport::Group &group) {
     if (symbol.is_group) {
       new_group.symbols.push_back(ASTImport::Symbol::Group(copy_import_group(symbol.group)));
     } else {
-      new_group.symbols.push_back(ASTImport::Symbol::Path((ASTPath *)copy_node(symbol.path)));
+      new_group.symbols.push_back(ASTImport::Symbol::Path((ASTPath *)copy_node(symbol.path), symbol.alias));
     }
   }
   return new_group;

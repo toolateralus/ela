@@ -1316,7 +1316,13 @@ ASTImport::Group Parser::parse_import_group(ASTPath *base_path) {
         eat();
       }
       if (peek().type == TType::Identifier) {
-        group.symbols.push_back(ASTImport::Symbol::Path(parse_path(true)));
+        auto path = parse_path(true);
+        if (peek().type == TType::As) {
+          eat();
+          group.symbols.push_back(ASTImport::Symbol::Path(path, expect(TType::Identifier).value));
+        } else {
+          group.symbols.push_back(ASTImport::Symbol::Path(path));
+        }
       }
     }
   } else {
@@ -1339,11 +1345,16 @@ ASTImport::Group Parser::parse_import_group(ASTPath *base_path) {
         // Nested group: symbol::{
         if (peek().type == TType::LCurly) {
           group.symbols.push_back(ASTImport::Symbol::Group(parse_import_group(symbol_path)));
-        } else if (peek().type==TType::Mul) {
+        } else if (peek().type == TType::Mul) {
           eat();
-          group.symbols.push_back(ASTImport::Symbol::Group({.is_wildcard=true, .path=symbol_path}));
+          group.symbols.push_back(ASTImport::Symbol::Group({.is_wildcard = true, .path = symbol_path}));
         } else {
-          group.symbols.push_back(ASTImport::Symbol::Path(symbol_path));
+          if (peek().type == TType::As) {
+            eat();
+            group.symbols.push_back(ASTImport::Symbol::Path(symbol_path, expect(TType::Identifier).value));
+          } else {
+            group.symbols.push_back(ASTImport::Symbol::Path(symbol_path));
+          }
         }
       }
       if (peek().type != TType::RCurly) {

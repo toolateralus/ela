@@ -2692,7 +2692,7 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
                                const SourceRange &range) {
   ENTER_SCOPE(module_scope);
   import_scope->create_reference(ctx.get_symbol_and_scope(group.path));
-  
+
   if (group.is_wildcard) {
     // Import all symbols from the module
     for (const auto &[name, sym] : module_scope->symbols) {
@@ -2715,6 +2715,9 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
       InternedString name = symbol.path->segments.back().identifier;
       if (!sym) {
         throw_error(std::format("symbol: {} not found in module", name), range);
+      }
+      if (symbol.has_alias) {
+        import_scope->create_reference(name, module_scope, symbol.alias);
       }
       import_scope->create_reference(name, module_scope);
     }

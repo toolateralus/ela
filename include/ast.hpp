@@ -213,7 +213,11 @@ struct ASTImport : ASTStatement {
   struct Symbol {
     bool is_group = false;
     union {
-      ASTPath *path;
+      struct {
+        ASTPath *path;
+        InternedString alias;
+        bool has_alias = false;
+      };
       Group group;
     };
     Symbol() {}
@@ -224,6 +228,8 @@ struct ASTImport : ASTStatement {
         new (&group) struct Group(other.group);
       } else {
         path = other.path;
+        alias = other.alias;
+        has_alias = other.has_alias;
       }
     }
     Symbol &operator=(const Symbol &other) {
@@ -232,6 +238,8 @@ struct ASTImport : ASTStatement {
           group = other.group;
         } else if (!is_group && !other.is_group) {
           path = other.path;
+          alias = other.alias;
+          has_alias = other.has_alias;
         } else {
           if (is_group) {
             group.~Group();
@@ -241,6 +249,8 @@ struct ASTImport : ASTStatement {
             new (&group) struct Group(other.group);
           } else {
             path = other.path;
+            alias = other.alias;
+            has_alias = other.has_alias;
           }
         }
       }
@@ -250,6 +260,15 @@ struct ASTImport : ASTStatement {
       Symbol symbol;
       symbol.is_group = false;
       symbol.path = path;
+      symbol.has_alias = false;
+      return symbol;
+    }
+    static Symbol Path(ASTPath *path, InternedString alias) {
+      Symbol symbol;
+      symbol.is_group = false;
+      symbol.has_alias = true;
+      symbol.path = path;
+      symbol.alias = alias;
       return symbol;
     }
     static Symbol Group(Group group) {
@@ -1131,7 +1150,6 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
-  
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_statement();
@@ -1233,4 +1251,3 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
-

@@ -81,8 +81,8 @@ Symbol *Scope::local_lookup(const InternedString &name) {
   }
 
   for (auto it = references.begin(); it != references.end(); ++it) {
-    if (it->name == name) {
-      return it->original_scope->local_lookup(name);
+    if (it->original_name == name || it->alias_name == name) {
+      return it->scope->local_lookup(it->original_name);
     }
   }
 
@@ -95,15 +95,13 @@ Symbol *Scope::lookup(const InternedString &name) {
   }
 
   for (auto it = references.begin(); it != references.end(); ++it) {
-    if (it->name == name) {
-      return it->original_scope->local_lookup(name);
+    if (it->original_name == name || it->alias_name == name) {
+      return it->scope->local_lookup(it->original_name);
     }
   }
 
   if (parent) {
-    if (auto symbol = parent->lookup(name)) {
-      return symbol;
-    }
+    return parent->lookup(name);
   }
 
   return nullptr;
@@ -133,8 +131,8 @@ size_t Scope::methods_count() const {
 }
 
 void Scope::create_reference(SymbolScopePair pair) {
-  references.push_back({
-    pair.scope,
-    pair.sybmol->name,
+  references.insert({
+    .scope=pair.scope,
+    .original_name=pair.symbol->name,
   });
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -374,16 +375,24 @@ struct ASTFunctionDeclaration;
 struct ASTTraitDeclaration;
 
 struct SymbolReference {
-  Scope *original_scope;
-  InternedString name;
+  Scope *scope;
+  InternedString original_name;
+  InternedString alias_name;
+  bool operator==(const SymbolReference &other) const { return original_name == other.original_name; }
+
+  bool operator<(const SymbolReference &other) const {
+    return original_name < other.original_name;
+  }
 };
+
 struct SymbolScopePair {
-  Symbol *sybmol;
+  Symbol *symbol;
   Scope *scope;
   bool has_value = false;
 };
+
 struct Scope {
-  std::vector<SymbolReference> references;
+  std::set<SymbolReference> references;
   std::unordered_map<InternedString, Symbol> symbols = {};
   InternedString name = "";
   Scope *parent = nullptr;
@@ -530,7 +539,12 @@ struct Scope {
 
   void create_reference(SymbolScopePair pair);
   inline void create_reference(const InternedString &name, Scope *original_scope) {
-    references.push_back({original_scope, name});
+    references.insert({original_scope, name});
+  }
+
+  void create_reference(const InternedString &original_name, Scope *original_scope,
+                        const InternedString &aliased_name) {
+    references.insert({.scope = original_scope, .original_name = original_name, .alias_name = aliased_name});
   }
 };
 
@@ -572,7 +586,7 @@ struct Context {
       return {};
     }
     return {
-        .sybmol = symbol.get(),
+        .symbol = symbol.get(),
         .scope = scope.get(),
         .has_value = true,
     };
