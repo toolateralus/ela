@@ -2691,7 +2691,8 @@ void Typer::visit(ASTSize_Of *node) {
 void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
                                const SourceRange &range) {
   ENTER_SCOPE(module_scope);
-
+  import_scope->create_reference(ctx.get_symbol_and_scope(group.path));
+  
   if (group.is_wildcard) {
     // Import all symbols from the module
     for (const auto &[name, sym] : module_scope->symbols) {
