@@ -2,6 +2,7 @@
 #include <deque>
 #include <format>
 #include <string>
+#include <type_traits>
 #include "ast.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
@@ -370,7 +371,7 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
 }
 
 THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
-                          const std::vector<std::pair<InternedString, ASTExpr *>> &key_values) {
+                          std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
 
   // TODO: might need more ignored things here
@@ -385,6 +386,8 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
   thir->source_range = source_range;
   thir->type = type;
 
+  bool type_is_union = type->is_kind(TYPE_STRUCT) && type->info->as<StructTypeInfo>()->is_union;
+
   for (const auto &member : info->members) {
     ASTExpr *initializer = nullptr;
     for (const auto &[key, value] : key_values) {
@@ -393,16 +396,52 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
         break;
       }
     }
-    const auto is_non_ptr_non_union_struct = member.type->is_kind(TYPE_STRUCT) && member.type->has_no_extensions() &&
-                                             !member.type->info->as<StructTypeInfo>()->is_union;
+
+    bool is_extensionless_non_union_struct = false;
+    bool is_anonymous_subtype = false;
+    if (member.type->is_kind(TYPE_STRUCT)) {
+      const StructTypeInfo *info = member.type->info->as<StructTypeInfo>();
+      is_extensionless_non_union_struct = member.type->has_no_extensions() && !info->is_union;
+      is_anonymous_subtype = member.type->has_no_extensions() && info->is_anonymous;
+    }
+
+    if (is_anonymous_subtype) {
+      const TypeInfo *info = member.type->info;
+      std::vector<std::pair<InternedString, ASTExpr *>> subinitializer_elements;
+
+      // Collect keys for the anonymous subtype
+      for (const auto &[key, value] : key_values) {
+        if (info->find_member(key)) {
+          subinitializer_elements.push_back({key, value});
+        }
+      }
+
+      if (subinitializer_elements.empty()) {
+        continue;
+      }
+
+      for (const auto &[subkey, _] : subinitializer_elements) {
+        std::erase_if(key_values, [&](const auto &kv) { return kv.first == subkey; });
+      }
+
+      auto *initialization =
+          (THIRAggregateInitializer *)initialize(source_range, member.type, subinitializer_elements);
+      
+      // get the keys from that initializer and drop them in here.
+      for (auto &[key, value] : initialization->key_values) {
+        thir->key_values.push_back({key, value});
+      }
+
+      continue;
+    }
 
     if (initializer) {
       thir->key_values.push_back({member.name, visit_node(initializer)});
     } else if (member.default_value) {
       thir->key_values.push_back({member.name, visit_node(member.default_value.get())});
-    } else if (is_non_ptr_non_union_struct) {
+    } else if (is_extensionless_non_union_struct) {
       thir->key_values.push_back({member.name, initialize(source_range, member.type, {})});
-    } else {
+    } else if (!type_is_union) {
       THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, empty_init);
       empty_init->source_range = source_range;
       empty_init->type = type;
@@ -474,6 +513,21 @@ THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
   thir->operand = visit_node(ast->expression);
   thir->type = ast->target_type->resolved_type;
+
+  if (thir->operand->type->is_kind(TYPE_STRUCT) && thir->operand->type->info->as<StructTypeInfo>()->is_structural) {
+    auto addr = take_address_of(thir->operand, ast);
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRCast, ptr_cast);
+    ptr_cast->type = thir->type->take_pointer_to(true);
+    ptr_cast->operand = addr;
+
+    THIR_ALLOC(THIRUnaryExpr, deref, ast);
+    deref->op = TType::Mul;
+    deref->operand = ptr_cast;
+    deref->type = thir->type;
+    return deref;
+  }
+
   return thir;
 }
 
