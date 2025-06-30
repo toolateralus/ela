@@ -1,7 +1,5 @@
 #include "ast.hpp"
-
 #include <cassert>
-#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -660,10 +658,12 @@ ASTPath::Segment Parser::parse_path_segment() {
   }
 }
 
-ASTPath *Parser::parse_path() {
+ASTPath *Parser::parse_path(bool parsing_import_group) {
   NODE_ALLOC(ASTPath, path, range, defer, this);
   // If we find a double colon, then we continue.
-  while (true) {
+  while (!parsing_import_group || (peek().type != TType::LCurly &&
+                                   peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
+                                                                  // place to simplify parsing of import groups.
     path->segments.push_back(parse_path_segment());
     if (peek().type == TType::DoubleColon) {
       eat();
@@ -1253,6 +1253,120 @@ ASTIf *Parser::parse_if() {
   return node;
 }
 
+ASTModule *Parser::parse_module() {
+  NODE_ALLOC(ASTModule, the_module, range, _, this);
+  the_module->scope = create_child(ctx.scope);
+  ENTER_SCOPE(the_module->scope);
+  expect(TType::Module);
+  the_module->module_name = expect(TType::Identifier).value;
+  expect(TType::LCurly);
+  while (peek().type != TType::RCurly) {
+    the_module->statements.push_back(parse_statement());
+    if (peek().type == TType::Semi) {
+      eat();
+    }
+  }
+  expect(TType::RCurly);
+  return the_module;
+}
+
+ASTImport *Parser::parse_import() {
+  expect(TType::Import);
+  NODE_ALLOC(ASTImport, import, range, _, this);
+  // Parse the root group (could be a single path, a group, or a wildcard, or a recursive set of groups.)
+  import->root_group = parse_import_group(nullptr);
+
+  ASTPath *path = import->root_group.path;
+  ASTPath::Segment root_segment = path->segments[0];
+
+  // Import stuff from files
+  Scope *scope = create_child(ctx.scope);
+  ENTER_SCOPE(scope)
+
+  if (this->import(root_segment.identifier, &scope)) {
+    NODE_ALLOC(ASTModule, the_module, range, _, this)
+    the_module->module_name = root_segment.identifier;
+    the_module->scope = scope;
+    while (!peek().is_eof()) {
+      the_module->statements.push_back(parse_statement());
+    }
+    current_statement_list->push_back(the_module);
+    expect(TType::Eof);
+    states.pop_back();
+    std::filesystem::current_path(states.back().path.parent_path());
+  }
+
+  expect(TType::Semi);
+  return import;
+}
+
+ASTImport::Group Parser::parse_import_group(ASTPath *base_path) {
+  ASTImport::Group group;
+  group.is_wildcard = false;
+
+  if (!base_path) {
+    NODE_ALLOC(ASTPath, path, range, _, this);
+    group.path = path;
+
+    if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::Semi) {
+      path->push_segment(eat().value);
+    } else if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon) {
+      while (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon) {
+        path->push_segment(expect(TType::Identifier).value);
+        eat();
+      }
+      if (peek().type == TType::Identifier) {
+        auto path = parse_path(true);
+        if (peek().type == TType::As) {
+          eat();
+          group.symbols.push_back(ASTImport::Symbol::Path(path, expect(TType::Identifier).value));
+        } else {
+          group.symbols.push_back(ASTImport::Symbol::Path(path));
+        }
+      }
+    }
+  } else {
+    group.path = base_path;
+  }
+
+  // Handle wildcard: ::*
+  if (peek().type == TType::Mul) {
+    eat();  // *
+    group.is_wildcard = true;
+    return group;
+  }
+
+  // Handle group: ::{ ... }
+  if (peek().type == TType::LCurly) {
+    eat();  // {
+    while (peek().type != TType::RCurly) {
+      if (peek().type == TType::Identifier) {
+        ASTPath *symbol_path = parse_path(true);
+        // Nested group: symbol::{
+        if (peek().type == TType::LCurly) {
+          group.symbols.push_back(ASTImport::Symbol::Group(parse_import_group(symbol_path)));
+        } else if (peek().type == TType::Mul) {
+          eat();
+          group.symbols.push_back(ASTImport::Symbol::Group({.is_wildcard = true, .path = symbol_path}));
+        } else {
+          if (peek().type == TType::As) {
+            eat();
+            group.symbols.push_back(ASTImport::Symbol::Path(symbol_path, expect(TType::Identifier).value));
+          } else {
+            group.symbols.push_back(ASTImport::Symbol::Path(symbol_path));
+          }
+        }
+      }
+      if (peek().type != TType::RCurly) {
+        expect(TType::Comma);
+      }
+    }
+    expect(TType::RCurly);
+  }
+
+  return group;
+}
+
 void Parser::parse_destructure_element_value_semantic(DestructureElement &destruct) {
   if (peek().type == TType::And) {
     expect(TType::And);
@@ -1285,6 +1399,14 @@ ASTStatement *Parser::parse_statement() {
     // ! but the way we handle semi colons is absolutely terrible.
     // ! it should be much more structured, not just wishy washy.
     return ast_alloc<ASTNoop>();
+  }
+
+  if (tok.type == TType::Import) {
+    return parse_import();
+  }
+
+  if (tok.type == TType::Module) {
+    return parse_module();
   }
 
   if (tok.type == TType::Attribute) {
@@ -1381,85 +1503,6 @@ ASTStatement *Parser::parse_statement() {
 
     end_node(statement, range);
     return statement;
-  }
-
-  if (tok.type == TType::Import) {
-    expect(TType::Import);
-    NODE_ALLOC(ASTImport, import, range, _, this);
-    auto module_name = expect(TType::Identifier).value;
-
-    import->module_name = module_name;
-    if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Mul) {
-      eat();
-      eat();
-      import->tag = ASTImport::IMPORT_ALL;
-    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::LCurly) {
-      eat();
-      eat();
-      while (peek().type != TType::RCurly) {
-        // TODO: support :: imports here too, like
-        // import mod::{submod::symbol, submod::submod::symbol};
-        import->symbols.push_back(expect(TType::Identifier).value);
-        if (peek().type != TType::RCurly) {
-          expect(TType::Comma);
-        }
-      }
-      expect(TType::RCurly);
-      import->tag = ASTImport::IMPORT_NAMED;
-    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier) {
-      // TODO: support :: imports here also, like
-      // import mod::submod::symbol; etc
-      eat();
-      import->symbols.push_back(expect(TType::Identifier).value);
-      import->tag = ASTImport::IMPORT_NAMED;
-    }
-
-    expect(TType::Semi);
-
-    auto symbol = ctx.scope->lookup(module_name);
-
-    if (symbol && symbol->is_module) {
-      printf("importing existing module %s\n", module_name.get_str().c_str());
-      import->scope = ((ASTModule *)symbol->module.declaration)->scope;
-      return import;
-    }
-
-    auto old_scope = ctx.scope;
-    // TODO: fix the wasteful double allocation that may happen here.
-    ctx.set_scope(import->scope = create_child(ctx.root_scope));
-
-    if (this->import(module_name.get_str(), &import->scope)) {
-      while (!peek().is_eof()) {
-        import->statements.push_back(parse_statement());
-      }
-      expect(TType::Eof);
-      states.pop_back();
-      std::filesystem::current_path(states.back().path.parent_path());
-    }
-
-    old_scope->create_module(module_name, import);
-    ctx.set_scope(old_scope);
-
-    return import;
-  }
-
-  if (tok.type == TType::Module) {
-    NODE_ALLOC(ASTModule, module, range, _, this);
-    eat();
-    module->module_name = expect(TType::Identifier).value;
-    expect(TType::LCurly);
-    auto old_scope = ctx.scope;
-    ctx.set_scope();
-    module->scope = ctx.scope;
-    while (peek().type != TType::RCurly) {
-      module->statements.push_back(parse_statement());
-      if (peek().type == TType::Semi) {
-        eat();
-      }
-    }
-    ctx.set_scope(old_scope);
-    expect(TType::RCurly);
-    return module;
   }
 
   /*
@@ -2627,22 +2670,25 @@ void Parser::fill_buffer_if_needed() {
 }
 
 bool Parser::import(InternedString name, Scope **scope) {
-  std::string ela_lib_path;
-  if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
-    ela_lib_path = env_p;
-  } else {
+  static std::string ela_lib_path = ({
+    std::string path;
+    if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
+      path = env_p;
+    } else {
 #ifdef _WIN32
-    ela_lib_path = "C:\\Program Files\\ela";
+      path = "C:\\Program Files\\ela";
 #else
-    ela_lib_path = "/usr/local/lib/ela";
+      path = "/usr/local/lib/ela";
 #endif
-  }
+    }
+    path;
+  });
 
-  auto module_name = name;
-  auto filename = std::filesystem::path(ela_lib_path) / name.get_str();
+  std::string module_name = name.get_str();
+  std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();
 
-  if (std::filesystem::exists(module_name.get_str()) || std::filesystem::exists(module_name.get_str() + ".ela")) {
-    filename = module_name.get_str();
+  if (std::filesystem::exists(module_name) || std::filesystem::exists(module_name + ".ela")) {
+    filename = module_name;
   }
 
   // Right now, we just return false if we're double including.
@@ -2659,10 +2705,7 @@ bool Parser::import(InternedString name, Scope **scope) {
   }
 
   if (!std::filesystem::exists(filename)) {
-    throw_error(std::format("Couldn't find imported module: {}\nIf you're writing a directory based module, make sure "
-                            "you have a 'lib.ela' as your lib main.",
-                            module_name),
-                {});
+    return false;
   }
 
   import_map.insert({module_name, *scope});
@@ -2738,4 +2781,27 @@ std::vector<DestructureElement> Parser::parse_destructure_elements() {
     elements.push_back(element);
   }
   return elements;
+}
+
+bool ASTNode::is_expr() {
+  switch (get_node_type()) {
+    case AST_NODE_BIN_EXPR:
+    case AST_NODE_UNARY_EXPR:
+    case AST_NODE_LITERAL:
+    case AST_NODE_TYPE:
+    case AST_NODE_TUPLE:
+    case AST_NODE_CALL:
+    case AST_NODE_ARGUMENTS:
+    case AST_NODE_DOT_EXPR:
+    case AST_NODE_INDEX:
+    case AST_NODE_INITIALIZER_LIST:
+    case AST_NODE_CAST:
+    case AST_NODE_RANGE:
+    case AST_NODE_SWITCH:
+    case AST_NODE_PATH:
+      return true;
+    // lazy but effective for when we forget to add something to this.
+    default:
+      return dynamic_cast<ASTExpr *>(this);
+  }
 }

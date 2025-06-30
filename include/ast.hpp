@@ -114,27 +114,7 @@ struct ASTNode {
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
 
-  inline bool is_expr() {
-    switch (get_node_type()) {
-      case AST_NODE_BIN_EXPR:
-      case AST_NODE_UNARY_EXPR:
-      case AST_NODE_LITERAL:
-      case AST_NODE_TYPE:
-      case AST_NODE_TUPLE:
-      case AST_NODE_CALL:
-      case AST_NODE_ARGUMENTS:
-      case AST_NODE_DOT_EXPR:
-      case AST_NODE_INDEX:
-      case AST_NODE_INITIALIZER_LIST:
-      case AST_NODE_CAST:
-      case AST_NODE_RANGE:
-      case AST_NODE_SWITCH:
-      case AST_NODE_PATH:
-        return true;
-      default:
-        return false;
-    }
-  }
+  bool is_expr();
 };
 
 enum AttributeTag {
@@ -185,35 +165,121 @@ inline static std::string block_flags_to_string(int flags) {
 
 struct ASTModule : ASTStatement {
   InternedString module_name;
-  std::vector<ASTStatement *> statements;
+  std::vector<ASTNode *> statements;
   Scope *scope;
   ASTNodeType get_node_type() const override { return AST_NODE_MODULE; }
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTImport : ASTModule {
-  // We need to have a more complex way to represent these 'symbols', which could be any of these,
-  // where we could be ::{}, ::*, or ::identifier.
+struct ASTPath;
+struct ASTImport : ASTStatement {
+  struct Symbol;
   /*
-    import fs::{
-      file::*,
-      directory::prober::*,
-      directory::Directory::open,
-    };
-
-    import fs::file::*;
-
-    import fs::*;
+    see the examples inside of group for more basic info.
+    for an advanced example:
+    `import fmt::{FormatOptions, submodule::{A, B, C}};`
+    there are TWO groups!
   */
+  struct Group {
+    bool is_wildcard = false;
+    /*
+      The name of the module.
+      for the example: `import fmt;`
+      { fmt; } is the only group
+       and 'fmt' is the name,
+    */
+    ASTPath *path;
+    /*
+      the specific symbols, whether they're submodules, functions, types, globals etc, that are being imported.
 
-  std::vector<InternedString> symbols;
+      for an example:
 
-  enum {
-    IMPORT_NORMAL,
-    IMPORT_ALL,
-    IMPORT_NAMED,
-  } tag = IMPORT_NAMED;
+      `import fmt::{format, FormatOptions, Formatter::some_constant};`
 
+      `fmt` is the 'name`
+
+      `format`
+      `FormatOptions`
+      and
+      `Formatter::some_constant`
+      are all 'symbols' that are being imported.
+
+      this example, would be one group.
+
+      groups can and are often recursive, see the example above (on the Group def) for more info.
+    */
+    std::vector<Symbol> symbols;
+  };
+  struct Symbol {
+    bool is_group = false;
+    union {
+      struct {
+        ASTPath *path;
+        InternedString alias;
+        bool has_alias = false;
+      };
+      Group group;
+    };
+    Symbol() {}
+    ~Symbol() {}
+    Symbol(const Symbol &other) {
+      is_group = other.is_group;
+      if (is_group) {
+        new (&group) struct Group(other.group);
+      } else {
+        path = other.path;
+        alias = other.alias;
+        has_alias = other.has_alias;
+      }
+    }
+    Symbol &operator=(const Symbol &other) {
+      if (this != &other) {
+        if (is_group && other.is_group) {
+          group = other.group;
+        } else if (!is_group && !other.is_group) {
+          path = other.path;
+          alias = other.alias;
+          has_alias = other.has_alias;
+        } else {
+          if (is_group) {
+            group.~Group();
+          }
+          is_group = other.is_group;
+          if (is_group) {
+            new (&group) struct Group(other.group);
+          } else {
+            path = other.path;
+            alias = other.alias;
+            has_alias = other.has_alias;
+          }
+        }
+      }
+      return *this;
+    }
+    static Symbol Path(ASTPath *path) {
+      Symbol symbol;
+      symbol.is_group = false;
+      symbol.path = path;
+      symbol.has_alias = false;
+      return symbol;
+    }
+    static Symbol Path(ASTPath *path, InternedString alias) {
+      Symbol symbol;
+      symbol.is_group = false;
+      symbol.has_alias = true;
+      symbol.path = path;
+      symbol.alias = alias;
+      return symbol;
+    }
+    static Symbol Group(Group group) {
+      Symbol symbol;
+      symbol.is_group = true;
+      new (&symbol.group) struct Group(group);
+      return symbol;
+    }
+  };
+
+  Group root_group;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPORT; }
   void accept(VisitorBase *visitor) override;
 };
@@ -223,8 +289,7 @@ struct ASTBlock : ASTStatement {
   // of course used for defer.
   bool has_defer = false;
   int defer_count = 0;
-
-  size_t temp_iden_idx;
+  size_t temp_iden_idx = 0;
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -253,7 +318,7 @@ struct Conversion {
 
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
-  Conversion implicit_conversion;
+  Conversion conversion;
 };
 
 struct ASTTypeExtension {
@@ -315,7 +380,7 @@ struct ASTType : ASTExpr {
     TUPLE,
     FUNCTION,
     SELF,
-    STRUCTURAL_DECLARATIVE_ASCRIPTION, // something like ` x: struct { x: f32, y: f32 } `
+    STRUCTURAL_DECLARATIVE_ASCRIPTION,  // something like ` x: struct { x: f32, y: f32 } `
   } kind = NORMAL;
 
   union {
@@ -1086,12 +1151,15 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
-  ASTIf *parse_if();
-  ASTProgram *parse_program();
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
+  ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
+  ASTImport *parse_import();
+  ASTModule *parse_module();
+  ASTIf *parse_if();
+  ASTProgram *parse_program();
 
   ASTTraitDeclaration *parse_trait_declaration();
   ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node);
@@ -1114,7 +1182,7 @@ struct Parser {
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
-  ASTPath *parse_path();
+  ASTPath *parse_path(bool parsing_import_group = false);
   ASTExpr *parse_primary();
   ASTImpl *parse_impl();
 

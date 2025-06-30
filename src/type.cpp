@@ -204,6 +204,10 @@ StructuralTypingRule get_structural_typing_rule(const Type *from, const Type *to
     return StructuralTypingRule::Inapplicable();
   }
 
+  if (!to->extensions_equals(from->extensions)) {
+    return StructuralTypingRule::Inapplicable();
+  }
+
   for (size_t i = 0; i < to_members.size(); ++i) {
     const auto &to_member = to_members[i];
     const auto &from_member = from_members[i];
@@ -278,13 +282,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     auto conversion = type_conversion_rule(from_elem, to_elem);
     if (conversion == CONVERT_NONE_NEEDED ||
         (conversion == CONVERT_IMPLICIT &&
-         (from->pointer_depth() == to->pointer_depth()))) {  // ! I ADDED PARENTHESIS HERE THIS MAY CAUSE BUGS
+         (from->pointer_depth() == to->pointer_depth()))) {
       elements_cast = true;
     }
   }
 
   const auto dest_is_u8_or_void_ptr = to->is_pointer() && (to->base_type == u8_type() || to->base_type == void_type());
-
   const auto implicit_cast_void_pointer_to_any_ptr = to->is_pointer() && (from->base_type == void_type());
 
   // Handling casting function pointers:
@@ -421,6 +424,10 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   Unmangles.
 */
 std::string Type::to_string() const {
+  if (basename.str_ptr->starts_with("__anon_D")) {
+    return extensions_to_string(extensions) + "(anonymous type)";
+  }
+
   switch (kind) {
     case TYPE_FUNCTION:
       return (info->as<FunctionTypeInfo>())->to_string(extensions);

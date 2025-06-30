@@ -22,8 +22,8 @@ def main():
   os.makedirs(build_dir, exist_ok=True)
   os.chdir(build_dir)
 
-  if len(sys.argv) > 1 and (sys.argv[1] == "Clean" or not os.path.isfile("build.ninja")):
-    build_type = "Release" if len(sys.argv) > 2 and sys.argv[2] == "Release" else "Debug"
+  if len(sys.argv) > 1 and (sys.argv[1].lower() == "clean" or not os.path.isfile("build.ninja")):
+    build_type = "Release" if len(sys.argv) > 2 and sys.argv[2].lower() == "Release" else "Debug"
     run_command(f"cmake .. -G Ninja -DCMAKE_BUILD_TYPE={build_type}")
     run_command("ninja clean")
 

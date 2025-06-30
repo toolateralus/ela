@@ -176,7 +176,13 @@ typedef float f32;
 typedef short int s16;
 typedef unsigned short int u16;
 
-typedef signed char s8;
+/* 
+  TODO: replace the 'signed' attribute on s8.
+  * We did this because we can't use main() in 
+  * freestanding with a signed char, because of 
+  * command line args, and C restrictions.
+*/
+typedef char s8;
 typedef unsigned char u8;
 
 /* static initializers. */

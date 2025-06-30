@@ -18,6 +18,7 @@ struct ASTCopier {
 
   Scope *current_scope = nullptr;
   ASTImpl *copy_impl(ASTImpl* node);
+  ASTImport::Group copy_import_group(ASTImport::Group &group);
   Scope *copy_scope(Scope *old);
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);

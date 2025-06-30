@@ -1,10 +1,7 @@
 #pragma once
 
 #include <csetjmp>
-#include <deque>
-#include <set>
 #include <vector>
-
 #include "ast.hpp"
 #include "builder.hpp"
 #include "core.hpp"
@@ -72,19 +69,17 @@ struct VisitorBase {
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
-  bool in_call = false;
   Type *expected_type = Type::INVALID_TYPE;
-
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
-
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
-  std::string getIndent();
   void visit_path_for_call(ASTPath *node);
-
+  
+  void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
+                          const SourceRange &range);
   /*
-    TODO:
+  TODO:
     Why are these in the typer and not just globally available?
     they're static and lazily evaluated, and these things are all
     from the stdlib, which is in Context::root_scope, which is also
@@ -139,7 +134,7 @@ struct Typer : VisitorBase {
                              std::vector<Type *> generic_args);
 
   void visit_structural_type_declaration(ASTStructDeclaration *node);
-  
+
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<Type *> generic_args = {});
   void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,

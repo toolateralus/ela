@@ -10,7 +10,6 @@
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
-#include "thir.hpp"
 #include "type.hpp"
 
 /*

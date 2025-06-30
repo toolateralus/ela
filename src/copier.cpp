@@ -315,6 +315,7 @@ ASTDestructure *ASTCopier::copy_destructure(ASTDestructure *node) {
     DestructureElement new_destruct;
     new_destruct.semantic = destruct.semantic;
     new_destruct.identifier = destruct.identifier;
+    new_destruct.type = destruct.type;
     new_node->elements.push_back(new_destruct);
   }
   new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
@@ -557,16 +558,25 @@ ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
   }
   return new_node;
 }
+
+ASTImport::Group ASTCopier::copy_import_group(ASTImport::Group &group) {
+  ASTImport::Group new_group;
+  new_group.is_wildcard = group.is_wildcard;
+  new_group.path = (ASTPath *)copy_node(group.path);
+  new_group.symbols.clear();
+  for (ASTImport::Symbol &symbol : group.symbols) {
+    if (symbol.is_group) {
+      new_group.symbols.push_back(ASTImport::Symbol::Group(copy_import_group(symbol.group)));
+    } else {
+      new_group.symbols.push_back(ASTImport::Symbol::Path((ASTPath *)copy_node(symbol.path), symbol.alias));
+    }
+  }
+  return new_group;
+}
+
 ASTImport *ASTCopier::copy_import(ASTImport *node) {
   auto new_node = copy(node);
-  new_node->statements.clear();
-  new_node->scope = copy_scope(node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  for (const auto &statement : node->statements) {
-    new_node->statements.push_back((ASTStatement *)copy_node(statement));
-  }
-  current_scope = old_scope;
+  new_node->root_group = copy_import_group(node->root_group);
   return new_node;
 }
 ASTModule *ASTCopier::copy_module(ASTModule *node) {

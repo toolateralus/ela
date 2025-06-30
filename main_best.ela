@@ -1,7 +1,7 @@
-alias c_str :: *const u8;
+type c_str :: *const u8;
 
 import dlfcn;
-
+  
 module std {
   extern fn printf(fmt: c_str, ...);
   extern fn exit(code: s32);
@@ -36,7 +36,6 @@ impl!<T> Option!<T> {
     return *(discriminant as *const s32);
   }
 }
-
 
 trait Iterator!<T> {
   fn next(*mut self) -> Option!<T>;
@@ -93,7 +92,7 @@ fn get() -> bool {
   return true;
 }
 
-const colors: c_str[7] = c_str.[
+const colors: [c_str; 7] = c_str.[
   "\033[1;3;31m", // Red
   "\033[1;3;33m", // Yellow (used for Orange and Yellow)
   "\033[1;3;33m",
@@ -105,9 +104,9 @@ const colors: c_str[7] = c_str.[
 
 fn rainbowize(s: c_str) {
   mut i := 0;
-  while (s[i] != 0) {
+  while (s![i] != 0) {
     color := colors[(i % 7)];
-    std::printf("%s%c"c, color, s[i]);
+    std::printf("%s%c"c, color, s![i]);
     i += 1;
   }
   std::printf("\033[0m"c);
@@ -122,14 +121,14 @@ fn rainbowize_str(s: c_str) -> c_str {
 
   mut i := 0;
   mut written := 0;
-  while (s[i] != 0) {
+  while (s![i] != 0) {
     color := colors[i % 7];
-    written += std::sprintf(out + written, "%s%c", color, s[i]);
+    written += std::sprintf(out + written, "%s%c", color, s![i]);
     i += 1;
   }
 
   written += std::sprintf(out + written, "\033[0m");
-  (out + written)[0] = 0;
+  (out + written)![0] = 0;
   return buf;
 }
 
@@ -139,7 +138,7 @@ fn print_discriminant(c: Choice) {
 }
 
 impl s32 {
-  fn eq(self, other: #self) -> bool {
+  fn eq(self, other: Self) -> bool {
     // cast to prevent infinite recursion for this basic test.
     return self as s64 == other as s32;
   }
@@ -165,7 +164,7 @@ struct RangeBase!<V> {
   end:   V,
 }
 
-alias Range :: RangeBase!<s32>;
+type Range :: RangeBase!<s32>;
 
 struct RangeIter!<T> {
   idx: T,
@@ -207,7 +206,7 @@ fn main() -> s32 {
   };
   print_discriminant(c);
 
-  std::printf("bb=%d\n", if get() { return 100; });
+  std::printf("bb=%d\n", if get() { return 100; } else { return 0;});
 
   switch 0 {
     1: { std::println("wrong!"); }
@@ -339,7 +338,8 @@ fn main() -> s32 {
 
   const VEC_ARRAY_LEN := 5;
 
-  array: Vec2[VEC_ARRAY_LEN];
+  array: [Vec2; VEC_ARRAY_LEN];
+  
   iter2: Iter!<Vec2> = .{
     ptr: array,
     end: (array as *Vec2) + VEC_ARRAY_LEN
@@ -363,6 +363,5 @@ fn main() -> s32 {
   }
 
   takes_init_list(.[0,1,2,3]);
-
   return 0;
 }
