@@ -9,6 +9,9 @@
   this is used for std::format() with the type id to get the reflected upon type info.
 */
 
+
+// TODO: reorder these, they're crappy and it's not that hard. 
+// would just be nice if they were in a neat logical order.
 constexpr size_t TYPE_FLAGS_INTEGER = 1 << 0;
 constexpr size_t TYPE_FLAGS_FLOAT = 1 << 1;
 constexpr size_t TYPE_FLAGS_BOOL = 1 << 2;
@@ -24,6 +27,7 @@ constexpr size_t TYPE_FLAGS_UNSIGNED = 1 << 11;
 constexpr size_t TYPE_FLAGS_TRAIT = 1 << 12;
 constexpr size_t TYPE_FLAGS_DYN = 1 << 13;
 constexpr size_t TYPE_FLAGS_UNION = 1 << 14;
+constexpr size_t TYPE_FLAGS_FLAGS_ENUM = 1 << 15;
 
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";

@@ -266,7 +266,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "flags",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto enum_decl = parser->parse_enum_declaration();
+        ASTEnumDeclaration *enum_decl = parser->parse_enum_declaration();
         int index = 0;
         for (auto &key_value : enum_decl->key_values) {
           NODE_ALLOC(ASTLiteral, literal, range, _, parser);
@@ -276,7 +276,39 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           index++;
         }
         enum_decl->is_flags = true;
-        return enum_decl;
+
+        parser->current_statement_list->push_back(enum_decl);
+
+        if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) { 
+          NODE_ALLOC(ASTImpl, impl, range, defer, parser);
+          impl->scope = create_child(parser->ctx.scope);
+          
+          { // create the path & type for the std::util::Flags trait impl.
+            NODE_ALLOC(ASTPath, path, range1, defer1, parser);
+            path->push_segment("std");
+            path->push_segment("util");
+            path->push_segment("Flags");
+            NODE_ALLOC(ASTType, type, range2, defer2, parser);
+            type->kind=ASTType::NORMAL;
+            type->normal.is_dyn = false;
+            type->normal.path = path;
+            impl->trait = type;
+          }
+
+          { // create the path & type for the target of the impl.
+            NODE_ALLOC(ASTType, type, range, defer, parser);
+            NODE_ALLOC(ASTPath, path, range1, defer1, parser);
+            path->push_segment(enum_decl->name);
+            type->kind = ASTType::NORMAL;
+            type->normal.is_dyn = false;
+            type->normal.path = path;
+            impl->target = type;
+          }
+          
+          parser->current_statement_list->push_back(impl);
+        }
+
+        return nullptr;
     }},
 
     // #export, for exporting a non-mangled name to a dll or C library

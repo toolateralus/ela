@@ -109,6 +109,9 @@ void append_reflection_type_flags(Type *type, StringBuilder &builder) {
     } break;
     case TYPE_ENUM:
       kind_flags = TYPE_FLAGS_ENUM;
+      if (type->info->as<EnumTypeInfo>()->is_flags) {
+        kind_flags |= TYPE_FLAGS_FLAGS_ENUM;
+      }
       break;
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
