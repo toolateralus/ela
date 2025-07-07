@@ -1047,7 +1047,10 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       auto parameters = func->params->params;
       auto generics = func->generic_parameters;
 
-      std::vector<std::pair<bool, int>> arg_to_generic_map(parameters.size());
+      // TODO: I added this little ternary to stop crashes but this whole thing needs a rework if this was commonly
+      // going out of bounds, which it was.
+      std::vector<std::pair<bool, int>> arg_to_generic_map(parameters.size() > args.size() ? parameters.size()
+                                                                                           : args.size());
 
       for (size_t i = 0; i < parameters.size(); ++i) {
         auto &param = parameters[i];
@@ -1315,7 +1318,26 @@ void Typer::visit(ASTEnumDeclaration *node) {
 
   for (auto &[key, value] : node->key_values) {
     value->accept(this);
-    auto node_ty = value->resolved_type;
+    Type *node_ty = value->resolved_type;
+
+    // We need to adjust the underlying type for larger-than-default (s32) values.
+    // C will infer this, but we need to be explicit and not rely on any target language stuff.
+    // we upcast to unsigned to get the largest maximum value for huge values
+
+    Value evaluated = evaluate_constexpr(value, ctx);
+    size_t evaluated_integer = evaluated.integer;
+
+    constexpr uint64_t u32_max = 0xFFFFFFFFull;
+    constexpr int64_t s32_max = 0x7FFFFFFF;
+    constexpr int64_t s32_min = -0x80000000;
+    if (evaluated_integer > s32_max || evaluated_integer < s32_min) {
+      if (evaluated_integer <= u32_max) {
+        underlying_type = u32_type();
+      } else {
+        underlying_type = u64_type();
+      }
+    }
+
     info->scope->insert_variable(key, node_ty, value, CONST);
     info->members.push_back({key, node_ty});
     if (underlying_type == Type::INVALID_TYPE) {

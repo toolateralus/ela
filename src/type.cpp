@@ -295,6 +295,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     Any function pointer type may implicitly cast to any other function pointer,
     so as long as all of it's parameters are equal or can implicitly convert to the target parameter,
     and the same for the return type.
+
+    !this needs to be fixed for correct sizing of parameters.
   */
   if (operands_are_pointers && to->is_kind(TYPE_FUNCTION) && from->is_kind(TYPE_FUNCTION)) {
     // Wrong number of pointer extensions.
@@ -335,6 +337,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   if (operands_are_pointers && (elements_cast || dest_is_u8_or_void_ptr || implicit_cast_void_pointer_to_any_ptr)) {
     return CONVERT_IMPLICIT;
+  } else if (operands_are_pointers && !elements_cast) {
+    return CONVERT_EXPLICIT;
   }
 
   // If we have a fixed array such as

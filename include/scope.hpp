@@ -19,8 +19,8 @@ struct Value {
   } tag;
 
   struct {
-    int integer;
-    float floating;
+    size_t integer;
+    double floating;
     bool boolean;
   };
 
