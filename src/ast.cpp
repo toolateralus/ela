@@ -132,7 +132,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         include_set.insert(filename);
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
-        parser->fill_buffer_if_needed();
+        parser->fill_buffer_if_needed(parser->states.back());
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         while (parser->peek().type != TType::Eof) {
           list->statements.push_back(parser->parse_statement());
@@ -2687,17 +2687,43 @@ ASTType *ASTType::get_void() {
   return type;
 }
 
-Token Parser::eat() {
-  fill_buffer_if_needed();
-  auto tok = peek();
-  lookahead_buf().pop_front();
-  lexer.get_token(states.back());
+inline Token Parser::eat() {
+  Lexer::State &state = states.back();
+  fill_buffer_if_needed(state);
+  const Token tok = peek();
+  state.lookahead_buffer.pop_front();
+  lexer.get_token(state);
   return tok;
 }
 
-void Parser::fill_buffer_if_needed() {
-  while (states.back().lookahead_buffer.size() < 8) {
-    lexer.get_token(states.back());
+inline Token Parser::expect(TType type) {
+  fill_buffer_if_needed(states.back());
+  if (peek().type != type) {
+    SourceRange range = peek().location;
+    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
+                range);
+  }
+  return eat();
+}
+
+
+inline Token Parser::peek() const {
+  if (states.empty()) {
+    return Token::Eof();
+  }
+
+  const Lexer::State &state = states.back();
+  if (!state.lookahead_buffer.empty()) {
+    return state.lookahead_buffer.front();
+  } else {
+    return Token::Eof();
+  }
+}
+
+inline void Parser::fill_buffer_if_needed(Lexer::State &state) {
+  const size_t initial_size = state.lookahead_buffer.size();
+  for (size_t i = initial_size; i < 8; ++i) {
+    lexer.get_token(state);
   }
 }
 
@@ -2742,20 +2768,10 @@ bool Parser::import(InternedString name, Scope **scope) {
 
   import_map.insert({module_name, *scope});
   states.push_back(Lexer::State::from_file(filename));
-  fill_buffer_if_needed();
+  fill_buffer_if_needed(states.back());
   return true;
 }
 
-Token Parser::expect(TType type) {
-  fill_buffer_if_needed();
-  if (peek().type != type) {
-    SourceRange range = peek().location;
-
-    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
-                range);
-  }
-  return eat();
-}
 
 SourceRange Parser::begin_node() {
   auto location = peek().location;
@@ -2768,22 +2784,9 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
   }
 }
 
-Token Parser::peek() const {
-  if (states.empty()) {
-    return Token::Eof();
-  }
-
-  // nocheckin
-  if (!states.back().lookahead_buffer.empty()) {
-    return states.back().lookahead_buffer.front();
-  } else {
-    return Token::Eof();
-  }
-}
-
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
-  fill_buffer_if_needed();
+  fill_buffer_if_needed(states.back());
   typer = new Typer(context);
 }
 

@@ -34,8 +34,6 @@ set_target_properties(ela PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_DIR}
 )
 
-
-
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wunused-function -Wno-missing-designated-field-initializers -Wno-missing-field-initializers")
 
 # Set compiler flags based on the compiler and platform

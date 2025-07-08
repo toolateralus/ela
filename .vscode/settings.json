@@ -10,8 +10,8 @@
   "files.exclude": {
     "**/.clock_diff.txt": true,
     // we hide these cause they're ugly.
-    "**/bin": true,
-    "**/objs": true,
+    // "**/bin": true,
+    // "**/objs": true,
   
     // For windows users, you may want to remove these.
     "**/*vcxproj": true,

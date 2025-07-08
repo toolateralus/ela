@@ -1204,7 +1204,7 @@ struct Parser {
   Token eat();
   Token expect(TType type);
   Token peek() const;
-  void fill_buffer_if_needed();
+  void fill_buffer_if_needed(Lexer::State &state);
 
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
