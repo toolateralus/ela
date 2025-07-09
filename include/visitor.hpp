@@ -267,7 +267,7 @@ struct Emitter : VisitorBase {
 
   void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
-  void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments);
+  void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments, std::vector<Type *> generic_args={});
 
   std::string to_reflection_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);

@@ -647,13 +647,24 @@ void Emitter::visit(ASTType *node) {
   return;
 }
 
-void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments) {
+void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments, std::vector<Type *> generic_args) {
   auto symbol = ctx.get_symbol(callee);
 
   if (symbol && symbol.get()->is_function && symbol.get()->function.declaration) {
     const auto sym = symbol.get();
-    const auto declaration = sym->function.declaration;
-    const auto params = declaration->params;
+
+    // ! right here lies a bug where generic functions cannot have default parameters.
+    // ! We don't actually resolve the symbol to the generic instantiation and we don't even have the
+    // ! neccesary information to find the correct instantiation so we're just cooked.
+    // ! perhaps as a dirty fix we can pass generic params into this function
+
+    ASTDeclaration *declaration = sym->function.declaration;
+    if (generic_args.size() || declaration->generic_parameters.size()) {
+      declaration = find_generic_instance(declaration->generic_instantiations, generic_args);
+    }
+    ASTFunctionDeclaration *function_declaration = (ASTFunctionDeclaration *)declaration;
+
+    const auto params = function_declaration->params;
     const auto args_ct = arguments->arguments.size();
     const auto params_ct = params->params.size();
     const auto is_varargs = params->is_varargs;
@@ -673,7 +684,7 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
         arguments->arguments[arg_index++]->accept(this);
       } else if (param->normal.default_value) {
         auto old_scope = ctx.scope;
-        ctx.scope = declaration->scope;
+        ctx.scope = function_declaration->scope;
         param->normal.default_value.get()->accept(this);
         ctx.scope = old_scope;
       }
@@ -710,7 +721,7 @@ void Emitter::visit(ASTCall *node) {
     node->callee->accept(this);
     code << mangled_type_args(generic_args);
     code << "(";
-    emit_arguments_with_defaults(node->callee, node->arguments);
+    emit_arguments_with_defaults(node->callee, node->arguments, generic_args);
     code << ")";
   }
 }
@@ -2073,9 +2084,6 @@ void Emitter::visit(ASTMethodCall *node) {
       node->callee->base->accept(this);
     }
 
-    // ASTExpr *base = node->callee->base;
-    // base->accept(this);
-
     bool has_default_params = false;
     for (const auto &param : symbol->function.declaration->params->params) {
       if (param->tag == ASTParamDecl::Normal && param->normal.default_value) {
@@ -2090,7 +2098,7 @@ void Emitter::visit(ASTMethodCall *node) {
     }
   }
 
-  emit_arguments_with_defaults(node->callee, node->arguments);
+  emit_arguments_with_defaults(node->callee, node->arguments, generic_args);
 
   code << ")";
 }

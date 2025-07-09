@@ -48,7 +48,7 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
   }
 
   if (node->block) {
-    new_node->block = static_cast<ASTBlock *>(copy_node(node->block.get()));
+    new_node->block = (ASTBlock *)copy_node(node->block.get());
     node->block.get()->scope->parent = new_node->scope;
   }
   current_scope = old_scope;
@@ -58,11 +58,10 @@ ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
   auto new_node = copy(node);
   new_node->params.clear();
   for (auto param : node->params) {
-    new_node->params.push_back(static_cast<ASTParamDecl *>(copy_node(param)));
+    new_node->params.push_back((ASTParamDecl *)copy_node(param));
   }
   return new_node;
 }
-
 /*
   ! When passing an argument to a generic function that has a default parameter in that position, we get junk values out
   and it crashes.
@@ -70,16 +69,15 @@ ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
 ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = copy(node);
   if (new_node->tag == ASTParamDecl::Normal) {
+    new_node->normal.type = (ASTType *)copy_node(node->normal.type);
     if (node->normal.default_value.is_not_null()) {
       new_node->normal.default_value = (ASTType *)copy_node(node->normal.default_value.get());
     }
-    new_node->normal.type = (ASTType *)(copy_node(node->normal.type));
   } else {
     new_node->self.is_pointer = node->self.is_pointer;
   }
   return new_node;
 }
-
 ASTVariable *ASTCopier::copy_variable(ASTVariable *node) {
   auto new_node = copy(node);
   if (node->type) new_node->type = static_cast<ASTType *>(copy_node(node->type));

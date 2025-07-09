@@ -1538,12 +1538,19 @@ void Typer::visit(ASTParamDecl *node) {
     return;
   } else {
     node->normal.type->accept(this);
-    Type *id = node->normal.type->resolved_type;
-    node->resolved_type = id;
-    if (id == Type::INVALID_TYPE) {
+    Type *param_type = node->normal.type->resolved_type;
+    node->resolved_type = param_type;
+    
+    if (param_type == Type::INVALID_TYPE) {
       throw_error("Use of undeclared type.", node->source_range);
     }
-    // what exactly is this doing? There used to be some code here that didn't do anything -- it set the expected type.
+
+    if (node->normal.default_value) {
+      auto old_type = expected_type;
+      expected_type = param_type;
+      node->normal.default_value.get()->accept(this);
+      expected_type = old_type;
+    }
   }
 }
 
