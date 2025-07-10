@@ -492,8 +492,6 @@ void Emitter::visit(ASTIf *node) {
       node->_else.get()->accept(this);
     }
   }
-
-  return;
 }
 
 void Emitter::visit(ASTElse *node) {
@@ -653,11 +651,6 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
   if (symbol && symbol.get()->is_function && symbol.get()->function.declaration) {
     const auto sym = symbol.get();
 
-    // ! right here lies a bug where generic functions cannot have default parameters.
-    // ! We don't actually resolve the symbol to the generic instantiation and we don't even have the
-    // ! neccesary information to find the correct instantiation so we're just cooked.
-    // ! perhaps as a dirty fix we can pass generic params into this function
-
     ASTDeclaration *declaration = sym->function.declaration;
     if (generic_args.size() || declaration->generic_parameters.size()) {
       declaration = find_generic_instance(declaration->generic_instantiations, generic_args);
@@ -816,7 +809,6 @@ void Emitter::visit(ASTBinExpr *node) {
   space();
   node->right->accept(this);
   code << ")";
-  return;
 }
 
 void Emitter::visit(ASTExprStatement *node) {
@@ -2243,7 +2235,7 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
   if (the_if->is_expression) {
     cf_expr_return_register = nullptr;
     code << the_register;
-    code << ";\n});\n";
+    code << ";\n})\n";
   }
 }
 
@@ -2418,7 +2410,7 @@ void Emitter::visit(ASTSwitch *node) {
 
   // This is static to help with the lifetime issues taking an `address of` here would cause.
   static std::string the_register;
-  if (!node->is_statement) {
+  if (!node->is_statement) {  // Declare a temporary for the C extension "Expression block";
     code << "({";
     the_register = "register$" + std::to_string(cf_expr_return_id++);
     cf_expr_return_register = &the_register;
@@ -2437,7 +2429,7 @@ void Emitter::visit(ASTSwitch *node) {
 
   const auto target_type = node->expression->resolved_type;
 
-  auto emit_switch_case = [&](ASTExpr *target, const SwitchBranch &branch, bool first) {
+  const auto emit_branch = [&](ASTExpr *target, const SwitchBranch &branch, bool first) {
     emit_line_directive(target);
     if (!first) {
       code << indent() << "else ";
@@ -2461,8 +2453,8 @@ void Emitter::visit(ASTSwitch *node) {
   };
 
   bool first = true;
-  for (const auto &_case : node->branches) {
-    emit_switch_case(node->expression, _case, first);
+  for (const auto &branch : node->branches) {
+    emit_branch(node->expression, branch, first);
     first = false;
   }
 

@@ -272,9 +272,7 @@ void Resolver::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->operand, get_operator_overload_name(node->op, OPERATION_UNARY), nullptr);
   } else {
-    if (node->op == TType::Mul) {
-      define_type(node->operand->resolved_type);
-    }
+    define_type(node->operand->resolved_type);
     node->operand->accept(this);
   }
 }

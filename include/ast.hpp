@@ -95,6 +95,7 @@ struct ASTNode {
     switch (get_node_type()) {
       case AST_NODE_LITERAL:
       case AST_NODE_CALL:
+      case AST_NODE_METHOD_CALL:
       case AST_NODE_CAST:
       case AST_NODE_SIZE_OF:
         return true;
