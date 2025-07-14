@@ -868,6 +868,9 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Self: {
+      return parse_type();
+    }
     case TType::If: {
       return parse_if();
     }
@@ -1597,6 +1600,44 @@ ASTStatement *Parser::parse_statement() {
       alias->source_node = parse_type();
     }
     return alias;
+  }
+
+  if (peek().type == TType::Using) {
+    eat();
+    ASTVariable *variable = parse_variable();
+    ASTBlock *block = parse_block();
+    block->statements.insert(block->statements.begin(), variable);
+
+    // the variable.destroy() method call.
+    NODE_ALLOC(ASTMethodCall, method_call, range, defer, this);
+
+    NODE_ALLOC(ASTExprStatement, expr_stmt, range5, defer5, this);
+    expr_stmt->expression = method_call;
+    block->statements.push_back(expr_stmt);
+
+    {  // create the variable.destroy() paths.
+      // variable.
+      NODE_ALLOC(ASTPath, path, range1, defer1, this);
+      path->push_segment(variable->name);
+      // .destroy()
+      NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
+      dot->base = path;
+      dot->member = ASTPath::Segment{.identifier = "destroy"};
+      method_call->callee = dot;
+    }
+
+    // create arguments.
+    NODE_ALLOC(ASTArguments, arguments, range3, defer3, this);
+
+    {  // push the recursive: true argument
+      NODE_ALLOC(ASTLiteral, literal, range4, defer4, this);
+      literal->tag = ASTLiteral::Bool;
+      literal->value = "true";
+      arguments->arguments.push_back(literal);
+    }
+    method_call->arguments = arguments;
+
+    return block;
   }
 
   // * Control flow
@@ -2706,7 +2747,6 @@ inline Token Parser::expect(TType type) {
   return eat();
 }
 
-
 inline Token Parser::peek() const {
   if (states.empty()) {
     return Token::Eof();
@@ -2771,7 +2811,6 @@ bool Parser::import(InternedString name, Scope **scope) {
   fill_buffer_if_needed(states.back());
   return true;
 }
-
 
 SourceRange Parser::begin_node() {
   auto location = peek().location;
