@@ -1612,8 +1612,13 @@ ASTStatement *Parser::parse_statement() {
     NODE_ALLOC(ASTMethodCall, method_call, range, defer, this);
 
     NODE_ALLOC(ASTExprStatement, expr_stmt, range5, defer5, this);
+    NODE_ALLOC(ASTDefer, defer_ast, range6, defer7, this);
+
     expr_stmt->expression = method_call;
-    block->statements.push_back(expr_stmt);
+    defer_ast->statement=expr_stmt;
+
+    block->statements.insert(block->statements.begin() + 1, defer_ast);
+    
 
     {  // create the variable.destroy() paths.
       // variable.
