@@ -1,11 +1,13 @@
+import assertion::*;
+
 struct Reflector {
   n: s32,
 }
 
 #test fn test_reflection_names() {
   f := typeof(Reflector);
-  assert("field count wrong", f.fields.length == 1);
-  assert("name wrong", f.name == "Reflector");
+  assert(f.fields.length == 1, "field count wrong");
+  assert(f.name == "Reflector", "name wrong");
 }
 
 #test fn test_set_field_with_reflection() {
@@ -14,7 +16,7 @@ struct Reflector {
   mut field := _type.fields[0];
   mut integer: s32 = 100;
   field.set(&mut reflector, integer);
-  assert("reflection field.set() failed.", reflector.n == 100);
+  assert(reflector.n == 100, "reflection field.set() failed.");
 }
 
 #test fn test_get_field_with_reflection() {
@@ -23,27 +25,27 @@ struct Reflector {
   _type := typeof(Reflector);
   mut field := _type.fields[0];
   n := *(field.get(&mut reflector) as *const s32);
-  assert("reflection field.set() failed.", n == 100);
+  assert(n == 100, "reflection field.set() failed.");
 }
 
-// #test fn test_array_reflection() {
-//   fixed: s32[3] = {1, 2, 3};
-//   fixed_type := typeof(fixed);
-//   index: s32 = 0;
-//   fixed_elements := fixed_type.elements((&fixed) as u8*);
-//   assert("Fixed array length mismatch", fixed_elements.length == 3);
-//   for elem in fixed_elements {
-//     assert("Fixed array element mismatch", *(elem.data as s32*) == fixed[index]);
-//     ++index;
-//   }
+#test fn test_array_reflection() {
+  fixed: s32[3] = {1, 2, 3};
+  fixed_type := typeof(fixed);
+  index: s32 = 0;
+  fixed_elements := fixed_type.elements((&fixed) as u8*);
+  assert(fixed_elements.length == 3, "Fixed array length mismatch");
+  for elem in fixed_elements {
+    assert(*(elem.data as s32*) == fixed[index], "Fixed array element mismatch");
+    ++index;
+  }
 
-//   dynamic := List!<s32>::init({3, 2, 1});
-//   dynamic_type := typeof(dynamic);
-//   index = 0;
-//   dynamic_elements := dynamic_type.elements((&dynamic) as u8*);
-//   assert("Dynamic array length mismatch", dynamic_elements.length == 3);
-//   for elem in dynamic_elements {
-//     assert("Dynamic array element mismatch", *(elem.data as s32*) == dynamic[index]);
-//     ++index;
-//   }
-// }
+  dynamic := List!<s32>::init({3, 2, 1});
+  dynamic_type := typeof(dynamic);
+  index = 0;
+  dynamic_elements := dynamic_type.elements((&dynamic) as u8*);
+  assert(dynamic_elements.length == 3, "Dynamic array length mismatch");
+  for elem in dynamic_elements {
+    assert(*(elem.data as s32*) == dynamic[index], "Dynamic array element mismatch");
+    ++index;
+  }
+}

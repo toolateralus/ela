@@ -1,3 +1,5 @@
+import assertion::*;
+
 trait DynInterface {
   fn default_getter(*const self) -> s32 {
     return 0;
@@ -20,32 +22,32 @@ impl DynInterface for u32 {
 #test fn test_dynamic_dispatch() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
-  assert("dyn default method failed", d.default_getter() == 0);
+  assert(d.default_getter() == 0, "dyn default method failed");
 }
 
 #test fn test_dynamic_dispatch_non_default() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
-  assert("dyn default method failed", d.scrut() == 100.0);
+  assert(d.scrut() == 100.0, "dyn default method failed");
 }
 
 #test fn test_dynamic_dispatch_non_default_2() {
   mut num : u32 = 0;
   d := dynof(&mut num, DynInterface);
-  assert("dyn default method failed", d.scrut() == 200.0);
+  assert(d.scrut() == 200.0, "dyn default method failed");
 }
 
 #test fn test_dynamic_dispatch_non_default_3() {
   mut num1 : s32 = 0;
   mut num : u32 = 0;
   mut d := dynof(&mut num, DynInterface);
-  assert("dyn default method failed", d.scrut() == 200.0);
+  assert(d.scrut() == 200.0, "dyn default method failed");
   d = dynof(&mut num1);
-  assert("dyn default method failed", d.scrut() == 100.0);
+  assert(d.scrut() == 100.0, "dyn default method failed");
 }
 
 fn dyn_func(o: dyn DynInterface) {
-  assert("dyn as param failed", o.scrut() == 100.0);
+  assert(o.scrut() == 100.0, "dyn as param failed");
 }
 
 fn dyn_returns() -> dyn DynInterface {
@@ -56,7 +58,7 @@ fn dyn_returns() -> dyn DynInterface {
 #test fn test_dyn_as_param_and_return_value() {
   iface := dyn_returns();
   dyn_func(iface);
-  assert("dyn returned from func failed", iface.scrut() == 100.0);
+  assert(iface.scrut() == 100.0, "dyn returned from func failed");
 }
 
 struct Strakt {
@@ -68,21 +70,21 @@ struct Strakt {
   s: Strakt = .{
     obj: dynof(&mut x),
   };
-  assert("nested call of dyn failed", s.obj.scrut() == 100.0);
+  assert(s.obj.scrut() == 100.0, "nested call of dyn failed");
 }
 
 #test fn test_dyn_from_array() {
   mut x := 0;
   mut array: [dyn DynInterface; 100];
   array[0] = dynof(&mut x);
-  assert("dyn call from array failed", array[0].scrut() == 100.0);
+  assert(array[0].scrut() == 100.0, "dyn call from array failed");
 }
 
 #test fn test_dyn_from_list() {
   mut x := 0;
   mut array: List!<dyn DynInterface>;
   array.push(dynof(&mut x));
-  assert("dyn call from array failed", (array[0]).scrut() == 100.0);
+  assert((array[0]).scrut() == 100.0, "dyn call from array failed");
 }
 
 impl Strakt {

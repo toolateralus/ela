@@ -1,65 +1,67 @@
+import assertion::*;
+
 #test fn test_for() {
   for i in 0..10 {
-    assert("i should be less than 10", i < 10);
+    assert(i < 10, "i should be less than 10");
     return;
   }
 
   for i in 10..0 {
-    assert("i should be greater than 0", i > 0);
+    assert(i > 0, "i should be greater than 0");
     return;
   }
 
   arr: List!<s32>;
   for v in arr {
-      assert("Unexpected case in array loop", false);
+      assert(false, "Unexpected case in array loop");
       return;
   }
-  assert("End of test_for reached", true);
+  assert(true, "End of test_for reached");
 }
 
 #test fn test_while() {
   b: bool = true;
   while b {
-      assert("while condition == true", b == true);
+      assert(b == true, "while condition == true");
       return;
   }
-  assert("End of test_while reached", true);
+  assert(true, "End of test_while reached");
 }
 
 #test fn test_if_1() {
   v: bool = true;
   mut hit: bool = false;
   if v {
-    assert("v should be true", v == true);
+    assert(v == true, "v should be true");
     hit = true;
   } else {
-    assert("Unexpected case", false);
+    assert(false, "Unexpected case");
   }
-  assert("failed to fall through if statement", hit);
+  assert(hit, "failed to fall through if statement");
 }
 
 #test fn test_if_2() {
   v: bool = false;
   mut hit: bool = true;
   if v {
-      assert("Unexpected case", false);
+      assert(false, "Unexpected case");
   } else if !v {
     hit = true;
   }
-  assert("fell through if else, but didn't set the variable", hit);
+  assert(hit, "fell through if else, but didn't set the variable");
 }
 
 #test fn test_if_3() {
   v: bool = false;
   mut hit: bool = true;
   if v {
-      assert("Unexpected case", false);
+      assert(false, "Unexpected case");
   } else if v {
-      assert("Unexpected case", false);
+      assert(false, "Unexpected case");
   } else {
       hit = true;
   }
-  assert("fell though if,if_else,else but didn't set the variable", hit);
+  assert(hit, "fell though if,if_else,else but didn't set the variable");
 }
 
 #test fn empty_for_loops() {
@@ -82,7 +84,7 @@
   }
   mut n: s32 ;
   for v in array.iter_mut() {
-    assert("", n == *v);
+    assert(n == *v, "");
     ++n;
   }
 
@@ -94,7 +96,7 @@
   }
 
   for v in *arr {
-    assert("", n == v);
+    assert(n == v, "");
     ++n;
   }
   std::c::free(arr);
@@ -108,19 +110,19 @@
   for i in 0..10 {
     n = i;
   }
-  assert_eq("Range based for loop failed.", n, 9);
+  assert_eq(n, 9, "Range based for loop failed.");
   for i in 0..ten {
     n = i;
   }
-  assert_eq("Range based for loop failed.", n, 9);
+  assert_eq(n, 9, "Range based for loop failed.");
   for i in zero..ten {
     n = i;
   }
-  assert_eq("Range based for loop failed.", n, 9);
+  assert_eq(n, 9, "Range based for loop failed.");
   for i in zero..10 {
     n = i;
   }
-  assert_eq("Range based for loop failed.", n, 9);
+  assert_eq(n, 9, "Range based for loop failed.");
 }
 
 #test fn test_tuple_destructure_in_for_loop() {
@@ -132,7 +134,7 @@
 
   mut i := 0;
   for x, y in list {
-    assert("failed", x == i && y == i);
+    assert(x == i && y == i, "failed");
     ++i;
   }
 
@@ -143,7 +145,7 @@
 
   i = 0;
   for x, y in list {
-    assert("failed on set in tuple", x == i * 2 && y == i * 2);
+    assert(x == i * 2 && y == i * 2, "failed on set in tuple");
     i++;
   }
 }
@@ -163,7 +165,7 @@ import fmt::*;
 
   mut i := 0;
   for x, y in list {
-    assert("failed", x == i && y == i);
+    assert(x == i && y == i, "failed");
     ++i;
   }
 
@@ -174,7 +176,7 @@ import fmt::*;
 
   i = 0;
   for x, y in list {
-    assert("failed on set for struct", x == i * 2 && y == i * 2);
+    assert(x == i * 2 && y == i * 2, "failed on set for struct");
     i++;
   }
 }
@@ -201,18 +203,18 @@ fn switch_helper() -> s32 {
   mut passed := false;
   switch integer {
     0: { passed = true; }
-    1: { assert("Switch on s32 case failed", false);  }
+    1: { assert(false, "Switch on s32 case failed");  }
   };
 
-  assert("Failed to hit positive switch case for integer", passed);
+  assert(passed, "Failed to hit positive switch case for integer");
   s := "Hello!";
 
   passed = false;
   switch s {
-    "Hello": { assert("Switch case on str failed", false); }
+    "Hello": { assert(false, "Switch case on str failed"); }
     "Hello!": { passed = true; }
   }
-  assert("Failed to hit positive switch case for str", passed);
+  assert(passed, "Failed to hit positive switch case for str");
 
   passed = false;
   switch SwitchCaseEnum::SwitchVariant0 {
@@ -220,10 +222,10 @@ fn switch_helper() -> s32 {
       passed = true;
     }
     SwitchCaseEnum::SwitchVariant1: {
-      assert("Switch on enum value failed", false);
+      assert(false, "Switch on enum value failed");
     }
   }
-  assert("Failed to hit positive switch case for enum", passed);
+  assert(passed, "Failed to hit positive switch case for enum");
 
   /*  With return value as expression :  */
 
@@ -232,7 +234,7 @@ fn switch_helper() -> s32 {
     1 => -1,
   }
 
-  assert("Return value of switch statement failed", new_int == integer);
+  assert(new_int == integer, "Return value of switch statement failed");
 
   // test range based shiz.
   // passed = false;
@@ -241,12 +243,12 @@ fn switch_helper() -> s32 {
   //     passed = true;
   //   }
   //   10..20: {
-  //     assert("switch on range passing in number failed", false);
+  //     assert(false, "switch on range passing in number failed");
   //   }
   // }
-  // assert("Failed to pass range based switch statement", passed);
+  // assert(passed, "Failed to pass range based switch statement");
 
-  assert("Returns in switched failed", switch_helper() == 5);
+  assert(switch_helper() == 5, "Returns in switched failed");
 }
 
 #test fn test_switch_with_else() {
@@ -255,7 +257,7 @@ fn switch_helper() -> s32 {
     1 => false,
     else => true,
   }
-  assert("switch with else case failed", case as bool);
+  assert(case as bool, "switch with else case failed");
 }
 
 
@@ -263,12 +265,12 @@ fn switch_helper() -> s32 {
   mut list: List!<s32> = List!<s32>::init(.[0,1,2,3,4,5,6,7,8,9,10]);
   mut idx := 0;
   for v in list.iter() {
-    assert("list.iter() for loop failed", v == idx);
+    assert(v == idx, "list.iter() for loop failed");
     idx++;
   }
   idx = 0;
   for v in list.iter_mut() {
-    assert("list.iter() for loop failed", (*v) == idx);
+    assert((*v) == idx, "list.iter() for loop failed");
     idx++;
   }
 }
@@ -277,7 +279,7 @@ fn switch_helper() -> s32 {
   range := 0..10;
   mut idx := 0;
   for v in range.iter() {
-    assert("range.iter() for loop failed", v == idx);
+    assert(v == idx, "range.iter() for loop failed");
     idx++;
   }
 }

@@ -1,3 +1,5 @@
+import assertion::*;
+
 ;
 
 union Union {
@@ -8,7 +10,7 @@ union Union {
 
 impl Union {
   fn method(*mut self, n: s32) {
-    assert("union equality check in method failed", n == self.a && n == self.b && n == self.c);
+    assert(n == self.a && n == self.b && n == self.c, "union equality check in method failed");
   }
 }
 
@@ -23,8 +25,8 @@ union _Vec2 {
 
 impl _Vec2 {
   fn method(*mut self, n: s32) {
-    assert("union equality check in method failed", n == self.x && n == self.y && n == self.z);
-    assert("union equality check in method failed", n == self.values[0] && n == self.values[1] && n == self.values[2]);
+    assert(n == self.x && n == self.y && n == self.z, "union equality check in method failed");
+    assert(n == self.values[0] && n == self.values[1] && n == self.values[2], "union equality check in method failed");
   }
   fn something() -> Self {
     return .{};
@@ -41,7 +43,7 @@ impl _Vec2 {
 #test fn test_union_type() {
   mut test_union: Union;
   test_union.a = 10;
-  assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
+  assert(test_union.a == test_union.b && test_union.b == test_union.c, "union variants failed to equal each other");
   test_union.method(10);
 }
 
@@ -55,5 +57,5 @@ struct AnonSubUnion {
 #test fn test_anon_union_in_struct() {
   mut anon: AnonSubUnion;
   anon.a = 100;
-  assert("Anon sub union failed", anon.a == 100);
+  assert(anon.a == 100, "Anon sub union failed");
 }

@@ -1,3 +1,5 @@
+import assertion::*;
+
 /* 
  * :: Important :: 
   - Some of these value-based returns from defers may be surprising in that they do not mutate the variables.
@@ -16,7 +18,7 @@ fn nested_defer_test() -> s32 {
 }
 
 #test fn test_nested_defer() {
-  assert("nested defer failed", nested_defer_test() == 2);
+  assert(nested_defer_test() == 2, "nested defer failed");
 }
 
 fn loop_defer_test() -> s32 {
@@ -28,7 +30,7 @@ fn loop_defer_test() -> s32 {
 }
 
 #test fn test_loop_defer() {
-  assert("loop defer failed", loop_defer_test() == 3);
+  assert(loop_defer_test() == 3, "loop defer failed");
 }
 
 fn early_return_defer_test() -> s32 {
@@ -42,7 +44,7 @@ fn early_return_defer_test() -> s32 {
 }
 
 #test fn test_early_return_defer() {
-  assert("early return defer failed", early_return_defer_test() == 0);
+  assert(early_return_defer_test() == 0, "early return defer failed");
 }
 
 struct DeferCleanup {
@@ -60,7 +62,7 @@ fn defer_cleanup_routine(mut c: *mut DeferCleanup) -> u64 {
     std::c::free(c.ptr);
     c.ptr = null;
   }
-  assert("defer cleanup got null input", c.ptr != null);
+  assert(c.ptr != null, "defer cleanup got null input");
   return (c.ptr as *mut u64) as u64;
 }
 
@@ -71,8 +73,8 @@ fn defer_cleanup_routine(mut c: *mut DeferCleanup) -> u64 {
   };
   ptr_as_int : u64 = ptr as u64;
   n := defer_cleanup_routine(&mut cleanup);
-  assert("yep", n == ptr_as_int);
-  assert("leanup on defer failed", cleanup.ptr == null);
+  assert(n == ptr_as_int, "yep");
+  assert(cleanup.ptr == null, "leanup on defer failed");
 }
 
 // Additional comprehensive tests
@@ -89,7 +91,7 @@ fn continue_defer_test() -> s32 {
 }
 
 #test fn test_continue_defer() {
-  assert("ontinue defer failed", continue_defer_test() == 7);
+  assert(continue_defer_test() == 7, "ontinue defer failed");
 }
 
 fn break_defer_test() -> s32 {
@@ -105,7 +107,7 @@ fn break_defer_test() -> s32 {
 }
 
 #test fn test_break_defer() {
-  assert("break defer failed", break_defer_test() == 4);
+  assert(break_defer_test() == 4, "break defer failed");
 }
 
 fn multiple_defer_test() -> s32 {
@@ -116,7 +118,7 @@ fn multiple_defer_test() -> s32 {
 }
 
 #test fn test_multiple_defer() {
-  assert("multiple defer failed", multiple_defer_test() == 0);
+  assert(multiple_defer_test() == 0, "multiple defer failed");
 }
 
 fn nested_control_flow_defer_test() -> s32 {
@@ -133,5 +135,5 @@ fn nested_control_flow_defer_test() -> s32 {
 }
 
 #test fn test_nested_control_flow_defer() {
-  assert("nested control flow defer failed", nested_control_flow_defer_test() == 7);
+  assert(nested_control_flow_defer_test() == 7, "nested control flow defer failed");
 }

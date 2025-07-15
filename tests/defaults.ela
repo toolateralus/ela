@@ -1,3 +1,4 @@
+import assertion::*;
 
 
 
@@ -25,9 +26,9 @@ impl WithDefaultField {
 
 #test fn test_defaults() {
   wdf: WithDefaultField;
-  assert_eq("WithDefaultField.field != 100.0, which was the expected default value", wdf.field, 100.0);
-  assert_eq("with_default_parameter != 200.0, which was expected result", with_default_parameter(2), 200.0);
-  assert_eq("WithDefaultField::associated_with_default_parameter != 200.0, which was expected result", WithDefaultField::associated_with_default_parameter(2), 200.0);
-  assert_eq("method_with_default_parameter != 200.0, which was expected result", wdf.method_with_default_parameter(), 200.0);
-  assert_eq("generic with default param != 100.0", generic_with_default_param(100.0), 100.0);
+  assert_eq(wdf.field, 100.0, "WithDefaultField.field != 100.0, which was the expected default value");
+  assert_eq(with_default_parameter(2), 200.0, "with_default_parameter != 200.0, which was expected result");
+  assert_eq(WithDefaultField::associated_with_default_parameter(2), 200.0, "WithDefaultField::associated_with_default_parameter != 200.0, which was expected result");
+  assert_eq(wdf.method_with_default_parameter(), 200.0, "method_with_default_parameter != 200.0, which was expected result");
+  assert_eq(generic_with_default_param(100.0), 100.0, "generic with default param != 100.0");
 }

@@ -1,4 +1,4 @@
-;
+import assertion::*;
 
 #flags enum Banana  {
   Unripe,
@@ -11,10 +11,12 @@
 /* 
   We broke flags by auto assigning values to all enums.
   We need to change that somehow, at parse time likely.
+
+  update: I have no idea what this comment means nor do I know if it's relevant
 */
 #test fn test_flags_enum() {
   flags := Banana::Unripe | Banana::Overripe;
-  assert("flags & Banana::Unripe failed.", (flags & Banana::Unripe) != 0);
+  assert((flags & Banana::Unripe) != 0, "flags & Banana::Unripe failed.");
 }
 
 enum MyEnum {
@@ -25,6 +27,6 @@ enum MyEnum {
 #test fn test_regular_enum() {
   value := MyEnum::Some;
   value1 := MyEnum::Value;
-  assert("MyEnum::Value failed to == 100 * 2", value1 == 100 * 2);
-  assert("Zero case of enum did not equal 0", value == 0);
+  assert(value1 == 100 * 2, "MyEnum::Value failed to == 100 * 2");
+  assert(value == 0, "Zero case of enum did not equal 0");
 }

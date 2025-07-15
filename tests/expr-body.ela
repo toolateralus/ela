@@ -1,7 +1,9 @@
+import assertion::*;
+
 fn getter() -> s32 => 100;
 
 #test fn test_expr_body_fn() {
-  assert("expr body != 100", getter() == 100);
+  assert(getter() == 100, "expr body != 100");
 }
 
 #test fn test_expr_body_switch() {
@@ -9,5 +11,5 @@ fn getter() -> s32 => 100;
     true: => 100,
     false: => 200,
   };
-  assert("switch with expr-bodies failed", v == 100);
+  assert(v == 100, "switch with expr-bodies failed");
 }

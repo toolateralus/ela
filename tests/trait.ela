@@ -1,3 +1,4 @@
+import assertion::*;
 
 #region basic_struct {
 
@@ -35,12 +36,12 @@
 }
 
 #test fn basic_struct() {
-  assert("trait failed", Struct::static_get() == 0);
-  assert("trait failed", Struct::static_get_self().a == 100);
+  assert(Struct::static_get() == 0, "trait failed");
+  assert(Struct::static_get_self().a == 100, "trait failed");
   mut instance: Struct;
-  assert("trait failed", instance.method_get() == 0);
-  assert("trait failed", instance.method_get_ptr() == 0);
-  assert("trait failed", instance.method_get_self().a == 100);
+  assert(instance.method_get() == 0, "trait failed");
+  assert(instance.method_get_ptr() == 0, "trait failed");
+  assert(instance.method_get_self().a == 100, "trait failed");
 }
 
 #region generic_interface_regular_struct {
@@ -78,12 +79,12 @@
 }
 
 #test fn generic_interface_regular_struct() {
-  assert("trait failed", Struct1::static_get() == 0);
-  assert("trait failed", Struct1::static_get_self().a == 100);
+  assert(Struct1::static_get() == 0, "trait failed");
+  assert(Struct1::static_get_self().a == 100, "trait failed");
   mut instance: Struct1;
-  assert("trait failed", instance.method_get() == 0);
-  assert("trait failed", instance.method_get_ptr() == 0);
-  assert("trait failed", instance.method_get_self().a == 100);
+  assert(instance.method_get() == 0, "trait failed");
+  assert(instance.method_get_ptr() == 0, "trait failed");
+  assert(instance.method_get_self().a == 100, "trait failed");
 }
 
 #region generic trait generic struct {
@@ -116,12 +117,12 @@
 }
 
 #test fn generic_struct_generic_interface() {
-  assert("trait failed", Struct2!<s32>::static_get() == 0);
-  assert("trait failed", Struct2!<s32>::static_get_self().n == 0);
+  assert(Struct2!<s32>::static_get() == 0, "trait failed");
+  assert(Struct2!<s32>::static_get_self().n == 0, "trait failed");
   mut instance: Struct2!<s32>;
-  assert("trait failed", instance.method_get() == 0);
-  assert("trait failed", instance.method_get_ptr() == 0);
-  assert("trait failed", instance.method_get_self().n == 0);
+  assert(instance.method_get() == 0, "trait failed");
+  assert(instance.method_get_ptr() == 0, "trait failed");
+  assert(instance.method_get_self().n == 0, "trait failed");
 }
 
 #region uninstantiated generic {
