@@ -847,6 +847,7 @@ struct ASTChoiceDeclaration : ASTDeclaration {
   InternedString name;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
+  bool destroy_glue_compiler_implementation_needed = false;
   std::vector<ASTChoiceVariant> variants;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CHOICE_DECLARATION; }

@@ -74,6 +74,10 @@ struct Typer : VisitorBase {
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
+
+  void implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *choice, const bool generic_instantiation,
+                                              const std::vector<Type *> generic_args = {});
+
   void visit_path_for_call(ASTPath *node);
   
   void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
@@ -93,6 +97,11 @@ struct Typer : VisitorBase {
   Type *iterable_trait() {
     static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
     return iterable_id;
+  }
+
+  Type *destroy_trait() {
+    static Type *destroy_id = ctx.scope->lookup("Destroy")->resolved_type;
+    return destroy_id;
   }
 
   Type *init_trait() {

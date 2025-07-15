@@ -1,0 +1,26 @@
+
+
+struct Destroyable {
+  memory: *u8,
+}
+impl Destroyable {
+  fn new() -> Self {
+    return .{
+      memory: std::c::malloc(sizeof(u8)),
+    };
+  }
+}
+
+impl Destroy for Destroyable {
+  fn destroy(*mut self, recursive: bool = false) {
+    std::c::free(self.memory);
+    self.memory = null;
+  }
+}
+
+#test fn test_using() {
+  using destroyable: Destroyable = Destroyable::new() {
+    assert_neq("destroyable.memory was null", destroyable.memory, null);
+  }
+  assert_eq("failed to release on using", destroyable.memory, null);
+}

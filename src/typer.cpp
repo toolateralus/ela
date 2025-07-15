@@ -356,6 +356,10 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
       } break;
     }
   }
+
+  // TODO: add an auto implementation of Destroy for any variants that support it, if any.
+
+  implement_destroy_glue_for_choice_type(node, generic_instantiation, generic_args);
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
@@ -1540,7 +1544,7 @@ void Typer::visit(ASTParamDecl *node) {
     node->normal.type->accept(this);
     Type *param_type = node->normal.type->resolved_type;
     node->resolved_type = param_type;
-    
+
     if (param_type == Type::INVALID_TYPE) {
       throw_error("Use of undeclared type.", node->source_range);
     }
@@ -3517,4 +3521,74 @@ void Typer::visit(ASTWhereStatement *node) {
     control_flow = {};
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
+}
+
+/// TODO: this needs ot happen for tuples too, any tuple that contains a "Destroy"able object needs to forward
+/// that declaration to the parent type, and this is where we steal therust nomenclature of "Drop Glue".
+void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, const bool generic_instantiation,
+                                                   const std::vector<Type *> generic_args) {
+  
+  return;
+                                                    //no-checkin
+  if (generic_instantiation) {
+    node = (ASTChoiceDeclaration *)find_generic_instance(node->generic_instantiations, generic_args);
+  }
+  Type *type = node->resolved_type;
+  ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
+
+  bool needs_destroy = false;
+  for (const auto &member : info->members) {
+    if (member.type->implements(destroy_trait())) {
+      needs_destroy = true;
+      break;
+    }
+  }
+
+  if (!needs_destroy) {
+    return;
+  }
+
+  type->traits.push_back(destroy_trait());
+  node->destroy_glue_compiler_implementation_needed = true;
+
+  FunctionTypeInfo func_info;
+  func_info.parameter_types[0] = node->resolved_type->take_pointer_to(true);
+  func_info.parameter_types[1] = bool_type();
+  func_info.params_len = 2;
+  func_info.return_type = void_type();
+  func_info.is_varargs = false;
+  Type *destroy_method_type_id = global_find_function_type_id(func_info, {});
+
+  ASTFunctionDeclaration *declaration = ast_alloc<ASTFunctionDeclaration>();
+  declaration->block = nullptr;
+  declaration->generic_arguments = {};
+  declaration->declaring_type = type;
+  declaration->resolved_type = destroy_method_type_id;
+  declaration->params = ast_alloc<ASTParamsDecl>();
+
+  {
+    ASTParamDecl *first_param = ast_alloc<ASTParamDecl>();
+    first_param->mutability = MUT;
+    first_param->tag = ASTParamDecl::Self;
+    first_param->self.is_pointer = true;
+    declaration->params->params.push_back(first_param);
+  }
+  {
+    ASTParamDecl *second_param = ast_alloc<ASTParamDecl>();
+    second_param->mutability = CONST;
+    second_param->tag = ASTParamDecl::Normal;
+    {
+      ASTLiteral *default_value = ast_alloc<ASTLiteral>();
+      default_value->value = "true";
+      default_value->tag = ASTLiteral::Bool;
+      second_param->normal.default_value = default_value;
+    }
+    {
+      second_param->normal.type = ast_alloc<ASTType>();
+      second_param->normal.type->resolved_type = bool_type();
+    }
+    declaration->params->params.push_back(second_param);
+  }
+
+  info->scope->insert_function("destroy", destroy_method_type_id, declaration);
 }
