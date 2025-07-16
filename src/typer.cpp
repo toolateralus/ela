@@ -54,6 +54,31 @@
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
 #endif
 
+std::string print_where_predicate(ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr *>(predicate);
+      auto op = bin->op;
+      if (op == TType::And) {
+        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
+      } else if (op == TType::Or) {
+        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
+      } else {
+        throw_error(
+            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+            bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      return predicate->resolved_type->to_string();
+    } break;
+    default:
+      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
+  }
+  return "";
+}
+
 void handle_generic_error(GenericInstantiationErrorUserData *data, const SourceRange &range) {
   reset_panic_handler();
   throw_error(std::format("Error at definition: {}\nerror: {}",
@@ -637,6 +662,26 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             ctx.set_scope(node->scope);
           },
           node->source_range);
+    } else if (decl_node && !decl_node->trait_bounds.empty()) {
+      GenericInstantiationErrorUserData data;
+      set_panic_handler(generic_instantiation_panic_handler);
+      set_error_user_data(&data);
+      Defer defer_1([] { reset_panic_handler(); });
+      if (_setjmp(data.save_state) == 0) {
+        for (auto &constraint : decl_node->trait_bounds) {
+          auto [target_type, predicate] = constraint;
+          target_type->accept(this);
+          auto type = target_type->resolved_type;
+          auto satisfied = visit_where_predicate(type, predicate);
+          if (!satisfied) {
+            throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(predicate),
+                                    get_unmangled_name(type)),
+                        node->source_range);
+          }
+        }
+      } else {
+        handle_generic_error(&data, node->source_range);
+      };
     }
   }
 
@@ -1890,7 +1935,7 @@ void Typer::visit(ASTType_Of *node) {
 }
 
 void Typer::visit(ASTType *node) {
-  if (node->resolved_type != Type::INVALID_TYPE) {
+  if (type_is_valid(node->resolved_type)) {
     return;
   }
 
@@ -3403,31 +3448,6 @@ void Typer::visit_path_for_call(ASTPath *node) {
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
 }
 
-std::string print_where_predicate(ASTExpr *predicate) {
-  switch (predicate->get_node_type()) {
-    case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op;
-      if (op == TType::And) {
-        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
-      } else if (op == TType::Or) {
-        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
-      } else {
-        throw_error(
-            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
-            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
-            bin->source_range);
-      }
-    } break;
-    case AST_NODE_TYPE: {
-      return predicate->resolved_type->to_string();
-    } break;
-    default:
-      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
-  }
-  return "";
-}
-
 bool Typer::visit_where_predicate_throws(Type *target_type, ASTExpr *predicate) {
   switch (predicate->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
@@ -3527,9 +3547,8 @@ void Typer::visit(ASTWhereStatement *node) {
 /// that declaration to the parent type, and this is where we steal therust nomenclature of "Drop Glue".
 void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, const bool generic_instantiation,
                                                    const std::vector<Type *> generic_args) {
-  
   return;
-                                                    //no-checkin
+  // no-checkin
   if (generic_instantiation) {
     node = (ASTChoiceDeclaration *)find_generic_instance(node->generic_instantiations, generic_args);
   }

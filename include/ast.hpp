@@ -813,14 +813,6 @@ struct ASTType_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTTraitDeclaration : ASTDeclaration {
-  Nullable<ASTWhere> where_clause;
-  InternedString name;
-  Scope *scope;
-  std::vector<ASTFunctionDeclaration *> methods;
-  ASTNodeType get_node_type() const override { return AST_NODE_TRAIT_DECLARATION; }
-  void accept(VisitorBase *visitor) override;
-};
 
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
@@ -971,6 +963,16 @@ struct ASTWhere : ASTExpr {
   */
   std::vector<Constraint> constraints;
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
+  void accept(VisitorBase *visitor) override;
+};
+
+struct ASTTraitDeclaration : ASTDeclaration {
+  Nullable<ASTWhere> where_clause;
+  InternedString name;
+  Scope *scope;
+  std::vector<ASTFunctionDeclaration *> methods;
+  std::vector<Constraint> trait_bounds;
+  ASTNodeType get_node_type() const override { return AST_NODE_TRAIT_DECLARATION; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -1155,6 +1157,7 @@ struct Typer;
 struct Parser {
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
+  ASTStatement *parse_using_stmt();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();

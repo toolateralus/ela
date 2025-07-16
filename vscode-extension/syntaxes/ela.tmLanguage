@@ -155,13 +155,13 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch|dyn|module|extern)\b</string>
+					<string>\b(if|then|else|for|while|defer|return|switch|dyn|module|extern)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(break|прерв|continue|продолжать)\b</string>
+					<string>\b(break|прерв|continue)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
@@ -203,7 +203,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\&mut|\&const|\*mut|\*const|mut|const|где|where|as|как|in|в|is|является|import)\b</string>
+					<string>\b(\&amp;mut|\&amp;const|\*mut|\*const|mut|const|using|where|as|in|is|import)\b</string>
 					<key>name</key>
 					<string>keyword.function.ela</string>
 				</dict>

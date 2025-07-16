@@ -1419,6 +1419,61 @@ void Parser::parse_destructure_element_value_semantic(DestructureElement &destru
   }
 }
 
+ASTStatement *Parser::parse_using_stmt() {
+  eat();
+  ASTVariable *variable = parse_variable();
+
+  ASTBlock *block = current_block.get();
+  NODE_ALLOC(ASTDefer, defer_ast, range6, defer7, this);
+
+  bool parsed_block = false;
+  if (peek().type == TType::LCurly) {
+    parsed_block = true;
+    block = parse_block();
+    block->statements.insert(block->statements.begin(), variable);
+    block->statements.insert(block->statements.begin() + 1, defer_ast);
+  } else {  // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
+    block->statements.push_back(variable);
+    block->statements.push_back(defer_ast);
+  }
+
+  // the variable.destroy() method call.
+  NODE_ALLOC(ASTMethodCall, method_call, range, defer, this);
+
+  NODE_ALLOC(ASTExprStatement, expr_stmt, range5, defer5, this);
+
+  expr_stmt->expression = method_call;
+  defer_ast->statement = expr_stmt;
+
+  {  // create the variable.destroy() paths.
+    // variable.
+    NODE_ALLOC(ASTPath, path, range1, defer1, this);
+    path->push_segment(variable->name);
+    // .destroy()
+    NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
+    dot->base = path;
+    dot->member = ASTPath::Segment{.identifier = "destroy"};
+    method_call->callee = dot;
+  }
+
+  // create arguments.
+  NODE_ALLOC(ASTArguments, arguments, range3, defer3, this);
+
+  {  // push the recursive: true argument
+    NODE_ALLOC(ASTLiteral, literal, range4, defer4, this);
+    literal->tag = ASTLiteral::Bool;
+    literal->value = "true";
+    arguments->arguments.push_back(literal);
+  }
+  method_call->arguments = arguments;
+
+  if (parsed_block) {
+    return block;
+  } else {
+    static auto noop = ast_alloc<ASTNoop>();
+    return noop;
+  }
+}
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
@@ -1603,46 +1658,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (peek().type == TType::Using) {
-    eat();
-    ASTVariable *variable = parse_variable();
-    ASTBlock *block = parse_block();
-    block->statements.insert(block->statements.begin(), variable);
-
-    // the variable.destroy() method call.
-    NODE_ALLOC(ASTMethodCall, method_call, range, defer, this);
-
-    NODE_ALLOC(ASTExprStatement, expr_stmt, range5, defer5, this);
-    NODE_ALLOC(ASTDefer, defer_ast, range6, defer7, this);
-
-    expr_stmt->expression = method_call;
-    defer_ast->statement=expr_stmt;
-
-    block->statements.insert(block->statements.begin() + 1, defer_ast);
-    
-
-    {  // create the variable.destroy() paths.
-      // variable.
-      NODE_ALLOC(ASTPath, path, range1, defer1, this);
-      path->push_segment(variable->name);
-      // .destroy()
-      NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
-      dot->base = path;
-      dot->member = ASTPath::Segment{.identifier = "destroy"};
-      method_call->callee = dot;
-    }
-
-    // create arguments.
-    NODE_ALLOC(ASTArguments, arguments, range3, defer3, this);
-
-    {  // push the recursive: true argument
-      NODE_ALLOC(ASTLiteral, literal, range4, defer4, this);
-      literal->tag = ASTLiteral::Bool;
-      literal->value = "true";
-      arguments->arguments.push_back(literal);
-    }
-    method_call->arguments = arguments;
-
-    return block;
+    return parse_using_stmt();
   }
 
   // * Control flow
@@ -2368,6 +2384,25 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
     node->generic_parameters = parse_generic_parameters();
   }
 
+   if (peek().type == TType::Colon) {
+    eat();
+    auto &constraints = node->trait_bounds;
+    auto parse_constraint = [&] -> Constraint {
+      ASTExpr *condition = parse_type();
+      while (peek().type == TType::And || peek().type == TType::Or) {
+        NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+        binexpr->op = eat().type;
+        binexpr->right = parse_type();
+        binexpr->left = condition;
+        condition = (ASTExpr *)binexpr;
+      }
+      NODE_ALLOC(ASTType, self_type, range, defer, this);
+      self_type->kind = ASTType::SELF;
+      return {self_type, condition};
+    };
+    constraints.push_back(parse_constraint());
+  } 
+  
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
