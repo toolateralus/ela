@@ -482,6 +482,7 @@ struct ASTLiteral : ASTExpr {
     Integer,
     Float,
     String,
+    MultiLineString,
     Char,
     Bool,
     Null,

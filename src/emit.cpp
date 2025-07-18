@@ -735,6 +735,40 @@ void Emitter::visit(ASTLiteral *node) {
         return;
       }
     } break;
+    case ASTLiteral::MultiLineString: {
+      auto str = node->value.get_str();
+      size_t length = 0;
+      std::stringstream ss;
+      ss << "(str) { .data = ";
+    
+      size_t start = 0;
+      while (start < str.size()) {
+        size_t end = str.find('\n', start);
+        if (end == std::string::npos) end = str.size();
+        std::string line = str.substr(start, end - start);
+    
+        ss << "\"";
+        // Emit the actual line content, escaping quotes and backslashes
+        for (char c : line) {
+          if (c == '\\' || c == '"') ss << '\\';
+          ss << c;
+        }
+        length += line.size();
+    
+        if (end < str.size()) {
+          ss << "\\n\"";
+          length += 1; // for the newline
+        } else {
+          ss << "\"";
+        }
+    
+        start = end + 1;
+      }
+    
+      ss << ", .length = " << length << " }";
+      code << ss.str();
+      return;
+    } break;
     case ASTLiteral::Float:
       if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";

@@ -5,11 +5,10 @@
 using std::string;
 using std::stringstream;
 
-
-static std::set<std::string> reserved = {"auto",   "break",  "case",    "const",    "continue", "default",  "do", "char",
-                                         "double", "else",   "enum",    "extern",   "float",    "for",      "goto",
-                                         "if",     "int",    "long",    "register", "return",   "short",    "signed",
-                                         "struct", "switch", "typedef", "union",    "unsigned", "volatile", "while"};
+static std::set<std::string> reserved = {
+    "auto",  "break",  "case",   "const",  "continue", "default", "do",       "char",     "double",   "else",
+    "enum",  "extern", "float",  "for",    "goto",     "if",      "int",      "long",     "register", "return",
+    "short", "signed", "struct", "switch", "typedef",  "union",   "unsigned", "volatile", "while"};
 
 void Lexer::get_token(State &state) {
   size_t &pos = state.pos;
@@ -26,7 +25,7 @@ void Lexer::get_token(State &state) {
     if (c == '\n') {
       pos++;
       lines++;
-      col = 1; // Reset column position at the start of a new line
+      col = 1;  // Reset column position at the start of a new line
       continue;
     }
 
@@ -43,7 +42,7 @@ void Lexer::get_token(State &state) {
       size_t newlinePos = input.find('\n', pos);
       if (newlinePos != std::string::npos) {
         lines++;
-        col = 1; // Reset column position at the start of a new line
+        col = 1;  // Reset column position at the start of a new line
         pos = newlinePos + 1;
       } else {
         pos = len;
@@ -54,31 +53,31 @@ void Lexer::get_token(State &state) {
     // multi line comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
       int depth = 1;
-      pos+=2;
-      col+=2;
-      while (pos+1<len && depth>0) {
-        if (pos + 1 < len && input[pos] == '/' && input[pos+1] == '*') {
+      pos += 2;
+      col += 2;
+      while (pos + 1 < len && depth > 0) {
+        if (pos + 1 < len && input[pos] == '/' && input[pos + 1] == '*') {
           depth++;
-          pos+=2;
-          col+=2;
+          pos += 2;
+          col += 2;
           continue;
         }
-        if (pos + 1 < len && input[pos] == '*' && input[pos+1] == '/') {
+        if (pos + 1 < len && input[pos] == '*' && input[pos + 1] == '/') {
           depth--;
-          col+=2;
-          pos+=2;
+          col += 2;
+          pos += 2;
           continue;
         }
 
-        if (input[pos]=='\n') {
+        if (input[pos] == '\n') {
           lines++;
-          col=1;
+          col = 1;
         } else {
           col++;
         }
         pos++;
 
-        if (depth==0) {
+        if (depth == 0) {
           break;
         }
       }
@@ -88,98 +87,118 @@ void Lexer::get_token(State &state) {
     SourceRange location{state.line, state.col, state.file_idx};
 
     if (c == '\'') {
-        pos++; // move past '
+      pos++;  // move past '
+      col++;
+      c = input[pos];
+      uint32_t codepoint = 0;
+
+      if (c == '\\') {
+        // Handle escape sequences
+        pos++;
         col++;
         c = input[pos];
-        uint32_t codepoint = 0;
-    
-        if (c == '\\') {
-            // Handle escape sequences
+        pos++;
+        col++;
+        switch (c) {
+          case 'n':
+            codepoint = '\n';
+            break;
+          case 'v':
+            codepoint = '\v';
+            break;
+          case 'b':
+            codepoint = '\b';
+            break;
+          case 't':
+            codepoint = '\t';
+            break;
+          case 'f':
+            codepoint = '\f';
+            break;
+          case 'r':
+            codepoint = '\r';
+            break;
+          case '\\':
+            codepoint = '\\';
+            break;
+          case '\'':
+            codepoint = '\'';
+            break;
+          case '\"':
+            codepoint = '\"';
+            break;
+          case '0':
+            codepoint = '\0';
+            break;
+          case 'x':
+          case 'u':
+          case 'U': {
+            int num_digits = (c == 'x') ? 2 : (c == 'u') ? 4 : 8;
             pos++;
             col++;
-            c = input[pos];
-            pos++;
-            col++;
-            switch (c) {
-                case 'n': codepoint = '\n'; break;
-                case 'v': codepoint = '\v'; break;
-                case 'b': codepoint = '\b'; break;
-                case 't': codepoint = '\t'; break;
-                case 'f': codepoint = '\f'; break;
-                case 'r': codepoint = '\r'; break;
-                case '\\': codepoint = '\\'; break;
-                case '\'': codepoint = '\''; break;
-                case '\"': codepoint = '\"'; break;
-                case '0': codepoint = '\0'; break;
-                case 'x':
-                case 'u':
-                case 'U': {
-                    int num_digits = (c == 'x') ? 2 : (c == 'u') ? 4 : 8;
-                    pos++;
-                    col++;
-                    codepoint = 0;
-                    for (int i = 0; i < num_digits; ++i) {
-                        if (pos >= input.size() || !std::isxdigit(input[pos])) {
-                            throw_error("invalid hexadecimal escape sequence", {location});
-                        }
-                        codepoint = (codepoint << 4) | std::stoi(std::string(1, input[pos]), nullptr, 16);
-                        pos++;
-                        col++;
-                    }
-                    break;
-                }
-                default:
-                    if (c >= '0' && c <= '7') { // Octal escape sequence
-                        codepoint = 0;
-                        for (int i = 0; i < 3 && c >= '0' && c <= '7'; ++i) {
-                            codepoint = (codepoint << 3) | (c - '0');
-                            pos++;
-                            col++;
-                            c = input[pos];
-                        }
-                    } else {
-                        throw_error(std::format("invalid escape sequence {}", c), {location});
-                    }
-                    break;
+            codepoint = 0;
+            for (int i = 0; i < num_digits; ++i) {
+              if (pos >= input.size() || !std::isxdigit(input[pos])) {
+                throw_error("invalid hexadecimal escape sequence", {location});
+              }
+              codepoint = (codepoint << 4) | std::stoi(std::string(1, input[pos]), nullptr, 16);
+              pos++;
+              col++;
             }
-        } else if (DOESNT_HAVE_FLAG(c, 0x80)) {
-            // ASCII character
-            codepoint = c;
-            pos++;
-            col++;
-        } else {
-            // UTF-8 character
-            int num_bytes = 0;
-            if ((c & 0xE0) == 0xC0)
-                num_bytes = 2;
-            else if ((c & 0xF0) == 0xE0)
-                num_bytes = 3;
-            else if ((c & 0xF8) == 0xF0)
-                num_bytes = 4;
-            else
-                throw_error("invalid UTF-8 start byte", {location});
-    
-            for (int i = 0; i < num_bytes; ++i) {
-                if (pos >= input.size() || (i > 0 && (input[pos] & 0xC0) != 0x80)) {
-                    throw_error("invalid UTF-8 continuation byte", {location});
-                }
-                codepoint = (codepoint << 6) | (input[pos] & 0x3F);
+            break;
+          }
+          default:
+            if (c >= '0' && c <= '7') {  // Octal escape sequence
+              codepoint = 0;
+              for (int i = 0; i < 3 && c >= '0' && c <= '7'; ++i) {
+                codepoint = (codepoint << 3) | (c - '0');
                 pos++;
                 col++;
+                c = input[pos];
+              }
+            } else {
+              throw_error(std::format("invalid escape sequence {}", c), {location});
             }
+            break;
         }
-    
-        c = input[pos];
-        if (c != '\'') {
-            throw_error(std::format("invalid char literal: too many characters {}", codepoint), {location});
-        }
-        pos++; // move past '
+      } else if (DOESNT_HAVE_FLAG(c, 0x80)) {
+        // ASCII character
+        codepoint = c;
+        pos++;
         col++;
-    
-        std::stringstream ss;
-        ss << "0x" << std::hex << codepoint;
-        state.lookahead_buffer.push_back(Token(location, ss.str(), TType::Char, TFamily::Literal));
-        return;
+      } else {
+        // UTF-8 character
+        int num_bytes = 0;
+        if ((c & 0xE0) == 0xC0)
+          num_bytes = 2;
+        else if ((c & 0xF0) == 0xE0)
+          num_bytes = 3;
+        else if ((c & 0xF8) == 0xF0)
+          num_bytes = 4;
+        else
+          throw_error("invalid UTF-8 start byte", {location});
+
+        for (int i = 0; i < num_bytes; ++i) {
+          if (pos >= input.size() || (i > 0 && (input[pos] & 0xC0) != 0x80)) {
+            throw_error("invalid UTF-8 continuation byte", {location});
+          }
+          codepoint = (codepoint << 6) | (input[pos] & 0x3F);
+          pos++;
+          col++;
+        }
+      }
+
+      c = input[pos];
+      if (c != '\'') {
+        throw_error(std::format("invalid char literal: too many characters {}", codepoint), {location});
+      }
+      pos++;  // move past '
+      col++;
+
+      std::stringstream ss;
+      ss << "0x" << std::hex << codepoint;
+      state.lookahead_buffer.push_back(Token(location, ss.str(), TType::Char, TFamily::Literal));
+      return;
     }
 
     if (c == '"') {
@@ -190,7 +209,8 @@ void Lexer::get_token(State &state) {
         c = input[pos];
         if (c == '"') {
           break;
-        } if (c == '\n') {
+        }
+        if (c == '\n') {
           throw_error("You can't directly embed a '\\n' in string by just letting it span multiple lines", {location});
         } else if (c == '\\') {
           if (pos + 1 < len) {
@@ -216,15 +236,42 @@ void Lexer::get_token(State &state) {
       return;
     }
 
+    if (c == '#' && pos + 1 < len && input[pos + 1] == '"') {
+      pos += 2;  // Skip #"
+      col += 2;
+      while (pos < len) {
+        // Check for end delimiter: '"#'
+        if (input[pos] == '"' && pos + 1 < len && input[pos + 1] == '#') {
+          break;
+        }
+        c = input[pos];
+        if (c == '\n') {
+          lines++;
+          col = 1;
+        } else {
+          col++;
+        }
+        token.put(c);
+        pos++;
+      }
+      if (pos + 1 >= len || input[pos] != '"' || input[pos + 1] != '#') {
+        throw_error("unterminated multi-line string literal", {location});
+      }
+      pos += 2;  // Skip closing '"#'
+      col += 2;
+      state.lookahead_buffer.push_back(Token(location, token.str(), TType::MultiLineString, TFamily::Literal));
+      return;
+    }
+
     if (std::isalpha(c) || c == '_' ||
-        (c & 0x80) != 0) { // Check if the character is alphabetic, underscore, or a UTF-8 start byte
+        (c & 0x80) != 0) {  // Check if the character is alphabetic, underscore, or a UTF-8 start byte
       while (pos < len) {
         if (std::isalnum(c) || c == '_') {
           token << c;
           pos++;
           col++;
           c = input[pos];
-        } else if (HAS_FLAG(c, 0x80)) { // Check if the character is a UTF-8 start byte
+        } else if (HAS_FLAG(c, 0x80)) {  // Check if the character is a UTF-8 start byte
           int num_bytes = 0;
           if ((c & 0xE0) == 0xC0)
             num_bytes = 2;
@@ -233,11 +280,11 @@ void Lexer::get_token(State &state) {
           else if ((c & 0xF8) == 0xF0)
             num_bytes = 4;
           else
-            break; // Stop processing if it's not a valid UTF-8 start byte
+            break;  // Stop processing if it's not a valid UTF-8 start byte
 
           for (int i = 0; i < num_bytes; ++i) {
             if (pos >= len || (i > 0 && (input[pos] & 0xC0) != 0x80)) {
-              break; // Stop processing if it's not a valid UTF-8 continuation byte
+              break;  // Stop processing if it's not a valid UTF-8 continuation byte
             }
             token << input[pos];
             pos++;
@@ -246,7 +293,7 @@ void Lexer::get_token(State &state) {
 
           c = input[pos];
         } else {
-          break; // Stop processing if it's not a valid identifier character
+          break;  // Stop processing if it's not a valid identifier character
         }
       }
 
@@ -295,12 +342,12 @@ void Lexer::get_token(State &state) {
       bool is_bin = false;
       if (c == '0' && (input[pos + 1] == 'x' || input[pos + 1] == 'X')) {
         is_hex = true;
-        pos += 2; // Skip '0x'
+        pos += 2;  // Skip '0x'
         col += 2;
         c = input[pos];
       } else if (c == '0' && (input[pos + 1] == 'b' || input[pos + 1] == 'B')) {
         is_bin = true;
-        pos += 2; // Skip '0b'
+        pos += 2;  // Skip '0b'
         col += 2;
         c = input[pos];
       }
@@ -312,7 +359,7 @@ void Lexer::get_token(State &state) {
           col++;
           c = input[pos];
         }
-        if (c == '.' && pos + 1 < len && (input[pos + 1] == '.' || !isdigit(input[pos+1]))) {
+        if (c == '.' && pos + 1 < len && (input[pos + 1] == '.' || !isdigit(input[pos + 1]))) {
           break;
         }
         if (c == '.') {

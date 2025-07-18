@@ -1081,7 +1081,17 @@ ASTExpr *Parser::parse_primary() {
         literal->is_c_string = true;
         eat();
       }
-      end_node(literal, range);
+      return literal;
+    }
+    case TType::MultiLineString: {
+      NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
+      literal->tag = ASTLiteral::MultiLineString;
+      literal->value = tok.value;
+      if (peek().type == TType::Identifier && peek().value == "c") {
+        literal->is_c_string = true;
+        eat();
+      }
       return literal;
     }
     case TType::LParen: {

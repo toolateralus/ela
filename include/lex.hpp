@@ -17,6 +17,7 @@ enum struct TType {
   Integer,
   Float,
   String,
+  MultiLineString,
   Char,
 
   Assign,
@@ -132,6 +133,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(MultiLineString);
     TTYPE_CASE(Using);
     TTYPE_CASE(Extern);
     TTYPE_CASE(Char);

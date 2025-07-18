@@ -2245,6 +2245,7 @@ void Typer::visit(ASTLiteral *node) {
         node->resolved_type = f32_type();
       }
       return;
+    case ASTLiteral::MultiLineString:
     case ASTLiteral::String: {
       static bool nostdlib = compile_command.has_flag("nostdlib");
       if (nostdlib) {
@@ -2259,6 +2260,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     }
+    
     case ASTLiteral::Bool:
       node->resolved_type = bool_type();
       return;
