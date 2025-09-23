@@ -224,3 +224,13 @@ recursive pattern stuff like this should work, to any degree:
 
 ```
 
+#### Instead of variadics, we could..
+  (...tuple) allow for tuple unpacking.
+
+  ```rust
+
+  fn printf!<T>(fmt: str, tuple: T) where T: IsTuple {
+    std::c::printf(fmt, ...tuple);
+  }
+
+  ```

@@ -90,11 +90,11 @@ struct Strakt {
 impl Strakt {
   fn new() -> Self {
     mut self: Self;
-    self.obj = dynof(new(0));
+    self.obj = dynof(new(0, get_global_allocator()));
     return self;
   }
 
   fn init(*mut self) {
-    self.obj = dynof(new(0));
+    self.obj = dynof(new(0, get_global_allocator()));
   }
 }

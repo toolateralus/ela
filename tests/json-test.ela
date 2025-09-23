@@ -14,5 +14,6 @@ impl JsonValueDeleter {
     for val in self.vals {
       std::c::free(val);
     }
+    vals.destroy();
   }
 }
