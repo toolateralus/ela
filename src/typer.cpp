@@ -923,21 +923,32 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   // this just stores the old type and restores it when we exit.
   // the actual expected type is set per parameter.
   ENTER_EXPECTED_TYPE(nullptr);
-  auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
   {  // Check the other parameters, besides self.
-    for (size_t arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
+    for (size_t arg_index = 0; arg_index < node->arguments.size() || param_index < params_ct; ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
-        if (arg_index < args_ct) {
+
+        if (arg_index < node->arguments.size()) {
           // Argument provided, type-check it
           expected_type = param->resolved_type;
-          node->arguments[arg_index]->accept(this);
+
+          ASTExpr *arg = node->arguments[arg_index];
+          if (arg->get_node_type() == AST_NODE_UNPACK) {
+            node->arguments.erase(node->arguments.begin() + arg_index);
+            arg_index--;
+            param_index--;
+            current_expression_list = &node->arguments;
+            arg->accept(this);
+            continue;
+          }
+
+          arg->accept(this);
 
           assert_types_can_cast_or_equal(
-              node->arguments[arg_index], param->resolved_type, node->arguments[arg_index]->source_range,
+              arg, param->resolved_type, arg->source_range,
               std::format("unexpected argument type.. parameter #{} of function",
                           arg_index + 1));  // +1 here to make it 1-based indexing for user. more intuitive
 
@@ -1031,23 +1042,55 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
 void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
   ENTER_EXPECTED_TYPE(nullptr);
-  auto args_ct = node->arguments.size();
-  // TODO: rewrite this. this is so hard tor read.
-  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
-    throw_error(
-        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
-                    info->params_len, args_ct, info->to_string()),
-        node->source_range);
-  }
-
-  for (size_t i = 0; i < args_ct; ++i) {
+  // Process arguments dynamically because unpack expressions (`...expr`) expand into
+  // multiple arguments at visit time. We therefore must not cache the initial
+  // argument count.
+  size_t i = 0;
+  while (i < node->arguments.size()) {
     auto arg = node->arguments[i];
+
+    // Handle unpack nodes by erasing the placeholder and visiting it which will
+    // push `ASTUnpackElement` nodes into `node->arguments` at the current
+    // insertion point via `current_expression_list` (see `visit(ASTUnpackExpr)`).
+    if (arg->get_node_type() == AST_NODE_UNPACK) {
+      node->arguments.erase(node->arguments.begin() + i);
+      current_expression_list = &node->arguments;
+      arg->accept(this);
+      // Do not advance `i` because new elements were inserted at position `i`.
+      continue;
+    }
+
+    if (i >= info->params_len) {
+      // We've exceeded the declared parameters.
+      if (!info->is_varargs) {
+        std::stringstream ss;
+        ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
+           << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+        throw_error(ss.str(), node->source_range);
+      }
+
+      // Varargs: accept remaining args without type checks.
+      expected_type = Type::INVALID_TYPE;
+      arg->accept(this);
+      ++i;
+      continue;
+    }
+
+    // Normal parameter position — type-check against parameter type.
     expected_type = info->parameter_types[i];
     arg->accept(this);
-    if (i < info->params_len) {
-      assert_types_can_cast_or_equal(arg, info->parameter_types[i], arg->source_range,
-                                     std::format("invalid argument type for parameter #{}", i + 1));
-    }
+    assert_types_can_cast_or_equal(arg, info->parameter_types[i], arg->source_range,
+                                   std::format("invalid argument type for parameter #{}", i + 1));
+
+    ++i;
+  }
+
+  // After expanding unpack expressions, ensure we have at least the required parameters.
+  if (node->arguments.size() < info->params_len) {
+    std::stringstream ss;
+    ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
+       << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+    throw_error(ss.str(), node->source_range);
   }
 }
 
@@ -1899,6 +1942,18 @@ void Typer::visit(ASTArguments *node) {
   }
   for (size_t i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
+
+    /*
+      TODO: let's add a more graceful way to do this
+    */
+    if (arg->get_node_type() == AST_NODE_UNPACK) {
+      node->arguments.erase(node->arguments.begin() + i);
+      i--;
+      current_expression_list = &node->arguments;
+      arg->accept(this);
+      continue;
+    }
+
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -3618,4 +3673,32 @@ void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, c
   }
 
   info->scope->insert_function("destroy", destroy_method_type_id, declaration);
+}
+
+void Typer::visit(ASTUnpackExpr *node) {
+  ASTExpr *expr = node->expression;
+  expr->accept(this);
+  if (!expr->resolved_type->is_kind(TYPE_TUPLE)) {
+    throw_error("Cannot use an unpack expression '...<expr>' on a non-tuple type.", node->source_range);
+  }
+  node->resolved_type = void_type();
+
+  TupleTypeInfo *info = expr->resolved_type->info->as<TupleTypeInfo>();
+
+  static int temp_idx = 0;
+
+  for (size_t i = 0; i < info->types.size(); ++i) {
+    Type *type = info->types[i];
+    auto element = ast_alloc<ASTUnpackElement>();
+    element->source_temp_id = "$unpack" + std::to_string(temp_idx);
+    element->source_range = node->source_range;
+    element->source_tuple = node->expression;
+    element->resolved_type = type;
+    element->element_index = i;
+    current_expression_list.get()->push_back(element);
+  }
+}
+
+void Typer::visit(ASTUnpackElement *element) {
+  // Do nothing. this is essentially a placeholder, until emit time.
 }

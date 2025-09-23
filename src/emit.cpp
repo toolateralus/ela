@@ -697,11 +697,43 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
   emit_arguments_no_parens(arguments);
 }
 
+void Emitter::collect_and_declare_unpack_elements_before_call(ASTArguments *arguments) {
+  // Collect unpack elements and materialize their source temporaries so their lifetime
+  // is extended (similar to pattern-matching temporaries). Replace each unpack element's
+  // source_temp_id with a fresh temp so later emission can simply reference that temp.
+  static size_t _unpack_temp_counter = 0;
+  std::vector<std::string> seen_sources;
+  seen_sources.reserve(arguments->arguments.size());
+
+  for (auto &arg : arguments->arguments) {
+    if (arg->get_node_type() != AST_NODE_UNPACK_ELEMENT) {
+      continue;
+    }
+
+    auto element = (ASTUnpackElement *)arg;
+    const auto temp_id = element->source_temp_id;
+    auto it = std::find(seen_sources.begin(), seen_sources.end(), temp_id);
+
+    if (it != seen_sources.end()) {
+      continue;
+    }
+
+    emit_line_directive(arg);
+    code << indent() << "auto " << temp_id << " = ";
+    element->source_tuple->accept(this);
+    code << ";\n";
+
+    seen_sources.push_back(temp_id);
+  }
+}
+
 void Emitter::visit(ASTCall *node) {
   std::vector<Type *> generic_args;
   if (node->has_generics()) {
     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
+
+  collect_and_declare_unpack_elements_before_call(node->arguments);
 
   auto resolved_func_type = node->callee->resolved_type;
 
@@ -2078,6 +2110,7 @@ void Emitter::visit(ASTMethodCall *node) {
         args.insert(args.begin(), dot);
       }
     }
+    collect_and_declare_unpack_elements_before_call(node->arguments);
 
     auto func = node->callee;
     func->accept(this);
@@ -2634,4 +2667,11 @@ void Emitter::visit(ASTWhereStatement *node) {
     branch->block.get()->accept(this);
     return;
   }
+}
+
+// This does nothing here, it's delegated to the unpack elements.
+void Emitter::visit(ASTUnpackExpr *) {}
+
+void Emitter::visit(ASTUnpackElement *node) {
+  code << node->source_temp_id + ".$" + std::to_string(node->element_index);
 }

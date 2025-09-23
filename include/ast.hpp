@@ -66,6 +66,8 @@ enum ASTNodeType {
   AST_NODE_DEFER,
   AST_NODE_CAST,
   AST_NODE_LAMBDA,
+  AST_NODE_UNPACK,
+  AST_NODE_UNPACK_ELEMENT,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
@@ -814,7 +816,6 @@ struct ASTType_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
   Type *underlying_type;
@@ -952,6 +953,22 @@ struct ASTLambda : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_LAMBDA; }
   void accept(VisitorBase *visitor) override;
 };
+
+struct ASTUnpackExpr : ASTExpr {
+  // the source of the unpack, such as a variable, function result, literal, etc.
+  ASTExpr *expression;
+  ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
+  void accept(VisitorBase *visitor) override;
+};
+
+struct ASTUnpackElement: ASTExpr {
+  std::string source_temp_id;
+  ASTExpr *source_tuple;
+  int element_index;
+  ASTNodeType get_node_type() const override { return AST_NODE_UNPACK_ELEMENT; }
+  void accept(VisitorBase *visitor) override;
+};
+
 
 // The first value is the target type.
 // The second value is the condition/constraint being applied.

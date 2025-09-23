@@ -13,6 +13,10 @@
 // {
 
 // clang-format off
+
+void ASTUnpackElement::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTUnpackExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
+
 void ASTDyn_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTModule::accept(VisitorBase *visitor) { visitor->visit(this); }

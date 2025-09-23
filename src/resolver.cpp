@@ -624,3 +624,13 @@ void Resolver::visit(ASTWhereStatement *node) {
     return;
   }
 }
+
+// This does nothing here, it's delegated to the unpack elements.
+void Resolver::visit(ASTUnpackExpr *) {}
+
+void Resolver::visit(ASTUnpackElement *node) {
+  node->source_tuple->accept(this);
+  TupleTypeInfo *info = node->source_tuple->resolved_type->info->as<TupleTypeInfo>();
+  Type *element_type = info->types[node->element_index];
+  define_type(element_type);
+}

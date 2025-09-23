@@ -67,6 +67,8 @@ struct ASTCopier {
   ASTPatternMatch *copy_pattern_match(ASTPatternMatch *node);
   ASTPath *copy_path(ASTPath *node);
   ASTMethodCall *copy_method_call(ASTMethodCall *node);
+  ASTUnpackExpr *copy_unpack(ASTUnpackExpr *node);
+  ASTUnpackElement *copy_unpack_element(ASTUnpackElement *node);
 };
 
 ASTNode *deep_copy_ast(ASTNode *root);

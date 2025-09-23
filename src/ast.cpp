@@ -880,6 +880,12 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Varargs: {
+      NODE_ALLOC(ASTUnpackExpr, node, range, defer, this)
+      eat();
+      node->expression =parse_expr();
+      return node;
+    };
     case TType::Self: {
       return parse_type();
     }
@@ -2941,3 +2947,4 @@ bool ASTNode::is_expr() {
       return dynamic_cast<ASTExpr *>(this);
   }
 }
+

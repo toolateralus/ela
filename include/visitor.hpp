@@ -59,6 +59,8 @@ struct VisitorBase {
   virtual void visit(ASTChoiceDeclaration *node) = 0;
   virtual void visit(ASTModule *node) = 0;
   virtual void visit(ASTType_Of *node) = 0;
+  virtual void visit(ASTUnpackExpr *node) = 0;
+  virtual void visit(ASTUnpackElement *node) = 0;
   virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -68,11 +70,19 @@ struct VisitorBase {
 };
 
 struct Typer : VisitorBase {
+
   Nullable<ASTType> type_context = nullptr;
   Type *expected_type = Type::INVALID_TYPE;
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
+
+  // This is strictly for unpack expressions right now,
+  // collection initializers  '[...tuple] '
+  // other tuples             '(...tuple) '
+  // arguments                'fn(...tuple)'
+  Nullable<std::vector<ASTExpr *>> current_expression_list;
+
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
 
   void implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *choice, const bool generic_instantiation,
@@ -135,6 +145,7 @@ struct Typer : VisitorBase {
   void visit(ASTTraitDeclaration *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
+  void visit(ASTUnpackElement *node) override;
 
   std::vector<Type *> get_generic_arg_types(const std::vector<ASTExpr *> &args);
 
@@ -189,6 +200,7 @@ struct Typer : VisitorBase {
   void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
+  void visit(ASTUnpackExpr *node) override;
 
   bool visit_where_predicate(Type *type, ASTExpr *node);
   bool visit_where_predicate_throws(Type *type, ASTExpr *node);
@@ -357,6 +369,9 @@ struct Emitter : VisitorBase {
   void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
+  void visit(ASTUnpackExpr *node) override;
+  void visit(ASTUnpackElement *node) override;
+  
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -374,6 +389,8 @@ struct Emitter : VisitorBase {
   void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
   void emit_choice_marker_variant_instantiation(Type *type, ASTPath *value);
+
+  void collect_and_declare_unpack_elements_before_call(ASTArguments *arguments);
 };
 
 struct Resolver : VisitorBase {
@@ -432,6 +449,8 @@ struct Resolver : VisitorBase {
   void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
+  void visit(ASTUnpackExpr *node) override;
+  void visit(ASTUnpackElement *node) override;
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
