@@ -820,6 +820,8 @@ void Emitter::visit(ASTLiteral *node) {
 }
 
 void Emitter::visit(ASTUnaryExpr *node) {
+
+  // ! What the hell is this doing
   if (node->op == TType::Sub) {
     auto type = type_to_string(node->operand->resolved_type);
     code << '(' << type << ')';
@@ -835,9 +837,18 @@ void Emitter::visit(ASTUnaryExpr *node) {
 
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
+
   if (node->op == TType::Increment || node->op == TType::Decrement) {
     node->operand->accept(this);
     code << ttype_get_operator_string(node->op, node->source_range);
+  } else if (node->op == TType::And && node->operand->is_temporary_value()) {
+    *inserting_at_cursor = true;
+    auto temp_name = get_temporary_variable();
+    code << type_to_string(node->operand->resolved_type) << " " << temp_name << " = ";
+    node->operand->accept(this);
+    code << ";\n";
+    *inserting_at_cursor = false;
+    code << "&" << temp_name;
   } else {
     code << '(';
     code << ttype_get_operator_string(node->op, node->source_range);
@@ -1950,7 +1961,7 @@ void Emitter::visit(ASTBlock *node) {
     if (statement->get_node_type() == AST_NODE_VARIABLE) {
       indented("");
     }
-    current_statement_cursor = code.length();
+    code.cursor = code.length();
     statement->accept(this);
   }
 
@@ -2159,10 +2170,14 @@ void Emitter::visit(ASTMethodCall *node) {
 
       // if not, we'll just have some constructs not be thread safe until eventually
       // we finally get that THIR/LLVM port finished.
+
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
-        code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
+        auto temp_name = get_temporary_variable();
+        *inserting_at_cursor = true;
+        code << type_to_string(base_type) << " " << temp_name;
         node->callee->base->accept(this);
-        code << "; &__temp; })";
+        *inserting_at_cursor = false;
+        code << "&" << temp_name;
       } else {
         code << "&";
         node->callee->base->accept(this);
@@ -2277,15 +2292,13 @@ std::string Emitter::declare_temporary_for_pattern_match(bool is_pointer, Type *
   } else {
     code << type_to_string(object_type->take_pointer_to(true)) << " " << patmatch_target << " = ";
     if (pattern->object->is_temporary_value()) {
-      // using this ({ static }) pattern is totally horrible.
-      // it is not thread safe at all, and should never be in our code.
-      // if we can find another way to do this, excellent.
-
-      // if not, we'll just have some constructs not be thread safe until eventually
-      // we finally get that THIR/LLVM port finished.
-      code << "({ static " << type_to_string(object_type) << " __temp; __temp = ";
+      *inserting_at_cursor = true;
+      auto temp_name = get_temporary_variable();
+      code << type_to_string(pattern->object->resolved_type) << " " << temp_name << " = ";
       pattern->object->accept(this);
-      code << "; &__temp; })";
+      code << ";\n";
+      *inserting_at_cursor = false;
+      code << "&" << temp_name;
     } else {
       code << "&";
       pattern->object->accept(this);
@@ -2686,5 +2699,3 @@ void Emitter::visit(ASTUnpackExpr *) {}
 void Emitter::visit(ASTUnpackElement *node) {
   code << node->source_temp_id + ".$" + std::to_string(node->element_index) << '\n';
 }
-
-void Emitter::insert_at_cursor(const std::string &text) { code.insert_at(current_statement_cursor, text); }

@@ -221,9 +221,11 @@ struct DeferBlock {
 struct Resolver;
 
 struct Emitter : VisitorBase {
-  size_t current_statement_cursor = 0;
 
-  void insert_at_cursor(const std::string &text);
+  size_t temporary_variable_index = 0;
+
+  inline std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }
+
 
   std::unordered_set<int> reflected_upon_types;
 
@@ -259,6 +261,8 @@ struct Emitter : VisitorBase {
 
   StringBuilder code{};
   StringBuilder test_functions{};
+
+  bool *inserting_at_cursor = &code.inserting_at_cursor;
 
   int indent_level = 0;
   Context &ctx;
