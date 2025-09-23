@@ -927,7 +927,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
   {  // Check the other parameters, besides self.
-    for (size_t arg_index = 0; arg_index < node->arguments.size() || param_index < params_ct; ++arg_index, ++param_index) {
+    for (size_t arg_index = 0; arg_index < node->arguments.size() || param_index < params_ct;
+         ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
 
@@ -940,7 +941,6 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
             node->arguments.erase(node->arguments.begin() + arg_index);
             arg_index--;
             param_index--;
-            current_expression_list = &node->arguments;
             arg->accept(this);
             continue;
           }
@@ -1005,6 +1005,16 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           ss << ")\n";
           throw_error(ss.str(), node->source_range);
         }
+        
+        ASTExpr *arg = node->arguments[arg_index];
+        if (arg->get_node_type() == AST_NODE_UNPACK) {
+          node->arguments.erase(node->arguments.begin() + arg_index);
+          arg_index--;
+          param_index--;
+          arg->accept(this);
+          continue;
+        }
+
         expected_type = Type::INVALID_TYPE;
         node->arguments[arg_index]->accept(this);
       }
@@ -1054,7 +1064,6 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
     // insertion point via `current_expression_list` (see `visit(ASTUnpackExpr)`).
     if (arg->get_node_type() == AST_NODE_UNPACK) {
       node->arguments.erase(node->arguments.begin() + i);
-      current_expression_list = &node->arguments;
       arg->accept(this);
       // Do not advance `i` because new elements were inserted at position `i`.
       continue;
@@ -1849,6 +1858,11 @@ void Typer::visit(ASTCall *node) {
   // We have to use a custom path visitor for calls due to the fact that visit(ASTPath *) will try to instantiate
   // a generic function when it's partially defined and doesn't allow the call to try to fill out the rest of
   // the generic args through inference.
+
+  auto old_expression_list = current_expression_list;
+  current_expression_list = &node->arguments->arguments;
+  Defer _defer([&] { current_expression_list = old_expression_list; });
+
   if (node->callee->get_node_type() == AST_NODE_PATH) {
     visit_path_for_call((ASTPath *)node->callee);
   } else {
@@ -1949,7 +1963,6 @@ void Typer::visit(ASTArguments *node) {
     if (arg->get_node_type() == AST_NODE_UNPACK) {
       node->arguments.erase(node->arguments.begin() + i);
       i--;
-      current_expression_list = &node->arguments;
       arg->accept(this);
       continue;
     }
@@ -3219,6 +3232,10 @@ void Typer::visit(ASTMethodCall *node) {
 
   bool added_dyn_instance_argument_as_arg_0 = false;
 
+  auto old_expression_list = current_expression_list;
+  current_expression_list = &node->arguments->arguments;
+  Defer _defer([&] { current_expression_list = old_expression_list; });
+
   if (func_sym && func_sym->is_function) {
     type = func_sym->resolved_type;
 
@@ -3695,10 +3712,21 @@ void Typer::visit(ASTUnpackExpr *node) {
     element->source_tuple = node->expression;
     element->resolved_type = type;
     element->element_index = i;
+
+    if (current_expression_list.is_null()) {
+      throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
+                  node->source_range);
+      return;
+    }
+
+    if (current_expression_list.get()->size() == 0) {
+      new (current_expression_list.get()) std::vector<ASTExpr *>();
+    }
+
     current_expression_list.get()->push_back(element);
   }
 }
 
-void Typer::visit(ASTUnpackElement *element) {
+void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }

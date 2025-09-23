@@ -254,7 +254,7 @@ struct Emitter : VisitorBase {
   // into that block.
   std::deque<DeferBlock> defer_blocks{};
 
-  StringBuilder code{};
+  StringBuilder code {};
   StringBuilder test_functions{};
 
   int indent_level = 0;

@@ -685,16 +685,21 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
 
     if (is_varargs && args_ct > params_ct) {
       for (size_t arg_index = params_ct; arg_index < args_ct; ++arg_index) {
-        if (!first) code << ",";
+
+        printf("is_varargs=true, args_ct=%zu, params_ct=%zu, arg_index=%zu, first=%d\n", args_ct, params_ct, arg_index,
+               first);
+               
+        if (!first) {
+          code << ",";
+        }
 
         first = false;
         arguments->arguments[arg_index]->accept(this);
       }
     }
-    return;
+  } else {
+    emit_arguments_no_parens(arguments);
   }
-
-  emit_arguments_no_parens(arguments);
 }
 
 void Emitter::collect_and_declare_unpack_elements_before_call(ASTArguments *arguments) {
@@ -2631,12 +2636,15 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
 }
 
 void Emitter::emit_arguments_no_parens(ASTArguments *node) {
+  bool first = true;
   for (size_t i = 0; i < node->arguments.size(); ++i) {
-    if (i != 0) {
+    auto argument = node->arguments[i];
+
+    if (!first) {
       code << ", ";
     }
+    first = false;
 
-    auto argument = node->arguments[i];
     auto type = argument->resolved_type;
 
     /*
@@ -2646,7 +2654,7 @@ void Emitter::emit_arguments_no_parens(ASTArguments *node) {
       auto path = (ASTPath *)argument;
       emit_choice_marker_variant_instantiation(type, path);
     } else {
-      node->arguments[i]->accept(this);
+      argument->accept(this);
     }
   }
 }
@@ -2673,5 +2681,5 @@ void Emitter::visit(ASTWhereStatement *node) {
 void Emitter::visit(ASTUnpackExpr *) {}
 
 void Emitter::visit(ASTUnpackElement *node) {
-  code << node->source_temp_id + ".$" + std::to_string(node->element_index);
+  code << node->source_temp_id + ".$" + std::to_string(node->element_index) << '\n';
 }
