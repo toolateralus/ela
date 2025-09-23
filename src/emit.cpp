@@ -740,13 +740,13 @@ void Emitter::visit(ASTLiteral *node) {
       size_t length = 0;
       std::stringstream ss;
       ss << "(str) { .data = ";
-    
+
       size_t start = 0;
       while (start < str.size()) {
         size_t end = str.find('\n', start);
         if (end == std::string::npos) end = str.size();
         std::string line = str.substr(start, end - start);
-    
+
         ss << "\"";
         // Emit the actual line content, escaping quotes and backslashes
         for (char c : line) {
@@ -754,17 +754,17 @@ void Emitter::visit(ASTLiteral *node) {
           ss << c;
         }
         length += line.size();
-    
+
         if (end < str.size()) {
           ss << "\\n\"";
-          length += 1; // for the newline
+          length += 1;  // for the newline
         } else {
           ss << "\"";
         }
-    
+
         start = end + 1;
       }
-    
+
       ss << ", .length = " << length << " }";
       code << ss.str();
       return;
@@ -865,7 +865,11 @@ void Emitter::visit(ASTVariable *node) {
   auto variable = ctx.scope->lookup(node->name);
 
   if (!variable) {
-    throw_error(std::format("INTERNAL_COMPILER_ERROR: variable '{}' somehow wasn't able to be found while emitting it's declaration", node->name), node->source_range);
+    throw_error(
+        std::format(
+            "INTERNAL_COMPILER_ERROR: variable '{}' somehow wasn't able to be found while emitting it's declaration",
+            node->name),
+        node->source_range);
     return;
   }
 
@@ -1981,7 +1985,6 @@ void Emitter::call_operator_overload(const SourceRange &range, OperationKind ope
 }
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
-
   if (symbol == nullptr) {
     throw_error("Symbol was nullptr at emit time", {});
     return {};
@@ -2108,6 +2111,13 @@ void Emitter::visit(ASTMethodCall *node) {
       // TODO: It would be preferable to use a compound literal here, but we'd have to get all the fields from structs
       // so I don't think we can. I don't know what kind of memory implications this might have, it may be messed up
       // idk.
+
+      // using this ({ static }) pattern is totally horrible.
+      // it is not thread safe at all, and should never be in our code.
+      // if we can find another way to do this, excellent.
+
+      // if not, we'll just have some constructs not be thread safe until eventually
+      // we finally get that THIR/LLVM port finished.
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
         code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
         node->callee->base->accept(this);
@@ -2226,6 +2236,12 @@ std::string Emitter::declare_temporary_for_pattern_match(bool is_pointer, Type *
   } else {
     code << type_to_string(object_type->take_pointer_to(true)) << " " << patmatch_target << " = ";
     if (pattern->object->is_temporary_value()) {
+      // using this ({ static }) pattern is totally horrible.
+      // it is not thread safe at all, and should never be in our code.
+      // if we can find another way to do this, excellent.
+
+      // if not, we'll just have some constructs not be thread safe until eventually
+      // we finally get that THIR/LLVM port finished.
       code << "({ static " << type_to_string(object_type) << " __temp; __temp = ";
       pattern->object->accept(this);
       code << "; &__temp; })";

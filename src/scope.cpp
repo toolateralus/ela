@@ -64,6 +64,7 @@ Context::Context() {
     is_const_pointer_trait();
     is_slice_trait();
     is_slice_mut_trait();
+    blittable_trait();
   }
 
   for (size_t i = 0; i < type_table.size(); ++i) {
