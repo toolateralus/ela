@@ -685,10 +685,6 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
 
     if (is_varargs && args_ct > params_ct) {
       for (size_t arg_index = params_ct; arg_index < args_ct; ++arg_index) {
-
-        printf("is_varargs=true, args_ct=%zu, params_ct=%zu, arg_index=%zu, first=%d\n", args_ct, params_ct, arg_index,
-               first);
-               
         if (!first) {
           code << ",";
         }
@@ -702,15 +698,11 @@ void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *argume
   }
 }
 
-void Emitter::collect_and_declare_unpack_elements_before_call(ASTArguments *arguments) {
-  // Collect unpack elements and materialize their source temporaries so their lifetime
-  // is extended (similar to pattern-matching temporaries). Replace each unpack element's
-  // source_temp_id with a fresh temp so later emission can simply reference that temp.
-  static size_t _unpack_temp_counter = 0;
-  std::vector<std::string> seen_sources;
-  seen_sources.reserve(arguments->arguments.size());
+void Emitter::collect_and_declare_unpack_elements_before_call(std::vector<ASTExpr *> &arguments) {
+  static std::vector<std::string> seen_sources{};
+  seen_sources.reserve(arguments.size());
 
-  for (auto &arg : arguments->arguments) {
+  for (auto &arg : arguments) {
     if (arg->get_node_type() != AST_NODE_UNPACK_ELEMENT) {
       continue;
     }
@@ -738,7 +730,7 @@ void Emitter::visit(ASTCall *node) {
     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
 
-  collect_and_declare_unpack_elements_before_call(node->arguments);
+  collect_and_declare_unpack_elements_before_call(node->arguments->arguments);
 
   auto resolved_func_type = node->callee->resolved_type;
 
@@ -923,14 +915,22 @@ void Emitter::visit(ASTVariable *node) {
   const bool is_global_variable =
       !node->is_local && !node->is_constexpr && !is_init_list && !is_array; /*  || node->is_static; */
 
-  // if (node->is_static) {
-  //   node->type->accept(dep_emitter);
-  //   reflection_externs << "extern " << type_to_string(node->type->resolved_type) << " " << name << ";\n";
-  // }
-
   if (node->type->resolved_type == Type::INVALID_TYPE) {
     throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
+
+  if (node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+    auto init_list = (ASTInitializerList *)node->value.get();
+    if (init_list->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
+      for (const auto &v : init_list->values) {
+        if (v->get_node_type() == AST_NODE_UNPACK_ELEMENT) {
+          collect_and_declare_unpack_elements_before_call(init_list->values);
+          break;
+        }
+      }
+    }
+  }
+
   auto type = node->type->resolved_type;
   auto handle_initialization = [&]() {
     if (node->value.is_not_null() && emit_default_value) {
@@ -1941,6 +1941,7 @@ void Emitter::visit(ASTBlock *node) {
   code << "{\n";
   indent_level++;
   auto old_scope = ctx.scope;
+
   ctx.set_scope(node->scope);
 
   defer_blocks.emplace_back();
@@ -1949,6 +1950,7 @@ void Emitter::visit(ASTBlock *node) {
     if (statement->get_node_type() == AST_NODE_VARIABLE) {
       indented("");
     }
+    current_statement_cursor = code.length();
     statement->accept(this);
   }
 
@@ -2097,6 +2099,8 @@ void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
 void Emitter::visit(ASTMethodCall *node) {
   std::vector<Type *> generic_args = node->callee->member.get_resolved_generics();
 
+  collect_and_declare_unpack_elements_before_call(node->arguments->arguments);
+
   auto symbol = ctx.get_symbol(node->callee).get();
   // Call a function pointer via a dot expression
   if (symbol->is_variable) {
@@ -2115,7 +2119,6 @@ void Emitter::visit(ASTMethodCall *node) {
         args.insert(args.begin(), dot);
       }
     }
-    collect_and_declare_unpack_elements_before_call(node->arguments);
 
     auto func = node->callee;
     func->accept(this);
@@ -2683,3 +2686,5 @@ void Emitter::visit(ASTUnpackExpr *) {}
 void Emitter::visit(ASTUnpackElement *node) {
   code << node->source_temp_id + ".$" + std::to_string(node->element_index) << '\n';
 }
+
+void Emitter::insert_at_cursor(const std::string &text) { code.insert_at(current_statement_cursor, text); }

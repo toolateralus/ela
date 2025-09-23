@@ -633,4 +633,5 @@ void Resolver::visit(ASTUnpackElement *node) {
   TupleTypeInfo *info = node->source_tuple->resolved_type->info->as<TupleTypeInfo>();
   Type *element_type = info->types[node->element_index];
   define_type(element_type);
+  define_type(node->source_tuple->resolved_type);
 }

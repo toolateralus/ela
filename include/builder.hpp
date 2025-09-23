@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <string>
+#include <algorithm>
 
 
 struct StringBuilder {
@@ -180,5 +182,26 @@ struct StringBuilder {
   inline void clear() {
     delete root;
     root = new Block(block_length);
+  }
+
+  // Insert `s` at absolute byte position `pos` within the current buffer.
+  // This rebuilds the underlying blocks from a temporary string. It's simple
+  // and acceptable for rare inserts.
+  inline void insert_at(size_t pos, const std::string &s) {
+    size_t cur_len = length();
+    if (pos >= cur_len) {
+      // append
+      *this << s;
+      return;
+    }
+
+    std::string full = str();
+    std::string prefix = full.substr(0, pos);
+    std::string suffix = full.substr(pos);
+
+    clear();
+    if (!prefix.empty()) *this << prefix;
+    if (!s.empty()) *this << s;
+    if (!suffix.empty()) *this << suffix;
   }
 };

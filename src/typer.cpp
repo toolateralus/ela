@@ -1005,7 +1005,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           ss << ")\n";
           throw_error(ss.str(), node->source_range);
         }
-        
+
         ASTExpr *arg = node->arguments[arg_index];
         if (arg->get_node_type() == AST_NODE_UNPACK) {
           node->arguments.erase(node->arguments.begin() + arg_index);
@@ -2455,6 +2455,7 @@ void Typer::visit(ASTInitializerList *node) {
       auto expected = expected_type;
       if (expected && expected->is_fixed_sized_array()) {
         auto elem = expected->get_element_type();
+
         auto rule = type_conversion_rule(target_type, elem);
         if (rule == CONVERT_PROHIBITED) {
           throw_error("invalid initializer list element type", node->source_range);
@@ -2557,10 +2558,22 @@ void Typer::visit(ASTInitializerList *node) {
       for (size_t i = 0; i < values.size(); ++i) {
         const auto old = expected_type;
         expected_type = target_element_type;
-        values[i]->accept(this);
+        auto value = values[i];
+
+        if (value->get_node_type() == AST_NODE_UNPACK) {
+          auto old_expr_list = current_expression_list;
+          values.erase(values.begin() + i);
+          i--;
+          current_expression_list = &values;
+          value->accept(this);
+          current_expression_list = old_expr_list;
+          continue;
+        }
+
+        value->accept(this);
         expected_type = old;
         assert_types_can_cast_or_equal(
-            values[i], target_element_type, values[i]->source_range,
+            value, target_element_type, value->source_range,
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
       }
       node->resolved_type = target_type;
@@ -3725,6 +3738,8 @@ void Typer::visit(ASTUnpackExpr *node) {
 
     current_expression_list.get()->push_back(element);
   }
+
+  temp_idx++;
 }
 
 void Typer::visit(ASTUnpackElement *) {

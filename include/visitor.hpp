@@ -70,7 +70,6 @@ struct VisitorBase {
 };
 
 struct Typer : VisitorBase {
-
   Nullable<ASTType> type_context = nullptr;
   Type *expected_type = Type::INVALID_TYPE;
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
@@ -89,7 +88,7 @@ struct Typer : VisitorBase {
                                               const std::vector<Type *> generic_args = {});
 
   void visit_path_for_call(ASTPath *node);
-  
+
   void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
                           const SourceRange &range);
   /*
@@ -222,6 +221,10 @@ struct DeferBlock {
 struct Resolver;
 
 struct Emitter : VisitorBase {
+  size_t current_statement_cursor = 0;
+
+  void insert_at_cursor(const std::string &text);
+
   std::unordered_set<int> reflected_upon_types;
 
   StringBuilder reflection_externs;
@@ -254,7 +257,7 @@ struct Emitter : VisitorBase {
   // into that block.
   std::deque<DeferBlock> defer_blocks{};
 
-  StringBuilder code {};
+  StringBuilder code{};
   StringBuilder test_functions{};
 
   int indent_level = 0;
@@ -288,7 +291,7 @@ struct Emitter : VisitorBase {
 
   void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
-  void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments, std::vector<Type *> generic_args={});
+  void emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments, std::vector<Type *> generic_args = {});
 
   std::string to_reflection_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
@@ -371,7 +374,7 @@ struct Emitter : VisitorBase {
   void visit(ASTWhere *node) override;
   void visit(ASTUnpackExpr *node) override;
   void visit(ASTUnpackElement *node) override;
-  
+
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -390,7 +393,7 @@ struct Emitter : VisitorBase {
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
   void emit_choice_marker_variant_instantiation(Type *type, ASTPath *value);
 
-  void collect_and_declare_unpack_elements_before_call(ASTArguments *arguments);
+  void collect_and_declare_unpack_elements_before_call(std::vector<ASTExpr *> &arguments);
 };
 
 struct Resolver : VisitorBase {
