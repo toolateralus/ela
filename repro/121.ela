@@ -5,8 +5,7 @@ fn main() {
   // How the hell does this work?? it just gets default constructed.
   f := Result!<s32, String>::Ok();
 
-  // * If you comment out the above line, and uncomment the below line..
-  // * you'll see that now the dependency emitter fails to even emit the correct result type.
-  // Result!<s32, String>::Ok();
+  // * the dependency emitter fails to even emit the correct result type.
+  Result!<s32, String>::Ok(0);
 } 
 
