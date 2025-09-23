@@ -820,7 +820,6 @@ void Emitter::visit(ASTLiteral *node) {
 }
 
 void Emitter::visit(ASTUnaryExpr *node) {
-
   // ! What the hell is this doing
   if (node->op == TType::Sub) {
     auto type = type_to_string(node->operand->resolved_type);
@@ -842,13 +841,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
     node->operand->accept(this);
     code << ttype_get_operator_string(node->op, node->source_range);
   } else if (node->op == TType::And && node->operand->is_temporary_value()) {
-    *inserting_at_cursor = true;
-    auto temp_name = get_temporary_variable();
-    code << type_to_string(node->operand->resolved_type) << " " << temp_name << " = ";
-    node->operand->accept(this);
-    code << ";\n";
-    *inserting_at_cursor = false;
-    code << "&" << temp_name;
+    take_pointer_to_value(node->operand->resolved_type, node->operand);
   } else {
     code << '(';
     code << ttype_get_operator_string(node->op, node->source_range);
@@ -2070,6 +2063,7 @@ void Emitter::visit(ASTDyn_Of *node) {
   auto object_scope_bare = node->object->resolved_type->get_element_type();
   auto object_scope = object_scope_bare->info->scope;
 
+  // TODO: we should use a vtable instead of fields.
   for (auto &[name, method_type] : dyn_info->methods) {
     indent();
     code << "." << name.get_str() << " = ";
@@ -2105,6 +2099,16 @@ void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
   }
   code << "} " << name << ";";
   newline_indented();
+}
+
+void Emitter::take_pointer_to_value(Type *base_type, ASTExpr *expr) {
+  auto temp_name = get_temporary_variable();
+  *inserting_at_cursor = true;
+  code << type_to_string(base_type) << " " << temp_name << " = ";
+  expr->accept(this);
+  code << ";\n";
+  *inserting_at_cursor = false;
+  code << "&" << temp_name;
 }
 
 void Emitter::visit(ASTMethodCall *node) {
@@ -2172,12 +2176,7 @@ void Emitter::visit(ASTMethodCall *node) {
       // we finally get that THIR/LLVM port finished.
 
       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
-        auto temp_name = get_temporary_variable();
-        *inserting_at_cursor = true;
-        code << type_to_string(base_type) << " " << temp_name;
-        node->callee->base->accept(this);
-        *inserting_at_cursor = false;
-        code << "&" << temp_name;
+        take_pointer_to_value(base_type, node->callee->base);
       } else {
         code << "&";
         node->callee->base->accept(this);
@@ -2292,13 +2291,7 @@ std::string Emitter::declare_temporary_for_pattern_match(bool is_pointer, Type *
   } else {
     code << type_to_string(object_type->take_pointer_to(true)) << " " << patmatch_target << " = ";
     if (pattern->object->is_temporary_value()) {
-      *inserting_at_cursor = true;
-      auto temp_name = get_temporary_variable();
-      code << type_to_string(pattern->object->resolved_type) << " " << temp_name << " = ";
-      pattern->object->accept(this);
-      code << ";\n";
-      *inserting_at_cursor = false;
-      code << "&" << temp_name;
+      take_pointer_to_value(pattern->object->resolved_type, pattern->object);
     } else {
       code << "&";
       pattern->object->accept(this);
@@ -2629,7 +2622,7 @@ void Emitter::emit_default_construction(Type *type, std::vector<std::pair<Intern
           goto NORMAL;
       } else {
       NORMAL:
-        code << "(" << type_to_string(type) << ")";
+        // code << "(" << type_to_string(type) << ")";
         initializer->accept(this);
       }
       indent_level--;

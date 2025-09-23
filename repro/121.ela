@@ -6,6 +6,8 @@ fn main() {
   f := Result!<s32, String>::Ok();
 
   // * the dependency emitter fails to even emit the correct result type.
-  Result!<s32, String>::Ok(0);
+  Result!<s32, String>::Ok();
+
+  #error "idk why this only happens sometimes";
 } 
 

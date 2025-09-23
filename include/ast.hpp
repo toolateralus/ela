@@ -95,6 +95,7 @@ struct ASTBlock;
 struct ASTNode {
   bool is_temporary_value() const {
     switch (get_node_type()) {
+      case AST_NODE_INITIALIZER_LIST:
       case AST_NODE_LITERAL:
       case AST_NODE_CALL:
       case AST_NODE_METHOD_CALL:
