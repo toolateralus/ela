@@ -458,8 +458,16 @@ ASTProgram *Parser::parse_program() {
     while (peek().type != TType::Eof) {
       program->statements.push_back(parse_statement());
     }
+
     expect(TType::Eof);
     states.pop_back();
+
+    if (states.empty()) {
+      end_node(program, range);
+      throw_error("INTERNAL_COMPILER_ERROR: somehow the lexer state stack was empty after including the bootstrap lib.", range);
+      return nullptr;
+    }
+
     std::filesystem::current_path(states.back().path.parent_path());
   }
 

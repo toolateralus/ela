@@ -861,7 +861,15 @@ void Emitter::visit(ASTVariable *node) {
   }
 
   emit_line_directive(node);
-  auto name = emit_symbol(ctx.scope->lookup(node->name));
+
+  auto variable = ctx.scope->lookup(node->name);
+
+  if (!variable) {
+    throw_error(std::format("INTERNAL_COMPILER_ERROR: variable '{}' somehow wasn't able to be found while emitting it's declaration", node->name), node->source_range);
+    return;
+  }
+
+  auto name = emit_symbol(variable);
 
   // We exclude initializer lists, and array types. this is because arrays are not assignable in C, and init lists have
   // temporary memory that would go out of scope after the global ini function
@@ -1973,6 +1981,12 @@ void Emitter::call_operator_overload(const SourceRange &range, OperationKind ope
 }
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
+
+  if (symbol == nullptr) {
+    throw_error("Symbol was nullptr at emit time", {});
+    return {};
+  }
+
   if (symbol->is_local ||
       (symbol->is_function && symbol->function.declaration && symbol->function.declaration->is_extern)) {
     return symbol->name.get_str();
