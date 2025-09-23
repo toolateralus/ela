@@ -545,14 +545,17 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
 }
 
 bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
-  auto trait_method_info = trait_method->info->as<FunctionTypeInfo>();
-  auto impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+  FunctionTypeInfo *trait_method_info = trait_method->info->as<FunctionTypeInfo>();
+  FunctionTypeInfo *impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+
   if (trait_method_info->params_len != impl_method_info->params_len) {
     return false;
   }
+
   for (size_t i = 0; i < trait_method_info->params_len; ++i) {
-    auto trait_param = trait_method_info->parameter_types[i];
-    auto impl_param = impl_method_info->parameter_types[i];
+    Type *trait_param = trait_method_info->parameter_types[i];
+    Type *impl_param = impl_method_info->parameter_types[i];
+
     if (trait_param->is_kind(TYPE_TRAIT)) {
       if (!impl_param->implements(trait_param)) {
         return false;
@@ -566,8 +569,8 @@ bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
   }
 
   {
-    auto trait_return = trait_method_info->return_type;
-    auto impl_return = impl_method_info->return_type;
+    Type *trait_return = trait_method_info->return_type;
+    Type *impl_return = impl_method_info->return_type;
     if (trait_return->is_kind(TYPE_TRAIT)) {
       if (trait_return->generic_base_type != Type::INVALID_TYPE) {
         if (!impl_return->implements(trait_return->generic_base_type)) {
@@ -2261,7 +2264,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     }
-    
+
     case ASTLiteral::Bool:
       node->resolved_type = bool_type();
       return;
@@ -3363,7 +3366,8 @@ void Typer::visit(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name), node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
+                      node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
@@ -3434,7 +3438,8 @@ void Typer::visit_path_for_call(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name), node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
+                      node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;

@@ -68,10 +68,10 @@ mut color_index := 0;
 
 fn get_sequencer_style(mut style: Style) -> Style {
   color_index++;
-  index := color_index % All_Colors.length;
-  index_1 := index + 4 % All_Colors.length;
-  style.foreground = All_Colors.data![index];
-  style.background = All_Colors.data![index_1].with_alpha(75).scaled_rgb(0.5);
+  index := color_index % All_Colors_Length;
+  index_1 := index + 4 % All_Colors_Length;
+  style.foreground = All_Colors[index];
+  style.background = All_Colors[index_1].with_alpha(75).scaled_rgb(0.5);
   style.highlighted = style.background.with_alpha(255);
   return style;
 }

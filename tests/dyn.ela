@@ -82,7 +82,7 @@ struct Strakt {
 
 #test fn test_dyn_from_list() {
   mut x := 0;
-  mut array: List!<dyn DynInterface>;
+  mut array := List!<dyn DynInterface>::new(get_global_allocator());
   array.push(dynof(&mut x));
   assert((array[0]).scrut() == 100.0, "dyn call from array failed");
 }

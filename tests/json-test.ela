@@ -2,7 +2,7 @@ import json::*;
 import fs::*;
 
 struct JsonValueDeleter {
-  vals: List!<*const JsonValue>,
+  vals: List!<*const JsonValue> = List!<*const JsonValue>::new(get_global_allocator()),
 }
 
 impl JsonValueDeleter {

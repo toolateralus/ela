@@ -41,7 +41,7 @@ struct Reflector {
     ++index;
   }
 
-  dynamic := List!<s32>::init(.[3, 2, 1]);
+  dynamic := List!<s32>::init(.[3, 2, 1], get_global_allocator());
   dynamic_type := typeof(List!<s32>);
   index = 0;
   dynamic_elements := dynamic_type.elements((&dynamic) as *u8);
