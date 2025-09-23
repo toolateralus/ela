@@ -159,6 +159,8 @@ void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
 void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
   EXPR_BEGIN(thir);
   if (thir->op == TType::And && thir->operand->is_temporary_value()) {
+    // TODO: copy the pattern from main's builder.hpp to use insert at cursor.
+    // this is not thread safe and is really bad.
     code << "({";
     code << " static " << c_type_string(thir->operand->type) << " temp = {};";
     code << " temp = ";
