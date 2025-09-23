@@ -1,0 +1,16 @@
+/* 
+  This happens when using file based modules as well.
+  For some reason, constants in the file scope aren't located
+  when emitting a module.
+*/
+
+module test_module {
+  const A := 0;
+}
+
+import test_module;
+
+fn main() { 
+  a := test_module::A;
+
+}

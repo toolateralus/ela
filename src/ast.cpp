@@ -453,7 +453,11 @@ ASTProgram *Parser::parse_program() {
 
   // put bootstrap on root scope
   if (!compile_command.has_flag("nostdlib")) {
-    import("bootstrap", &ctx.root_scope);
+    
+    if (!import("bootstrap", &ctx.root_scope)) {
+      throw_error("Unable to find bootstrap lib", {});
+      return nullptr;
+    }
 
     while (peek().type != TType::Eof) {
       program->statements.push_back(parse_statement());
