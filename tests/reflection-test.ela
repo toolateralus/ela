@@ -29,23 +29,26 @@ struct Reflector {
 }
 
 #test fn test_array_reflection() {
-  fixed: s32[3] = {1, 2, 3};
-  fixed_type := typeof(fixed);
-  index: s32 = 0;
-  fixed_elements := fixed_type.elements((&fixed) as u8*);
-  assert(fixed_elements.length == 3, "Fixed array length mismatch");
+  fixed: [s32; 3] = .[1, 2, 3];
+  fixed_type := typeof([s32; 3]);
+  mut index: s32 = 0;
+
+  fixed_elements := fixed_type.elements((&fixed) as *u8);
+  assert(fixed_elements.count() == 3, "Fixed array length mismatch");
+
   for elem in fixed_elements {
-    assert(*(elem.data as s32*) == fixed[index], "Fixed array element mismatch");
+    assert(*(elem.ptr as *s32) == fixed[index], "Fixed array element mismatch");
     ++index;
   }
 
-  dynamic := List!<s32>::init({3, 2, 1});
-  dynamic_type := typeof(dynamic);
+  dynamic := List!<s32>::init(.[3, 2, 1]);
+  dynamic_type := typeof(List!<s32>);
   index = 0;
-  dynamic_elements := dynamic_type.elements((&dynamic) as u8*);
-  assert(dynamic_elements.length == 3, "Dynamic array length mismatch");
+  dynamic_elements := dynamic_type.elements((&dynamic) as *u8);
+  assert(dynamic_elements.count() == 3, "Dynamic array length mismatch");
+  
   for elem in dynamic_elements {
-    assert(*(elem.data as s32*) == dynamic[index], "Dynamic array element mismatch");
+    assert(*(elem.ptr as *s32) == dynamic[index], "Dynamic array element mismatch");
     ++index;
   }
 }

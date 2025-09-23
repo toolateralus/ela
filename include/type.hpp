@@ -252,6 +252,15 @@ Type *is_union_trait();
 Type *is_pointer_trait();
 Type *is_mut_pointer_trait();
 Type *is_const_pointer_trait();
+Type *is_slice_trait();
+Type *is_slice_mut_trait();
+
+// Kind of a specific trait to be compiler implemented,
+// but it will greatly improve compile time reflection capabilities
+// when writing serialization/ transmittion libraries.
+Type *blittable_trait();
+
+void assess_and_try_add_blittable_trait(Type *type);
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 

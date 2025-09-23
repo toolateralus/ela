@@ -1346,6 +1346,7 @@ void Typer::visit(ASTStructDeclaration *node) {
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, node);
   } else {
     visit_struct_declaration(node, false);
+    assess_and_try_add_blittable_trait(node->resolved_type);
   }
 }
 
@@ -3362,7 +3363,7 @@ void Typer::visit(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name), node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
@@ -3433,7 +3434,7 @@ void Typer::visit_path_for_call(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name), node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
