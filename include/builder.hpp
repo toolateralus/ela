@@ -56,7 +56,8 @@ struct StringBuilder {
   }
 
   // Move constructor
-  StringBuilder(StringBuilder &&other) noexcept : root(other.root), current(other.current) {
+  StringBuilder(StringBuilder &&other) noexcept
+      : root(other.root), current(other.current), inserting_at_cursor(other.inserting_at_cursor), cursor(other.cursor) {
     other.root = nullptr;
     other.current = nullptr;
   }
