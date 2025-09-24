@@ -453,7 +453,6 @@ ASTProgram *Parser::parse_program() {
 
   // put bootstrap on root scope
   if (!compile_command.has_flag("nostdlib")) {
-    
     if (!import("bootstrap", &ctx.root_scope)) {
       throw_error("Unable to find bootstrap lib", {});
       return nullptr;
@@ -468,7 +467,8 @@ ASTProgram *Parser::parse_program() {
 
     if (states.empty()) {
       end_node(program, range);
-      throw_error("INTERNAL_COMPILER_ERROR: somehow the lexer state stack was empty after including the bootstrap lib.", range);
+      throw_error("INTERNAL_COMPILER_ERROR: somehow the lexer state stack was empty after including the bootstrap lib.",
+                  range);
       return nullptr;
     }
 
@@ -883,7 +883,7 @@ ASTExpr *Parser::parse_primary() {
     case TType::Varargs: {
       NODE_ALLOC(ASTUnpackExpr, node, range, defer, this)
       eat();
-      node->expression =parse_expr();
+      node->expression = parse_expr();
       return node;
     };
     case TType::Self: {
@@ -2412,7 +2412,7 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
     node->generic_parameters = parse_generic_parameters();
   }
 
-   if (peek().type == TType::Colon) {
+  if (peek().type == TType::Colon) {
     eat();
     auto &constraints = node->trait_bounds;
     auto parse_constraint = [&] -> Constraint {
@@ -2429,14 +2429,20 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
       return {self_type, condition};
     };
     constraints.push_back(parse_constraint());
-  } 
-  
+  }
+
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
 
   auto scope = create_child(ctx.scope);
   node->scope = scope;
+
+  if (peek().type == TType::Semi) {
+    node->is_forward_declared = true;
+    return node;
+  }
+  
   auto block = parse_block(scope);
   for (const auto &stmt : block->statements) {
     if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
@@ -2947,4 +2953,3 @@ bool ASTNode::is_expr() {
       return dynamic_cast<ASTExpr *>(this);
   }
 }
-

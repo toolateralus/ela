@@ -645,6 +645,11 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       throw_error("internal compiler error: type of impl trait was invalid", node->source_range);
     }
     trait_ty = trait_id;
+
+    if (trait_ty->info->as<TraitTypeInfo>()->is_forward_declared) {
+      throw_error("Attempted to implement a forward declared but not yet defined trait type", node->source_range);
+    }
+
     node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
 
     auto decl_node = (ASTTraitDeclaration *)trait_id->declaring_node.get();
@@ -827,11 +832,18 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
 void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                     std::vector<Type *> generic_args) {
+  bool was_forward_declared = false;
   auto id = ctx.scope->find_type_id(node->name, {});
+
   if (id != Type::INVALID_TYPE) {
     auto type = id;
     if (type->is_kind(TYPE_TRAIT)) {
-      if (!generic_instantiation) throw_error("re-definition of trait type.", node->source_range);
+      auto info = type->info->as<TraitTypeInfo>();
+      was_forward_declared = info->is_forward_declared;
+      if (!generic_instantiation && !was_forward_declared) {
+        throw_error("re-definition of trait type.", node->source_range);
+      }
+      info->is_forward_declared = false;
     } else {
       throw_error("re-definition of a type", node->source_range);
     }
@@ -841,7 +853,13 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
-  auto type = global_create_trait_type(node->name.get_str(), ctx.scope, generic_args);
+  Type *type = nullptr;
+  if (was_forward_declared) {
+    type = ctx.scope->find_type_id(node->name, {});
+  } else {
+    type = global_create_trait_type(node->name, ctx.scope, generic_args);
+    type->info->as<TraitTypeInfo>()->is_forward_declared = node->is_forward_declared;
+  }
 
   if (auto symbol = ctx.scope->lookup(node->name)) {
     type->generic_base_type = symbol->resolved_type;
@@ -1662,12 +1680,33 @@ void Typer::visit(ASTParamDecl *node) {
 
 void Typer::visit(ASTReturn *node) {
   Type *type;
+
   if (node->expression.is_not_null()) {
-    node->expression.get()->accept(this);
-    type = node->expression.get()->resolved_type;
+    ASTExpr *expr = node->expression.get();
+    expr->accept(this);
+    type = expr->resolved_type;
 
     if (expected_type != Type::INVALID_TYPE && expected_type != void_type()) {
-      assert_types_can_cast_or_equal(node->expression.get(), expected_type, node->source_range, "invalid return type");
+      assert_types_can_cast_or_equal(expr, expected_type, node->source_range, "invalid return type");
+    }
+
+    if (expr->get_node_type() == AST_NODE_PATH) {
+      // since there hasnt been an error (we got to this point), we can assume this exists.
+      Symbol *symbol = ctx.get_symbol(expr).get();
+
+      bool is_static_var = false;
+
+      if (symbol->is_variable && symbol->variable.declaration.is_not_null()) {
+        ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+        is_static_var = variable->is_static;
+      }
+
+      if (symbol->resolved_type->is_fixed_sized_array() && symbol->is_local && !is_static_var) {
+        throw_warning(WARNING_RETURNING_ARRAY,
+                      "returning a non-static fixed array from a function can lead to unexpected behaviour, as it's "
+                      "allocated on the functions stack, and becomes invalid upon return immediately.",
+                      node->source_range);
+      }
     }
   } else {
     type = ctx.scope->find_type_id("void", {});

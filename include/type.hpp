@@ -161,6 +161,7 @@ struct TypeInfo {
 
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
+  bool is_forward_declared = false;
 };
 
 struct ChoiceTypeInfo : TypeInfo {

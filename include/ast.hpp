@@ -1002,6 +1002,7 @@ struct ASTTraitDeclaration : ASTDeclaration {
   Scope *scope;
   std::vector<ASTFunctionDeclaration *> methods;
   std::vector<Constraint> trait_bounds;
+  bool is_forward_declared = false;
   ASTNodeType get_node_type() const override { return AST_NODE_TRAIT_DECLARATION; }
   void accept(VisitorBase *visitor) override;
 };
