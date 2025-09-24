@@ -95,18 +95,29 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
   return type;
 }
 
+
+/// TODO:
+// Interned type extensions; intern all new type extensions to a hash map,
+// then just compare pointers. much cheaper, and also storing type extensions as a pointer will be cheaper
+// than how we constantly copy them around currently.
+
+// TODO:
+// use a hashmap for the global type table. we can have a TypeKey{ ptr, extensions } and a custom
+// hash function that will drastically improve type lookup times.
+
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
   if (!type_is_valid(base_t)) return Type::INVALID_TYPE;
 
   if (!type_extensions.size()) return base_t;
 
-  auto extensions_copy = type_extensions;
+  auto extensions_copy = type_extensions; // copy vector
 
   if (base_t && type_is_valid(base_t->base_type)) {
-    extensions_copy = base_t->append_extension(extensions_copy);
+    extensions_copy = base_t->append_extension(extensions_copy); // copies base_t's std::vector<TypeExtension>
     base_t = base_t->base_type;
   }
 
+  // expensive loop
   for (const auto &type : type_table) {
     if (type->base_type == base_t && extensions_copy == type->extensions) {
       return type;
@@ -143,11 +154,11 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
     } break;
   }
 
-  assert(info && "Copying type info for extended type failed");
-
+  // not bad- arena allocator.
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   info->scope->parent = base_t->info->scope->parent;
 
+  // rare (comparatively) case-- have to create a new extended type.
   return global_create_type(base_t->kind, base_t->basename, info, extensions_copy, base_t);
 }
 

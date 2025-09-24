@@ -708,7 +708,14 @@ void Emitter::collect_and_declare_unpack_elements_before_call(std::vector<ASTExp
     }
 
     auto element = (ASTUnpackElement *)arg;
-    const auto temp_id = element->source_temp_id;
+
+    if (element->tag != ASTUnpackElement::TUPLE_ELEMENT) {
+      continue;
+    }
+
+    const auto &tuple = element->tuple;
+    const std::string temp_id = tuple.source_temp_id;
+
     auto it = std::find(seen_sources.begin(), seen_sources.end(), temp_id);
 
     if (it != seen_sources.end()) {
@@ -717,7 +724,7 @@ void Emitter::collect_and_declare_unpack_elements_before_call(std::vector<ASTExp
 
     emit_line_directive(arg);
     code << indent() << "auto " << temp_id << " = ";
-    element->source_tuple->accept(this);
+    tuple.source_tuple->accept(this);
     code << ";\n";
 
     seen_sources.push_back(temp_id);
@@ -858,10 +865,29 @@ void Emitter::visit(ASTBinExpr *node) {
     return;
   }
 
+  if (left_ty->is_fixed_sized_array()) {
+
+    throw_warning(WARNING_ARRAY_ASSIGNMENT_MEMCPY, "Assigning to a fixed array incurs a memcpy, and relies on libc.", node->source_range);
+
+    code << "memcpy(";
+    node->left->accept(this);
+    code << ", ";
+
+    if (node->right->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+      code << "(" << type_to_string(left_ty->base_type) << "[])";
+    }
+
+    node->right->accept(this);
+
+    code << ", sizeof(" << type_to_string(left_ty) << "))";
+    return;
+  }
+
   code << "(";
   node->left->accept(this);
   space();
   code << ttype_get_operator_string(node->op, node->source_range);
+
   if (node->op == TType::Assign) {
     auto type = node->resolved_type;
     if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
@@ -1985,11 +2011,14 @@ void Emitter::emit_tuple(Type *type) {
   auto info = type->info->as<TupleTypeInfo>();
   for (size_t i = 0; i < info->types.size(); ++i) {
     auto type = info->types[i];
-    if (type->is_kind(TYPE_FUNCTION)) {
-      auto name = "$" + std::to_string(i);
+
+    auto name = "$" + std::to_string(i);
+    if (type->is_fixed_sized_array()) {
+      code << get_declaration_type_signature_and_identifier(name, type);
+    } else if (type->is_kind(TYPE_FUNCTION)) {
       code << indent() << get_function_pointer_type_string(type, &name, false) << ";\n";
     } else {
-      code << indent() << type_to_string(type) << " $" << std::to_string(i) << ";\n";
+      code << indent() << type_to_string(type) << " " << name << ";\n";
     }
   }
   indent_level--;
@@ -2690,5 +2719,9 @@ void Emitter::visit(ASTWhereStatement *node) {
 void Emitter::visit(ASTUnpackExpr *) {}
 
 void Emitter::visit(ASTUnpackElement *node) {
-  code << node->source_temp_id + ".$" + std::to_string(node->element_index) << '\n';
+  if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {
+    code << node->tuple.source_temp_id + ".$" + std::to_string(node->tuple.element_index) << '\n';
+  } else {
+    node->range_literal_value->accept(this);
+  }
 }

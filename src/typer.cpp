@@ -269,6 +269,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   for (const ASTStructMember &member : node->members) {
     member.type->accept(this);
+
     ctx.scope->insert_local_variable(member.name, member.type->resolved_type, nullptr, MUT);
 
     if (member.default_value) {
@@ -2690,7 +2691,7 @@ void Typer::visit(ASTSwitch *node) {
     node->control_flow = ControlFlow{flags, return_type};
   } else {
     if (HAS_FLAG(flags, BLOCK_FLAGS_BREAK)) {
-      throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
+      throw_warning(WARNING_SWITCH_BREAK, "You do not need to break from switch cases.", node->source_range);
     } else if (HAS_FLAG(flags, BLOCK_FLAGS_CONTINUE)) {
       throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
     }
@@ -2701,7 +2702,22 @@ void Typer::visit(ASTTuple *node) {
   std::vector<Type *> types;
   auto declaring_tuple = expected_type;
   size_t type_index = 0;
-  for (const auto &v : node->values) {
+
+  for (size_t i = 0; i < node->values.size(); ++i) {
+    const auto &value = node->values[i];
+
+    if (value->get_node_type() == AST_NODE_UNPACK) {
+      auto old_expression_list = current_expression_list;
+      current_expression_list = &node->values;
+
+      node->values.erase(node->values.begin() + i);
+      --i;
+      value->accept(this);
+
+      current_expression_list = old_expression_list;
+      continue;
+    }
+
     ENTER_EXPECTED_TYPE(nullptr);
 
     bool declaring_type_set = false;
@@ -2709,24 +2725,26 @@ void Typer::visit(ASTTuple *node) {
       auto info = declaring_tuple->info->as<TupleTypeInfo>();
       if (info->types.size() < type_index) {
         throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()),
-                    v->source_range);
+                    value->source_range);
       }
       expected_type = info->types[type_index];
       declaring_type_set = true;
     }
 
-    v->accept(this);
+    value->accept(this);
 
     if (declaring_type_set) {
-      assert_types_can_cast_or_equal(v, expected_type, v->source_range,
+      assert_types_can_cast_or_equal(value, expected_type, value->source_range,
                                      "tuple value was incapable of casting to expected tuple element type");
-      v->resolved_type = expected_type;
+      value->resolved_type = expected_type;
     }
 
-    types.push_back(v->resolved_type);
+    types.push_back(value->resolved_type);
     type_index++;
   }
+
   TypeExtensions extensions;
+
   node->resolved_type = global_find_type_id(types, extensions);
 }
 
@@ -3708,38 +3726,75 @@ void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, c
 void Typer::visit(ASTUnpackExpr *node) {
   ASTExpr *expr = node->expression;
   expr->accept(this);
-  if (!expr->resolved_type->is_kind(TYPE_TUPLE)) {
-    throw_error("Cannot use an unpack expression '...<expr>' on a non-tuple type.", node->source_range);
-  }
-  node->resolved_type = void_type();
 
-  TupleTypeInfo *info = expr->resolved_type->info->as<TupleTypeInfo>();
+  if (expr->resolved_type->is_kind(TYPE_TUPLE)) {
+    node->resolved_type = void_type();
 
-  static int temp_idx = 0;
+    TupleTypeInfo *info = expr->resolved_type->info->as<TupleTypeInfo>();
 
-  for (size_t i = 0; i < info->types.size(); ++i) {
-    Type *type = info->types[i];
-    auto element = ast_alloc<ASTUnpackElement>();
-    element->source_temp_id = "$unpack" + std::to_string(temp_idx);
-    element->source_range = node->source_range;
-    element->source_tuple = node->expression;
-    element->resolved_type = type;
-    element->element_index = i;
+    static int temp_idx = 0;
 
-    if (current_expression_list.is_null()) {
-      throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
-                  node->source_range);
-      return;
+    for (size_t i = 0; i < info->types.size(); ++i) {
+      Type *type = info->types[i];
+      auto element = ast_alloc<ASTUnpackElement>();
+      element->tuple.source_temp_id = "$unpack" + std::to_string(temp_idx);
+      element->source_range = node->source_range;
+      element->tuple.source_tuple = node->expression;
+      element->resolved_type = type;
+      element->tuple.element_index = i;
+      element->tag = ASTUnpackElement::TUPLE_ELEMENT;
+
+      if (current_expression_list.is_null()) {
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
+                    node->source_range);
+        return;
+      }
+
+      if (current_expression_list.get()->size() == 0) {
+        new (current_expression_list.get()) std::vector<ASTExpr *>();
+      }
+
+      current_expression_list.get()->push_back(element);
     }
 
-    if (current_expression_list.get()->size() == 0) {
-      new (current_expression_list.get()) std::vector<ASTExpr *>();
+    temp_idx++;
+  } else if (expr->get_node_type() == AST_NODE_RANGE) {
+    ASTRange *range = (ASTRange *)expr;
+
+    auto left = evaluate_constexpr(range->left, ctx);
+    auto right = evaluate_constexpr(range->right, ctx);
+
+    if (left.tag != Value::INTEGER || right.tag != Value::INTEGER) {
+      throw_error("currently, you can only use integer literals in range unpack expressions", node->source_range);
     }
 
-    current_expression_list.get()->push_back(element);
-  }
+    for (size_t i = left.integer; i < right.integer; ++i) {
+      ASTUnpackElement *element = ast_alloc<ASTUnpackElement>();
+      element->source_range = node->source_range;
+      ASTLiteral *literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Integer;
+      literal->value = std::to_string(i);
+      literal->source_range = node->source_range;
+      literal->resolved_type = s32_type();
+      element->range_literal_value = literal;
+      element->tag = ASTUnpackElement::RANGE_ELEMENT;
+      element->resolved_type = s32_type();
 
-  temp_idx++;
+      if (current_expression_list.is_null()) {
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
+                    node->source_range);
+        return;
+      }
+
+      current_expression_list.get()->push_back(element);
+    }
+
+  } else {
+    throw_error(
+        "currently, you can only use an unpack expression '...<expr>' on a tuples and ranges (literals only right "
+        "now).",
+        node->source_range);
+  }
 }
 
 void Typer::visit(ASTUnpackElement *) {

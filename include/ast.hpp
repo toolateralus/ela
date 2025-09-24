@@ -963,9 +963,20 @@ struct ASTUnpackExpr : ASTExpr {
 };
 
 struct ASTUnpackElement: ASTExpr {
-  std::string source_temp_id;
-  ASTExpr *source_tuple;
-  int element_index;
+
+  enum {
+    TUPLE_ELEMENT,
+    RANGE_ELEMENT
+  } tag;
+
+  struct {
+    std::string source_temp_id;
+    ASTExpr *source_tuple;
+    int element_index;
+  } tuple;
+
+  ASTLiteral *range_literal_value;
+
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK_ELEMENT; }
   void accept(VisitorBase *visitor) override;
 };

@@ -380,9 +380,7 @@ struct Type {
   // it just returns a new set.
   inline TypeExtensions append_extension(const TypeExtensions &to_append) const {
     auto these = this->extensions;
-    for (const auto &ext : to_append) {
-      these.push_back({ext});
-    }
+    these.append_range(to_append);
     return these;
   }
 

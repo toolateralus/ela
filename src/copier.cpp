@@ -367,9 +367,15 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
 }
 
 ASTUnpackElement *ASTCopier::copy_unpack_element(ASTUnpackElement *node) {
-  auto new_node = copy(node);
-  new_node->source_tuple = (ASTExpr *)copy_node(node->source_tuple);
-  new_node->element_index = node->element_index;
+  ASTUnpackElement* new_node = copy(node);
+  
+  if (new_node->tag == ASTUnpackElement::TUPLE_ELEMENT) {
+    new_node->tuple.source_tuple = (ASTExpr *)copy_node(node->tuple.source_tuple);
+    new_node->tuple.element_index = node->tuple.element_index;
+  } else {
+    new_node->range_literal_value = (ASTLiteral *)copy_node(node->range_literal_value);
+  }
+
   return new_node;
 }
 

@@ -51,7 +51,7 @@ std::unordered_set<InternedString> include_set;
   #########################
 */
 
-int ignored_warnings = WarningNone;
+int ignored_warnings = WARNING_NONE;
 
 bool run_on_finished = false;
 

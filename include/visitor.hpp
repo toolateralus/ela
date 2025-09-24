@@ -6,6 +6,7 @@
 #include "builder.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 

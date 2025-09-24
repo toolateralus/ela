@@ -1,0 +1,51 @@
+/* 
+  more efficient than using a vector for simple stacking operations
+  would be able to request chunks of memory from arenas in compiler
+
+  should be easy to implement.
+*/
+
+struct LLItem { next: *LLItem, /*... payload ...*/ }
+struct State {
+  head: *mut LLItem,
+  root: *mut LLItem,
+  count: u32,
+}
+
+impl State {
+  fn pop(*mut self) {
+    self.head = ((self.root + self.count) - 1);
+    self.head.next = null;
+    self.count--;
+  }
+
+  fn push(*mut self, item: *mut LLItem) {
+    if !self.root {
+      self.root = item;
+      self.head = item;
+      self.count = 1;
+      return;
+    } 
+
+    self.head.next = item;
+    self.head = item;
+    self.count++;
+  }
+}
+
+#export fn main() {
+  mut buffer: [LLItem; 1024];
+  mut state: State;
+
+  for i in 0..1024 {
+    state.push(&mut buffer[i]);
+  }
+
+  fmt::println(state.count);
+
+  for i in 0..1024 {
+    state.pop();
+  }
+
+  fmt::println(state.count);
+}

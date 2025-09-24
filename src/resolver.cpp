@@ -88,6 +88,21 @@ void Resolver::define_type(Type *type) {
 }
 
 void Resolver::visit(ASTStructDeclaration *node) {
+  static std::unordered_set<ASTStructDeclaration *> visitation_set{};
+
+  if (visitation_set.contains(node)) {
+    throw_error(
+        "Self referential type detected, which is invalid. The struct would be infinitely sized. Did you mean to add a "
+        "pointer to a field's type?",
+        node->source_range);
+  }
+
+  visitation_set.insert(node);
+
+  Defer _defer([&] {
+    visitation_set.erase(node);
+  });
+
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -98,6 +113,7 @@ void Resolver::visit(ASTStructDeclaration *node) {
   for (auto subtype : node->subtypes) {
     subtype->accept(this);
   }
+
   for (auto member : node->members) {
     declare_type(member.type->resolved_type);
     if (member.default_value) {
@@ -629,9 +645,13 @@ void Resolver::visit(ASTWhereStatement *node) {
 void Resolver::visit(ASTUnpackExpr *) {}
 
 void Resolver::visit(ASTUnpackElement *node) {
-  node->source_tuple->accept(this);
-  TupleTypeInfo *info = node->source_tuple->resolved_type->info->as<TupleTypeInfo>();
-  Type *element_type = info->types[node->element_index];
-  define_type(element_type);
-  define_type(node->source_tuple->resolved_type);
+  if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {
+    node->tuple.source_tuple->accept(this);
+    TupleTypeInfo *info = node->tuple.source_tuple->resolved_type->info->as<TupleTypeInfo>();
+    Type *element_type = info->types[node->tuple.element_index];
+    define_type(element_type);
+    define_type(node->tuple.source_tuple->resolved_type);
+  } else {
+    node->range_literal_value->accept(this);
+  }
 }

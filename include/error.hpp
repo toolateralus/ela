@@ -125,11 +125,20 @@ static std::string format_source_location(const SourceRange &source_range, Error
   return ss.str();
 }
 enum WarningFlags {
-  WarningNone = 0,
-  WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
-  WarningInaccessibleDeclaration = 1 << 1,        // --Wno-inaccessible-decl
-  WarningSwitchBreak = 1 << 2,                    // --Wno-switch-break
-  WarningIgnoreAll = 1 << 3,                      // --Wignore-all
+  WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD = 1 << 0, // --Wno-arrow-operator
+  WARNING_INACCESSIBLE_DECLARATION = 1 << 1,        // --Wno-inaccessible-decl
+  WARNING_SWITCH_BREAK = 1 << 2,                    // --Wno-switch-break
+  WARNING_IGNORE_ALL = 1 << 3,                      // --Wignore-all
+  WARNING_ARRAY_ASSIGNMENT_MEMCPY = 1 << 4,          // --Warray-assignment-memcpy
+  WARNING_NONE,
+};
+
+const std::string WARNING_STRINGS[WARNING_NONE] { 
+  [WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD] = "Wno-arrow-operator",
+  [WARNING_INACCESSIBLE_DECLARATION] = "Wno-inaccessible-decl",
+  [WARNING_SWITCH_BREAK] = "Wno-switch-break",
+  [WARNING_IGNORE_ALL] = "Wignore-all",
+  [WARNING_ARRAY_ASSIGNMENT_MEMCPY] = "Warray-assignment-memcpy",
 };
 
 extern int ignored_warnings;
@@ -164,7 +173,7 @@ static inline void set_panic_handler(PanicHandler handler) { panic_handler = han
 static inline void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
 static inline void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
-  if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
+  if ((ignored_warnings & id) != 0 || (ignored_warnings & WARNING_IGNORE_ALL) != 0) {
     return;
   }
   std::stringstream ss;
