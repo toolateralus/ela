@@ -2156,22 +2156,23 @@ void Emitter::visit(ASTMethodCall *node) {
     auto object = node->callee->base;
     auto obj_type = object->resolved_type;
 
-    ASTExpr *instance_src = node->arguments->arguments[0];
-
     if (obj_type->is_kind(TYPE_DYN)) {
+      auto old_code = std::move(code);
+      code = {};
+
       auto temp = get_temporary_variable();
-      *inserting_at_cursor = true;
-      code << type_to_string(instance_src->resolved_type) << " " << temp << " = ";
-      instance_src->accept(this);
+      code << type_to_string(obj_type) << " " << temp << " = ";
+      object->accept(this);
       code << ";\n";
-      *inserting_at_cursor = false;
 
-      ctx.scope->insert_local_variable(temp, instance_src->resolved_type, nullptr, MUT);
+      old_code.inserting_at_cursor = true;
+      old_code << code.str();
+      old_code.inserting_at_cursor = false;
 
-      func->accept(this);
-      code << mangled_type_args(generic_args);
+      code = std::move(old_code);
 
-      code << "(" << temp;
+      code << temp << "." << node->callee->member.identifier.get_str();
+      code << "(" << temp << ".instance";
 
       if (node->arguments->arguments.size() > 1) {
         code << ", ";
