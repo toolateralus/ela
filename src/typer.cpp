@@ -3334,19 +3334,21 @@ void Typer::visit(ASTMethodCall *node) {
       type = func_decl->resolved_type;
     }
   } else {
+
+    
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     auto object = node->callee->base;
     auto obj_type = object->resolved_type;
 
-    if (obj_type->is_kind(TYPE_DYN)) {
+    if (obj_type->is_kind(TYPE_DYN) && !node->inserted_dyn_arg) {
       auto &args = node->arguments->arguments;
       auto dot = ast_alloc<ASTDotExpr>();
       dot->base = object;
       dot->member = ASTPath::Segment{"instance"};
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
-      added_dyn_instance_argument_as_arg_0 = true;
+      added_dyn_instance_argument_as_arg_0 = node->inserted_dyn_arg = true;
     }
 
     type = node->callee->resolved_type;
@@ -3372,10 +3374,6 @@ void Typer::visit(ASTMethodCall *node) {
                                 func_sym->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
-  }
-
-  if (added_dyn_instance_argument_as_arg_0) {
-    node->arguments->arguments.erase(node->arguments->arguments.begin());
   }
 
   node->resolved_type = info->return_type;

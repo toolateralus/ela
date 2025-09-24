@@ -72,3 +72,7 @@ void ASTPath::accept(VisitorBase *visitor) { visitor->visit(this); }
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
+
+size_t temporary_variable_index = 0;
+std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }

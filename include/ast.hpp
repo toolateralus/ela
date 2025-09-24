@@ -18,6 +18,8 @@ struct VisitorBase;
 extern std::unordered_map<InternedString, Scope *> import_map;
 extern std::unordered_set<InternedString> include_set;
 
+constexpr std::string CONTEXT_IDENTIFIER = "context";
+
 enum ASTNodeType {
   AST_NODE_PROGRAM,
   AST_NODE_BLOCK,
@@ -604,6 +606,8 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   Nullable<ASTBlock> block;
   InternedString name;
   ASTType *return_type;
+
+  signed context_push_count = 0;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_FUNCTION_DECLARATION; }
 };
@@ -652,6 +656,7 @@ struct ASTMethodCall : ASTExpr {
   */
   ASTDotExpr *callee;
   ASTArguments *arguments;
+  bool inserted_dyn_arg = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
 };
@@ -962,12 +967,8 @@ struct ASTUnpackExpr : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTUnpackElement: ASTExpr {
-
-  enum {
-    TUPLE_ELEMENT,
-    RANGE_ELEMENT
-  } tag;
+struct ASTUnpackElement : ASTExpr {
+  enum { TUPLE_ELEMENT, RANGE_ELEMENT } tag;
 
   struct {
     std::string source_temp_id;
@@ -980,7 +981,6 @@ struct ASTUnpackElement: ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK_ELEMENT; }
   void accept(VisitorBase *visitor) override;
 };
-
 
 // The first value is the target type.
 // The second value is the condition/constraint being applied.
@@ -1186,6 +1186,10 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
+  ASTPath *context_identifier();
+
+  ASTType *context_trait_ast_type();
+
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_using_stmt();

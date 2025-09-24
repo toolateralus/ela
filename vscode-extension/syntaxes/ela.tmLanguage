@@ -240,7 +240,7 @@
 				<!-- Basic Types -->
 				<dict>
 					<key>match</key>
-					<string>\b(s8|s16|s32|s64)\b</string>
+					<string>\b(s8|s16|s32|context|s64)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>

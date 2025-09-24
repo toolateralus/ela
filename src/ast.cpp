@@ -426,6 +426,95 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return list;
       }
     },
+
+    {
+      .identifier = "push_context",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        ASTExpr *object = parser->parse_expr(); // Context.{} or whatever.
+
+        if (parser->current_func_decl.is_null()) {
+          throw_error("Can only use #push_context within a function", object->source_range);
+        }
+
+        ASTFunctionDeclaration* function = parser->current_func_decl.get();
+
+        // Setup caching.
+        NODE_ALLOC(ASTVariable, old, old_range, old_defer, parser);
+        {
+          old->name = "$ctx" + std::to_string(function->context_push_count);
+          function->context_push_count++;
+          old->value = parser->context_identifier();
+          old->is_local = true;
+        }
+        
+        
+        // set up dynof(&mut object, compiler::Context)
+        NODE_ALLOC(ASTDyn_Of, dynof, dynof_range, dynof_defer, parser)
+        {
+          NODE_ALLOC(ASTUnaryExpr, expr, expr_range, expr_defer, parser)
+          expr->operand = object;
+          expr->mutability = MUT;
+          expr->op = TType::And;
+          
+          dynof->object = expr;
+          dynof->trait_type = parser->context_trait_ast_type();
+        }
+        
+        // setup the assignemnt of the new context
+        NODE_ALLOC(ASTBinExpr, context_assignment, assign_range, assign_defer, parser)
+        {
+          context_assignment->left = parser->context_identifier();
+          context_assignment->op = TType::Assign;
+          context_assignment->right = dynof;
+        }
+
+        // push caching
+        parser->current_statement_list->push_back(old);
+
+        // push assignment statement
+        {
+          NODE_ALLOC(ASTExprStatement, stmt, stmt_r, stmt_d, parser)
+          stmt->expression = context_assignment;
+          parser->current_statement_list->push_back(stmt);
+        }
+        
+        return nullptr;
+      }
+    },
+
+    {
+      .identifier = "pop_context",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+
+        if (parser->current_func_decl.is_null()) {
+          throw_error("Can only use #push_context within a function", parser->peek().location);
+        }
+
+        ASTFunctionDeclaration* function = parser->current_func_decl.get();
+        
+        function->context_push_count--;
+        if (function->context_push_count < 0) {
+          throw_error("context stack underflow, no contexts to pop.", function->source_range);
+        }
+        
+        NODE_ALLOC(ASTPath, path, path_range, path_defer, parser)
+        path->push_segment("$ctx" + std::to_string(function->context_push_count));
+
+        NODE_ALLOC(ASTBinExpr, context_assignment, assign_range, assign_defer, parser)
+        context_assignment->left = parser->context_identifier();
+        context_assignment->op = TType::Assign;
+        context_assignment->right = path;
+
+        NODE_ALLOC(ASTExprStatement, stmt, stmt_r, stmt_d, parser)
+        stmt->expression = context_assignment;
+
+        parser->current_statement_list->push_back(stmt);
+
+        return nullptr;
+      }
+    }
 };
 // clang-format on
 
@@ -2442,7 +2531,7 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
     node->is_forward_declared = true;
     return node;
   }
-  
+
   auto block = parse_block(scope);
   for (const auto &stmt : block->statements) {
     if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
@@ -2952,4 +3041,26 @@ bool ASTNode::is_expr() {
     default:
       return dynamic_cast<ASTExpr *>(this);
   }
+}
+
+ASTPath *Parser::context_identifier() {
+  static NODE_ALLOC(ASTPath, context_identifier, context_identifier_range, context_identifier_defer,
+                    this) if (context_identifier->segments.empty()) {
+    context_identifier->push_segment(CONTEXT_IDENTIFIER);
+  }
+  return context_identifier;
+};
+
+
+ASTType *Parser::context_trait_ast_type() {
+  static NODE_ALLOC(ASTType, type, _, defer, this);
+  if (!type->normal.path) {
+    type->kind = ASTType::NORMAL;
+    type->extensions={};
+    NODE_ALLOC(ASTPath, path, path_range, path_defer, this)
+    path->push_segment("compiler");
+    path->push_segment("Context");
+    type->normal.path = path;
+  }
+  return type;
 }

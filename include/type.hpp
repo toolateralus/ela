@@ -240,6 +240,7 @@ Type *f64_type();
 Type *f32_type();
 
 Type *is_fn_trait();
+
 Type *is_fn_ptr_trait();
 Type *is_tuple_trait();
 Type *is_array_trait();

@@ -866,8 +866,8 @@ void Emitter::visit(ASTBinExpr *node) {
   }
 
   if (left_ty->is_fixed_sized_array()) {
-
-    throw_warning(WARNING_ARRAY_ASSIGNMENT_MEMCPY, "Assigning to a fixed array incurs a memcpy, and relies on libc.", node->source_range);
+    throw_warning(WARNING_ARRAY_ASSIGNMENT_MEMCPY, "Assigning to a fixed array incurs a memcpy, and relies on libc.",
+                  node->source_range);
 
     code << "memcpy(";
     node->left->accept(this);
@@ -2147,24 +2147,57 @@ void Emitter::visit(ASTMethodCall *node) {
 
   auto symbol = ctx.get_symbol(node->callee).get();
   // Call a function pointer via a dot expression
+  // ...existing code...
+  // Call a function pointer via a dot expression
   if (symbol->is_variable) {
-    {
-      // Implicitly pass the 'dyn.instance' when calling the function pointers
-      // that the dyn thingy sets up.
-      auto object = node->callee->base;
-      auto obj_type = object->resolved_type;
+    auto func = node->callee;
 
-      if (obj_type->is_kind(TYPE_DYN)) {
-        auto &args = node->arguments->arguments;
-        auto dot = ast_alloc<ASTDotExpr>();
-        dot->base = object;
-        dot->member = ASTPath::Segment{"instance"};
-        dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
-        args.insert(args.begin(), dot);
-      }
+    // Implicitly pass the 'dyn.instance' when calling the function pointers
+    // that the dyn thingy sets up. Do NOT mutate the original arguments vector;
+    // materialize the instance into a local and emit it as the first argument
+    // manually, then emit the remaining args via emit_arguments_with_defaults.
+    auto object = node->callee->base;
+    auto obj_type = object->resolved_type;
+
+    // determine source for the implicit instance: prefer arg[0] if present,
+    // otherwise fall back to evaluating the callee base.
+    ASTExpr *instance_src = nullptr;
+    auto &orig_args = node->arguments->arguments;
+    if (!orig_args.empty()) {
+      instance_src = orig_args[0];
+    } else {
+      instance_src = object;
     }
 
-    auto func = node->callee;
+    if (obj_type->is_kind(TYPE_DYN)) {
+      auto temp = get_temporary_variable();
+      *inserting_at_cursor = true;
+      code << type_to_string(instance_src->resolved_type) << " " << temp << " = ";
+      instance_src->accept(this);
+      code << ";\n";
+      *inserting_at_cursor = false;
+
+      ctx.scope->insert_local_variable(temp, instance_src->resolved_type, nullptr, MUT);
+
+      func->accept(this);
+      code << mangled_type_args(generic_args);
+
+      code << "(" << temp;
+
+      if (orig_args.size() > 1) {
+        code << ", ";
+        ASTArguments rem_args;
+        rem_args.arguments.assign(orig_args.begin() + 1, orig_args.end());
+        emit_arguments_with_defaults(func, &rem_args, generic_args);
+      } else {
+        ASTArguments empty_args;
+        emit_arguments_with_defaults(func, &empty_args, generic_args);
+      }
+
+      code << ")";
+      return;
+    }
+
     func->accept(this);
     code << mangled_type_args(generic_args);
     node->arguments->accept(this);

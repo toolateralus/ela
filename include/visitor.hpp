@@ -223,9 +223,6 @@ struct Resolver;
 
 struct Emitter : VisitorBase {
   void take_pointer_to_value(Type *type, ASTExpr *expr);
-  size_t temporary_variable_index = 0;
-
-  inline std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }
 
   std::unordered_set<int> reflected_upon_types;
 
@@ -472,3 +469,5 @@ struct GenericInstantiationErrorUserData {
 };
 
 void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id);
+
+std::string get_temporary_variable();
