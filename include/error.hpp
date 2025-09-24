@@ -130,10 +130,12 @@ enum WarningFlags {
   WARNING_SWITCH_BREAK = 1 << 2,                    // --Wno-switch-break
   WARNING_IGNORE_ALL = 1 << 3,                      // --Wignore-all
   WARNING_ARRAY_ASSIGNMENT_MEMCPY = 1 << 4,          // --Warray-assignment-memcpy
-  WARNING_NONE,
+  WARNING_COUNT,
 };
 
-const std::string WARNING_STRINGS[WARNING_NONE] { 
+// All of these would be prefixed with -- in the command line.
+// this is just for detecting the flags in the command struct.
+const std::string WARNING_FLAG_STRINGS[WARNING_COUNT] { 
   [WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD] = "Wno-arrow-operator",
   [WARNING_INACCESSIBLE_DECLARATION] = "Wno-inaccessible-decl",
   [WARNING_SWITCH_BREAK] = "Wno-switch-break",

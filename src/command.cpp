@@ -234,21 +234,12 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     print_command();
   }
 
-  {
-    if (has_flag("Wignore-all")) {
-      ignored_warnings |= WARNING_IGNORE_ALL;
+  for (int i = 0; i < WARNING_COUNT; ++i) {
+    if (WARNING_FLAG_STRINGS[i].empty()) {
+      continue;
     }
-    if (has_flag("Wno-arrow-operator")) {
-      ignored_warnings |= WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD;
-    }
-    if (has_flag("Wno-inaccessible-decl")) {
-      ignored_warnings |= WARNING_INACCESSIBLE_DECLARATION;
-    }
-    if (has_flag("Wno-switch-break")) {
-      ignored_warnings |= WARNING_SWITCH_BREAK;
-    }
-    if (has_flag("Warray-assignment-memcpy")) {
-      ignored_warnings |= WARNING_ARRAY_ASSIGNMENT_MEMCPY;
+    if (has_flag(WARNING_FLAG_STRINGS[i])) {
+      ignored_warnings |= i;
     }
   }
 }
