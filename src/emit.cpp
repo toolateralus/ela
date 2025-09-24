@@ -2146,28 +2146,17 @@ void Emitter::visit(ASTMethodCall *node) {
   collect_and_declare_unpack_elements_before_call(node->arguments->arguments);
 
   auto symbol = ctx.get_symbol(node->callee).get();
-  // Call a function pointer via a dot expression
-  // ...existing code...
+
   // Call a function pointer via a dot expression
   if (symbol->is_variable) {
     auto func = node->callee;
 
     // Implicitly pass the 'dyn.instance' when calling the function pointers
-    // that the dyn thingy sets up. Do NOT mutate the original arguments vector;
-    // materialize the instance into a local and emit it as the first argument
-    // manually, then emit the remaining args via emit_arguments_with_defaults.
+    // that the dyn thingy sets up.
     auto object = node->callee->base;
     auto obj_type = object->resolved_type;
 
-    // determine source for the implicit instance: prefer arg[0] if present,
-    // otherwise fall back to evaluating the callee base.
-    ASTExpr *instance_src = nullptr;
-    auto &orig_args = node->arguments->arguments;
-    if (!orig_args.empty()) {
-      instance_src = orig_args[0];
-    } else {
-      instance_src = object;
-    }
+    ASTExpr *instance_src = node->arguments->arguments[0];
 
     if (obj_type->is_kind(TYPE_DYN)) {
       auto temp = get_temporary_variable();
@@ -2184,10 +2173,10 @@ void Emitter::visit(ASTMethodCall *node) {
 
       code << "(" << temp;
 
-      if (orig_args.size() > 1) {
+      if (node->arguments->arguments.size() > 1) {
         code << ", ";
         ASTArguments rem_args;
-        rem_args.arguments.assign(orig_args.begin() + 1, orig_args.end());
+        rem_args.arguments.assign(node->arguments->arguments.begin() + 1, node->arguments->arguments.end());
         emit_arguments_with_defaults(func, &rem_args, generic_args);
       } else {
         ASTArguments empty_args;
