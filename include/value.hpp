@@ -103,7 +103,7 @@ struct ReturnValue : Value {
   ReturnValue(Value* value) : Value(ValueType::RETURN) { this->value = value; }
   bool is_truthy() const override { return false; }
   ValueType get_value_type() const override { return value_type; }
-  Nullable<Value> value;
+  Nullable<Value> value = nullptr;
 };
 
 const static NullValue* SHARED_NULL_VALUE = new NullValue();
@@ -126,13 +126,13 @@ struct FunctionValue : Value {
   FunctionValue() : Value(ValueType::FUNCTION) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  Value* Call(CTInterpreter* interpreter, std::vector<Value*> arguments);
+  Value* call(CTInterpreter* interpreter, std::vector<Value*> arguments);
 };
 
 struct ExternFunctionValue : Value {
   InternedString name;
   FunctionTypeInfo *info;
-  
+
   ExternFunctionValue(InternedString name, FunctionTypeInfo *info)
       : Value(ValueType::EXTERN_FUNCTION), name(name), info(info) {}
 

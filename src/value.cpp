@@ -41,17 +41,29 @@ ReturnValue* ReturnV() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
 
 #include "constexpr.hpp"
 
-Value* FunctionValue::Call(CTInterpreter* interpreter, std::vector<Value*> arguments) {
+Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> arguments) {
   auto it = arguments.begin();
+  auto temp_scope = create_child(block->scope->parent);
+
   for (const auto param : this->parameters->params) {
     if (param->tag == ASTParamDecl::Normal) {
-      interpreter->set_value(param->normal.name, *it);
+      temp_scope->insert_local_variable(param->normal.name, param->resolved_type, nullptr, MUT);
+      auto symbol = temp_scope->local_lookup(param->normal.name);
+      symbol->value = *it;
+      ++it;
     }
   }
-  auto return_value = interpreter->visit_block(block)->as<ReturnValue>();
 
-  if (return_value->value) {
-    return return_value->value.get();
+  auto old_scope = block->scope;
+  block->scope = temp_scope;
+  auto result = interpreter->visit_block(block);
+  block->scope = old_scope;
+
+  if (result->value_type == ValueType::RETURN) {
+    auto return_v = result->as<ReturnValue>();
+    if (return_v->value) {
+      return return_v->value.get();
+    }
   }
 
   return NullV();

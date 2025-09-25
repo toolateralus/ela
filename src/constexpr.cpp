@@ -27,7 +27,7 @@ Value *CTInterpreter::visit_path(ASTPath *node) {
     if (symbol->is_variable && symbol->variable.initial_value.get()) {
       symbol->value = visit(symbol->variable.initial_value.get());
     }
-    
+
     if (symbol->is_function && symbol->function.declaration) {
       if (symbol->function.declaration->is_extern) {
         symbol->value = try_link_extern_function(symbol);
@@ -437,8 +437,19 @@ Value *CTInterpreter::visit_return(ASTReturn *node) {
   return ReturnV();
 }
 
+Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
+  if (node->is_forward_declared) {
+    return NullV();
+  }
+
+  auto function = value_arena_alloc<FunctionValue>();
+  function->parameters = node->params;
+  function->block = node->block.get();
+  
+  return function;
+}
+
 Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return NullV(); }
-Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *) { return NullV(); }
 Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return NullV(); }
 Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return NullV(); }
 
@@ -446,10 +457,8 @@ Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
 
 Value *CTInterpreter::visit_call(ASTCall *call) {
   auto function = visit(call->callee);
-
   std::vector<Value *> evaluated_args;
   evaluated_args.reserve(call->arguments->arguments.size());
-
   for (const auto &arg : call->arguments->arguments) {
     evaluated_args.push_back(visit(arg));
   }
@@ -458,10 +467,14 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
     auto extern_function = function->as<ExternFunctionValue>();
     auto result = compile_time_ffi_dispatch(extern_function->name, extern_function->info, evaluated_args);
     return result ? result: NullV();
+  } else if (function->get_value_type() == ValueType::FUNCTION) {
+    return function->as<FunctionValue>()->call(this, evaluated_args);
+  } else {
+    throw_error("Unable to call non-function symbol", call->source_range);
   }
-
   return NullV();
 }
+
 Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
 
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *) { return NullV(); }
