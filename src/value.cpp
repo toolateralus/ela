@@ -96,8 +96,82 @@ ASTNode* NullValue::to_ast() const {
   return literal;
 }
 
+static inline std::string unescape_string_lit(const std::string& s) {
+  std::string res;
+  std::istringstream iss(s);
+  char c;
+  while (iss.get(c)) {
+    if (c == '\\') {
+      char next = iss.peek();
+      switch (next) {
+        case 'e':
+          res += '\x1B';
+          iss.get();
+          break;
+        case 'n':
+          res += '\n';
+          iss.get();
+          break;
+        case 't':
+          res += '\t';
+          iss.get();
+          break;
+        case 'r':
+          res += '\r';
+          iss.get();
+          break;
+        case 'f':
+          res += '\f';
+          iss.get();
+          break;
+        case 'v':
+          res += '\v';
+          iss.get();
+          break;
+        case 'a':
+          res += '\a';
+          iss.get();
+          break;
+        case 'b':
+          res += '\b';
+          iss.get();
+          break;
+        case '\\':
+          res += '\\';
+          iss.get();
+          break;
+        case '\'':
+          res += '\'';
+          iss.get();
+          break;
+        case '\"':
+          res += '\"';
+          iss.get();
+          break;
+        case '\?':
+          res += '\?';
+          iss.get();
+          break;
+        case '0':
+          res += '\0';
+          iss.get();
+          break;
+        default:
+          // If the character following the backslash is not a recognized escape
+          // sequence, append the backslash followed by the character itself.
+          res += '\\';
+          res += next;
+          iss.get();
+          break;
+      }
+    } else {
+      res += c;
+    }
+  }
+  return res;
+}
+
 std::string Value::to_string() const {
-  printf("%d\n", this->get_value_type());
   switch (this->get_value_type()) {
     case ValueType::INTEGER:
       return std::to_string(((const IntValue*)this)->value);
@@ -109,8 +183,9 @@ std::string Value::to_string() const {
       char buf[2] = {((const CharValue*)this)->value, 0};
       return std::string(buf);
     }
-    case ValueType::STRING:
-      return ((const StringValue*)this)->value;
+    case ValueType::STRING: {
+      return unescape_string_lit(((const StringValue*)this)->value);
+    }
     case ValueType::NULLPTR:
       return "null";
     case ValueType::OBJECT:

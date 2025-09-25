@@ -258,7 +258,9 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
           break;
         }
         case ValueType::STRING: {
-          const char* s = v->as<StringValue>()->value.c_str();
+          // call to string for escapement;
+          auto string = v->as<StringValue>()->to_string();
+          const char* s = strdup(string.data());
           memcpy(storage[i].data(), &s, sizeof(const char*));
           arg_types[i] = &ffi_type_pointer;
           break;
