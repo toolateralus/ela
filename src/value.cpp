@@ -23,6 +23,7 @@ bool FloatValue::is_truthy() const { return value != 0.0; }
 bool BoolValue::is_truthy() const { return value; }
 bool StringValue::is_truthy() const { return !value.empty(); }
 
+PointerValue* new_pointer(Value** value) { return value_arena_alloc<PointerValue>((*value)->value_type, value); }
 IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
 FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
 BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
@@ -336,3 +337,29 @@ ASTNode* ArrayValue::to_ast() const {
   }
   return init;
 }
+
+bool RawPointerValue::is_truthy() const { return ptr != nullptr; }
+
+ValueType RawPointerValue::get_value_type() const { return value_type; }
+
+ASTNode* RawPointerValue::to_ast() const {
+  // Obviously strings can be built at compile time.
+  if (type->is_kind(TYPE_SCALAR)) {
+    auto info = type->info->as<ScalarTypeInfo>();
+    if (info->scalar_type == TYPE_CHAR) {
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::String;
+      literal->is_c_string = true;
+      literal->value = std::string(ptr);
+      return literal;
+    }
+  }
+  // TODO: maybe convert pointers to static arrays at compile time? idk.
+  throw_error(
+      "You cannot pass pointers out of the compile time code into runtime code-- pointers cant exist in a binary. "
+      "Just strings can.",
+      {});
+  return nullptr;
+}
+
+

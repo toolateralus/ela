@@ -152,6 +152,8 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
         case ValueType::STRING:
           ffi_ty = &ffi_type_pointer;
           break;
+        case ValueType::RAW_POINTER:
+        case ValueType::POINTER: 
         case ValueType::NULLPTR:
           ffi_ty = &ffi_type_pointer;
           break;

@@ -294,7 +294,7 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
 
 Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
   auto unary = (ASTUnaryExpr *)node;
-  auto operand = evaluate_constexpr(unary->operand, ctx);
+  auto operand = visit(unary->operand);
 
   switch (unary->op) {
     case TType::Sub: {
@@ -321,6 +321,16 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
         return new_int((~v));
       }
       return null_value();
+    }
+    case TType::And: {
+      return new_pointer(&operand);
+    }
+    case TType::Mul: {
+      if (operand->get_value_type() != ValueType::POINTER) {
+        throw_error("cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up", node->source_range);
+      }
+      auto pointer = operand->as<PointerValue>();
+      return *pointer->ptr;
     }
     default:
       return null_value();
@@ -445,7 +455,7 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
 Value **CTInterpreter::get_dot_expr_ptr(ASTDotExpr *dot) {
   Value *base = visit(dot->base);
   static Value *the_null_value = null_value();
-  
+
   if (base->get_value_type() != ValueType::OBJECT) {
     throw_error("cannot use '.' expression on a non-object at compile time", dot->source_range);
   }
@@ -464,15 +474,15 @@ Value **CTInterpreter::get_dot_expr_ptr(ASTDotExpr *dot) {
   }
 }
 
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
-  return *get_dot_expr_ptr(dot);
-}
+Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) { return *get_dot_expr_ptr(dot); }
 
-Value *CTInterpreter::visit_index(ASTIndex *node) {
+Value **CTInterpreter::get_index_ptr(ASTIndex *node) {
   ArrayValue *base = (ArrayValue *)visit(node->base);
   IntValue *index = (IntValue *)visit(node->index);
-  return base->values[index->value];
+  return &base->values[index->value];
 }
+
+Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_ptr(node); }
 
 Value *CTInterpreter::visit_range(ASTRange *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
@@ -550,7 +560,12 @@ Value *CTInterpreter::visit_size_of(ASTSize_Of *node) {
 }
 
 Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }
-Value *CTInterpreter::visit_type_of(ASTType_Of *) { return null_value(); }
+
+
+Value *CTInterpreter::visit_type_of(ASTType_Of *) {
+  ObjectValue *object = (ObjectValue *)default_value_of_t(ctx.root_scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}}), this);
+  return object;
+}
 
 Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
 Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
@@ -618,7 +633,10 @@ Value *CTInterpreter::visit_impl(ASTImpl *node) {
 
 Value **CTInterpreter::get_value(ASTNode *node) {
   if (node->get_node_type() == AST_NODE_DOT_EXPR) {
-    return get_dot_expr_ptr((ASTDotExpr*)node);
+    return get_dot_expr_ptr((ASTDotExpr *)node);
+  }
+  if (node->get_node_type() == AST_NODE_INDEX) {
+    return get_index_ptr((ASTIndex *)node);
   }
 
   static Value *the_null_value = null_value();

@@ -20,10 +20,12 @@ enum class ValueType {
   FUNCTION = 6,
   OBJECT = 7,
   ARRAY = 8,
+  POINTER = 9,
+  RAW_POINTER = 10,
 
   // Internal to interpreter.
-  EXTERN_FUNCTION = 9,
-  RETURN = 10,
+  EXTERN_FUNCTION = 11,
+  RETURN = 12,
 };
 
 template <typename T, typename... Args>
@@ -111,7 +113,7 @@ const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 
 struct ObjectValue : Value {
   Type* type = nullptr;
-  std::map<InternedString, Value*> values {};
+  std::map<InternedString, Value*> values{};
   ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT), type(t) {}
 
   bool is_truthy() const override;
@@ -123,9 +125,32 @@ struct ObjectValue : Value {
 
 struct ArrayValue : Value {
   Type* type = nullptr;
-  std::vector<Value*> values {};
+  std::vector<Value*> values{};
   ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), type(type), values(arr) {}
   ArrayValue(Type* type) : Value(ValueType::ARRAY), type(type), values({}) {}
+  bool is_truthy() const override;
+  ValueType get_value_type() const override;
+  ASTNode* to_ast() const override;
+};
+
+struct PointerValue : Value {
+  ValueType pointee_value_type = ValueType::NULLPTR;
+  Value** ptr;
+
+  PointerValue(ValueType pointee_value_type, Value** ptr)
+      : Value(ValueType::POINTER), pointee_value_type(pointee_value_type), ptr(ptr) {}
+
+  bool is_truthy() const override { return ptr; }
+
+  ValueType get_value_type() const override { return value_type; }
+
+  ASTNode* to_ast() const override { return nullptr; }
+};
+
+struct RawPointerValue : Value {
+  char* ptr;
+  Type* type;
+  RawPointerValue(Type* t, char* p) : Value(ValueType::RAW_POINTER), ptr(p), type(t) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -171,6 +196,14 @@ ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);
 ArrayValue* new_array(Type* type);
 ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
+
+template <class T>
+RawPointerValue* new_raw_pointer(Type* type, T* ptr, bool pointee_is_value_struct = false,
+                                 ValueType pointee_value_type = ValueType::NULLPTR) {
+  return value_arena_alloc<RawPointerValue>(type, (char*)ptr, pointee_is_value_struct, pointee_value_type);
+}
+
+PointerValue* new_pointer(Value** value);
 
 struct CTInterpreter;
 Value* default_value_of_t(Type* t, CTInterpreter*);
