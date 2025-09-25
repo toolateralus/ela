@@ -20,6 +20,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include "value.hpp"
 #include "visitor.hpp"
 
 // TODO:
@@ -829,7 +830,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   node->resolved_type = target_ty;
 
   if (target_ty->is_kind(TYPE_TRAIT)) {
-    for (Type *type: type_table) {
+    for (Type *type : type_table) {
       if (type->implements(target_ty)) {
         // We patch up any already-implemented types when adding a method to a trait.
         // You can't add new trait methods, just defaults.
@@ -1349,10 +1350,10 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   for (auto &ext : ast_extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
       auto val = evaluate_constexpr(ext.expression, ctx);
-      if (val.tag != Value::INTEGER) {
+      if (val->get_value_type() != ValueType::INTEGER) {
         throw_error("Fixed array must have integer size.", ext.expression->source_range);
       }
-      extensions.push_back({ext.type, (size_t)val.integer});
+      extensions.push_back({ext.type, val->as<IntValue>()->value});
     } else {
       extensions.push_back({.type = ext.type});
     }
@@ -1458,8 +1459,8 @@ void Typer::visit(ASTEnumDeclaration *node) {
     // C will infer this, but we need to be explicit and not rely on any target language stuff.
     // we upcast to unsigned to get the largest maximum value for huge values
 
-    Value evaluated = evaluate_constexpr(value, ctx);
-    size_t evaluated_integer = evaluated.integer;
+    Value *evaluated = evaluate_constexpr(value, ctx);
+    size_t evaluated_integer = evaluated->as<IntValue>()->value;
 
     constexpr uint64_t u32_max = 0xFFFFFFFFull;
     constexpr int64_t s32_max = 0x7FFFFFFF;
@@ -3342,8 +3343,6 @@ void Typer::visit(ASTMethodCall *node) {
       type = func_decl->resolved_type;
     }
   } else {
-
-    
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     auto object = node->callee->base;
@@ -3809,11 +3808,15 @@ void Typer::visit(ASTUnpackExpr *node) {
     auto left = evaluate_constexpr(range->left, ctx);
     auto right = evaluate_constexpr(range->right, ctx);
 
-    if (left.tag != Value::INTEGER || right.tag != Value::INTEGER) {
+    if (left->value_type != ValueType::INTEGER || right->value_type != ValueType::INTEGER) {
       throw_error("currently, you can only use integer literals in range unpack expressions", node->source_range);
     }
 
-    for (size_t i = left.integer; i < right.integer; ++i) {
+    auto left_integer = left->as<IntValue>()->value;
+    auto right_integer = right->as<IntValue>()->value;
+
+    for (size_t i = left_integer; left_integer > right_integer ? i < right_integer : i < left_integer;
+         left_integer < right_integer ? ++i : i--) {
       ASTUnpackElement *element = ast_alloc<ASTUnpackElement>();
       element->source_range = node->source_range;
       ASTLiteral *literal = ast_alloc<ASTLiteral>();
