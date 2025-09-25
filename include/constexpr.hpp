@@ -143,7 +143,7 @@ struct CTInterpreter {
       case AST_NODE_PATTERN_MATCH:
         return visit_pattern_match(static_cast<ASTPatternMatch *>(node));
       default:
-        return BoolV("false");
+        return new_bool("false");
     }
   }
 };

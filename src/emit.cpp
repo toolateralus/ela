@@ -1409,7 +1409,7 @@ void Emitter::visit(ASTInitializerList *node) {
     code << "(" + type_to_string(type) + ")";
   }
 
-  if (node->target_type.is_not_null() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH &&
+  if (node->target_type.is_not_null() && node->target_type.get()->normal.path && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH &&
       type->is_kind(TYPE_CHOICE)) {
     emit_choice_struct_variant_instantation(node->target_type.get()->normal.path, node);
     return;

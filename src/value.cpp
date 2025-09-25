@@ -1,5 +1,6 @@
 #include "value.hpp"
 #include "ast.hpp"
+#include "type.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
 bool ArrayValue::is_truthy() const { return !value.empty(); }
@@ -22,22 +23,23 @@ bool FloatValue::is_truthy() const { return value != 0.0; }
 bool BoolValue::is_truthy() const { return value; }
 bool StringValue::is_truthy() const { return !value.empty(); }
 
-IntValue* IntV(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
-FloatValue* FloatV(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
-BoolValue* BoolV(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
-IntValue* IntV(size_t val) { return value_arena_alloc<IntValue>(val); }
-FloatValue* FloatV(double val) { return value_arena_alloc<FloatValue>(val); }
-BoolValue* BoolV(bool val) { return value_arena_alloc<BoolValue>(val); }
-StringValue* StringV(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
-StringValue* StringV(const std::string& str) { return value_arena_alloc<StringValue>(str); }
-CharValue* CharV(char val) { return value_arena_alloc<CharValue>(val); }
-NullValue* NullV() { return (NullValue*)SHARED_NULL_VALUE; }
-ObjectValue* ObjectV(Type* type) { return value_arena_alloc<ObjectValue>(type); }
-FunctionValue* FunctionV() { return value_arena_alloc<FunctionValue>(); }
-ArrayValue* ArrayV(const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(arr); }
+IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
+FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
+BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
+IntValue* new_int(size_t val) { return value_arena_alloc<IntValue>(val); }
+FloatValue* new_float(double val) { return value_arena_alloc<FloatValue>(val); }
+BoolValue* new_bool(bool val) { return value_arena_alloc<BoolValue>(val); }
+StringValue* new_string(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
+StringValue* new_string(const std::string& str) { return value_arena_alloc<StringValue>(str); }
+CharValue* new_char(char val) { return value_arena_alloc<CharValue>(val); }
+NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
+ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
+FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
+ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
+ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
 
-ReturnValue* ReturnV(Value* value) { return value_arena_alloc<ReturnValue>(value); }
-ReturnValue* ReturnV() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
+ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }
+ReturnValue* return_value() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
 
 #include "constexpr.hpp"
 
@@ -199,4 +201,134 @@ std::string Value::to_string() const {
     default:
       return "(unsupported)";
   }
+}
+
+Value* default_value_of_scalar_t(ScalarType type) {
+  switch (type) {
+    case TYPE_VOID:
+      return null_value();
+    case TYPE_S8:
+    case TYPE_S16:
+    case TYPE_S32:
+    case TYPE_S64:
+    case TYPE_U8:
+    case TYPE_U16:
+    case TYPE_U32:
+    case TYPE_U64:
+      return new_int(0);
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return new_float(0);
+    case TYPE_STRING:
+      return new_string(std::string{});
+    case TYPE_CHAR:
+      return new_char(0);
+    case TYPE_BOOL:
+      return new_bool(false);
+      break;
+  }
+  return null_value();
+}
+
+Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpreter* interpreter) {
+  auto array = new_array({});
+  for (size_t i = 0; i < size; ++i) {
+    array->value.push_back(default_value_of_t(base_type, interpreter));
+  }
+  return array;
+}
+
+Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, CTInterpreter* interpreter) {
+  auto object = new_object(type);
+  for (const auto& member : info->members) {
+    if (member.default_value.is_not_null()) {
+      object->values[member.name] = interpreter->visit(member.default_value.get());
+    } else {
+      object->values[member.name] = default_value_of_t(member.type, interpreter);
+    }
+  }
+  return object;
+}
+
+Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, CTInterpreter* interpreter) {
+  auto object = new_object(type);
+  for (size_t i = 0; i < info->types.size(); ++i) {
+    Type* type = info->types[i];
+    object->values[std::format("${}", i)] = default_value_of_t(type, interpreter);
+  }
+  return object;
+}
+
+Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
+  auto object = new_object(type);
+  // 0 is always the invalid out of bounds discriminant for choice types.
+  // for interpreted choice types, we will just ignore initializing variants, only one can exist,
+  // so only one shall exist ever.
+  object->values["index"] = 0;
+  return object;
+}
+
+Value* default_value_of_dyn_t(Type* type, DynTypeInfo* info) {
+  auto object = new_object(type);
+  object->values["instance"] = null_value();
+  for (const auto& [name, _] : info->methods) {
+    object->values[name] = null_value();
+  }
+  return object;
+}
+
+Value* default_value_of_t(Type* t, CTInterpreter* interpreter) {
+  if (t->is_pointer()) {
+    return null_value();
+  }
+
+  if (t->is_fixed_sized_array()) {
+    return default_value_of_fixed_array_of_t(t->base_type, t->extensions.back().array_size, interpreter);
+  }
+
+  switch (t->kind) {
+    case TYPE_SCALAR: {
+      auto info = t->info->as<ScalarTypeInfo>();
+      return default_value_of_scalar_t(info->scalar_type);
+    } break;
+    case TYPE_STRUCT:
+      return default_value_of_struct_t(t, t->info->as<StructTypeInfo>(), interpreter);
+    case TYPE_TUPLE:
+      return default_value_of_tuple_t(t, t->info->as<TupleTypeInfo>(), interpreter);
+    case TYPE_ENUM:
+      return default_value_of_scalar_t(TYPE_S64);
+    case TYPE_CHOICE:
+      return default_value_of_choice_t(t, t->info->as<ChoiceTypeInfo>());
+    case TYPE_DYN:
+      return default_value_of_dyn_t(t, t->info->as<DynTypeInfo>());
+    case TYPE_FUNCTION:
+    case TYPE_TRAIT:
+      return null_value();
+  }
+}
+
+ASTNode* ObjectValue::to_ast() const {
+  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
+  init->resolved_type = type;
+  // TODO: figure out if we need this type allocated.
+  init->target_type = ast_alloc<ASTType>();
+  init->target_type.get()->resolved_type = type;
+  init->tag = ASTInitializerList::INIT_LIST_NAMED;
+  for (const auto& [key, value] : this->values) {
+    init->key_values.push_back({key, (ASTExpr*)value->to_ast()});
+  }
+  return init;
+}
+
+ASTNode* ArrayValue::to_ast() const {
+  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
+  init->resolved_type = type;
+  // TODO: figure out if we need this type allocated.
+  init->target_type = ast_alloc<ASTType>();
+  init->target_type.get()->resolved_type = type->base_type; // pass the base type to array initializers
+  init->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+  for (const auto& value : this->value) {
+    init->values.push_back((ASTExpr*)value->to_ast());
+  }
+  return init;
 }

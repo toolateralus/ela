@@ -296,60 +296,60 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
   ffi_call(&cif, FFI_FN(fn_ptr), ret_storage.data(), arg_values.data());
 
   Type* ret_type = fti->return_type;
-  if (!ret_type || ret_type->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) return NullV();
+  if (!ret_type || ret_type->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) return null_value();
 
   auto scalar_type = ret_type->info->as<ScalarTypeInfo>()->scalar_type;
   switch (scalar_type) {
     case TYPE_FLOAT: {
       float tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(float));
-      return FloatV(tmp);
+      return new_float(tmp);
     }
     case TYPE_DOUBLE: {
       double tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(double));
-      return FloatV(tmp);
+      return new_float(tmp);
     }
     case TYPE_S8:
     case TYPE_U8: {
       uint8_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint8_t));
-      return IntV(tmp);
+      return new_int(tmp);
     }
     case TYPE_S16:
     case TYPE_U16: {
       uint16_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint16_t));
-      return IntV(tmp);
+      return new_int(tmp);
     }
     case TYPE_S32:
     case TYPE_U32: {
       uint32_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint32_t));
-      return IntV(tmp);
+      return new_int(tmp);
     }
     case TYPE_S64:
     case TYPE_U64: {
       uint64_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint64_t));
-      return IntV(tmp);
+      return new_int(tmp);
     }
     case TYPE_BOOL: {
       uint8_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint8_t));
-      return BoolV(tmp != 0);
+      return new_bool(tmp != 0);
     }
     case TYPE_CHAR: {
       char tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(char));
-      return CharV(tmp);
+      return new_char(tmp);
     }
     case TYPE_STRING: {
       void* ptr;
       memcpy(&ptr, ret_storage.data(), sizeof(void*));
-      return StringV(ptr ? std::string((const char*)ptr) : "");
+      return new_string(ptr ? std::string((const char*)ptr) : "");
     }
     default:
-      return NullV();
+      return null_value();
   }
 }

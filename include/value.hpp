@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 #include <utility>
@@ -111,9 +112,15 @@ const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 
 struct ObjectValue : Value {
   Type* type;
+  std::map<InternedString, Value*> values{};
+
   ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT), type(t) {}
+
   bool is_truthy() const override;
+
   ValueType get_value_type() const override;
+
+  ASTNode* to_ast() const override;
 };
 
 struct ASTBlock;
@@ -131,9 +138,9 @@ struct FunctionValue : Value {
 
 struct ExternFunctionValue : Value {
   InternedString name;
-  FunctionTypeInfo *info;
+  FunctionTypeInfo* info;
 
-  ExternFunctionValue(InternedString name, FunctionTypeInfo *info)
+  ExternFunctionValue(InternedString name, FunctionTypeInfo* info)
       : Value(ValueType::EXTERN_FUNCTION), name(name), info(info) {}
 
   bool is_truthy() const override { return false; }
@@ -141,24 +148,32 @@ struct ExternFunctionValue : Value {
 };
 
 struct ArrayValue : Value {
+  Type* type;
   std::vector<Value*> value;
-  ArrayValue(const std::vector<Value*>& arr = {}) : Value(ValueType::ARRAY), value(arr) {}
+  ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), type(type), value(arr) {}
+  ArrayValue(Type* type) : Value(ValueType::ARRAY), type(type), value({}) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+
+  ASTNode* to_ast() const override;
 };
 
-IntValue* IntV(const InternedString& str);
-IntValue* IntV(size_t val);
-FloatValue* FloatV(const InternedString& str);
-FloatValue* FloatV(double val);
-BoolValue* BoolV(const InternedString& str);
-BoolValue* BoolV(bool val);
-StringValue* StringV(const InternedString& str);
-StringValue* StringV(const std::string& str);
-CharValue* CharV(char val);
-NullValue* NullV();
-ObjectValue* ObjectV(Type* type);
-FunctionValue* FunctionV();
-ArrayValue* ArrayV(const std::vector<Value*>& arr);
-ReturnValue* ReturnV(Value* value);
-ReturnValue* ReturnV();
+IntValue* new_int(const InternedString& str);
+IntValue* new_int(size_t val);
+FloatValue* new_float(const InternedString& str);
+FloatValue* new_float(double val);
+BoolValue* new_bool(const InternedString& str);
+BoolValue* new_bool(bool val);
+StringValue* new_string(const InternedString& str);
+StringValue* new_string(const std::string& str);
+CharValue* new_char(char val);
+NullValue* null_value();
+ObjectValue* new_object(Type* type);
+FunctionValue* new_function();
+ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);
+ArrayValue* new_array(Type* type);
+ReturnValue* return_value(Value* value);
+ReturnValue* return_value();
+
+struct CTInterpreter;
+Value* default_value_of_t(Type* t, CTInterpreter*);
