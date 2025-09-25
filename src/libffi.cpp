@@ -48,7 +48,6 @@ ffi_type* to_ffi_type(Type* t) noexcept {
       return &ffi_type_uint8;
     case TYPE_CHAR:
       return &ffi_type_schar;
-    case TYPE_STRING:
     case TYPE_VOID:
       return &ffi_type_pointer;
     default:
@@ -82,6 +81,195 @@ T ffi_coerce_numeric(Value* v) {
   }
 }
 
+void marshal_arg(FunctionTypeInfo*& fti, const std::vector<Value*>& args, std::vector<ffi_type*>& arg_types,
+               std::vector<std::vector<uint8_t>>& storage, size_t& i) {
+  Type* expected = (i < fti->params_len) ? fti->parameter_types[i] : nullptr;  // only known for non-varargs
+  Value* v = args[i];
+
+  size_t sz = 0;
+
+  if (expected) {
+    sz = expected->size_in_bytes();
+  } else {
+    // For varargs, infer type from the argument itself
+    switch (v->get_value_type()) {
+      case ValueType::FLOATING:
+        sz = sizeof(double);
+        break;  // C varargs promotes float->double
+      case ValueType::INTEGER:
+        sz = sizeof(int);
+        break;  // promotes char/short->int
+      case ValueType::BOOLEAN:
+        sz = sizeof(int);
+        break;
+      case ValueType::CHARACTER:
+        sz = sizeof(int);
+        break;  // promoted to int
+      case ValueType::STRING:
+        sz = sizeof(const char*);
+        break;
+      case ValueType::NULLPTR:
+      case ValueType::RAW_POINTER:
+        sz = sizeof(void*);
+        break;
+      default:
+        sz = sizeof(void*);
+        break;
+    }
+  }
+
+  storage[i].resize(sz);
+
+  ffi_type* ffi_ty = expected ? to_ffi_type(expected) : nullptr;
+
+  if (!ffi_ty) {
+    switch (v->get_value_type()) {
+      case ValueType::FLOATING:
+        ffi_ty = &ffi_type_double;
+        break;
+      case ValueType::INTEGER:
+        ffi_ty = &ffi_type_sint;
+        break;
+      case ValueType::BOOLEAN:
+        ffi_ty = &ffi_type_sint;
+        break;
+      case ValueType::CHARACTER:
+        ffi_ty = &ffi_type_sint;
+        break;
+      case ValueType::STRING:
+        ffi_ty = &ffi_type_pointer;
+        break;
+      case ValueType::RAW_POINTER:
+      case ValueType::POINTER:
+      case ValueType::NULLPTR:
+        ffi_ty = &ffi_type_pointer;
+        break;
+      default:
+        ffi_ty = &ffi_type_pointer;
+        break;
+    }
+  }
+
+  arg_types[i] = ffi_ty;
+
+  if (expected && !expected->has_extensions()) {
+    auto scalar_info = expected->info->as<ScalarTypeInfo>();
+    switch (scalar_info->scalar_type) {
+      case TYPE_S8: {
+        int8_t tmp = ffi_coerce_numeric<int8_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_U8: {
+        uint8_t tmp = ffi_coerce_numeric<uint8_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_S16: {
+        int16_t tmp = ffi_coerce_numeric<int16_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_U16: {
+        uint16_t tmp = ffi_coerce_numeric<uint16_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_S32: {
+        int32_t tmp = ffi_coerce_numeric<int32_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_U32: {
+        uint32_t tmp = ffi_coerce_numeric<uint32_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_S64: {
+        int64_t tmp = ffi_coerce_numeric<int64_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_U64: {
+        uint64_t tmp = ffi_coerce_numeric<uint64_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_FLOAT: {
+        float tmp = ffi_coerce_numeric<float>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_DOUBLE: {
+        double tmp = ffi_coerce_numeric<double>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_BOOL: {
+        uint8_t tmp = ffi_coerce_numeric<uint8_t>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      case TYPE_CHAR: {
+        char tmp = ffi_coerce_numeric<char>(v);
+        memcpy(storage[i].data(), &tmp, sz);
+        break;
+      }
+      default:
+        memcpy(storage[i].data(), &v, sz);
+        break;
+    }
+  } else {
+    // vararg / unknown / pointer
+    switch (v->get_value_type()) {
+      case ValueType::FLOATING: {
+        double tmp = ffi_coerce_numeric<double>(v);  // promote float->double
+        memcpy(storage[i].data(), &tmp, sizeof(double));
+        arg_types[i] = &ffi_type_double;
+        break;
+      }
+      case ValueType::INTEGER: {
+        int tmp = ffi_coerce_numeric<int>(v);  // promote char/short->int
+        memcpy(storage[i].data(), &tmp, sizeof(int));
+        arg_types[i] = &ffi_type_sint;
+        break;
+      }
+      case ValueType::BOOLEAN: {
+        int tmp = v->as<BoolValue>()->value ? 1 : 0;
+        memcpy(storage[i].data(), &tmp, sizeof(int));
+        arg_types[i] = &ffi_type_sint;
+        break;
+      }
+      case ValueType::CHARACTER: {
+        int tmp = (int)v->as<CharValue>()->value;  // promoted to int
+        memcpy(storage[i].data(), &tmp, sizeof(int));
+        arg_types[i] = &ffi_type_sint;
+        break;
+      }
+      case ValueType::STRING: {
+        // call to string for escapement;
+        auto string = v->as<StringValue>()->to_string();
+        const char* s = strdup(string.data());
+        memcpy(storage[i].data(), &s, sizeof(const char*));
+        arg_types[i] = &ffi_type_pointer;
+        break;
+      }
+      case ValueType::NULLPTR: {
+        void* p = nullptr;
+        memcpy(storage[i].data(), &p, sizeof(void*));
+        arg_types[i] = &ffi_type_pointer;
+        break;
+      }
+      default: {
+        void* p = nullptr;
+        memcpy(storage[i].data(), &p, sizeof(void*));
+        arg_types[i] = &ffi_type_pointer;
+        break;
+      }
+    }
+  }
+}
+
 Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
                                  const std::vector<Value*>& args) noexcept {
   if (!fti) {
@@ -98,190 +286,7 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
   std::vector<std::vector<uint8_t>> storage(nargs);  // backing storage for all args
 
   for (size_t i = 0; i < nargs; ++i) {
-    Type* expected = (i < fti->params_len) ? fti->parameter_types[i] : nullptr;  // only known for non-varargs
-    Value* v = args[i];
-
-    size_t sz = 0;
-
-    if (expected) {
-      sz = expected->size_in_bytes();
-    } else {
-      // For varargs, infer type from the argument itself
-      switch (v->get_value_type()) {
-        case ValueType::FLOATING:
-          sz = sizeof(double);
-          break;  // C varargs promotes float->double
-        case ValueType::INTEGER:
-          sz = sizeof(int);
-          break;  // promotes char/short->int
-        case ValueType::BOOLEAN:
-          sz = sizeof(int);
-          break;
-        case ValueType::CHARACTER:
-          sz = sizeof(int);
-          break;  // promoted to int
-        case ValueType::STRING:
-          sz = sizeof(const char*);
-          break;
-        case ValueType::NULLPTR:
-          sz = sizeof(void*);
-          break;
-        default:
-          sz = sizeof(void*);
-          break;
-      }
-    }
-
-    storage[i].resize(sz);
-
-    ffi_type* ffi_ty = expected ? to_ffi_type(expected) : nullptr;
-    if (!ffi_ty) {
-      switch (v->get_value_type()) {
-        case ValueType::FLOATING:
-          ffi_ty = &ffi_type_double;
-          break;
-        case ValueType::INTEGER:
-          ffi_ty = &ffi_type_sint;
-          break;
-        case ValueType::BOOLEAN:
-          ffi_ty = &ffi_type_sint;
-          break;
-        case ValueType::CHARACTER:
-          ffi_ty = &ffi_type_sint;
-          break;
-        case ValueType::STRING:
-          ffi_ty = &ffi_type_pointer;
-          break;
-        case ValueType::RAW_POINTER:
-        case ValueType::POINTER: 
-        case ValueType::NULLPTR:
-          ffi_ty = &ffi_type_pointer;
-          break;
-        default:
-          ffi_ty = &ffi_type_pointer;
-          break;
-      }
-    }
-
-    arg_types[i] = ffi_ty;
-
-    if (expected && !expected->has_extensions()) {
-      auto scalar_info = expected->info->as<ScalarTypeInfo>();
-      switch (scalar_info->scalar_type) {
-        case TYPE_S8: {
-          int8_t tmp = ffi_coerce_numeric<int8_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_U8: {
-          uint8_t tmp = ffi_coerce_numeric<uint8_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_S16: {
-          int16_t tmp = ffi_coerce_numeric<int16_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_U16: {
-          uint16_t tmp = ffi_coerce_numeric<uint16_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_S32: {
-          int32_t tmp = ffi_coerce_numeric<int32_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_U32: {
-          uint32_t tmp = ffi_coerce_numeric<uint32_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_S64: {
-          int64_t tmp = ffi_coerce_numeric<int64_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_U64: {
-          uint64_t tmp = ffi_coerce_numeric<uint64_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_FLOAT: {
-          float tmp = ffi_coerce_numeric<float>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_DOUBLE: {
-          double tmp = ffi_coerce_numeric<double>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_BOOL: {
-          uint8_t tmp = ffi_coerce_numeric<uint8_t>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        case TYPE_CHAR: {
-          char tmp = ffi_coerce_numeric<char>(v);
-          memcpy(storage[i].data(), &tmp, sz);
-          break;
-        }
-        default:
-          memcpy(storage[i].data(), &v, sz);
-          break;
-      }
-    } else {
-      // vararg / unknown / pointer
-      switch (v->get_value_type()) {
-        case ValueType::FLOATING: {
-          double tmp = ffi_coerce_numeric<double>(v);  // promote float->double
-          memcpy(storage[i].data(), &tmp, sizeof(double));
-          arg_types[i] = &ffi_type_double;
-          break;
-        }
-        case ValueType::INTEGER: {
-          int tmp = ffi_coerce_numeric<int>(v);  // promote char/short->int
-          memcpy(storage[i].data(), &tmp, sizeof(int));
-          arg_types[i] = &ffi_type_sint;
-          break;
-        }
-        case ValueType::BOOLEAN: {
-          int tmp = v->as<BoolValue>()->value ? 1 : 0;
-          memcpy(storage[i].data(), &tmp, sizeof(int));
-          arg_types[i] = &ffi_type_sint;
-          break;
-        }
-        case ValueType::CHARACTER: {
-          int tmp = (int)v->as<CharValue>()->value;  // promoted to int
-          memcpy(storage[i].data(), &tmp, sizeof(int));
-          arg_types[i] = &ffi_type_sint;
-          break;
-        }
-        case ValueType::STRING: {
-          // call to string for escapement;
-          auto string = v->as<StringValue>()->to_string();
-          const char* s = strdup(string.data());
-          memcpy(storage[i].data(), &s, sizeof(const char*));
-          arg_types[i] = &ffi_type_pointer;
-          break;
-        }
-        case ValueType::NULLPTR: {
-          void* p = nullptr;
-          memcpy(storage[i].data(), &p, sizeof(void*));
-          arg_types[i] = &ffi_type_pointer;
-          break;
-        }
-        default: {
-          void* p = nullptr;
-          memcpy(storage[i].data(), &p, sizeof(void*));
-          arg_types[i] = &ffi_type_pointer;
-          break;
-        }
-      }
-    }
-
+    marshal_arg(fti, args, arg_types, storage, i);
     arg_values[i] = storage[i].data();
   }
 
@@ -345,11 +350,6 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti,
       char tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(char));
       return new_char(tmp);
-    }
-    case TYPE_STRING: {
-      void* ptr;
-      memcpy(&ptr, ret_storage.data(), sizeof(void*));
-      return new_string(ptr ? std::string((const char*)ptr) : "");
     }
     default:
       return null_value();
