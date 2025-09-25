@@ -438,7 +438,6 @@ Value *CTInterpreter::visit_return(ASTReturn *node) {
   return return_value();
 }
 
-// TODO: handle generics.
 Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
   if (node->is_forward_declared) {
     return null_value();
@@ -471,6 +470,36 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return null_value();
 }
 
+Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
+  ObjectValue *base = (ObjectValue *)visit(dot->base);
+  return base->values[dot->member.identifier];
+}
+
+Value *CTInterpreter::visit_index(ASTIndex *node) {
+  ArrayValue *base = (ArrayValue *)visit(node->base);
+  IntValue *index = (IntValue *)visit(node->index);
+  return base->value[index->value];
+}
+
+Value *CTInterpreter::visit_range(ASTRange *node) {
+  ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
+  object->values["begin"] = visit(node->left);
+  object->values["end"] = visit(node->right);
+  return object;
+}
+
+Value *CTInterpreter::visit_tuple(ASTTuple *node) {
+  ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
+  for (size_t i = 0; i < node->values.size(); ++i) {
+    const auto &value = node->values[i];
+    object->values[std::format("${}", i)] = visit(value);
+  }
+  return object;
+}
+
+// we probably just have to push the self argument and call the function?
+Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return null_value(); }
+
 Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
   if (ini->tag == ASTInitializerList::INIT_LIST_NAMED) {
     ObjectValue *object = (ObjectValue *)default_value_of_t(ini->resolved_type, this);
@@ -487,22 +516,34 @@ Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
   }
 }
 
-Value *CTInterpreter::visit_program(ASTProgram *) { return null_value(); }
-Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return null_value(); }
-Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return null_value(); }
-Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return null_value(); }
+Value *CTInterpreter::visit_lambda(ASTLambda *node) {
+  // Might have to do more here.
+  auto function = value_arena_alloc<FunctionValue>();
+  function->block = node->block;
+  function->parameters = node->params;
+  return function;
+}
 
-Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return null_value(); }
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *) { return null_value(); }
-Value *CTInterpreter::visit_index(ASTIndex *) { return null_value(); }
-Value *CTInterpreter::visit_range(ASTRange *) { return null_value(); }
-Value *CTInterpreter::visit_tuple(ASTTuple *) { return null_value(); }
-Value *CTInterpreter::visit_lambda(ASTLambda *) { return null_value(); }
-Value *CTInterpreter::visit_cast(ASTCast *) { return null_value(); }
-Value *CTInterpreter::visit_size_of(ASTSize_Of *) { return null_value(); }
+Value *CTInterpreter::visit_cast(ASTCast *node) {
+  // TODO: do we even have to do any casting here? probably float<->int and other scalars just to make sense?
+  return visit(node->expression);
+}
+
+Value *CTInterpreter::visit_size_of(ASTSize_Of *node) {
+  return new_int(node->target_type->resolved_type->size_in_bytes());
+}
+
 Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }
 Value *CTInterpreter::visit_type_of(ASTType_Of *) { return null_value(); }
 
+Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
+Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
+Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }
+Value *CTInterpreter::visit_continue(ASTContinue *) { return null_value(); }
+Value *CTInterpreter::visit_break(ASTBreak *) { return null_value(); }
+Value *CTInterpreter::visit_if(ASTIf *) { return null_value(); }
+Value *CTInterpreter::visit_else(ASTElse *) { return null_value(); }
+Value *CTInterpreter::visit_while(ASTWhile *) { return null_value(); }
 Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return null_value(); }
 
 Value *CTInterpreter::visit_variable(ASTVariable *variable) {
@@ -519,20 +560,6 @@ Value *CTInterpreter::visit_variable(ASTVariable *variable) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
-
-Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
-Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }
-Value *CTInterpreter::visit_continue(ASTContinue *) { return null_value(); }
-Value *CTInterpreter::visit_break(ASTBreak *) { return null_value(); }
-Value *CTInterpreter::visit_if(ASTIf *) { return null_value(); }
-Value *CTInterpreter::visit_else(ASTElse *) { return null_value(); }
-Value *CTInterpreter::visit_while(ASTWhile *) { return null_value(); }
-
-Value *CTInterpreter::visit_module(ASTModule *) { return null_value(); }
-Value *CTInterpreter::visit_import(ASTImport *) { return null_value(); }
-Value *CTInterpreter::visit_impl(ASTImpl *) { return null_value(); }
-
 void CTInterpreter::set_value(InternedString &name, Value *value) {
   auto symbol = ctx.scope->lookup(name);
   if (symbol) {
@@ -548,4 +575,27 @@ Value *CTInterpreter::try_link_extern_function(Symbol *symbol) {
   auto function = symbol->function.declaration;
   auto fti = function->resolved_type->info->as<FunctionTypeInfo>();
   return value_arena_alloc<ExternFunctionValue>(function->name, fti);
+}
+
+// These will never do anything in here. typing is already complete.
+Value *CTInterpreter::visit_program(ASTProgram *) { return null_value(); }
+Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return null_value(); }
+Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return null_value(); }
+Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return null_value(); }
+
+// We might support these later, so you can have compile-time-only API's and types,
+// that are temporary and not used in your main program.
+Value *CTInterpreter::visit_module(ASTModule *node) {
+  throw_error("Declaring modules a #run or #eval directive is not allowed", node->source_range);
+  return null_value();
+}
+
+Value *CTInterpreter::visit_import(ASTImport *node) {
+  throw_error("Importing in a #run or #eval directive is not allowed", node->source_range);
+  return null_value();
+}
+
+Value *CTInterpreter::visit_impl(ASTImpl *node) {
+  throw_error("creating \"impl\"'s in a #run or #eval directive is not allowed", node->source_range);
+  return null_value();
 }
