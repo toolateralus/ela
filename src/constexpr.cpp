@@ -1,13 +1,13 @@
 #include "constexpr.hpp"
 #include "ast.hpp"
+#include "core.hpp"
 #include "scope.hpp"
+#include "value.hpp"
 
 Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
   CTInterpreter interpeter(ctx);
   return interpeter.visit(node);
 }
-
-Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
 
 Value *CTInterpreter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node).get();
@@ -20,11 +20,22 @@ Value *CTInterpreter::visit_path(ASTPath *node) {
   return symbol->value;
 }
 
-Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return NullV(); }
-Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return NullV(); }
-Value *CTInterpreter::visit_type_of(ASTType_Of *) { return NullV(); }
-Value *CTInterpreter::visit_block(ASTBlock *) { return NullV(); }
-Value *CTInterpreter::visit_expr_statement(ASTExprStatement *) { return NullV(); }
+Value *CTInterpreter::visit_block(ASTBlock *node) {
+  ENTER_SCOPE(node->scope);
+  for (const auto &stmt : node->statements) {
+    auto result = visit(stmt);
+    if (result->value_type == ValueType::RETURN) {
+      auto value = result->as<ReturnValue>()->value;
+      if (value) {
+        return value.get();
+      }
+      return NullV();
+    }
+  }
+  return NullV();
+}
+
+Value *CTInterpreter::visit_expr_statement(ASTExprStatement *stmt) { return visit(stmt->expression); }
 
 Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
   auto left = visit(node->left);
@@ -79,7 +90,7 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       long long b = to_int(right);
       return IntV((a * b));
     }
-    
+
     case TType::Div: {
       if (is_float(left) || is_float(right)) {
         double b = to_double(right);
@@ -280,30 +291,54 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
 
 Value *CTInterpreter::visit_for(ASTFor *) { return NullV(); }
 
+Value *CTInterpreter::visit_return(ASTReturn *node) {
+  if (node->expression) {
+    return ReturnV(visit(node->expression.get()));
+  }
+  return ReturnV();
+}
+
+Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return NullV(); }
+
+Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
+
 Value *CTInterpreter::visit_call(ASTCall *) { return NullV(); }
-Value *CTInterpreter::visit_return(ASTReturn *) { return NullV(); }
+Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
+
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *) { return NullV(); }
 Value *CTInterpreter::visit_index(ASTIndex *) { return NullV(); }
 Value *CTInterpreter::visit_initializer_list(ASTInitializerList *) { return NullV(); }
 Value *CTInterpreter::visit_range(ASTRange *) { return NullV(); }
-Value *CTInterpreter::visit_switch(ASTSwitch *) { return NullV(); }
 Value *CTInterpreter::visit_tuple(ASTTuple *) { return NullV(); }
-Value *CTInterpreter::visit_cast(ASTCast *) { return NullV(); }
 Value *CTInterpreter::visit_lambda(ASTLambda *) { return NullV(); }
+Value *CTInterpreter::visit_cast(ASTCast *) { return NullV(); }
 Value *CTInterpreter::visit_size_of(ASTSize_Of *) { return NullV(); }
-Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return NullV(); }
-Value *CTInterpreter::visit_module(ASTModule *) { return NullV(); }
-Value *CTInterpreter::visit_import(ASTImport *) { return NullV(); }
-Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
-Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return NullV(); }
+Value *CTInterpreter::visit_type_of(ASTType_Of *) { return NullV(); }
+
+Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return NullV(); }
+
 Value *CTInterpreter::visit_variable(ASTVariable *) { return NullV(); }
+Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return NullV(); }
+
+Value *CTInterpreter::visit_defer(ASTDefer *) { return NullV(); }
+Value *CTInterpreter::visit_switch(ASTSwitch *) { return NullV(); }
 Value *CTInterpreter::visit_continue(ASTContinue *) { return NullV(); }
 Value *CTInterpreter::visit_break(ASTBreak *) { return NullV(); }
 Value *CTInterpreter::visit_if(ASTIf *) { return NullV(); }
 Value *CTInterpreter::visit_else(ASTElse *) { return NullV(); }
 Value *CTInterpreter::visit_while(ASTWhile *) { return NullV(); }
-Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return NullV(); }
-Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return NullV(); }
+
+Value *CTInterpreter::visit_module(ASTModule *) { return NullV(); }
+Value *CTInterpreter::visit_import(ASTImport *) { return NullV(); }
 Value *CTInterpreter::visit_impl(ASTImpl *) { return NullV(); }
-Value *CTInterpreter::visit_defer(ASTDefer *) { return NullV(); }
-Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return NullV(); }
+
+void CTInterpreter::set_value(InternedString &name, Value *value) {
+  auto symbol = ctx.scope->lookup(name);
+  if (symbol) {
+    symbol->value = value;
+  }
+}

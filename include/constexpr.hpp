@@ -1,4 +1,5 @@
 #pragma once
+#include "interned_string.hpp"
 #include "type.hpp"
 #include "ast.hpp"
 #include "value.hpp"
@@ -9,6 +10,8 @@ struct ASTExpr;
 Value* evaluate_constexpr(ASTExpr *node, Context &ctx);
 
 struct CTInterpreter {
+  void set_value(InternedString &name, Value *value);
+
   CTInterpreter (Context &context): ctx(context) {}
   Context &ctx;
   Value* visit_method_call(ASTMethodCall *node);

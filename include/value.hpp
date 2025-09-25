@@ -19,6 +19,8 @@ enum class ValueType {
   FUNCTION,
   OBJECT,
   ARRAY,
+  // Internal to interpreter.
+  RETURN,
 };
 
 template <typename T, typename... Args>
@@ -82,7 +84,17 @@ struct NullValue : Value {
   ValueType get_value_type() const override;
 };
 
+// a void or non-void return value.
+struct ReturnValue : Value {
+  ReturnValue() : Value(ValueType::RETURN) {}
+  ReturnValue(Value* value) : Value(ValueType::RETURN) { this->value = value; }
+  bool is_truthy() const override { return false; }
+  ValueType get_value_type() const override { return value_type; }
+  Nullable<Value> value;
+};
+
 const static NullValue* SHARED_NULL_VALUE = new NullValue();
+const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 
 struct ObjectValue : Value {
   Type* type;
@@ -91,10 +103,18 @@ struct ObjectValue : Value {
   ValueType get_value_type() const override;
 };
 
+struct ASTBlock;
+struct ASTParamsDecl;
+
+struct CTInterpreter;
 struct FunctionValue : Value {
+  ASTBlock* block;
+  ASTParamsDecl* parameters;
+
   FunctionValue() : Value(ValueType::FUNCTION) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  Value* Call(CTInterpreter *interpreter, std::vector<Value*> arguments);
 };
 
 struct ArrayValue : Value {
@@ -103,7 +123,6 @@ struct ArrayValue : Value {
   bool is_truthy() const override;
   ValueType get_value_type() const override;
 };
-
 
 IntValue* IntV(const InternedString& str);
 IntValue* IntV(size_t val);
@@ -118,3 +137,5 @@ NullValue* NullV();
 ObjectValue* ObjectV(Type* type);
 FunctionValue* FunctionV();
 ArrayValue* ArrayV(const std::vector<Value*>& arr);
+ReturnValue* ReturnV(Value* value);
+ReturnValue* ReturnV();
