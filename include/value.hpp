@@ -198,9 +198,8 @@ ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
 
 template <class T>
-RawPointerValue* new_raw_pointer(Type* type, T* ptr, bool pointee_is_value_struct = false,
-                                 ValueType pointee_value_type = ValueType::NULLPTR) {
-  return value_arena_alloc<RawPointerValue>(type, (char*)ptr, pointee_is_value_struct, pointee_value_type);
+RawPointerValue* new_raw_pointer(Type* type, T* ptr) {
+  return value_arena_alloc<RawPointerValue>(type, (char*)ptr);
 }
 
 PointerValue* new_pointer(Value** value);

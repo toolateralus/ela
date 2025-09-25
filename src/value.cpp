@@ -224,8 +224,6 @@ Value* default_value_of_scalar_t(ScalarType type) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
       return new_float(0);
-    case TYPE_STRING:
-      return new_string(std::string{});
     case TYPE_CHAR:
       return new_char(0);
     case TYPE_BOOL:

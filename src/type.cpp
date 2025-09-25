@@ -1087,7 +1087,6 @@ size_t Type::size_in_bytes() const {
         return 1;
       case TYPE_VOID:
         return 0;
-      case TYPE_STRING:
       default:
         return sizeof(void *);
     }

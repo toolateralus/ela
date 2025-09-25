@@ -50,7 +50,6 @@ enum ScalarType {
   TYPE_U64,
   TYPE_FLOAT,
   TYPE_DOUBLE,
-  TYPE_STRING,
   TYPE_CHAR,
   TYPE_BOOL,
 };
