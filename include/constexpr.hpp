@@ -9,64 +9,65 @@
 struct Context;
 struct ASTExpr;
 
-Value* evaluate_constexpr(ASTExpr *node, Context &ctx);
+Value *evaluate_constexpr(ASTExpr *node, Context &ctx);
 
 struct CTInterpreter {
-  void set_value(InternedString &name, Value *value);
-
-  std::unordered_map<InternedString, ExternFunctionValue> extern_functions {};
-
-  Value *try_link_extern_function(Symbol *name);
-
+  std::unordered_map<InternedString, ExternFunctionValue> extern_functions{};
   Scope *root_scope;
   Scope *current_scope;
-  CTInterpreter (Context &context): ctx(context) {
+  Context &ctx;
+
+  CTInterpreter(Context &context) : ctx(context) {
     // create a detached temporary scope.
     root_scope = create_child(ctx.scope);
     current_scope = root_scope;
   }
 
-  Context &ctx;
-  Value* visit_method_call(ASTMethodCall *node);
-  Value* visit_path(ASTPath *node);
-  Value* visit_pattern_match(ASTPatternMatch *node);
-  Value* visit_dyn_of(ASTDyn_Of *node);
-  Value* visit_type_of(ASTType_Of *node);
-  Value* visit_block(ASTBlock *node);
-  Value* visit_expr_statement(ASTExprStatement *node);
-  Value* visit_bin_expr(ASTBinExpr *node);
-  Value* visit_unary_expr(ASTUnaryExpr *node);
-  Value* visit_literal(ASTLiteral *node);
-  Value* visit_call(ASTCall *node);
-  Value* visit_return(ASTReturn *node);
-  Value* visit_dot_expr(ASTDotExpr *node);
-  Value* visit_index(ASTIndex *node);
-  Value* visit_initializer_list(ASTInitializerList *node);
-  Value* visit_range(ASTRange *node);
-  Value* visit_switch(ASTSwitch *node);
-  Value* visit_tuple(ASTTuple *node);
-  Value* visit_cast(ASTCast *node);
-  Value* visit_lambda(ASTLambda *node);
-  Value* visit_size_of(ASTSize_Of *node);
-  Value* visit_struct_declaration(ASTStructDeclaration *node);
-  Value* visit_module(ASTModule *node);
-  Value* visit_import(ASTImport *node);
-  Value* visit_program(ASTProgram *node);
-  Value* visit_function_declaration(ASTFunctionDeclaration *node);
-  Value* visit_variable(ASTVariable *node);
-  Value* visit_continue(ASTContinue *node);
-  Value* visit_break(ASTBreak *node);
-  Value* visit_for(ASTFor *node);
-  Value* visit_if(ASTIf *node);
-  Value* visit_else(ASTElse *node);
-  Value* visit_while(ASTWhile *node);
-  Value* visit_enum_declaration(ASTEnumDeclaration *node);
-  Value* visit_tuple_deconstruction(ASTDestructure *node);
-  Value* visit_impl(ASTImpl *node);
-  Value* visit_defer(ASTDefer *node);
-  Value* visit_choice_declaration(ASTChoiceDeclaration *node);
+  Value *try_link_extern_function(Symbol *name);
+  void set_value(InternedString &name, Value *value);
+  Value **get_value(ASTNode *node);
+  Value **get_dot_expr_ptr(ASTDotExpr *dot);
+  
+  Value *visit_method_call(ASTMethodCall *node);
+  Value *visit_path(ASTPath *node);
+  Value *visit_pattern_match(ASTPatternMatch *node);
+  Value *visit_dyn_of(ASTDyn_Of *node);
+  Value *visit_type_of(ASTType_Of *node);
+  Value *visit_block(ASTBlock *node);
+  Value *visit_expr_statement(ASTExprStatement *node);
+  Value *visit_bin_expr(ASTBinExpr *node);
+  Value *visit_unary_expr(ASTUnaryExpr *node);
+  Value *visit_literal(ASTLiteral *node);
+  Value *visit_call(ASTCall *node);
+  Value *visit_return(ASTReturn *node);
+  Value *visit_dot_expr(ASTDotExpr *node);
+  Value *visit_index(ASTIndex *node);
+  Value *visit_initializer_list(ASTInitializerList *node);
+  Value *visit_range(ASTRange *node);
+  Value *visit_switch(ASTSwitch *node);
+  Value *visit_tuple(ASTTuple *node);
+  Value *visit_cast(ASTCast *node);
+  Value *visit_lambda(ASTLambda *node);
+  Value *visit_size_of(ASTSize_Of *node);
+  Value *visit_struct_declaration(ASTStructDeclaration *node);
+  Value *visit_module(ASTModule *node);
+  Value *visit_import(ASTImport *node);
+  Value *visit_program(ASTProgram *node);
+  Value *visit_function_declaration(ASTFunctionDeclaration *node);
+  Value *visit_variable(ASTVariable *node);
+  Value *visit_continue(ASTContinue *node);
+  Value *visit_break(ASTBreak *node);
+  Value *visit_for(ASTFor *node);
+  Value *visit_if(ASTIf *node);
+  Value *visit_else(ASTElse *node);
+  Value *visit_while(ASTWhile *node);
+  Value *visit_enum_declaration(ASTEnumDeclaration *node);
+  Value *visit_tuple_deconstruction(ASTDestructure *node);
+  Value *visit_impl(ASTImpl *node);
+  Value *visit_defer(ASTDefer *node);
+  Value *visit_choice_declaration(ASTChoiceDeclaration *node);
 
-  Value* visit(ASTNode *node) {
+  Value *visit(ASTNode *node) {
     switch (node->get_node_type()) {
       case AST_NODE_BLOCK:
         return visit_block(static_cast<ASTBlock *>(node));

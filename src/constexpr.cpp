@@ -2,6 +2,7 @@
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include "value.hpp"
@@ -12,38 +13,7 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
   return interpeter.visit(node);
 }
 
-Value *CTInterpreter::visit_path(ASTPath *node) {
-  auto symbol = ctx.get_symbol(node).get();
-
-  if (!symbol) {
-    ENTER_SCOPE(current_scope);
-    symbol = ctx.get_symbol(node).get();
-  }
-
-  if (!symbol) {
-    return null_value();
-  }
-
-  if (symbol->value == nullptr) {
-    if (symbol->is_variable && symbol->variable.initial_value.get()) {
-      symbol->value = visit(symbol->variable.initial_value.get());
-    }
-
-    if (symbol->is_function && symbol->function.declaration) {
-      if (symbol->function.declaration->is_extern) {
-        symbol->value = try_link_extern_function(symbol);
-      } else {
-        symbol->value = visit(symbol->function.declaration);
-      }
-    }
-  }
-
-  if (symbol->value == nullptr) {
-    return null_value();
-  }
-
-  return symbol->value;
-}
+Value *CTInterpreter::visit_path(ASTPath *node) { return *get_value(node); }
 
 Value *CTInterpreter::visit_block(ASTBlock *node) {
   ENTER_SCOPE(node->scope);
@@ -305,15 +275,16 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       Value *res = visit_bin_expr(node);
       node->op = old_op;
 
-      if (node->left->get_node_type() == AST_NODE_PATH) {
-        auto path = (ASTPath *)node->left;
-        auto symbol = ctx.get_symbol(path).get();
-        if (symbol) {
-          symbol->value = res;
-        }
-      }
+      // make it permanent
+      auto left_ptr = get_value(node->left);
+      *left_ptr = right;
 
       return res;
+    }
+    case TType::Assign: {
+      auto left_ptr = get_value(node->left);
+      *left_ptr = right;
+      break;
     }
     default:
       break;
@@ -471,21 +442,30 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
+Value **CTInterpreter::get_dot_expr_ptr(ASTDotExpr *dot) {
   Value *base = visit(dot->base);
-
+  static Value *the_null_value = null_value();
+  
   if (base->get_value_type() != ValueType::OBJECT) {
     throw_error("cannot use '.' expression on a non-object at compile time", dot->source_range);
   }
 
-  ObjectValue *object = (ObjectValue*)base;
+  ObjectValue *object = (ObjectValue *)base;
 
   if (object->values.contains(dot->member.identifier)) {
-    return object->values[dot->member.identifier];
+    return &object->values[dot->member.identifier];
   } else {
-    throw_warning(WARNING_COUNT, std::format("Accessing a dot expression during compile time, but the object didn't have a property {}, so it got ignored", dot->member.identifier), dot->source_range);
-    return null_value();
+    throw_warning(WARNING_COUNT,
+                  std::format("Accessing a dot expression during compile time, but the object didn't have a property "
+                              "{}, so it got ignored",
+                              dot->member.identifier),
+                  dot->source_range);
+    return &the_null_value;
   }
+}
+
+Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
+  return *get_dot_expr_ptr(dot);
 }
 
 Value *CTInterpreter::visit_index(ASTIndex *node) {
@@ -529,7 +509,11 @@ Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
     args.push_back(visit(arg_node));
   }
 
-  return fn->call(this, args);
+  auto result = fn->call(this, args);
+
+  auto self_ptr = get_value(node->callee->base);
+  *self_ptr = self_val;
+  return result;
 }
 
 Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
@@ -630,4 +614,46 @@ Value *CTInterpreter::visit_import(ASTImport *node) {
 Value *CTInterpreter::visit_impl(ASTImpl *node) {
   throw_error("creating \"impl\"'s in a #run or #eval directive is not allowed", node->source_range);
   return null_value();
+}
+
+Value **CTInterpreter::get_value(ASTNode *node) {
+  if (node->get_node_type() == AST_NODE_DOT_EXPR) {
+    return get_dot_expr_ptr((ASTDotExpr*)node);
+  }
+
+  static Value *the_null_value = null_value();
+
+  Symbol *symbol;
+  {
+    ENTER_SCOPE(current_scope);
+    symbol = ctx.get_symbol(node).get();
+  }
+
+  if (!symbol) {
+    symbol = ctx.get_symbol(node).get();
+  }
+
+  if (!symbol) {
+    return &the_null_value;
+  }
+
+  if (symbol->value == nullptr) {
+    if (symbol->is_variable && symbol->variable.initial_value.get()) {
+      symbol->value = visit(symbol->variable.initial_value.get());
+    }
+
+    if (symbol->is_function && symbol->function.declaration) {
+      if (symbol->function.declaration->is_extern) {
+        symbol->value = try_link_extern_function(symbol);
+      } else {
+        symbol->value = visit(symbol->function.declaration);
+      }
+    }
+  }
+
+  if (symbol->value == nullptr) {
+    return &the_null_value;
+  }
+
+  return &symbol->value;
 }

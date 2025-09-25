@@ -47,7 +47,6 @@ struct Value {
   virtual bool is_truthy() const = 0;
   virtual ValueType get_value_type() const;
   virtual ASTNode* to_ast() const { return nullptr; }
-
   virtual std::string to_string() const;
 };
 
