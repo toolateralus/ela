@@ -2067,6 +2067,14 @@ std::string Emitter::emit_symbol(Symbol *symbol) {
     return symbol->name.get_str();
   }
 
+  if (symbol->is_variable) {
+    ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+    // ! variable is sometimes null when is_variable is true. Why?
+    if (variable && variable->is_extern) {
+      return symbol->name.get_str();
+    }
+  }
+
   auto full_name = symbol->scope->full_name();
   if (!full_name.empty()) {
     full_name += "$";

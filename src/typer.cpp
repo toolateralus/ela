@@ -709,7 +709,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
-  // just like C-- (owned)
   for (const auto &method : node->methods) {
     method->declaring_type = target_ty;
 
@@ -828,6 +827,17 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   node->resolved_type = target_ty;
+
+  if (target_ty->is_kind(TYPE_TRAIT)) {
+    for (Type *type: type_table) {
+      if (type->implements(target_ty)) {
+        // We patch up any already-implemented types when adding a method to a trait.
+        // You can't add new trait methods, just defaults.
+        node->target->resolved_type = type;
+        node->accept(this);
+      }
+    }
+  }
 }
 
 void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
@@ -3300,8 +3310,6 @@ void Typer::visit(ASTMethodCall *node) {
   node->callee->accept(this);
   auto func_sym = ctx.get_symbol(node->callee).get();
 
-  bool added_dyn_instance_argument_as_arg_0 = false;
-
   auto old_expression_list = current_expression_list;
   current_expression_list = &node->arguments->arguments;
   Defer _defer([&] { current_expression_list = old_expression_list; });
@@ -3348,7 +3356,7 @@ void Typer::visit(ASTMethodCall *node) {
       dot->member = ASTPath::Segment{"instance"};
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
-      added_dyn_instance_argument_as_arg_0 = node->inserted_dyn_arg = true;
+      node->inserted_dyn_arg = true;
     }
 
     type = node->callee->resolved_type;

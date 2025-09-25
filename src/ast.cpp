@@ -514,7 +514,23 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         return nullptr;
       }
+    },
+
+    { 
+      // ! this is a hacky directive to make it so you can forward declare types from other modules without making a submodule within your current file.
+      // ! This is just a symptom of having implicit file scoped modules, we should have to declare 'module fmt;' at the top of the file (ish) so anything above
+      // !that would be in global namespace.
+      .identifier = "global",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto old_scope = parser->ctx.scope;
+        parser->ctx.scope = parser->ctx.root_scope;
+        auto module_definition = parser->parse_module();
+        parser->ctx.scope =old_scope;
+        return module_definition;
+      }
     }
+
 };
 // clang-format on
 
@@ -3051,12 +3067,11 @@ ASTPath *Parser::context_identifier() {
   return context_identifier;
 };
 
-
 ASTType *Parser::context_trait_ast_type() {
   static NODE_ALLOC(ASTType, type, _, defer, this);
   if (!type->normal.path) {
     type->kind = ASTType::NORMAL;
-    type->extensions={};
+    type->extensions = {};
     NODE_ALLOC(ASTPath, path, path_range, path_defer, this)
     path->push_segment("compiler");
     path->push_segment("Context");
