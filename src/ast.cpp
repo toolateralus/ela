@@ -536,10 +536,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .identifier = "run",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto block = parser->parse_block();
-        CTInterpreter interpreter(parser->ctx);
-        auto result = interpreter.visit_block(block);
-        return result->ToAST();
+        auto node = parser->parse_block();
+        NODE_ALLOC(ASTRun, run, range, defer, parser)
+        run->node_to_run = node;
+        return run;
       }
     }
 

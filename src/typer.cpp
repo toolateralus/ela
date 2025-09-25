@@ -3848,3 +3848,25 @@ void Typer::visit(ASTUnpackExpr *node) {
 void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }
+
+// 🅿️ 🅾️ 🅾️ 🅿️
+void Typer::visit(ASTRun *node) {
+  node->node_to_run->accept(this);
+  CTInterpreter interpreter(ctx);
+  auto result = interpreter.visit(node->node_to_run);
+  if (result->get_value_type() == ValueType::RETURN) {
+    auto return_v = result->as<ReturnValue>();
+    if (return_v->value.is_null()) {
+      return;
+    } else {
+      result = return_v->value.get();
+    }
+  }
+
+  auto ast = result->ToAST();
+  ast->accept(this);
+
+  if (parent_prev) {
+    parent_prev->accept_typed_replacement(ast);
+  }
+}

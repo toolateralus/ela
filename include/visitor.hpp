@@ -11,9 +11,14 @@
 #include "type.hpp"
 
 struct VisitorBase {
+
+  ASTNode *parent_node = nullptr;
+  ASTNode *parent_prev = nullptr;
+
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *) { return; }
 
+  virtual void visit(ASTRun *) = 0;
   virtual void visit(ASTWhereStatement *) = 0;
   virtual void visit(ASTPath *node) = 0;
   virtual void visit(ASTMethodCall *node) = 0;
@@ -146,6 +151,7 @@ struct Typer : VisitorBase {
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTUnpackElement *node) override;
+  void visit(ASTRun *) override;
 
   std::vector<Type *> get_generic_arg_types(const std::vector<ASTExpr *> &args);
 
@@ -325,7 +331,7 @@ struct Emitter : VisitorBase {
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr,
                                                bool type_erase_self = false);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
-
+  void visit(ASTRun *) override;
   void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
@@ -407,6 +413,7 @@ struct Resolver : VisitorBase {
 
   void define_type(Type *type_id);
   void declare_type(Type *type_id);
+  void visit(ASTRun *) override;
   void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;
   void visit(ASTPath *node) override;

@@ -2,6 +2,7 @@
 #include "ast.hpp"
 #include "core.hpp"
 #include "scope.hpp"
+#include "type.hpp"
 #include "value.hpp"
 
 Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
@@ -11,6 +12,11 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
 
 Value *CTInterpreter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node).get();
+
+  if (!symbol) {
+    ENTER_SCOPE(current_scope);
+    symbol = ctx.get_symbol(node).get();
+  }
 
   if (!symbol) {
     return NullV();
@@ -294,7 +300,61 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
   }
 }
 
-Value *CTInterpreter::visit_for(ASTFor *) { return NullV(); }
+Value *CTInterpreter::visit_for(ASTFor *node) { 
+
+  InternedString loop_var_name;
+  if (node->left_tag == ASTFor::IDENTIFIER) {
+    loop_var_name = node->left.identifier;
+  } else {
+    return NullV();
+  }
+
+  ASTRange *range;
+  if (node->right->get_node_type() == AST_NODE_RANGE) {
+    range = (ASTRange*)node->right;
+  } else {
+    return NullV();
+  }
+
+  auto left_v = visit(range->left);
+  auto right_v = visit(range->right);
+
+  long long left = 0, right = 0;
+  if (left_v->get_value_type() == ValueType::INTEGER) {
+    left = ((IntValue *)left_v)->value;
+  } else if (left_v->get_value_type() == ValueType::FLOATING) {
+    left = (long long)((FloatValue *)left_v)->value;
+  } else {
+    return NullV();
+  }
+
+  if (right_v->get_value_type() == ValueType::INTEGER) {
+    right = ((IntValue *)right_v)->value;
+  } else if (right_v->get_value_type() == ValueType::FLOATING) {
+    right = (long long)((FloatValue *)right_v)->value;
+  } else {
+    return NullV();
+  }
+
+  (void)left;
+  (void)right;
+
+  current_scope->insert_local_variable(loop_var_name, s32_type(), nullptr, MUT);
+
+  for (int i = left; i < right; ++i) {
+    set_value(loop_var_name, IntV(i));
+    auto result = visit(node->block);
+    if (result->get_value_type() == ValueType::RETURN) {
+      auto return_v = result->as<ReturnValue>();
+      if (return_v->value.is_not_null()) {
+        return return_v->value.get();
+      }
+      return NullV();
+    }
+  }
+
+  return NullV();
+}
 
 Value *CTInterpreter::visit_return(ASTReturn *node) {
   if (node->expression) {
@@ -348,6 +408,10 @@ Value *CTInterpreter::visit_impl(ASTImpl *) { return NullV(); }
 
 void CTInterpreter::set_value(InternedString &name, Value *value) {
   auto symbol = ctx.scope->lookup(name);
+  if (symbol) {
+    symbol->value = value;
+  }
+  symbol = current_scope->lookup(name);
   if (symbol) {
     symbol->value = value;
   }

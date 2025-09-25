@@ -2757,3 +2757,7 @@ void Emitter::visit(ASTUnpackElement *node) {
     node->range_literal_value->accept(this);
   }
 }
+
+void Emitter::visit(ASTRun *) {
+
+}

@@ -99,9 +99,7 @@ void Resolver::visit(ASTStructDeclaration *node) {
 
   visitation_set.insert(node);
 
-  Defer _defer([&] {
-    visitation_set.erase(node);
-  });
+  Defer _defer([&] { visitation_set.erase(node); });
 
   if (!node->generic_parameters.empty()) {
     return;
@@ -655,3 +653,5 @@ void Resolver::visit(ASTUnpackElement *node) {
     node->range_literal_value->accept(this);
   }
 }
+
+void Resolver::visit(ASTRun *) { /* do nothing */ }

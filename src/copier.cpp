@@ -385,6 +385,12 @@ ASTUnpackExpr *ASTCopier::copy_unpack(ASTUnpackExpr *node) {
   return new_node;
 }
 
+ASTRun *ASTCopier::copy_run(ASTRun *node) {
+  ASTRun* new_node = copy(node);
+  new_node->node_to_run = copy_node(node->node_to_run);
+  return new_node;
+}
+
 // TODO: make sure this is correct.
 ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
   ASTWhereStatement *new_node = copy(node);
@@ -408,6 +414,8 @@ ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   const auto type = node->get_node_type();
   switch (type) {
+    case AST_NODE_RUN: 
+      return copy_run((ASTRun*)node);
     case AST_NODE_UNPACK:
       return copy_unpack((ASTUnpackExpr *)node);
     case AST_NODE_UNPACK_ELEMENT:
