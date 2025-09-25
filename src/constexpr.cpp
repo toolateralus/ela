@@ -1,6 +1,7 @@
 #include "constexpr.hpp"
 #include "ast.hpp"
 #include "core.hpp"
+#include "error.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include "value.hpp"
@@ -471,14 +472,26 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
 }
 
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
-  ObjectValue *base = (ObjectValue *)visit(dot->base);
-  return base->values[dot->member.identifier];
+  Value *base = visit(dot->base);
+
+  if (base->get_value_type() != ValueType::OBJECT) {
+    throw_error("cannot use '.' expression on a non-object at compile time", dot->source_range);
+  }
+
+  ObjectValue *object = (ObjectValue*)base;
+
+  if (object->values.contains(dot->member.identifier)) {
+    return object->values[dot->member.identifier];
+  } else {
+    throw_warning(WARNING_COUNT, std::format("Accessing a dot expression during compile time, but the object didn't have a property {}, so it got ignored", dot->member.identifier), dot->source_range);
+    return null_value();
+  }
 }
 
 Value *CTInterpreter::visit_index(ASTIndex *node) {
   ArrayValue *base = (ArrayValue *)visit(node->base);
   IntValue *index = (IntValue *)visit(node->index);
-  return base->value[index->value];
+  return base->values[index->value];
 }
 
 Value *CTInterpreter::visit_range(ASTRange *node) {
@@ -497,8 +510,27 @@ Value *CTInterpreter::visit_tuple(ASTTuple *node) {
   return object;
 }
 
-// we probably just have to push the self argument and call the function?
-Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return null_value(); }
+Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
+  auto func_symbol = ctx.get_symbol(node->callee).get();
+  auto func_decl = func_symbol->function.declaration;
+  auto function = visit(func_decl);
+
+  if (function->get_value_type() != ValueType::FUNCTION) {
+    throw_error("Tried to .call() a non-function during compile time", node->source_range);
+  }
+
+  auto fn = function->as<FunctionValue>();
+
+  Value *self_val = visit(node->callee->base);
+
+  std::vector<Value *> args;
+  args.push_back(self_val);
+  for (auto *arg_node : node->arguments->arguments) {
+    args.push_back(visit(arg_node));
+  }
+
+  return fn->call(this, args);
+}
 
 Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
   if (ini->tag == ASTInitializerList::INIT_LIST_NAMED) {
@@ -510,7 +542,7 @@ Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
   } else {
     ArrayValue *array = new_array(ini->resolved_type);
     for (const auto &value : ini->values) {
-      array->value.push_back(visit(value));
+      array->values.push_back(visit(value));
     }
     return array;
   }

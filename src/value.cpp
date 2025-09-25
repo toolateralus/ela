@@ -3,7 +3,7 @@
 #include "type.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
-bool ArrayValue::is_truthy() const { return !value.empty(); }
+bool ArrayValue::is_truthy() const { return !values.empty(); }
 bool FunctionValue::is_truthy() const { return true; }
 ValueType FunctionValue::get_value_type() const { return ValueType::FUNCTION; }
 bool ObjectValue::is_truthy() const { return true; }
@@ -53,6 +53,10 @@ Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> argum
       auto symbol = temp_scope->local_lookup(param->normal.name);
       symbol->value = *it;
       ++it;
+    } else {
+      temp_scope->insert_local_variable("self", param->resolved_type, nullptr, param->mutability);
+      auto symbol = temp_scope->local_lookup("self");
+      symbol->value = *it;
     }
   }
 
@@ -233,7 +237,7 @@ Value* default_value_of_scalar_t(ScalarType type) {
 Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpreter* interpreter) {
   auto array = new_array({});
   for (size_t i = 0; i < size; ++i) {
-    array->value.push_back(default_value_of_t(base_type, interpreter));
+    array->values.push_back(default_value_of_t(base_type, interpreter));
   }
   return array;
 }
@@ -327,7 +331,7 @@ ASTNode* ArrayValue::to_ast() const {
   init->target_type = ast_alloc<ASTType>();
   init->target_type.get()->resolved_type = type->base_type; // pass the base type to array initializers
   init->tag = ASTInitializerList::INIT_LIST_COLLECTION;
-  for (const auto& value : this->value) {
+  for (const auto& value : this->values) {
     init->values.push_back((ASTExpr*)value->to_ast());
   }
   return init;

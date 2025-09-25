@@ -111,15 +111,24 @@ const static NullValue* SHARED_NULL_VALUE = new NullValue();
 const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 
 struct ObjectValue : Value {
-  Type* type;
-  std::map<InternedString, Value*> values{};
-
+  Type* type = nullptr;
+  std::map<InternedString, Value*> values {};
   ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT), type(t) {}
 
   bool is_truthy() const override;
 
   ValueType get_value_type() const override;
 
+  ASTNode* to_ast() const override;
+};
+
+struct ArrayValue : Value {
+  Type* type = nullptr;
+  std::vector<Value*> values {};
+  ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), type(type), values(arr) {}
+  ArrayValue(Type* type) : Value(ValueType::ARRAY), type(type), values({}) {}
+  bool is_truthy() const override;
+  ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
 };
 
@@ -145,17 +154,6 @@ struct ExternFunctionValue : Value {
 
   bool is_truthy() const override { return false; }
   ValueType get_value_type() const override { return value_type; }
-};
-
-struct ArrayValue : Value {
-  Type* type;
-  std::vector<Value*> value;
-  ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), type(type), value(arr) {}
-  ArrayValue(Type* type) : Value(ValueType::ARRAY), type(type), value({}) {}
-  bool is_truthy() const override;
-  ValueType get_value_type() const override;
-
-  ASTNode* to_ast() const override;
 };
 
 IntValue* new_int(const InternedString& str);

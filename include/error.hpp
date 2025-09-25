@@ -129,6 +129,7 @@ enum WarningFlags {
   WARNING_IGNORE_ALL = 1 << 3,                     // --Wignore-all
   WARNING_ARRAY_ASSIGNMENT_MEMCPY = 1 << 4,        // --Warray-assignment-memcpy
   WARNING_RETURNING_ARRAY = 1 << 5,                // --Wno-returning-array
+  WARNING_GENERAL = 1 << 6,
   WARNING_COUNT,
 };
 
@@ -141,6 +142,7 @@ const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
     [WARNING_IGNORE_ALL] = "Wignore-all",
     [WARNING_ARRAY_ASSIGNMENT_MEMCPY] = "Wno-array-assignment-memcpy",
     [WARNING_RETURNING_ARRAY] = "Wno-returning-array",
+    [WARNING_GENERAL] = "Wno-general",
 };
 
 extern int ignored_warnings;
