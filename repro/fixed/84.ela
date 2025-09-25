@@ -1,12 +1,13 @@
 import fmt::*;
+import stringstream::StringStream;
 import assertion::assert;
 
 fn main() { 
-  mut builder: StringBuilder;
-  defer builder.destroy();
-  builder.append('c');
+  mut stream: StringStream;
+  defer stream.destroy();
+  stream.append('c');
 
-  // ! there is a problem with StringBuilder and As_Char_Slice![u32]
+  // ! there is a problem with StringStream and As_Char_Slice![u32]
   // ! where slices have to be null terminated, or they'll spew junk.
-  assert(builder.get_string().data![0] == 'c', "builder.get_string().data![0] != 'c'");
+  assert(stream.get_string().data![0] == 'c', "builder.get_string().data![0] != 'c'");
 }
