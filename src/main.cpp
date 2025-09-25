@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
       args += arg + " ";
     }
     std::string command = invocation + " " + args;
-    std::cout << "\nrunning: " << command << std::endl;
+    std::cout << "\033[1;30mrunning:\033[0m " << "\033[1;34m" << command << "\033[0m" << std::endl;
     auto status = system(command.c_str());
 
     if (status == -1) {

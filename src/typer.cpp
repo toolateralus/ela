@@ -3865,7 +3865,7 @@ void Typer::visit(ASTRun *node) {
   auto ast = result->to_ast();
   ast->accept(this);
 
-  if (parent_prev) {
+  if (parent_prev && node->replace_prev_parent) {
     parent_prev->accept_typed_replacement(ast);
   }
 }

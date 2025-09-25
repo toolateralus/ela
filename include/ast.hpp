@@ -1148,6 +1148,7 @@ struct WhereBranch {
 };
 
 struct ASTRun : ASTExpr {
+  bool replace_prev_parent = true;
   ASTNode *node_to_run;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RUN; }

@@ -56,17 +56,10 @@ Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> argum
 
   auto old_scope = block->scope;
   block->scope = temp_scope;
-  auto result = interpreter->visit_block(block);
+  auto value = interpreter->visit_block(block);
   block->scope = old_scope;
 
-  if (result->value_type == ValueType::RETURN) {
-    auto return_v = result->as<ReturnValue>();
-    if (return_v->value) {
-      return return_v->value.get();
-    }
-  }
-
-  return NullV();
+  return value;
 }
 ASTNode* IntValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();

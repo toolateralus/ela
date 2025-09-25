@@ -61,6 +61,7 @@ Value *CTInterpreter::visit_block(ASTBlock *node) {
 
 Value *CTInterpreter::visit_expr_statement(ASTExprStatement *stmt) { return visit(stmt->expression); }
 
+
 Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
   auto left = visit(node->left);
   auto right = visit(node->right);
@@ -375,6 +376,7 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
   }
 }
 
+// TODO: handle iterators.
 Value *CTInterpreter::visit_for(ASTFor *node) {
   InternedString loop_var_name;
   if (node->left_tag == ASTFor::IDENTIFIER) {
@@ -437,6 +439,7 @@ Value *CTInterpreter::visit_return(ASTReturn *node) {
   return ReturnV();
 }
 
+// TODO: handle generics.
 Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
   if (node->is_forward_declared) {
     return NullV();
@@ -445,15 +448,9 @@ Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto function = value_arena_alloc<FunctionValue>();
   function->parameters = node->params;
   function->block = node->block.get();
-  
+
   return function;
 }
-
-Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return NullV(); }
-Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return NullV(); }
-Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return NullV(); }
-
-Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
 
 Value *CTInterpreter::visit_call(ASTCall *call) {
   auto function = visit(call->callee);
@@ -475,8 +472,12 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return NullV();
 }
 
-Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
+Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return NullV(); }
+Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return NullV(); }
 
+Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
+Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *) { return NullV(); }
 Value *CTInterpreter::visit_index(ASTIndex *) { return NullV(); }
 Value *CTInterpreter::visit_initializer_list(ASTInitializerList *) { return NullV(); }

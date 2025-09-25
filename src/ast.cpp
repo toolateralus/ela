@@ -531,17 +531,39 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return module_definition;
       }
     },
-
     {
-      .identifier = "run",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
+      .identifier = "eval",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto node = parser->parse_block();
         NODE_ALLOC(ASTRun, run, range, defer, parser)
-        run->node_to_run = node;
+        if (parser->peek().type == TType::LCurly) {
+          run->node_to_run = parser->parse_block();
+        } else {
+          run->node_to_run = parser->parse_expr();
+        }
         return run;
       }
-    }
+    },
+    {
+      .identifier = "run",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        NODE_ALLOC(ASTRun, run, range, defer, parser)
+
+        run->replace_prev_parent = false;
+
+        if (parser->peek().type == TType::LCurly) {
+          run->node_to_run = parser->parse_block();
+        } else {
+          run->node_to_run = parser->parse_expr();
+        }
+
+        NODE_ALLOC(ASTExprStatement, stmt, range1, defer1, parser)
+        stmt->expression = run;
+
+        return stmt;
+      }
+    },
 
 };
 // clang-format on
