@@ -32,27 +32,13 @@ struct Value {
   Value(ValueType vt = ValueType::NULLPTR) : value_type(vt) {}
   virtual ~Value() {}
 
-  template<class T>
-  inline T *as() const {
+  template <class T>
+  inline T* as() const {
     return (T*)this;
   }
 
   virtual bool is_truthy() const = 0;
   virtual ValueType get_value_type() const;
-
-  static Value* Int(const InternedString& str);
-  static Value* Float(const InternedString& str);
-  static Value* Bool(const InternedString& str);
-  static Value* Int(size_t val);
-  static Value* Float(double val);
-  static Value* Bool(bool val);
-  static Value* String(const InternedString& str);
-  static Value* String(const std::string& str);
-  static Value* Char(char val);
-  static Value* Null();
-  static Value* Object(Type* type);
-  static Value* Function();
-  static Value* Array(const std::vector<Value*>& arr);
 };
 
 struct IntValue : Value {
@@ -96,7 +82,7 @@ struct NullValue : Value {
   ValueType get_value_type() const override;
 };
 
-const static NullValue *SHARED_NULL_VALUE = new NullValue();
+const static NullValue* SHARED_NULL_VALUE = new NullValue();
 
 struct ObjectValue : Value {
   Type* type;
@@ -118,3 +104,17 @@ struct ArrayValue : Value {
   ValueType get_value_type() const override;
 };
 
+
+IntValue* IntV(const InternedString& str);
+IntValue* IntV(size_t val);
+FloatValue* FloatV(const InternedString& str);
+FloatValue* FloatV(double val);
+BoolValue* BoolV(const InternedString& str);
+BoolValue* BoolV(bool val);
+StringValue* StringV(const InternedString& str);
+StringValue* StringV(const std::string& str);
+CharValue* CharV(char val);
+NullValue* NullV();
+ObjectValue* ObjectV(Type* type);
+FunctionValue* FunctionV();
+ArrayValue* ArrayV(const std::vector<Value*>& arr);

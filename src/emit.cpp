@@ -15,6 +15,7 @@
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
+#include "value.hpp"
 #include "visitor.hpp"
 
 /*
@@ -179,7 +180,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     // We don't check the nullable here because it's an absolute guarantee that enum variables all have
     // a value always.
     auto value = evaluate_constexpr((ASTExpr *)symbol->variable.initial_value.get(), ctx);
-    ss << std::format(".enum_value = {}", value.integer);
+    ss << std::format(".enum_value = {}", value->as<IntValue>()->value);
   }
 
   ss << " }";

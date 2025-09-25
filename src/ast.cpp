@@ -7,6 +7,7 @@
 #include <set>
 #include <string>
 #include <unordered_set>
+#include "value.hpp"
 #include "visitor.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
@@ -68,7 +69,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
-    executed = value.is_truthy();
+    executed = value->is_truthy();
   } else {
     throw_error(
         "internal compiler error: Invalid #if/#ifdef/#ifndef, "
@@ -2323,10 +2324,10 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
       expect(TType::Assign);
       value = parse_expr();
       auto evaluated_value = evaluate_constexpr(value, this->ctx);
-      if (evaluated_value.tag != Value::INTEGER) {
+      if (evaluated_value->value_type != ValueType::INTEGER) {
         throw_error("Enums can only have integers", value->source_range);
       }
-      last_value = evaluated_value.integer;
+      last_value = evaluated_value->as<IntValue>()->value;
     } else {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       last_value++;

@@ -26,6 +26,7 @@ jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};
 jstl::Arena thir_arena(MB(10));
+jstl::Arena value_arena(MB(10));
 
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
