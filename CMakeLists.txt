@@ -14,6 +14,7 @@ endif()
 # Include directories
 include_directories(include)
 
+
 # Source files
 file(GLOB SRCS "src/*.cpp")
 
@@ -27,6 +28,14 @@ file(MAKE_DIRECTORY ${BIN_DIR})
 
 # Executable
 add_executable(ela ${SRCS})
+
+# Link against libffi
+find_library(FFI_LIBRARY ffi)
+if(FFI_LIBRARY)
+    target_link_libraries(ela PRIVATE ${FFI_LIBRARY})
+else()
+    message(FATAL_ERROR "libffi not found")
+endif()
 
 set_target_properties(ela PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR}

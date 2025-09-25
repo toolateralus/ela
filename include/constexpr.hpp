@@ -1,4 +1,5 @@
 #pragma once
+#include <unordered_map>
 #include "interned_string.hpp"
 #include "scope.hpp"
 #include "type.hpp"
@@ -12,6 +13,10 @@ Value* evaluate_constexpr(ASTExpr *node, Context &ctx);
 
 struct CTInterpreter {
   void set_value(InternedString &name, Value *value);
+
+  std::unordered_map<InternedString, ExternFunctionValue> extern_functions {};
+
+  Value *try_link_extern_function(Symbol *name);
 
   Scope *root_scope;
   Scope *current_scope;

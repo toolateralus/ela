@@ -95,7 +95,6 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
   return type;
 }
 
-
 /// TODO:
 // Interned type extensions; intern all new type extensions to a hash map,
 // then just compare pointers. much cheaper, and also storing type extensions as a pointer will be cheaper
@@ -110,10 +109,10 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
 
   if (!type_extensions.size()) return base_t;
 
-  auto extensions_copy = type_extensions; // copy vector
+  auto extensions_copy = type_extensions;  // copy vector
 
   if (base_t && type_is_valid(base_t->base_type)) {
-    extensions_copy = base_t->append_extension(extensions_copy); // copies base_t's std::vector<TypeExtension>
+    extensions_copy = base_t->append_extension(extensions_copy);  // copies base_t's std::vector<TypeExtension>
     base_t = base_t->base_type;
   }
 
@@ -1053,4 +1052,130 @@ void assess_and_try_add_blittable_trait(Type *type) {
   }
 
   type->traits.push_back(blittable_trait());
+}
+
+size_t Type::size_in_bytes() const {
+  if (!info) {
+    return sizeof(void *);
+  }
+
+  if (kind == TYPE_SCALAR) {
+    switch (info->as<ScalarTypeInfo>()->scalar_type) {
+      case TYPE_S8:
+        return 1;
+      case TYPE_U8:
+        return 1;
+      case TYPE_S16:
+        return 2;
+      case TYPE_U16:
+        return 2;
+      case TYPE_S32:
+        return 4;
+      case TYPE_U32:
+        return 4;
+      case TYPE_S64:
+        return 8;
+      case TYPE_U64:
+        return 8;
+      case TYPE_FLOAT:
+        return 4;
+      case TYPE_DOUBLE:
+        return 8;
+      case TYPE_CHAR:
+        return 1;
+      case TYPE_BOOL:
+        return 1;
+      case TYPE_VOID:
+        return 0;
+      case TYPE_STRING:
+      default:
+        return sizeof(void *);
+    }
+  }
+
+  if (is_pointer()) {
+    return sizeof(void *);
+  }
+
+  if (is_fixed_sized_array()) {
+    size_t elem_size = base_type->size_in_bytes();
+    size_t len = extensions.back().array_size;
+    return elem_size * len;
+  }
+
+  if (kind == TYPE_STRUCT && info->as<StructTypeInfo>()->is_union) {
+    auto struct_info = info->as<StructTypeInfo>();
+    size_t max_size = 0;
+    size_t max_align = 1;
+    for (auto &member : struct_info->members) {
+      max_size = std::max(max_size, member.type->size_in_bytes());
+      max_align = std::max(max_align, member.type->alignment_in_bytes());
+    }
+    // round up to max alignment
+    max_size = (max_size + max_align - 1) & ~(max_align - 1);
+    return max_size;
+  }
+
+  if (kind == TYPE_STRUCT) {
+    auto struct_info = info->as<StructTypeInfo>();
+    size_t offset = 0;
+    size_t max_align = 1;
+
+    for (auto &member : struct_info->members) {
+      size_t member_size = member.type->size_in_bytes();
+      size_t align = member.type->alignment_in_bytes();
+      max_align = std::max(max_align, align);
+
+      // align the offset
+      offset = (offset + align - 1) & ~(align - 1);
+      offset += member_size;
+    }
+
+    // Round up to max alignment
+    offset = (offset + max_align - 1) & ~(max_align - 1);
+    return offset;
+  }
+
+  return sizeof(void *);
+}
+
+size_t Type::alignment_in_bytes() const {
+  if (!info) return alignof(void *);
+
+  if (kind == TYPE_SCALAR) {
+    switch (info->as<ScalarTypeInfo>()->scalar_type) {
+      case TYPE_S8:
+      case TYPE_U8:
+      case TYPE_CHAR:
+      case TYPE_BOOL:
+        return 1;
+      case TYPE_S16:
+      case TYPE_U16:
+        return 2;
+      case TYPE_S32:
+      case TYPE_U32:
+        return 4;
+      case TYPE_S64:
+      case TYPE_U64:
+        return 8;
+      case TYPE_FLOAT:
+        return 4;
+      case TYPE_DOUBLE:
+        return 8;
+      default:
+        return alignof(void *);
+    }
+  }
+
+  if (is_pointer()) return alignof(void *);
+  if (is_fixed_sized_array()) return base_type->alignment_in_bytes();
+
+  if (kind == TYPE_STRUCT) {
+    auto struct_info = info->as<StructTypeInfo>();
+    size_t max_align = 1;
+    for (auto &member : struct_info->members) max_align = std::max(max_align, member.type->alignment_in_bytes());
+    return max_align;
+  }
+
+  return alignof(void *);
 }

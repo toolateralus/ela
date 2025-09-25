@@ -4,6 +4,7 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include "value.hpp"
+#include "libffi.hpp"
 
 Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
   CTInterpreter interpeter(ctx);
@@ -22,12 +23,24 @@ Value *CTInterpreter::visit_path(ASTPath *node) {
     return NullV();
   }
 
-  if (symbol->is_variable && symbol->variable.initial_value.get()) {
-    symbol->value = visit(symbol->variable.initial_value.get());
+  if (symbol->value == nullptr) {
+    if (symbol->is_variable && symbol->variable.initial_value.get()) {
+      symbol->value = visit(symbol->variable.initial_value.get());
+    }
+    
+    if (symbol->is_function && symbol->function.declaration) {
+      if (symbol->function.declaration->is_extern) {
+        symbol->value = try_link_extern_function(symbol);
+      } else {
+        symbol->value = visit(symbol->function.declaration);
+      }
+    }
   }
-  if (symbol->is_function && symbol->function.declaration) {
-    symbol->value = visit(symbol->function.declaration);
+
+  if (symbol->value == nullptr) {
+    return NullV();
   }
+
   return symbol->value;
 }
 
@@ -79,7 +92,6 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       long long b = to_int(right);
       return IntV((size_t)(a + b));
     }
-
     case TType::Sub: {
       if (is_float(left) || is_float(right)) {
         double a = to_double(left);
@@ -90,7 +102,6 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       long long b = to_int(right);
       return IntV((a - b));
     }
-
     case TType::Mul: {
       if (is_float(left) || is_float(right)) {
         double a = to_double(left);
@@ -101,7 +112,6 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       long long b = to_int(right);
       return IntV((a * b));
     }
-
     case TType::Div: {
       if (is_float(left) || is_float(right)) {
         double b = to_double(right);
@@ -240,9 +250,74 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       }
       return NullV();
     }
+
+    case TType::CompAdd:
+    case TType::CompSub:
+    case TType::CompMul:
+    case TType::CompDiv:
+    case TType::CompMod:
+    case TType::CompAnd:
+    case TType::CompOr:
+    case TType::CompXor:
+    case TType::CompSHL:
+    case TType::CompSHR: {
+      auto old_op = node->op;
+      TType base_op = TType::Add;
+      switch (old_op) {
+        case TType::CompAdd:
+          base_op = TType::Add;
+          break;
+        case TType::CompSub:
+          base_op = TType::Sub;
+          break;
+        case TType::CompMul:
+          base_op = TType::Mul;
+          break;
+        case TType::CompDiv:
+          base_op = TType::Div;
+          break;
+        case TType::CompMod:
+          base_op = TType::Modulo;
+          break;
+        case TType::CompAnd:
+          base_op = TType::And;
+          break;
+        case TType::CompOr:
+          base_op = TType::Or;
+          break;
+        case TType::CompXor:
+          base_op = TType::Xor;
+          break;
+        case TType::CompSHL:
+          base_op = TType::SHL;
+          break;
+        case TType::CompSHR:
+          base_op = TType::SHR;
+          break;
+        default:
+          base_op = old_op;
+          break;
+      }
+
+      // temporarily replace op and evaluate as a normal binary expr
+      node->op = base_op;
+      Value *res = visit_bin_expr(node);
+      node->op = old_op;
+
+      if (node->left->get_node_type() == AST_NODE_PATH) {
+        auto path = (ASTPath *)node->left;
+        auto symbol = ctx.get_symbol(path).get();
+        if (symbol) {
+          symbol->value = res;
+        }
+      }
+
+      return res;
+    }
     default:
-      return NullV();
+      break;
   }
+  return NullV();
 }
 
 Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
@@ -300,8 +375,7 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
   }
 }
 
-Value *CTInterpreter::visit_for(ASTFor *node) { 
-
+Value *CTInterpreter::visit_for(ASTFor *node) {
   InternedString loop_var_name;
   if (node->left_tag == ASTFor::IDENTIFIER) {
     loop_var_name = node->left.identifier;
@@ -311,7 +385,7 @@ Value *CTInterpreter::visit_for(ASTFor *node) {
 
   ASTRange *range;
   if (node->right->get_node_type() == AST_NODE_RANGE) {
-    range = (ASTRange*)node->right;
+    range = (ASTRange *)node->right;
   } else {
     return NullV();
   }
@@ -370,7 +444,24 @@ Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return Null
 
 Value *CTInterpreter::visit_program(ASTProgram *) { return NullV(); }
 
-Value *CTInterpreter::visit_call(ASTCall *) { return NullV(); }
+Value *CTInterpreter::visit_call(ASTCall *call) {
+  auto function = visit(call->callee);
+
+  std::vector<Value *> evaluated_args;
+  evaluated_args.reserve(call->arguments->arguments.size());
+
+  for (const auto &arg : call->arguments->arguments) {
+    evaluated_args.push_back(visit(arg));
+  }
+
+  if (function->get_value_type() == ValueType::EXTERN_FUNCTION) {
+    auto extern_function = function->as<ExternFunctionValue>();
+    auto result = compile_time_ffi_dispatch(extern_function->name, extern_function->info, evaluated_args);
+    return result ? result: NullV();
+  }
+
+  return NullV();
+}
 Value *CTInterpreter::visit_method_call(ASTMethodCall *) { return NullV(); }
 
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *) { return NullV(); }
@@ -415,4 +506,10 @@ void CTInterpreter::set_value(InternedString &name, Value *value) {
   if (symbol) {
     symbol->value = value;
   }
+}
+
+Value *CTInterpreter::try_link_extern_function(Symbol *symbol) {
+  auto function = symbol->function.declaration;
+  auto fti = function->resolved_type->info->as<FunctionTypeInfo>();
+  return value_arena_alloc<ExternFunctionValue>(function->name, fti);
 }

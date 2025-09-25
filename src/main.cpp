@@ -31,6 +31,8 @@ jstl::Arena value_arena(MB(10));
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
+std::unordered_map<std::string, void*> loaded_ffi_extern_functions {};
+
 
 size_t lambda_unique_id = 0;
 

@@ -3849,7 +3849,6 @@ void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }
 
-// 🅿️ 🅾️ 🅾️ 🅿️
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
   CTInterpreter interpreter(ctx);
@@ -3863,7 +3862,7 @@ void Typer::visit(ASTRun *node) {
     }
   }
 
-  auto ast = result->ToAST();
+  auto ast = result->to_ast();
   ast->accept(this);
 
   if (parent_prev) {

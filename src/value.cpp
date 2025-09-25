@@ -22,21 +22,21 @@ bool FloatValue::is_truthy() const { return value != 0.0; }
 bool BoolValue::is_truthy() const { return value; }
 bool StringValue::is_truthy() const { return !value.empty(); }
 
-IntValue* IntV(const InternedString& str) { return arena_alloc<IntValue>(std::stoll(str.get_str())); }
-FloatValue* FloatV(const InternedString& str) { return arena_alloc<FloatValue>(std::stod(str.get_str())); }
-BoolValue* BoolV(const InternedString& str) { return arena_alloc<BoolValue>(str.get_str() == "true"); }
-IntValue* IntV(size_t val) { return arena_alloc<IntValue>(val); }
-FloatValue* FloatV(double val) { return arena_alloc<FloatValue>(val); }
-BoolValue* BoolV(bool val) { return arena_alloc<BoolValue>(val); }
-StringValue* StringV(const InternedString& str) { return arena_alloc<StringValue>(str.get_str()); }
-StringValue* StringV(const std::string& str) { return arena_alloc<StringValue>(str); }
-CharValue* CharV(char val) { return arena_alloc<CharValue>(val); }
+IntValue* IntV(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
+FloatValue* FloatV(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
+BoolValue* BoolV(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
+IntValue* IntV(size_t val) { return value_arena_alloc<IntValue>(val); }
+FloatValue* FloatV(double val) { return value_arena_alloc<FloatValue>(val); }
+BoolValue* BoolV(bool val) { return value_arena_alloc<BoolValue>(val); }
+StringValue* StringV(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
+StringValue* StringV(const std::string& str) { return value_arena_alloc<StringValue>(str); }
+CharValue* CharV(char val) { return value_arena_alloc<CharValue>(val); }
 NullValue* NullV() { return (NullValue*)SHARED_NULL_VALUE; }
-ObjectValue* ObjectV(Type* type) { return arena_alloc<ObjectValue>(type); }
-FunctionValue* FunctionV() { return arena_alloc<FunctionValue>(); }
-ArrayValue* ArrayV(const std::vector<Value*>& arr) { return arena_alloc<ArrayValue>(arr); }
+ObjectValue* ObjectV(Type* type) { return value_arena_alloc<ObjectValue>(type); }
+FunctionValue* FunctionV() { return value_arena_alloc<FunctionValue>(); }
+ArrayValue* ArrayV(const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(arr); }
 
-ReturnValue* ReturnV(Value* value) { return arena_alloc<ReturnValue>(value); }
+ReturnValue* ReturnV(Value* value) { return value_arena_alloc<ReturnValue>(value); }
 ReturnValue* ReturnV() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
 
 #include "constexpr.hpp"
@@ -56,41 +56,67 @@ Value* FunctionValue::Call(CTInterpreter* interpreter, std::vector<Value*> argum
 
   return NullV();
 }
-ASTNode* IntValue::ToAST() const {
+ASTNode* IntValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Integer;
   return literal;
 }
-ASTNode* FloatValue::ToAST() const {
+ASTNode* FloatValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Float;
   return literal;
 }
-ASTNode* BoolValue::ToAST() const {
+ASTNode* BoolValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = value ? "true" : "false";
   literal->tag = ASTLiteral::Bool;
   return literal;
 }
 
-ASTNode* StringValue::ToAST() const {
+ASTNode* StringValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = value;
   literal->tag = ASTLiteral::String;
   return literal;
 }
 
-ASTNode* CharValue::ToAST() const {
+ASTNode* CharValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Char;
   return literal;
 }
-ASTNode* NullValue::ToAST() const {
+
+ASTNode* NullValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = "null";
   literal->tag = ASTLiteral::Null;
   return literal;
+}
+
+std::string Value::to_string() const {
+  printf("%d\n", this->get_value_type());
+  switch (this->get_value_type()) {
+    case ValueType::INTEGER:
+      return std::to_string(((const IntValue*)this)->value);
+    case ValueType::FLOATING:
+      return std::to_string(((const FloatValue*)this)->value);
+    case ValueType::BOOLEAN:
+      return (((const BoolValue*)this)->value ? "true" : "false");
+    case ValueType::CHARACTER: {
+      char buf[2] = {((const CharValue*)this)->value, 0};
+      return std::string(buf);
+    }
+    case ValueType::STRING:
+      return ((const StringValue*)this)->value;
+    case ValueType::NULLPTR:
+      return "null";
+    case ValueType::OBJECT:
+    case ValueType::FUNCTION:
+    case ValueType::ARRAY:
+    default:
+      return "(unsupported)";
+  }
 }

@@ -42,7 +42,7 @@ struct Symbol {
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }
 
-  Value* value;
+  Value* value = nullptr;
 
   union {
     struct {

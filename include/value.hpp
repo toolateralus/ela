@@ -10,29 +10,32 @@
 extern jstl::Arena value_arena;
 
 enum class ValueType {
-  INTEGER,
-  FLOATING,
-  BOOLEAN,
-  STRING,
-  CHARACTER,
-  NULLPTR,
-  FUNCTION,
-  OBJECT,
-  ARRAY,
+  NULLPTR = 0,
+  FLOATING = 1,
+  BOOLEAN = 2,
+  STRING = 3,
+  CHARACTER = 4,
+  INTEGER = 5,
+  FUNCTION = 6,
+  OBJECT = 7,
+  ARRAY = 8,
+
   // Internal to interpreter.
-  RETURN,
+  EXTERN_FUNCTION = 9,
+  RETURN = 10,
 };
 
 template <typename T, typename... Args>
-inline T* arena_alloc(Args&&... args) {
+inline T* value_arena_alloc(Args&&... args) {
   void* mem = value_arena.allocate(sizeof(T));
   return new (mem) T(std::forward<Args>(args)...);
 }
 
 struct ASTNode;
 struct Value {
-  ValueType value_type = ValueType::NULLPTR;
+  const ValueType value_type = ValueType::NULLPTR;
   Value(ValueType vt = ValueType::NULLPTR) : value_type(vt) {}
+  Value() = delete;
   virtual ~Value() {}
 
   template <class T>
@@ -42,9 +45,9 @@ struct Value {
 
   virtual bool is_truthy() const = 0;
   virtual ValueType get_value_type() const;
-  virtual ASTNode *ToAST() const {
-    return nullptr;
-  }
+  virtual ASTNode* to_ast() const { return nullptr; }
+
+  virtual std::string to_string() const;
 };
 
 struct IntValue : Value {
@@ -52,7 +55,7 @@ struct IntValue : Value {
   IntValue(size_t val = 0) : Value(ValueType::INTEGER), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 struct FloatValue : Value {
@@ -60,7 +63,7 @@ struct FloatValue : Value {
   FloatValue(double val = 0.0) : Value(ValueType::FLOATING), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 struct BoolValue : Value {
@@ -68,7 +71,7 @@ struct BoolValue : Value {
   BoolValue(bool val = false) : Value(ValueType::BOOLEAN), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 struct StringValue : Value {
@@ -76,7 +79,7 @@ struct StringValue : Value {
   StringValue(const std::string& str = "") : Value(ValueType::STRING), value(str) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 struct CharValue : Value {
@@ -84,14 +87,14 @@ struct CharValue : Value {
   CharValue(char c = '\0') : Value(ValueType::CHARACTER), value(c) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 struct NullValue : Value {
   NullValue() : Value(ValueType::NULLPTR) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* ToAST() const override;
+  ASTNode* to_ast() const override;
 };
 
 // a void or non-void return value.
@@ -120,11 +123,21 @@ struct CTInterpreter;
 struct FunctionValue : Value {
   ASTBlock* block;
   ASTParamsDecl* parameters;
-
   FunctionValue() : Value(ValueType::FUNCTION) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  Value* Call(CTInterpreter *interpreter, std::vector<Value*> arguments);
+  Value* Call(CTInterpreter* interpreter, std::vector<Value*> arguments);
+};
+
+struct ExternFunctionValue : Value {
+  InternedString name;
+  FunctionTypeInfo *info;
+  
+  ExternFunctionValue(InternedString name, FunctionTypeInfo *info)
+      : Value(ValueType::EXTERN_FUNCTION), name(name), info(info) {}
+
+  bool is_truthy() const override { return false; }
+  ValueType get_value_type() const override { return value_type; }
 };
 
 struct ArrayValue : Value {
