@@ -29,6 +29,7 @@ inline T* arena_alloc(Args&&... args) {
   return new (mem) T(std::forward<Args>(args)...);
 }
 
+struct ASTNode;
 struct Value {
   ValueType value_type = ValueType::NULLPTR;
   Value(ValueType vt = ValueType::NULLPTR) : value_type(vt) {}
@@ -41,6 +42,9 @@ struct Value {
 
   virtual bool is_truthy() const = 0;
   virtual ValueType get_value_type() const;
+  virtual ASTNode *ToAST() const {
+    return nullptr;
+  }
 };
 
 struct IntValue : Value {
@@ -48,6 +52,7 @@ struct IntValue : Value {
   IntValue(size_t val = 0) : Value(ValueType::INTEGER), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 struct FloatValue : Value {
@@ -55,6 +60,7 @@ struct FloatValue : Value {
   FloatValue(double val = 0.0) : Value(ValueType::FLOATING), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 struct BoolValue : Value {
@@ -62,6 +68,7 @@ struct BoolValue : Value {
   BoolValue(bool val = false) : Value(ValueType::BOOLEAN), value(val) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 struct StringValue : Value {
@@ -69,6 +76,7 @@ struct StringValue : Value {
   StringValue(const std::string& str = "") : Value(ValueType::STRING), value(str) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 struct CharValue : Value {
@@ -76,12 +84,14 @@ struct CharValue : Value {
   CharValue(char c = '\0') : Value(ValueType::CHARACTER), value(c) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 struct NullValue : Value {
   NullValue() : Value(ValueType::NULLPTR) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
+  ASTNode* ToAST() const override;
 };
 
 // a void or non-void return value.

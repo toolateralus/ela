@@ -1,5 +1,6 @@
 #pragma once
 #include "interned_string.hpp"
+#include "scope.hpp"
 #include "type.hpp"
 #include "ast.hpp"
 #include "value.hpp"
@@ -12,7 +13,14 @@ Value* evaluate_constexpr(ASTExpr *node, Context &ctx);
 struct CTInterpreter {
   void set_value(InternedString &name, Value *value);
 
-  CTInterpreter (Context &context): ctx(context) {}
+  Scope *root_scope;
+  Scope *current_scope;
+  CTInterpreter (Context &context): ctx(context) {
+    // create a detached temporary scope.
+    root_scope = create_child(ctx.scope);
+    current_scope = root_scope;
+  }
+
   Context &ctx;
   Value* visit_method_call(ASTMethodCall *node);
   Value* visit_path(ASTPath *node);

@@ -56,3 +56,41 @@ Value* FunctionValue::Call(CTInterpreter* interpreter, std::vector<Value*> argum
 
   return NullV();
 }
+ASTNode* IntValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = std::to_string(value);
+  literal->tag = ASTLiteral::Integer;
+  return literal;
+}
+ASTNode* FloatValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = std::to_string(value);
+  literal->tag = ASTLiteral::Float;
+  return literal;
+}
+ASTNode* BoolValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = value ? "true" : "false";
+  literal->tag = ASTLiteral::Bool;
+  return literal;
+}
+
+ASTNode* StringValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = value;
+  literal->tag = ASTLiteral::String;
+  return literal;
+}
+
+ASTNode* CharValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = std::to_string(value);
+  literal->tag = ASTLiteral::Char;
+  return literal;
+}
+ASTNode* NullValue::ToAST() const {
+  auto literal = ast_alloc<ASTLiteral>();
+  literal->value = "null";
+  literal->tag = ASTLiteral::Null;
+  return literal;
+}

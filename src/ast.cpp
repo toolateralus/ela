@@ -530,6 +530,17 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->ctx.scope =old_scope;
         return module_definition;
       }
+    },
+
+    {
+      .identifier = "run",
+      .kind = DIRECTIVE_KIND_DONT_CARE,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto block = parser->parse_block();
+        CTInterpreter interpreter(parser->ctx);
+        auto result = interpreter.visit_block(block);
+        return result->ToAST();
+      }
     }
 
 };

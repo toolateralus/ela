@@ -11,6 +11,11 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
 
 Value *CTInterpreter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node).get();
+
+  if (!symbol) {
+    return NullV();
+  }
+
   if (symbol->is_variable && symbol->variable.initial_value.get()) {
     symbol->value = visit(symbol->variable.initial_value.get());
   }
@@ -321,7 +326,12 @@ Value *CTInterpreter::visit_type_of(ASTType_Of *) { return NullV(); }
 
 Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return NullV(); }
 
-Value *CTInterpreter::visit_variable(ASTVariable *) { return NullV(); }
+Value *CTInterpreter::visit_variable(ASTVariable *variable) {
+  current_scope->insert_local_variable(variable->name, variable->resolved_type, variable->value.get(),
+                                       variable->mutability);
+  return NullV();
+}
+
 Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return NullV(); }
 
 Value *CTInterpreter::visit_defer(ASTDefer *) { return NullV(); }
