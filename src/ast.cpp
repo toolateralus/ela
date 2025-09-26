@@ -7,6 +7,7 @@
 #include <set>
 #include <string>
 #include <unordered_set>
+#include "value.hpp"
 #include "visitor.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
@@ -68,7 +69,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
-    executed = value.is_truthy();
+    executed = value->is_truthy();
   } else {
     throw_error(
         "internal compiler error: Invalid #if/#ifdef/#ifndef, "
@@ -132,6 +133,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         include_set.insert(filename);
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+        parser->fill_buffer_if_needed(parser->states.back());
         parser->fill_buffer_if_needed(parser->states.back());
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         while (parser->peek().type != TType::Eof) {
@@ -529,7 +531,40 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->ctx.scope =old_scope;
         return module_definition;
       }
-    }
+    },
+    {
+      .identifier = "eval",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        NODE_ALLOC(ASTRun, run, range, defer, parser)
+        if (parser->peek().type == TType::LCurly) {
+          run->node_to_run = parser->parse_block();
+        } else {
+          run->node_to_run = parser->parse_expr();
+        }
+        return run;
+      }
+    },
+    {
+      .identifier = "run",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        NODE_ALLOC(ASTRun, run, range, defer, parser)
+
+        run->replace_prev_parent = false;
+
+        if (parser->peek().type == TType::LCurly) {
+          run->node_to_run = parser->parse_block();
+        } else {
+          run->node_to_run = parser->parse_expr();
+        }
+
+        NODE_ALLOC(ASTExprStatement, stmt, range1, defer1, parser)
+        stmt->expression = run;
+
+        return stmt;
+      }
+    },
 
 };
 // clang-format on
@@ -986,7 +1021,7 @@ ASTExpr *Parser::parse_primary() {
 
   switch (tok.type) {
     case TType::Varargs: {
-      NODE_ALLOC(ASTUnpackExpr, node, range, defer, this)
+      NODE_ALLOC(ASTUnpack, node, range, defer, this)
       eat();
       node->expression = parse_expr();
       return node;
@@ -2323,10 +2358,10 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
       expect(TType::Assign);
       value = parse_expr();
       auto evaluated_value = evaluate_constexpr(value, this->ctx);
-      if (evaluated_value.tag != Value::INTEGER) {
+      if (evaluated_value->value_type != ValueType::INTEGER) {
         throw_error("Enums can only have integers", value->source_range);
       }
-      last_value = evaluated_value.integer;
+      last_value = evaluated_value->as<IntValue>()->value;
     } else {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       last_value++;

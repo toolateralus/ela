@@ -35,6 +35,12 @@ int CompileCommand::compile() {
     resolver.visit_node(thir);
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
+
+    std::string program;
+    if (compile_command.has_flag("test")) {
+      output << "#define TESTING\n";
+    }
+
     output << BOILERPLATE_C_CODE << '\n';
     output << emitter.code.str();
   });

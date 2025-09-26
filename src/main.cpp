@@ -26,10 +26,13 @@ jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};
 jstl::Arena thir_arena(MB(10));
+jstl::Arena value_arena(MB(10));
 
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
+std::unordered_map<std::string, void*> loaded_ffi_extern_functions {};
+
 
 size_t lambda_unique_id = 0;
 
@@ -94,7 +97,7 @@ int main(int argc, char *argv[]) {
       args += arg + " ";
     }
     std::string command = invocation + " " + args;
-    std::cout << "running: " << command << std::endl;
+    std::cout << "\033[1;30mrunning:\033[0m " << "\033[1;34m" << command << "\033[0m" << std::endl;
     auto status = system(command.c_str());
 
     if (status == -1) {

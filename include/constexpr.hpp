@@ -1,54 +1,73 @@
 #pragma once
+#include <unordered_map>
+#include "interned_string.hpp"
+#include "scope.hpp"
 #include "type.hpp"
 #include "ast.hpp"
+#include "value.hpp"
 
 struct Context;
 struct ASTExpr;
 
-Value evaluate_constexpr(ASTExpr *node, Context &ctx);
+Value *evaluate_constexpr(ASTExpr *node, Context &ctx);
 
 struct CTInterpreter {
-  Value visit_method_call(ASTMethodCall *node);
-  Value visit_path(ASTPath *node);
-  Value visit_pattern_match(ASTPatternMatch *node);
-  Value visit_dyn_of(ASTDyn_Of *node);
-  Value visit_type_of(ASTType_Of *node);
-  Value visit_block(ASTBlock *node);
-  Value visit_expr_statement(ASTExprStatement *node);
-  Value visit_bin_expr(ASTBinExpr *node);
-  Value visit_unary_expr(ASTUnaryExpr *node);
-  Value visit_literal(ASTLiteral *node);
-  Value visit_call(ASTCall *node);
-  Value visit_return(ASTReturn *node);
-  Value visit_dot_expr(ASTDotExpr *node);
-  Value visit_index(ASTIndex *node);
-  Value visit_initializer_list(ASTInitializerList *node);
-  Value visit_range(ASTRange *node);
-  Value visit_switch(ASTSwitch *node);
-  Value visit_tuple(ASTTuple *node);
-  Value load_value(ASTNode *node, Value expr); // What exactly is this supposed to do?
-  Value visit_cast(ASTCast *node);
-  Value visit_lambda(ASTLambda *node);
-  Value visit_size_of(ASTSize_Of *node);
-  Value visit_struct_declaration(ASTStructDeclaration *node);
-  Value visit_module(ASTModule *node);
-  Value visit_import(ASTImport *node);
-  Value visit_program(ASTProgram *node);
-  Value visit_function_declaration(ASTFunctionDeclaration *node);
-  Value visit_variable(ASTVariable *node);
-  Value visit_continue(ASTContinue *node);
-  Value visit_break(ASTBreak *node);
-  Value visit_for(ASTFor *node);
-  Value visit_if(ASTIf *node);
-  Value visit_else(ASTElse *node);
-  Value visit_while(ASTWhile *node);
-  Value visit_enum_declaration(ASTEnumDeclaration *node);
-  Value visit_tuple_deconstruction(ASTDestructure *node);
-  Value visit_impl(ASTImpl *node);
-  Value visit_defer(ASTDefer *node);
-  Value visit_choice_declaration(ASTChoiceDeclaration *node);
+  std::unordered_map<InternedString, ExternFunctionValue> extern_functions{};
+  Scope *root_scope;
+  Scope *current_scope;
+  Context &ctx;
 
-  Value visit(ASTNode *node) {
+  CTInterpreter(Context &context) : ctx(context) {
+    // create a detached temporary scope.
+    root_scope = create_child(ctx.scope);
+    current_scope = root_scope;
+  }
+
+  Value *try_link_extern_function(Symbol *name);
+  void set_value(InternedString &name, Value *value);
+  
+  LValue *get_lvalue(ASTNode *node);
+  LValue *get_dot_expr_lvalue(ASTDotExpr *dot);
+  LValue *get_index_lvalue(ASTIndex *node);
+  LValue *get_unary_lvalue(ASTUnaryExpr *node);
+
+  Value *visit_method_call(ASTMethodCall *node);
+  Value *visit_path(ASTPath *node);
+  Value *visit_pattern_match(ASTPatternMatch *node);
+  Value *visit_dyn_of(ASTDyn_Of *node);
+  Value *visit_type_of(ASTType_Of *node);
+  Value *visit_block(ASTBlock *node);
+  Value *visit_expr_statement(ASTExprStatement *node);
+  Value *visit_bin_expr(ASTBinExpr *node);
+  Value *visit_unary_expr(ASTUnaryExpr *node);
+  Value *visit_literal(ASTLiteral *node);
+  Value *visit_call(ASTCall *node);
+  Value *visit_return(ASTReturn *node);
+  Value *visit_dot_expr(ASTDotExpr *node);
+  Value *visit_index(ASTIndex *node);
+  Value *visit_initializer_list(ASTInitializerList *node);
+  Value *visit_range(ASTRange *node);
+  Value *visit_switch(ASTSwitch *node);
+  Value *visit_tuple(ASTTuple *node);
+  Value *visit_cast(ASTCast *node);
+  Value *visit_lambda(ASTLambda *node);
+  Value *visit_size_of(ASTSize_Of *node);
+  Value *visit_function_declaration(ASTFunctionDeclaration *node);
+  Value *visit_variable(ASTVariable *node);
+  Value *visit_continue(ASTContinue *node);
+  Value *visit_break(ASTBreak *node);
+  Value *visit_for(ASTFor *node);
+  Value *visit_if(ASTIf *node);
+  Value *visit_else(ASTElse *node);
+  Value *visit_while(ASTWhile *node);
+  Value *visit_tuple_deconstruction(ASTDestructure *node);
+  Value *visit_impl(ASTImpl *node);
+  Value *visit_defer(ASTDefer *node);
+
+  Value *visit_unpack_element(ASTUnpackElement *node);
+  Value *visit_unpack(ASTUnpack *node);
+
+  Value *visit(ASTNode *node) {
     switch (node->get_node_type()) {
       case AST_NODE_BLOCK:
         return visit_block(static_cast<ASTBlock *>(node));
@@ -56,10 +75,6 @@ struct CTInterpreter {
         return visit_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
       case AST_NODE_IMPL:
         return visit_impl(static_cast<ASTImpl *>(node));
-      case AST_NODE_IMPORT:
-        return visit_import(static_cast<ASTImport *>(node));
-      case AST_NODE_MODULE:
-        return visit_module(static_cast<ASTModule *>(node));
       case AST_NODE_RETURN:
         return visit_return(static_cast<ASTReturn *>(node));
       case AST_NODE_CONTINUE:
@@ -74,12 +89,6 @@ struct CTInterpreter {
         return visit_else(static_cast<ASTElse *>(node));
       case AST_NODE_WHILE:
         return visit_while(static_cast<ASTWhile *>(node));
-      case AST_NODE_STRUCT_DECLARATION:
-        return visit_struct_declaration(static_cast<ASTStructDeclaration *>(node));
-      case AST_NODE_ENUM_DECLARATION:
-        return visit_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
-      case AST_NODE_CHOICE_DECLARATION:
-        return visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
       case AST_NODE_VARIABLE:
         return visit_variable(static_cast<ASTVariable *>(node));
       case AST_NODE_EXPR_STATEMENT:
@@ -124,8 +133,15 @@ struct CTInterpreter {
         return visit_switch(static_cast<ASTSwitch *>(node));
       case AST_NODE_PATTERN_MATCH:
         return visit_pattern_match(static_cast<ASTPatternMatch *>(node));
+      case AST_NODE_UNPACK:
+        return visit_unpack(static_cast<ASTUnpack *>(node));
+      case AST_NODE_UNPACK_ELEMENT:
+        return visit_unpack_element(static_cast<ASTUnpackElement *>(node));
+      case AST_NODE_RUN:  // We do not process recursive run statements.
+      // other nodes are ignored because theyre irrelevant.
       default:
-        return Value::Bool("false");
+        return null_value();
+        break;
     }
   }
 };

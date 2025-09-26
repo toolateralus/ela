@@ -78,6 +78,7 @@ enum ASTNodeType {
   AST_NODE_STATEMENT_LIST,  // Used just to return a bunch of statments from a single directive.s
 
   AST_NODE_WHERE_STATEMENT,
+  AST_NODE_RUN,
 };
 
 enum BlockFlags {
@@ -119,7 +120,9 @@ struct ASTNode {
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
-
+  virtual void accept_typed_replacement(ASTNode *) {
+    printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
+  }
   bool is_expr();
 };
 
@@ -148,7 +151,10 @@ struct Attribute {
 
 struct ASTStatement : ASTNode {
   std::vector<Attribute> attributes = {};
-  virtual ASTNodeType get_node_type() const = 0;
+  virtual ASTNodeType get_node_type() const override  = 0;
+  virtual void accept_typed_replacement(ASTNode *) override {
+    printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
+  }
 };
 
 struct ASTStatementList : ASTStatement {
@@ -462,6 +468,10 @@ struct ASTVariable : ASTStatement {
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
+  
+  void accept_typed_replacement(ASTNode *node) override {
+    value = (ASTExpr*)node;
+  }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -960,7 +970,7 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTUnpackExpr : ASTExpr {
+struct ASTUnpack : ASTExpr {
   // the source of the unpack, such as a variable, function result, literal, etc.
   ASTExpr *expression;
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
@@ -979,6 +989,13 @@ struct ASTUnpackElement : ASTExpr {
   ASTLiteral *range_literal_value;
 
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK_ELEMENT; }
+  void accept(VisitorBase *visitor) override;
+};
+
+struct ASTUnpackExpr : ASTExpr {
+  // the source of the unpack, such as a variable, function result, literal, etc.
+  ASTExpr *expression;
+  ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -1065,11 +1082,13 @@ struct ASTPatternMatch : ASTExpr {
         break;
     }
   }
+  
   /*
     the left hand side of the 'is', e.g { if x is ... }
                                              ^<- object.
   */
   ASTExpr *object;
+
   /*
     the type thats being matched
     e.g
@@ -1135,6 +1154,13 @@ struct WhereBranch {
   Nullable<ASTWhereStatement> where_stmt;
   // if this is just an else {} this will be the occupied field.
   Nullable<ASTBlock> block;
+};
+
+struct ASTRun : ASTExpr {
+  bool replace_prev_parent = true;
+  ASTNode *node_to_run;
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_RUN; }
 };
 
 enum DirectiveKind {

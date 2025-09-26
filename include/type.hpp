@@ -50,7 +50,6 @@ enum ScalarType {
   TYPE_U64,
   TYPE_FLOAT,
   TYPE_DOUBLE,
-  TYPE_STRING,
   TYPE_CHAR,
   TYPE_BOOL,
 };
@@ -448,6 +447,10 @@ struct Type {
   // use `type_is_valid()` to check for this as well as null, instead of `type != nullptr`
   static Type *UNRESOLVED_GENERIC;
   constexpr static Type *INVALID_TYPE = nullptr;
+
+  size_t size_in_bytes() const;
+  size_t alignment_in_bytes() const;
+
 };
 
 static inline constexpr bool type_is_valid(Type *type) {
@@ -565,3 +568,5 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 
   return kind_flags;
 }
+
+

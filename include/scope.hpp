@@ -5,272 +5,11 @@
 #include <unordered_set>
 
 #include "arena.hpp"
-
 #include "interned_string.hpp"
 #include "type.hpp"
+#include "value.hpp"
 
 extern jstl::Arena scope_arena;
-
-struct Value {
-  enum {
-    INTEGER,
-    FLOATING,
-    BOOLEAN,
-  } tag;
-
-  struct {
-    size_t integer;
-    double floating;
-    bool boolean;
-  };
-
-  bool is_truthy() {
-    switch (tag) {
-      case INTEGER:
-        return integer;
-      case FLOATING:
-        return floating;
-      case BOOLEAN:
-        return boolean;
-        break;
-    }
-  }
-
-  static Value Int(const InternedString &str) {
-    Value val;
-    val.tag = INTEGER;
-    val.integer = std::stoll(str.get_str());
-    return val;
-  }
-
-  static Value Float(const InternedString &str) {
-    Value val;
-    val.tag = FLOATING;
-    val.floating = std::stod(str.get_str());
-    return val;
-  }
-
-  static Value Bool(const InternedString &str) {
-    Value val;
-    val.tag = BOOLEAN;
-    val.boolean = (str.get_str() == "true");
-    return val;
-  }
-
-  Value operator-() const {
-    if (tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = -integer};
-    } else if (tag == FLOATING) {
-      return Value{.tag = FLOATING, .floating = -floating};
-    }
-    throw_error("Invalid type for unary minus", {});
-    return {};
-  }
-
-  Value operator!() const {
-    if (tag == BOOLEAN) {
-      return Value{.tag = BOOLEAN, .boolean = !boolean};
-    }
-    throw_error("Invalid type for logical not", {});
-    return {};
-  }
-
-  Value operator~() const {
-    if (tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = ~integer};
-    }
-    throw_error("Invalid type for bitwise not", {});
-    return {};
-  }
-
-  Value operator+(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer + other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = FLOATING,
-                   .floating = (tag == FLOATING ? floating : integer) +
-                               (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for addition", {});
-    return {};
-  }
-
-  Value operator-(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer - other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = FLOATING,
-                   .floating = (tag == FLOATING ? floating : integer) -
-                               (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for subtraction", {});
-    return {};
-  }
-
-  Value operator*(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer * other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = FLOATING,
-                   .floating = (tag == FLOATING ? floating : integer) *
-                               (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for multiplication", {});
-    return {};
-  }
-
-  Value operator/(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer / other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = FLOATING,
-                   .floating = (tag == FLOATING ? floating : integer) /
-                               (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for division", {});
-    return {};
-  }
-
-  Value operator%(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer % other.integer};
-    }
-    throw_error("Invalid types for modulo", {});
-    return {};
-  }
-
-  Value operator|(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer | other.integer};
-    }
-    throw_error("Invalid types for bitwise or", {});
-    return {};
-  }
-
-  Value operator&(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer & other.integer};
-    }
-    throw_error("Invalid types for bitwise and", {});
-    return {};
-  }
-
-  Value operator<<(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer << other.integer};
-    }
-    throw_error("Invalid types for shift left", {});
-    return {};
-  }
-
-  Value operator>>(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer >> other.integer};
-    }
-    throw_error("Invalid types for shift right", {});
-    return {};
-  }
-
-  Value operator^(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = INTEGER, .integer = integer ^ other.integer};
-    }
-    throw_error("Invalid types for bitwise xor", {});
-    return {};
-  }
-
-  Value operator||(const Value &other) const {
-    if (tag == BOOLEAN && other.tag == BOOLEAN) {
-      return Value{.tag = BOOLEAN, .boolean = boolean || other.boolean};
-    }
-    throw_error("Invalid types for logical or", {});
-    return {};
-  }
-
-  Value operator&&(const Value &other) const {
-    if (tag == BOOLEAN && other.tag == BOOLEAN) {
-      return Value{.tag = BOOLEAN, .boolean = boolean && other.boolean};
-    }
-    throw_error("Invalid types for logical and", {});
-    return {};
-  }
-
-  Value operator<(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer < other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{
-          .tag = BOOLEAN,
-          .boolean = (tag == FLOATING ? floating : integer) < (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for less than comparison", {});
-    return {};
-  }
-
-  Value operator>(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer > other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{
-          .tag = BOOLEAN,
-          .boolean = (tag == FLOATING ? floating : integer) > (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for greater than comparison", {});
-    return {};
-  }
-
-  Value operator==(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer == other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) ==
-                              (other.tag == FLOATING ? other.floating : other.integer)};
-    } else if (tag == BOOLEAN && other.tag == BOOLEAN) {
-      return Value{.tag = BOOLEAN, .boolean = boolean == other.boolean};
-    }
-    throw_error("Invalid types for equality comparison", {});
-    return {};
-  }
-
-  Value operator!=(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer != other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) !=
-                              (other.tag == FLOATING ? other.floating : other.integer)};
-    } else if (tag == BOOLEAN && other.tag == BOOLEAN) {
-      return Value{.tag = BOOLEAN, .boolean = boolean != other.boolean};
-    }
-    throw_error("Invalid types for inequality comparison", {});
-    return {};
-  }
-
-  Value operator<=(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer <= other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) <=
-                              (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for less than or equal comparison", {});
-    return {};
-  }
-
-  Value operator>=(const Value &other) const {
-    if (tag == INTEGER && other.tag == INTEGER) {
-      return Value{.tag = BOOLEAN, .boolean = integer >= other.integer};
-    } else if (tag == FLOATING || other.tag == FLOATING) {
-      return Value{.tag = BOOLEAN,
-                   .boolean = (tag == FLOATING ? floating : integer) >=
-                              (other.tag == FLOATING ? other.floating : other.integer)};
-    }
-    throw_error("Invalid types for greater than or equal comparison", {});
-    return {};
-  }
-};
 
 struct ASTNode;
 struct ASTStructDeclaration;
@@ -303,10 +42,11 @@ struct Symbol {
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }
 
+  Value* value = nullptr;
+
   union {
     struct {
       Nullable<ASTNode> declaration;
-      Value value;
       // This is null for almost every variable besides constant declarations,
       // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
       Nullable<ASTExpr> initial_value;
@@ -380,9 +120,7 @@ struct SymbolReference {
   InternedString alias_name;
   bool operator==(const SymbolReference &other) const { return original_name == other.original_name; }
 
-  bool operator<(const SymbolReference &other) const {
-    return original_name < other.original_name;
-  }
+  bool operator<(const SymbolReference &other) const { return original_name < other.original_name; }
 };
 
 struct SymbolScopePair {
