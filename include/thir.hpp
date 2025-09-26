@@ -34,7 +34,6 @@ enum struct THIRNodeType : unsigned char {
   CollectionInitializer,
   EmptyInitializer,
 
-  Size_Of,
   Offset_Of,
   // Control Flow
   Return,
@@ -65,7 +64,6 @@ struct THIR {
       case THIRNodeType::Call:
       case THIRNodeType::Cast:
       case THIRNodeType::ExpressionBlock:
-      case THIRNodeType::Size_Of:
         return true;
       // These are technically rvalues, but C doesn't care, so for now, we ignore them.
       // it would be best to not do this.
@@ -181,10 +179,6 @@ struct THIRIndex : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Index; }
 };
 
-struct THIRSizeOf : THIR {
-  Type *target_type;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Size_Of; }
-};
 
 struct THIROffsetOf : THIR {
   Type *target_type;

@@ -213,8 +213,6 @@ void Emitter::emit_cast(const THIRCast *thir) {
   emit_expr(thir->operand);
 }
 
-void Emitter::emit_size_of(const THIRSizeOf *thir) { code << "sizeof(" << c_type_string(thir->target_type) << ')'; }
-
 void Emitter::emit_offset_of(const THIROffsetOf *thir) {
   code << "offsetof(" << c_type_string(thir->target_type) << ", " << thir->target_field.get_str() << ')';
 }
@@ -610,8 +608,6 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_collection_initializer((const THIRCollectionInitializer *)thir);
     case THIRNodeType::EmptyInitializer:
       return emit_empty_initializer((const THIREmptyInitializer *)thir);
-    case THIRNodeType::Size_Of:
-      return emit_size_of((const THIRSizeOf *)thir);
     case THIRNodeType::Return:
       return emit_return((const THIRReturn *)thir);
     case THIRNodeType::Break:

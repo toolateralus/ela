@@ -1,5 +1,4 @@
 #include "resolver.hpp"
-#include "resolver.hpp"
 #include "emit.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -104,7 +103,6 @@ void Resolver::visit_collection_initializer(const THIRCollectionInitializer *thi
   }
 }
 
-void Resolver::visit_size_of(const THIRSizeOf *thir) { declare_or_define_type(thir->target_type); }
 void Resolver::visit_offset_of(const THIROffsetOf *thir) { declare_or_define_type(thir->target_type); }
 
 void Resolver::visit_return(const THIRReturn *thir) {
@@ -223,9 +221,6 @@ void Resolver::visit_node(const THIR *thir) {
       break;
     case THIRNodeType::EmptyInitializer:
       visit_empty_initializer((const THIREmptyInitializer *)thir);
-      break;
-    case THIRNodeType::Size_Of:
-      visit_size_of((const THIRSizeOf *)thir);
       break;
     case THIRNodeType::Return:
       visit_return((const THIRReturn *)thir);

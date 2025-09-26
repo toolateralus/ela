@@ -62,10 +62,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   I put some of these super trivial nodes up top here so they stay out of the way
 */
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
-  THIR_ALLOC(THIRSizeOf, thir, ast);
-  thir->target_type = ast->target_type->resolved_type;
-  thir->type = u64_type();
-  return thir;
+  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->source_range, u64_type());
 }
 
 THIR *THIRGen::visit_continue(ASTContinue *ast) {
@@ -149,10 +146,17 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     return thir;
   }
 
-  auto callee = thir->callee = visit_node(ast->callee);
+  auto symbol = ctx.get_symbol(ast->callee);
+  THIR *callee;
+
+  if (symbol.get() && symbol.get()->is_function && symbol.get()->function.declaration) {
+    callee = thir->callee = visit_function_declaration_via_symbol(symbol.get());
+  } else {
+    callee = thir->callee = visit_node(ast->callee);
+  }
 
   if (!callee) {
-    throw_error("cannot call forward declared functions with the THIR currently", ast->source_range);
+    throw_error("INTERNAL COMPILER ERROR: unable to locate callee for function", ast->source_range);
   }
 
   extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
@@ -1214,11 +1218,9 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
       to_reflection_type_struct(type),
   });
 
-  THIR_ALLOC_NO_SRC_RANGE(THIRSizeOf, size_of);
-  size_of->target_type = type;
   thir->key_values.push_back({
       "size",
-      size_of,
+      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
   });
 
   THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
@@ -1380,11 +1382,9 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
       make_str(type->basename, {}),
   });
 
-  THIR_ALLOC_NO_SRC_RANGE(THIRSizeOf, size_of);
-  size_of->target_type = type;
   thir->key_values.push_back({
       "size",
-      size_of,
+      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
   });
 
   thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type())});
