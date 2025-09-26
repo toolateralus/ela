@@ -10,7 +10,6 @@
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
-#include "thir.hpp"
 #include "type.hpp"
 
 /*
@@ -52,7 +51,7 @@ std::unordered_set<InternedString> include_set;
   #########################
 */
 
-int ignored_warnings = WarningNone;
+int ignored_warnings = 0;
 
 bool run_on_finished = false;
 

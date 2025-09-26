@@ -95,18 +95,29 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
   return type;
 }
 
+
+/// TODO:
+// Interned type extensions; intern all new type extensions to a hash map,
+// then just compare pointers. much cheaper, and also storing type extensions as a pointer will be cheaper
+// than how we constantly copy them around currently.
+
+// TODO:
+// use a hashmap for the global type table. we can have a TypeKey{ ptr, extensions } and a custom
+// hash function that will drastically improve type lookup times.
+
 Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
   if (!type_is_valid(base_t)) return Type::INVALID_TYPE;
 
   if (!type_extensions.size()) return base_t;
 
-  auto extensions_copy = type_extensions;
+  auto extensions_copy = type_extensions; // copy vector
 
   if (base_t && type_is_valid(base_t->base_type)) {
-    extensions_copy = base_t->append_extension(extensions_copy);
+    extensions_copy = base_t->append_extension(extensions_copy); // copies base_t's std::vector<TypeExtension>
     base_t = base_t->base_type;
   }
 
+  // expensive loop
   for (const auto &type : type_table) {
     if (type->base_type == base_t && extensions_copy == type->extensions) {
       return type;
@@ -143,11 +154,11 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
     } break;
   }
 
-  assert(info && "Copying type info for extended type failed");
-
+  // not bad- arena allocator.
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   info->scope->parent = base_t->info->scope->parent;
 
+  // rare (comparatively) case-- have to create a new extended type.
   return global_create_type(base_t->kind, base_t->basename, info, extensions_copy, base_t);
 }
 
@@ -281,8 +292,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     auto to_elem = to->get_element_type();
     auto conversion = type_conversion_rule(from_elem, to_elem);
     if (conversion == CONVERT_NONE_NEEDED ||
-        (conversion == CONVERT_IMPLICIT &&
-         (from->pointer_depth() == to->pointer_depth()))) {
+        (conversion == CONVERT_IMPLICIT && (from->pointer_depth() == to->pointer_depth()))) {
       elements_cast = true;
     }
   }
@@ -295,6 +305,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     Any function pointer type may implicitly cast to any other function pointer,
     so as long as all of it's parameters are equal or can implicitly convert to the target parameter,
     and the same for the return type.
+
+    !this needs to be fixed for correct sizing of parameters.
   */
   if (operands_are_pointers && to->is_kind(TYPE_FUNCTION) && from->is_kind(TYPE_FUNCTION)) {
     // Wrong number of pointer extensions.
@@ -335,6 +347,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   if (operands_are_pointers && (elements_cast || dest_is_u8_or_void_ptr || implicit_cast_void_pointer_to_any_ptr)) {
     return CONVERT_IMPLICIT;
+  } else if (operands_are_pointers && !elements_cast) {
+    return CONVERT_EXPLICIT;
   }
 
   // If we have a fixed array such as
@@ -532,6 +546,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   type->set_base(name);
 
   if (!info) {
+    // ! What? why is this defaulting to struct type info?
     info = type_info_alloc<StructTypeInfo>();
   }
 
@@ -540,6 +555,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   if (type_extensions_is_back_pointer(extensions) &&
       std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
+
     if (type_extensions_is_back_const_pointer(extensions)) {
       type->traits.push_back(is_const_pointer_trait());
     } else {
@@ -548,6 +564,12 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     if (base_type->is_kind(TYPE_FUNCTION)) {
       type->traits.push_back(is_fn_ptr_trait());
     }
+  }
+
+  if (name == "Slice") {
+    type->traits.push_back(is_slice_trait());
+  } else if (name == "SliceMut") {
+    type->traits.push_back(is_slice_mut_trait());
   }
 
   if (!info->scope) {
@@ -918,7 +940,7 @@ Type *is_tuple_trait() {
   static Type *id = global_create_trait_type("IsTuple", create_child(nullptr), {});
   return id;
 }
-/* NEW */
+
 Type *is_struct_trait() {
   static Type *id = global_create_trait_type("IsStruct", create_child(nullptr), {});
   return id;
@@ -939,7 +961,6 @@ Type *is_union_trait() {
   static Type *id = global_create_trait_type("IsUnion", create_child(nullptr), {});
   return id;
 }
-/* END NEW */
 
 Type *is_array_trait() {
   static Type *id = global_create_trait_type("IsArray", create_child(nullptr), {});
@@ -958,6 +979,21 @@ Type *is_mut_pointer_trait() {
 
 Type *is_const_pointer_trait() {
   static Type *id = global_create_trait_type("IsConstPointer", create_child(nullptr), {});
+  return id;
+}
+
+Type *is_slice_trait() {
+  static Type *id = global_create_trait_type("IsSlice", create_child(nullptr), {});
+  return id;
+}
+
+Type *is_slice_mut_trait() {
+  static Type *id = global_create_trait_type("IsSliceMut", create_child(nullptr), {});
+  return id;
+}
+
+Type *blittable_trait() {
+  static Type *id = global_create_trait_type("Blittable", create_child(nullptr), {});
   return id;
 }
 
@@ -991,4 +1027,30 @@ bool Type::implements(const Type *trait) {
     }
   }
   return false;
+}
+
+void assess_and_try_add_blittable_trait(Type *type) {
+  if (!type->is_kind(TYPE_STRUCT)) {
+    return;
+  }
+
+  if (type->implements(blittable_trait())) {
+    return;
+  }
+
+  StructTypeInfo *info = type->info->as<StructTypeInfo>();
+
+  for (const auto &member : info->members) {
+    // TODO: do we want to consider arrays plain old data?
+    if (!member.type->is_kind(TYPE_SCALAR)) {
+      if (!(member.type->has_extensions() && member.type->is_pointer())) {
+        return;
+      }
+      if (!member.type->implements(blittable_trait())) {
+        return;
+      }
+    }
+  }
+
+  type->traits.push_back(blittable_trait());
 }

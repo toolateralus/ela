@@ -54,6 +54,31 @@
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
 #endif
 
+std::string print_where_predicate(ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr *>(predicate);
+      auto op = bin->op;
+      if (op == TType::And) {
+        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
+      } else if (op == TType::Or) {
+        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
+      } else {
+        throw_error(
+            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+            bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      return predicate->resolved_type->to_string();
+    } break;
+    default:
+      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
+  }
+  return "";
+}
+
 void handle_generic_error(GenericInstantiationErrorUserData *data, const SourceRange &range) {
   reset_panic_handler();
   throw_error(std::format("Error at definition: {}\nerror: {}",
@@ -244,6 +269,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   for (const ASTStructMember &member : node->members) {
     member.type->accept(this);
+
     ctx.scope->insert_local_variable(member.name, member.type->resolved_type, nullptr, MUT);
 
     if (member.default_value) {
@@ -356,6 +382,10 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
       } break;
     }
   }
+
+  // TODO: add an auto implementation of Destroy for any variants that support it, if any.
+
+  implement_destroy_glue_for_choice_type(node, generic_instantiation, generic_args);
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
@@ -516,14 +546,17 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
 }
 
 bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
-  auto trait_method_info = trait_method->info->as<FunctionTypeInfo>();
-  auto impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+  FunctionTypeInfo *trait_method_info = trait_method->info->as<FunctionTypeInfo>();
+  FunctionTypeInfo *impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+
   if (trait_method_info->params_len != impl_method_info->params_len) {
     return false;
   }
+
   for (size_t i = 0; i < trait_method_info->params_len; ++i) {
-    auto trait_param = trait_method_info->parameter_types[i];
-    auto impl_param = impl_method_info->parameter_types[i];
+    Type *trait_param = trait_method_info->parameter_types[i];
+    Type *impl_param = impl_method_info->parameter_types[i];
+
     if (trait_param->is_kind(TYPE_TRAIT)) {
       if (!impl_param->implements(trait_param)) {
         return false;
@@ -537,8 +570,8 @@ bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
   }
 
   {
-    auto trait_return = trait_method_info->return_type;
-    auto impl_return = impl_method_info->return_type;
+    Type *trait_return = trait_method_info->return_type;
+    Type *impl_return = impl_method_info->return_type;
     if (trait_return->is_kind(TYPE_TRAIT)) {
       if (trait_return->generic_base_type != Type::INVALID_TYPE) {
         if (!impl_return->implements(trait_return->generic_base_type)) {
@@ -612,6 +645,11 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       throw_error("internal compiler error: type of impl trait was invalid", node->source_range);
     }
     trait_ty = trait_id;
+
+    if (trait_ty->info->as<TraitTypeInfo>()->is_forward_declared) {
+      throw_error("Attempted to implement a forward declared but not yet defined trait type", node->source_range);
+    }
+
     node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
 
     auto decl_node = (ASTTraitDeclaration *)trait_id->declaring_node.get();
@@ -633,6 +671,26 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             ctx.set_scope(node->scope);
           },
           node->source_range);
+    } else if (decl_node && !decl_node->trait_bounds.empty()) {
+      GenericInstantiationErrorUserData data;
+      set_panic_handler(generic_instantiation_panic_handler);
+      set_error_user_data(&data);
+      Defer defer_1([] { reset_panic_handler(); });
+      if (_setjmp(data.save_state) == 0) {
+        for (auto &constraint : decl_node->trait_bounds) {
+          auto [target_type, predicate] = constraint;
+          target_type->accept(this);
+          auto type = target_type->resolved_type;
+          auto satisfied = visit_where_predicate(type, predicate);
+          if (!satisfied) {
+            throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(predicate),
+                                    get_unmangled_name(type)),
+                        node->source_range);
+          }
+        }
+      } else {
+        handle_generic_error(&data, node->source_range);
+      };
     }
   }
 
@@ -651,7 +709,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
-  // just like C-- (owned)
   for (const auto &method : node->methods) {
     method->declaring_type = target_ty;
 
@@ -770,15 +827,33 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   node->resolved_type = target_ty;
+
+  if (target_ty->is_kind(TYPE_TRAIT)) {
+    for (Type *type: type_table) {
+      if (type->implements(target_ty)) {
+        // We patch up any already-implemented types when adding a method to a trait.
+        // You can't add new trait methods, just defaults.
+        node->target->resolved_type = type;
+        node->accept(this);
+      }
+    }
+  }
 }
 
 void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                     std::vector<Type *> generic_args) {
+  bool was_forward_declared = false;
   auto id = ctx.scope->find_type_id(node->name, {});
+
   if (id != Type::INVALID_TYPE) {
     auto type = id;
     if (type->is_kind(TYPE_TRAIT)) {
-      if (!generic_instantiation) throw_error("re-definition of trait type.", node->source_range);
+      auto info = type->info->as<TraitTypeInfo>();
+      was_forward_declared = info->is_forward_declared;
+      if (!generic_instantiation && !was_forward_declared) {
+        throw_error("re-definition of trait type.", node->source_range);
+      }
+      info->is_forward_declared = false;
     } else {
       throw_error("re-definition of a type", node->source_range);
     }
@@ -788,7 +863,13 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
-  auto type = global_create_trait_type(node->name.get_str(), ctx.scope, generic_args);
+  Type *type = nullptr;
+  if (was_forward_declared) {
+    type = ctx.scope->find_type_id(node->name, {});
+  } else {
+    type = global_create_trait_type(node->name, ctx.scope, generic_args);
+    type->info->as<TraitTypeInfo>()->is_forward_declared = node->is_forward_declared;
+  }
 
   if (auto symbol = ctx.scope->lookup(node->name)) {
     type->generic_base_type = symbol->resolved_type;
@@ -871,21 +952,32 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   // this just stores the old type and restores it when we exit.
   // the actual expected type is set per parameter.
   ENTER_EXPECTED_TYPE(nullptr);
-  auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
   {  // Check the other parameters, besides self.
-    for (size_t arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
+    for (size_t arg_index = 0; arg_index < node->arguments.size() || param_index < params_ct;
+         ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
-        if (arg_index < args_ct) {
+
+        if (arg_index < node->arguments.size()) {
           // Argument provided, type-check it
           expected_type = param->resolved_type;
-          node->arguments[arg_index]->accept(this);
+
+          ASTExpr *arg = node->arguments[arg_index];
+          if (arg->get_node_type() == AST_NODE_UNPACK) {
+            node->arguments.erase(node->arguments.begin() + arg_index);
+            arg_index--;
+            param_index--;
+            arg->accept(this);
+            continue;
+          }
+
+          arg->accept(this);
 
           assert_types_can_cast_or_equal(
-              node->arguments[arg_index], param->resolved_type, node->arguments[arg_index]->source_range,
+              arg, param->resolved_type, arg->source_range,
               std::format("unexpected argument type.. parameter #{} of function",
                           arg_index + 1));  // +1 here to make it 1-based indexing for user. more intuitive
 
@@ -942,6 +1034,16 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           ss << ")\n";
           throw_error(ss.str(), node->source_range);
         }
+
+        ASTExpr *arg = node->arguments[arg_index];
+        if (arg->get_node_type() == AST_NODE_UNPACK) {
+          node->arguments.erase(node->arguments.begin() + arg_index);
+          arg_index--;
+          param_index--;
+          arg->accept(this);
+          continue;
+        }
+
         expected_type = Type::INVALID_TYPE;
         node->arguments[arg_index]->accept(this);
       }
@@ -979,23 +1081,54 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
 void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
   ENTER_EXPECTED_TYPE(nullptr);
-  auto args_ct = node->arguments.size();
-  // TODO: rewrite this. this is so hard tor read.
-  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
-    throw_error(
-        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
-                    info->params_len, args_ct, info->to_string()),
-        node->source_range);
-  }
-
-  for (size_t i = 0; i < args_ct; ++i) {
+  // Process arguments dynamically because unpack expressions (`...expr`) expand into
+  // multiple arguments at visit time. We therefore must not cache the initial
+  // argument count.
+  size_t i = 0;
+  while (i < node->arguments.size()) {
     auto arg = node->arguments[i];
+
+    // Handle unpack nodes by erasing the placeholder and visiting it which will
+    // push `ASTUnpackElement` nodes into `node->arguments` at the current
+    // insertion point via `current_expression_list` (see `visit(ASTUnpackExpr)`).
+    if (arg->get_node_type() == AST_NODE_UNPACK) {
+      node->arguments.erase(node->arguments.begin() + i);
+      arg->accept(this);
+      // Do not advance `i` because new elements were inserted at position `i`.
+      continue;
+    }
+
+    if (i >= info->params_len) {
+      // We've exceeded the declared parameters.
+      if (!info->is_varargs) {
+        std::stringstream ss;
+        ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
+           << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+        throw_error(ss.str(), node->source_range);
+      }
+
+      // Varargs: accept remaining args without type checks.
+      expected_type = Type::INVALID_TYPE;
+      arg->accept(this);
+      ++i;
+      continue;
+    }
+
+    // Normal parameter position — type-check against parameter type.
     expected_type = info->parameter_types[i];
     arg->accept(this);
-    if (i < info->params_len) {
-      assert_types_can_cast_or_equal(arg, info->parameter_types[i], arg->source_range,
-                                     std::format("invalid argument type for parameter #{}", i + 1));
-    }
+    assert_types_can_cast_or_equal(arg, info->parameter_types[i], arg->source_range,
+                                   std::format("invalid argument type for parameter #{}", i + 1));
+
+    ++i;
+  }
+
+  // After expanding unpack expressions, ensure we have at least the required parameters.
+  if (node->arguments.size() < info->params_len) {
+    std::stringstream ss;
+    ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
+       << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+    throw_error(ss.str(), node->source_range);
   }
 }
 
@@ -1047,7 +1180,10 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       auto parameters = func->params->params;
       auto generics = func->generic_parameters;
 
-      std::vector<std::pair<bool, int>> arg_to_generic_map(parameters.size());
+      // TODO: I added this little ternary to stop crashes but this whole thing needs a rework if this was commonly
+      // going out of bounds, which it was.
+      std::vector<std::pair<bool, int>> arg_to_generic_map(parameters.size() > args.size() ? parameters.size()
+                                                                                           : args.size());
 
       for (size_t i = 0; i < parameters.size(); ++i) {
         auto &param = parameters[i];
@@ -1294,6 +1430,7 @@ void Typer::visit(ASTStructDeclaration *node) {
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, node);
   } else {
     visit_struct_declaration(node, false);
+    assess_and_try_add_blittable_trait(node->resolved_type);
   }
 }
 
@@ -1315,7 +1452,26 @@ void Typer::visit(ASTEnumDeclaration *node) {
 
   for (auto &[key, value] : node->key_values) {
     value->accept(this);
-    auto node_ty = value->resolved_type;
+    Type *node_ty = value->resolved_type;
+
+    // We need to adjust the underlying type for larger-than-default (s32) values.
+    // C will infer this, but we need to be explicit and not rely on any target language stuff.
+    // we upcast to unsigned to get the largest maximum value for huge values
+
+    Value evaluated = evaluate_constexpr(value, ctx);
+    size_t evaluated_integer = evaluated.integer;
+
+    constexpr uint64_t u32_max = 0xFFFFFFFFull;
+    constexpr int64_t s32_max = 0x7FFFFFFF;
+    constexpr int64_t s32_min = -0x80000000;
+    if (evaluated_integer > s32_max || evaluated_integer < s32_min) {
+      if (evaluated_integer <= u32_max) {
+        underlying_type = u32_type();
+      } else {
+        underlying_type = u64_type();
+      }
+    }
+
     info->scope->insert_variable(key, node_ty, value, CONST);
     info->members.push_back({key, node_ty});
     if (underlying_type == Type::INVALID_TYPE) {
@@ -1516,23 +1672,51 @@ void Typer::visit(ASTParamDecl *node) {
     return;
   } else {
     node->normal.type->accept(this);
-    Type *id = node->normal.type->resolved_type;
-    node->resolved_type = id;
-    if (id == Type::INVALID_TYPE) {
+    Type *param_type = node->normal.type->resolved_type;
+    node->resolved_type = param_type;
+
+    if (param_type == Type::INVALID_TYPE) {
       throw_error("Use of undeclared type.", node->source_range);
     }
-    // what exactly is this doing? There used to be some code here that didn't do anything -- it set the expected type.
+
+    if (node->normal.default_value) {
+      auto old_type = expected_type;
+      expected_type = param_type;
+      node->normal.default_value.get()->accept(this);
+      expected_type = old_type;
+    }
   }
 }
 
 void Typer::visit(ASTReturn *node) {
   Type *type;
+
   if (node->expression.is_not_null()) {
-    node->expression.get()->accept(this);
-    type = node->expression.get()->resolved_type;
+    ASTExpr *expr = node->expression.get();
+    expr->accept(this);
+    type = expr->resolved_type;
 
     if (expected_type != Type::INVALID_TYPE && expected_type != void_type()) {
-      assert_types_can_cast_or_equal(node->expression.get(), expected_type, node->source_range, "invalid return type");
+      assert_types_can_cast_or_equal(expr, expected_type, node->source_range, "invalid return type");
+    }
+
+    if (expr->get_node_type() == AST_NODE_PATH) {
+      // since there hasnt been an error (we got to this point), we can assume this exists.
+      Symbol *symbol = ctx.get_symbol(expr).get();
+
+      bool is_static_var = false;
+
+      if (symbol->is_variable && symbol->variable.declaration.is_not_null()) {
+        ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+        is_static_var = variable->is_static;
+      }
+
+      if (symbol->resolved_type->is_fixed_sized_array() && symbol->is_local && !is_static_var) {
+        throw_warning(WARNING_RETURNING_ARRAY,
+                      "returning a non-static fixed array from a function can lead to unexpected behaviour, as it's "
+                      "allocated on the functions stack, and becomes invalid upon return immediately.",
+                      node->source_range);
+      }
     }
   } else {
     type = ctx.scope->find_type_id("void", {});
@@ -1724,6 +1908,11 @@ void Typer::visit(ASTCall *node) {
   // We have to use a custom path visitor for calls due to the fact that visit(ASTPath *) will try to instantiate
   // a generic function when it's partially defined and doesn't allow the call to try to fill out the rest of
   // the generic args through inference.
+
+  auto old_expression_list = current_expression_list;
+  current_expression_list = &node->arguments->arguments;
+  Defer _defer([&] { current_expression_list = old_expression_list; });
+
   if (node->callee->get_node_type() == AST_NODE_PATH) {
     visit_path_for_call((ASTPath *)node->callee);
   } else {
@@ -1817,6 +2006,17 @@ void Typer::visit(ASTArguments *node) {
   }
   for (size_t i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
+
+    /*
+      TODO: let's add a more graceful way to do this
+    */
+    if (arg->get_node_type() == AST_NODE_UNPACK) {
+      node->arguments.erase(node->arguments.begin() + i);
+      i--;
+      arg->accept(this);
+      continue;
+    }
+
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -1857,7 +2057,7 @@ void Typer::visit(ASTType_Of *node) {
 }
 
 void Typer::visit(ASTType *node) {
-  if (node->resolved_type != Type::INVALID_TYPE) {
+  if (type_is_valid(node->resolved_type)) {
     return;
   }
 
@@ -2167,6 +2367,7 @@ void Typer::visit(ASTLiteral *node) {
         node->resolved_type = f32_type();
       }
       return;
+    case ASTLiteral::MultiLineString:
     case ASTLiteral::String: {
       static bool nostdlib = compile_command.has_flag("nostdlib");
       if (nostdlib) {
@@ -2181,6 +2382,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     }
+
     case ASTLiteral::Bool:
       node->resolved_type = bool_type();
       return;
@@ -2303,6 +2505,7 @@ void Typer::visit(ASTInitializerList *node) {
       auto expected = expected_type;
       if (expected && expected->is_fixed_sized_array()) {
         auto elem = expected->get_element_type();
+
         auto rule = type_conversion_rule(target_type, elem);
         if (rule == CONVERT_PROHIBITED) {
           throw_error("invalid initializer list element type", node->source_range);
@@ -2405,10 +2608,22 @@ void Typer::visit(ASTInitializerList *node) {
       for (size_t i = 0; i < values.size(); ++i) {
         const auto old = expected_type;
         expected_type = target_element_type;
-        values[i]->accept(this);
+        auto value = values[i];
+
+        if (value->get_node_type() == AST_NODE_UNPACK) {
+          auto old_expr_list = current_expression_list;
+          values.erase(values.begin() + i);
+          i--;
+          current_expression_list = &values;
+          value->accept(this);
+          current_expression_list = old_expr_list;
+          continue;
+        }
+
+        value->accept(this);
         expected_type = old;
         assert_types_can_cast_or_equal(
-            values[i], target_element_type, values[i]->source_range,
+            value, target_element_type, value->source_range,
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
       }
       node->resolved_type = target_type;
@@ -2525,7 +2740,7 @@ void Typer::visit(ASTSwitch *node) {
     node->control_flow = ControlFlow{flags, return_type};
   } else {
     if (HAS_FLAG(flags, BLOCK_FLAGS_BREAK)) {
-      throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
+      throw_warning(WARNING_SWITCH_BREAK, "You do not need to break from switch cases.", node->source_range);
     } else if (HAS_FLAG(flags, BLOCK_FLAGS_CONTINUE)) {
       throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
     }
@@ -2536,7 +2751,22 @@ void Typer::visit(ASTTuple *node) {
   std::vector<Type *> types;
   auto declaring_tuple = expected_type;
   size_t type_index = 0;
-  for (const auto &v : node->values) {
+
+  for (size_t i = 0; i < node->values.size(); ++i) {
+    const auto &value = node->values[i];
+
+    if (value->get_node_type() == AST_NODE_UNPACK) {
+      auto old_expression_list = current_expression_list;
+      current_expression_list = &node->values;
+
+      node->values.erase(node->values.begin() + i);
+      --i;
+      value->accept(this);
+
+      current_expression_list = old_expression_list;
+      continue;
+    }
+
     ENTER_EXPECTED_TYPE(nullptr);
 
     bool declaring_type_set = false;
@@ -2544,24 +2774,26 @@ void Typer::visit(ASTTuple *node) {
       auto info = declaring_tuple->info->as<TupleTypeInfo>();
       if (info->types.size() < type_index) {
         throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()),
-                    v->source_range);
+                    value->source_range);
       }
       expected_type = info->types[type_index];
       declaring_type_set = true;
     }
 
-    v->accept(this);
+    value->accept(this);
 
     if (declaring_type_set) {
-      assert_types_can_cast_or_equal(v, expected_type, v->source_range,
+      assert_types_can_cast_or_equal(value, expected_type, value->source_range,
                                      "tuple value was incapable of casting to expected tuple element type");
-      v->resolved_type = expected_type;
+      value->resolved_type = expected_type;
     }
 
-    types.push_back(v->resolved_type);
+    types.push_back(value->resolved_type);
     type_index++;
   }
+
   TypeExtensions extensions;
+
   node->resolved_type = global_find_type_id(types, extensions);
 }
 
@@ -3078,7 +3310,9 @@ void Typer::visit(ASTMethodCall *node) {
   node->callee->accept(this);
   auto func_sym = ctx.get_symbol(node->callee).get();
 
-  bool added_dyn_instance_argument_as_arg_0 = false;
+  auto old_expression_list = current_expression_list;
+  current_expression_list = &node->arguments->arguments;
+  Defer _defer([&] { current_expression_list = old_expression_list; });
 
   if (func_sym && func_sym->is_function) {
     type = func_sym->resolved_type;
@@ -3108,19 +3342,21 @@ void Typer::visit(ASTMethodCall *node) {
       type = func_decl->resolved_type;
     }
   } else {
+
+    
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     auto object = node->callee->base;
     auto obj_type = object->resolved_type;
 
-    if (obj_type->is_kind(TYPE_DYN)) {
+    if (obj_type->is_kind(TYPE_DYN) && !node->inserted_dyn_arg) {
       auto &args = node->arguments->arguments;
       auto dot = ast_alloc<ASTDotExpr>();
       dot->base = object;
       dot->member = ASTPath::Segment{"instance"};
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
-      added_dyn_instance_argument_as_arg_0 = true;
+      node->inserted_dyn_arg = true;
     }
 
     type = node->callee->resolved_type;
@@ -3146,10 +3382,6 @@ void Typer::visit(ASTMethodCall *node) {
                                 func_sym->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
-  }
-
-  if (added_dyn_instance_argument_as_arg_0) {
-    node->arguments->arguments.erase(node->arguments->arguments.begin());
   }
 
   node->resolved_type = info->return_type;
@@ -3282,7 +3514,8 @@ void Typer::visit(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
+                      node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
@@ -3353,7 +3586,8 @@ void Typer::visit_path_for_call(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
+                      node->source_range);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
@@ -3368,31 +3602,6 @@ void Typer::visit_path_for_call(ASTPath *node) {
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
-}
-
-std::string print_where_predicate(ASTExpr *predicate) {
-  switch (predicate->get_node_type()) {
-    case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op;
-      if (op == TType::And) {
-        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
-      } else if (op == TType::Or) {
-        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
-      } else {
-        throw_error(
-            "Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
-            "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
-            bin->source_range);
-      }
-    } break;
-    case AST_NODE_TYPE: {
-      return predicate->resolved_type->to_string();
-    } break;
-    default:
-      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
-  }
-  return "";
 }
 
 bool Typer::visit_where_predicate_throws(Type *target_type, ASTExpr *predicate) {
@@ -3488,4 +3697,151 @@ void Typer::visit(ASTWhereStatement *node) {
     control_flow = {};
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
+}
+
+/// TODO: this needs ot happen for tuples too, any tuple that contains a "Destroy"able object needs to forward
+/// that declaration to the parent type, and this is where we steal therust nomenclature of "Drop Glue".
+void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, const bool generic_instantiation,
+                                                   const std::vector<Type *> generic_args) {
+  return;
+  // no-checkin
+  if (generic_instantiation) {
+    node = (ASTChoiceDeclaration *)find_generic_instance(node->generic_instantiations, generic_args);
+  }
+  Type *type = node->resolved_type;
+  ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
+
+  bool needs_destroy = false;
+  for (const auto &member : info->members) {
+    if (member.type->implements(destroy_trait())) {
+      needs_destroy = true;
+      break;
+    }
+  }
+
+  if (!needs_destroy) {
+    return;
+  }
+
+  type->traits.push_back(destroy_trait());
+  node->destroy_glue_compiler_implementation_needed = true;
+
+  FunctionTypeInfo func_info;
+  func_info.parameter_types[0] = node->resolved_type->take_pointer_to(true);
+  func_info.parameter_types[1] = bool_type();
+  func_info.params_len = 2;
+  func_info.return_type = void_type();
+  func_info.is_varargs = false;
+  Type *destroy_method_type_id = global_find_function_type_id(func_info, {});
+
+  ASTFunctionDeclaration *declaration = ast_alloc<ASTFunctionDeclaration>();
+  declaration->block = nullptr;
+  declaration->generic_arguments = {};
+  declaration->declaring_type = type;
+  declaration->resolved_type = destroy_method_type_id;
+  declaration->params = ast_alloc<ASTParamsDecl>();
+
+  {
+    ASTParamDecl *first_param = ast_alloc<ASTParamDecl>();
+    first_param->mutability = MUT;
+    first_param->tag = ASTParamDecl::Self;
+    first_param->self.is_pointer = true;
+    declaration->params->params.push_back(first_param);
+  }
+  {
+    ASTParamDecl *second_param = ast_alloc<ASTParamDecl>();
+    second_param->mutability = CONST;
+    second_param->tag = ASTParamDecl::Normal;
+    {
+      ASTLiteral *default_value = ast_alloc<ASTLiteral>();
+      default_value->value = "true";
+      default_value->tag = ASTLiteral::Bool;
+      second_param->normal.default_value = default_value;
+    }
+    {
+      second_param->normal.type = ast_alloc<ASTType>();
+      second_param->normal.type->resolved_type = bool_type();
+    }
+    declaration->params->params.push_back(second_param);
+  }
+
+  info->scope->insert_function("destroy", destroy_method_type_id, declaration);
+}
+
+void Typer::visit(ASTUnpackExpr *node) {
+  ASTExpr *expr = node->expression;
+  expr->accept(this);
+
+  if (expr->resolved_type->is_kind(TYPE_TUPLE)) {
+    node->resolved_type = void_type();
+
+    TupleTypeInfo *info = expr->resolved_type->info->as<TupleTypeInfo>();
+
+    static int temp_idx = 0;
+
+    for (size_t i = 0; i < info->types.size(); ++i) {
+      Type *type = info->types[i];
+      auto element = ast_alloc<ASTUnpackElement>();
+      element->tuple.source_temp_id = "$unpack" + std::to_string(temp_idx);
+      element->source_range = node->source_range;
+      element->tuple.source_tuple = node->expression;
+      element->resolved_type = type;
+      element->tuple.element_index = i;
+      element->tag = ASTUnpackElement::TUPLE_ELEMENT;
+
+      if (current_expression_list.is_null()) {
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
+                    node->source_range);
+        return;
+      }
+
+      if (current_expression_list.get()->size() == 0) {
+        new (current_expression_list.get()) std::vector<ASTExpr *>();
+      }
+
+      current_expression_list.get()->push_back(element);
+    }
+
+    temp_idx++;
+  } else if (expr->get_node_type() == AST_NODE_RANGE) {
+    ASTRange *range = (ASTRange *)expr;
+
+    auto left = evaluate_constexpr(range->left, ctx);
+    auto right = evaluate_constexpr(range->right, ctx);
+
+    if (left.tag != Value::INTEGER || right.tag != Value::INTEGER) {
+      throw_error("currently, you can only use integer literals in range unpack expressions", node->source_range);
+    }
+
+    for (size_t i = left.integer; i < right.integer; ++i) {
+      ASTUnpackElement *element = ast_alloc<ASTUnpackElement>();
+      element->source_range = node->source_range;
+      ASTLiteral *literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Integer;
+      literal->value = std::to_string(i);
+      literal->source_range = node->source_range;
+      literal->resolved_type = s32_type();
+      element->range_literal_value = literal;
+      element->tag = ASTUnpackElement::RANGE_ELEMENT;
+      element->resolved_type = s32_type();
+
+      if (current_expression_list.is_null()) {
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
+                    node->source_range);
+        return;
+      }
+
+      current_expression_list.get()->push_back(element);
+    }
+
+  } else {
+    throw_error(
+        "currently, you can only use an unpack expression '...<expr>' on a tuples and ranges (literals only right "
+        "now).",
+        node->source_range);
+  }
+}
+
+void Typer::visit(ASTUnpackElement *) {
+  // Do nothing. this is essentially a placeholder, until emit time.
 }

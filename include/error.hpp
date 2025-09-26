@@ -46,8 +46,7 @@ static bool supports_color() {
     return false;
   }
   const char *term = getenv("TERM");
-  if (term == NULL)
-    return false;
+  if (term == NULL) return false;
 
   return strstr(term, "dumb") == nullptr || (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL ||
                                              strstr(term, "screen") != NULL || strstr(term, "tmux") != NULL);
@@ -104,13 +103,13 @@ static std::string format_source_location(const SourceRange &source_range, Error
   if (terminal_supports_color) {
     switch (severity) {
       case ERROR_INFO:
-        color = "\033[36m"; // Cyan
+        color = "\033[36m";  // Cyan
         break;
       case ERROR_WARNING:
-        color = "\033[33m"; // Yellow
+        color = "\033[33m";  // Yellow
         break;
       case ERROR_FAILURE:
-        color = "\033[31m"; // Red
+        color = "\033[31m";  // Red
         break;
     }
   }
@@ -119,17 +118,29 @@ static std::string format_source_location(const SourceRange &source_range, Error
   ss << color << source_range.ToString() << (terminal_supports_color ? "\033[0m" : "");
   ss << get_text_representation_of_source_range(source_range, num_lines_of_source_to_show);
 
-  if (terminal_supports_color)
-    ss << "\033[0m";
+  if (terminal_supports_color) ss << "\033[0m";
 
   return ss.str();
 }
 enum WarningFlags {
-  WarningNone = 0,
-  WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
-  WarningInaccessibleDeclaration = 1 << 1,        // --Wno-inaccessible-decl
-  WarningSwitchBreak = 1 << 2,                    // --Wno-switch-break
-  WarningIgnoreAll = 1 << 3,                      // --Wignore-all
+  WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD = 1 << 0,  // --Wno-arrow-operator
+  WARNING_INACCESSIBLE_DECLARATION = 1 << 1,       // --Wno-inaccessible-decl
+  WARNING_SWITCH_BREAK = 1 << 2,                   // --Wno-switch-break
+  WARNING_IGNORE_ALL = 1 << 3,                     // --Wignore-all
+  WARNING_ARRAY_ASSIGNMENT_MEMCPY = 1 << 4,        // --Warray-assignment-memcpy
+  WARNING_RETURNING_ARRAY = 1 << 5,                // --Wno-returning-array
+  WARNING_COUNT,
+};
+
+// All of these would be prefixed with -- in the command line.
+// this is just for detecting the flags in the command struct.
+const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
+    [WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD] = "Wno-arrow-operator",
+    [WARNING_INACCESSIBLE_DECLARATION] = "Wno-inaccessible-decl",
+    [WARNING_SWITCH_BREAK] = "Wno-switch-break",
+    [WARNING_IGNORE_ALL] = "Wignore-all",
+    [WARNING_ARRAY_ASSIGNMENT_MEMCPY] = "Wno-array-assignment-memcpy",
+    [WARNING_RETURNING_ARRAY] = "Wno-returning-array",
 };
 
 extern int ignored_warnings;
@@ -147,8 +158,9 @@ static PanicHandler get_default_panic_handler() {
 
     if (lower_message.contains("undeclared") ||
         (lower_message.contains("use of") && compile_command.has_flag("freestanding"))) {
-      lower_message += "\n You are in a freestanding environment. Many types that are normally built in, are not "
-                       "included in this mode";
+      lower_message +=
+          "\n You are in a freestanding environment. Many types that are normally built in, are not "
+          "included in this mode";
     }
 
     ss << message;
@@ -164,15 +176,14 @@ static inline void set_panic_handler(PanicHandler handler) { panic_handler = han
 static inline void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
 static inline void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
-  if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
+  if ((ignored_warnings & id) != 0 || (ignored_warnings & WARNING_IGNORE_ALL) != 0) {
     return;
   }
   std::stringstream ss;
-  if (terminal_supports_color)
-    ss << "\033[36m";
+  if (terminal_supports_color) ss << "\033[36m";
+  ss << "(ignore with --" << WARNING_FLAG_STRINGS[id] << ")\n";
   ss << "Warning:\n\t" << message;
-  if (terminal_supports_color)
-    ss << "\033[0m\n";
+  if (terminal_supports_color) ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_WARNING);
   const auto token_str = ss.str();
   std::cerr << token_str << std::endl;
@@ -182,9 +193,9 @@ extern void *error_user_data;
 
 static inline void set_error_user_data(void *data) { error_user_data = data; }
 
-template <class T> T *get_error_user_data_as() {
-  if (!error_user_data)
-    return nullptr;
+template <class T>
+T *get_error_user_data_as() {
+  if (!error_user_data) return nullptr;
   return (T *)error_user_data;
 }
 

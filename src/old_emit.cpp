@@ -1,3 +1,4 @@
+// #include <cstdio>
 // #include <format>
 // #include <functional>
 // #include <iterator>
@@ -21,7 +22,55 @@
 //    This entire visitor needs a huge cleanup. there's some absolutely terrible
 //   code in here and it's super messy. ? However it works xD
 // */
-// OldEmitter::OldEmitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {}
+// Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {}
+
+// static inline size_t calculate_actual_length(const std::string_view &str_view) {
+//   size_t length = 0;
+//   for (size_t i = 0; i < str_view.size(); ++i) {
+//     if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+//       switch (str_view[i + 1]) {
+//         case 'n':
+//         case 't':
+//         case 'r':
+//         case '\\':
+//         case '"':
+//           ++i;  // Skip the escape character
+//           break;
+//         case 'x':  // Hexadecimal escape sequence
+//           i += 2;  // Skip \x and the next two hex digits
+//           while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+//             ++i;
+//           }
+//           break;
+//         case 'u':  // Unicode escape sequence
+//           i += 4;  // Skip \u and the next four hex digits
+//           while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+//             ++i;
+//           }
+//           break;
+//         case 'U':  // Unicode escape sequence
+//           i += 8;  // Skip \U and the next eight hex digits
+//           while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+//             ++i;
+//           }
+//           break;
+//         default:
+//           if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {  // Octal escape sequence
+//             ++i;                                                   // Skip the first digit
+//             if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+//               ++i;  // Skip the second digit
+//             }
+//             if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+//               ++i;  // Skip the third digit
+//             }
+//           }
+//           break;
+//       }
+//     }
+//     ++length;
+//   }
+//   return length;
+// }
 
 // void append_reflection_type_flags(Type *type, StringBuilder &builder) {
 //   int kind_flags = 0;
@@ -54,12 +103,15 @@
 //     case TYPE_STRUCT: {
 //       kind_flags = TYPE_FLAGS_STRUCT;
 //       auto info = type->info->as<StructTypeInfo>();
-//       if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+//       if (info->is_union) {
 //         kind_flags = TYPE_FLAGS_UNION;
 //       }
 //     } break;
 //     case TYPE_ENUM:
 //       kind_flags = TYPE_FLAGS_ENUM;
+//       if (type->info->as<EnumTypeInfo>()->is_flags) {
+//         kind_flags |= TYPE_FLAGS_FLAGS_ENUM;
+//       }
 //       break;
 //     case TYPE_TUPLE:
 //       kind_flags = TYPE_FLAGS_TUPLE;
@@ -74,7 +126,7 @@
 //       kind_flags = TYPE_FLAGS_DYN;
 //       break;
 //   }
-//   for (const auto &ext : type->extensions.extensions) {
+//   for (const auto &ext : type->extensions) {
 //     switch (ext.type) {
 //       // TODO: add specific type flags for mut / const pointers?
 //       case TYPE_EXT_POINTER_MUT:
@@ -89,23 +141,23 @@
 //   builder << ".flags = " + std::to_string(kind_flags) + ",\n";
 // }
 
-// std::string OldEmitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
+// std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
 //   std::stringstream ss;
 
 //   const auto name_string =
-//       std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_strings_actual_length(name));
+//       std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name));
 
-//   ss << "(Field) { " << name_string << std::format(".type = {}, ", to_reflection_type_struct(type, context));
+//   ss << "(Field) { " << name_string << std::format("._type = {}, ", to_reflection_type_struct(type, context));
 
-//   if (type->extensions.is_pointer()) {
+//   if (type->is_pointer()) {
 //     ss << std::format(".size = sizeof(void*), ");
 //   } else if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
 //     if (type->is_kind(TYPE_STRUCT)) {
-//       auto flags = type->info->as<StructTypeInfo>()->flags;
-//       if (HAS_FLAG(flags, STRUCT_IS_FORWARD_DECLARED)) {
+//       auto info = type->info->as<StructTypeInfo>();
+//       if (info->is_forward_declared) {
 //         ss << std::format(".size = sizeof({}), ", type_to_string(type));
 //       } else {
-//         ss << ".size = 0, "; // ZST.
+//         ss << ".size = 0, ";  // ZST.
 //       }
 //     } else {
 //       ss << std::format(".size = sizeof({}), ", type_to_string(type));
@@ -114,8 +166,7 @@
 //     if (parent_type->is_kind(TYPE_TUPLE)) {
 //       ss << std::format(
 //           ".offset = offsetof({}, {})",
-//           type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type),
-//           "$" + name);
+//           type_to_string(parent_type->base_type == Type::INVALID_TYPE ? parent_type : parent_type->base_type), name);
 //     } else {
 //       ss << std::format(
 //           ".offset = offsetof({}, {})",
@@ -135,7 +186,7 @@
 //   return ss.str();
 // }
 
-// std::string OldEmitter::create_reflection_type_struct(Type *type, int id, Context &context) {
+// std::string Emitter::create_reflection_type_struct(Type *type, int id, Context &context) {
 //   StringBuilder builder;
 
 //   if (!type) {
@@ -145,14 +196,14 @@
 //   const auto string_id = std::format(REFL_TY_FORMAT_STRING, id);
 //   const auto type_name_string = type->to_string();
 //   const auto type_name_strlit =
-//       std::format("(str){{.data=\"{}\", .length = {}}}", type_name_string, calculate_strings_actual_length(type_name_string));
+//       std::format("(str){{.data=\"{}\", .length = {}}}", type_name_string, calculate_actual_length(type_name_string));
 
 //   const auto get_size = [&] -> std::string {
 //     // Get the size.
 //     // We should have our own sizer,
 //     // But also enums should get a size probably..
 //     if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_TRAIT) && !type->is_kind(TYPE_FUNCTION)) {
-//       if (type->extensions.is_pointer()) {
+//       if (type->is_pointer()) {
 //         return ".size = sizeof(void*), ";
 //       } else {
 //         return ".size = sizeof(" + type_to_string(type) + "), ";
@@ -162,9 +213,9 @@
 //   };
 
 //   const auto get_element_type = [&]() -> std::string {
-//     if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
+//     if (type->is_pointer() || type->is_fixed_sized_array()) {
 //       return ".element_type = " + to_reflection_type_struct(type->get_element_type(), context) + ",\n";
-//     } else if (type->is_kind(TYPE_ENUM) && !type->extensions.has_extensions()) {
+//     } else if (type->is_kind(TYPE_ENUM) && !type->has_extensions()) {
 //       auto underyling_type = type->info->as<EnumTypeInfo>()->underlying_type;
 //       return ".element_type = " + to_reflection_type_struct(underyling_type, context) + ",\n";
 //     } else {
@@ -188,11 +239,8 @@
 //       return {};
 //     }
 
-//     for (const auto &name : info->scope->ordered_symbols) {
-//       auto sym = info->scope->local_lookup(name);
-//       if (sym->is_type() || sym->is_function())
-//         continue;
-//       builder << get_field_struct(name.get_str(), sym->resolved_type, type, context) << ", ";
+//     for (const auto &[name, sym_type, _, __] : info->members) {
+//       builder << get_field_struct(name.get_str(), sym_type, type, context) << ", ";
 //     }
 
 //     builder << "};\n";
@@ -252,11 +300,11 @@
 //     size_t length = 0;
 
 //     for (const auto &[name, symbol] : scope->symbols) {
-//       if (!symbol.is_function() || !symbol.function.declaration) {
+//       if (!symbol.is_function || !symbol.function.declaration) {
 //         continue;
 //       }
 //       auto declaration = symbol.function.declaration;
-//       if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD) || declaration->generic_arguments.size() != 0) {
+//       if (!declaration->is_method || declaration->generic_arguments.size() != 0) {
 //         continue;
 //       }
 //       length++;
@@ -270,17 +318,17 @@
 //     builder << std::format("Method {}[] = {{", label);
 
 //     for (const auto &[name, symbol] : scope->symbols) {
-//       if (!symbol.is_function() || symbol.is_generic_function()) {
+//       if (!symbol.is_function || symbol.is_generic_function()) {
 //         continue;
 //       }
 
 //       auto declaration = symbol.function.declaration;
-//       if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD)) {
+//       if (!declaration->is_method) {
 //         continue;
 //       }
 
 //       const auto name_strlit = std::format("(str){{.data = \"{}\", .length =  {}}}", name.get_str(),
-//                                            calculate_strings_actual_length(name.get_str()));
+//                                            calculate_actual_length(name.get_str()));
 
 //       builder << std::format("{{ .name = {}, .pointer = {} }}, ", name_strlit, emit_symbol((Symbol *)&symbol));
 //     }
@@ -313,7 +361,7 @@
 //   return "((Type *)(&" + string_id + "))";
 // }
 
-// std::string OldEmitter::to_reflection_type_struct(Type *type, Context &context) {
+// std::string Emitter::to_reflection_type_struct(Type *type, Context &context) {
 //   if (!type) {
 //     throw_error("internal compiler error: Reflection system got a null type", {});
 //   }
@@ -338,13 +386,13 @@
 // }
 
 // // These should never get hit.
-// void OldEmitter::visit(ASTModule *) {}
-// void OldEmitter::visit(ASTImport *) {}
-// void OldEmitter::visit(ASTWhere *) {}
-// void OldEmitter::visit(ASTTraitDeclaration *) {}
-// void OldEmitter::visit(ASTAlias *) {}
+// void Emitter::visit(ASTModule *) {}
+// void Emitter::visit(ASTImport *) {}
+// void Emitter::visit(ASTWhere *) {}
+// void Emitter::visit(ASTTraitDeclaration *) {}
+// void Emitter::visit(ASTAlias *) {}
 
-// void OldEmitter::forward_decl_type(Type *type) {
+// void Emitter::forward_decl_type(Type *type) {
 //   if (type->base_type != Type::INVALID_TYPE) {
 //     type = type->base_type;
 //   }
@@ -366,7 +414,8 @@
 //     case TYPE_STRUCT: {
 //       auto info = type->info->as<StructTypeInfo>();
 //       std::string kw = "typedef struct ";
-//       if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+
+//       if (info->is_union) {
 //         kw = "typedef union ";
 //       }
 //       code << kw << type_to_string(type) << " " << type_to_string(type) << ";\n";
@@ -380,7 +429,7 @@
 //   }
 // }
 
-// void OldEmitter::visit(ASTWhile *node) {
+// void Emitter::visit(ASTWhile *node) {
 //   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
 //   emit_line_directive(node);
 //   if (node->condition.is_not_null()) {
@@ -402,7 +451,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTIf *node) {
+// void Emitter::visit(ASTIf *node) {
 //   if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
 //     emit_pattern_match_for_if(node, (ASTPatternMatch *)node->condition);
 //     return;
@@ -411,7 +460,7 @@
 //   newline();
 //   emit_line_directive(node);
 //   if (node->is_expression) {
-//     if (!node->_else) { // TODO: put this in typer.
+//     if (!node->_else) {  // TODO: put this in typer.
 //       throw_error("cannot use an 'if' expression without at least an 'else'.", node->source_range);
 //     }
 //     code << "({";
@@ -443,11 +492,9 @@
 //       node->_else.get()->accept(this);
 //     }
 //   }
-
-//   return;
 // }
 
-// void OldEmitter::visit(ASTElse *node) {
+// void Emitter::visit(ASTElse *node) {
 //   emit_line_directive(node);
 //   code << indent() << "else";
 //   if (node->_if.is_not_null()) {
@@ -459,7 +506,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTFor *node) {
+// void Emitter::visit(ASTFor *node) {
 //   auto old_scope = ctx.scope;
 //   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
 //   ctx.set_scope(node->block->scope);
@@ -496,7 +543,7 @@
 //   code << '\n';
 //   code << indent() << "for (auto $next = ";
 //   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator);\n";
-//   code << "$next.index != 0; ";
+//   code << "$next.index != 1; ";
 //   code << "$next = ";
 //   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator)) {\n";
 
@@ -514,12 +561,6 @@
 //     code << " = $next.Some.$0;\n";
 //   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
 //     auto type = node->identifier_type;
-//     auto scope = type->info->scope;
-
-//     if (type->extensions.is_pointer()) {
-//       auto t = type->get_element_type();
-//       scope = t->info->scope;
-//     }
 
 //     auto block = node->block;
 //     auto id = block->temp_iden_idx++;
@@ -527,32 +568,22 @@
 
 //     code << indent() << "auto " << temp_id << " = $next.Some.$0;\n";
 
-//     auto is_tuple = type->is_kind(TYPE_TUPLE);
-
 //     int i = 0;
-//     for (auto name : scope->ordered_symbols) {
-//       auto symbol = scope->local_lookup(name);
-//       if (symbol->is_function() || symbol->is_type())
-//         continue;
-
-//       if (is_tuple) {
-//         name = "$" + name.get_str();
-//       }
-
+//     for (auto &[name, sym_type, _, __] : type->info->members) {
 //       auto &destruct = node->left.destructure[i];
 //       auto iden = destruct.identifier;
 //       emit_line_directive(node);
 //       code << indent() << "auto " << iden.get_str();
 //       code << " = ";
 
-//       if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
-//         if (type->extensions.is_pointer()) {
+//       if (is_pointer_semantic(destruct.semantic)) {
+//         if (type->is_pointer()) {
 //           code << "&" << temp_id << "->" << name.get_str() << ";\n";
 //         } else {
 //           code << "&" << temp_id << "." << name.get_str() << ";\n";
 //         }
 //       } else {
-//         if (type->extensions.is_pointer()) {
+//         if (type->is_pointer()) {
 //           code << temp_id << "->" << name.get_str() << ";\n";
 //         } else {
 //           code << temp_id << "." << name.get_str() << ";\n";
@@ -578,22 +609,21 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTArguments *node) {
+// void Emitter::visit(ASTArguments *node) {
 //   code << "(";
 //   emit_arguments_no_parens(node);
 //   code << ")";
 //   return;
 // }
 
-// void OldEmitter::visit(ASTType_Of *node) {
+// void Emitter::visit(ASTType_Of *node) {
 //   auto id = node->target->resolved_type;
-//   if (!type_is_valid(id))
-//     throw_error("Invalid type in typeof() node", node->source_range);
+//   if (!type_is_valid(id)) throw_error("Invalid type in typeof() node", node->source_range);
 //   auto type = id;
 //   code << to_reflection_type_struct(type, ctx);
 // }
 
-// void OldEmitter::visit(ASTType *node) {
+// void Emitter::visit(ASTType *node) {
 //   auto type = node->resolved_type;
 //   if (!type) {
 //     throw_error("internal compiler error: ASTType* resolved to null in emitter.", node->source_range);
@@ -615,13 +645,19 @@
 //   return;
 // }
 
-// void OldEmitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments) {
+// void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments, std::vector<Type *> generic_args) {
 //   auto symbol = ctx.get_symbol(callee);
 
-//   if (symbol && symbol.get()->is_function() && symbol.get()->function.declaration) {
+//   if (symbol && symbol.get()->is_function && symbol.get()->function.declaration) {
 //     const auto sym = symbol.get();
-//     const auto declaration = sym->function.declaration;
-//     const auto params = declaration->params;
+
+//     ASTDeclaration *declaration = sym->function.declaration;
+//     if (generic_args.size() || declaration->generic_parameters.size()) {
+//       declaration = find_generic_instance(declaration->generic_instantiations, generic_args);
+//     }
+//     ASTFunctionDeclaration *function_declaration = (ASTFunctionDeclaration *)declaration;
+
+//     const auto params = function_declaration->params;
 //     const auto args_ct = arguments->arguments.size();
 //     const auto params_ct = params->params.size();
 //     const auto is_varargs = params->is_varargs;
@@ -634,15 +670,14 @@
 //     for (size_t param_index = param_start_index; param_index < params_ct; ++param_index) {
 //       const auto &param = params->params[param_index];
 
-//       if (!first)
-//         code << ",";
+//       if (!first) code << ",";
 
 //       first = false;
 //       if (arg_index < args_ct) {
 //         arguments->arguments[arg_index++]->accept(this);
 //       } else if (param->normal.default_value) {
 //         auto old_scope = ctx.scope;
-//         ctx.scope = declaration->scope;
+//         ctx.scope = function_declaration->scope;
 //         param->normal.default_value.get()->accept(this);
 //         ctx.scope = old_scope;
 //       }
@@ -650,24 +685,59 @@
 
 //     if (is_varargs && args_ct > params_ct) {
 //       for (size_t arg_index = params_ct; arg_index < args_ct; ++arg_index) {
-//         if (!first)
+//         if (!first) {
 //           code << ",";
+//         }
 
 //         first = false;
 //         arguments->arguments[arg_index]->accept(this);
 //       }
 //     }
-//     return;
+//   } else {
+//     emit_arguments_no_parens(arguments);
 //   }
-
-//   emit_arguments_no_parens(arguments);
 // }
 
-// void OldEmitter::visit(ASTCall *node) {
+// void Emitter::collect_and_declare_unpack_elements_before_call(std::vector<ASTExpr *> &arguments) {
+//   static std::vector<std::string> seen_sources{};
+//   seen_sources.reserve(arguments.size());
+
+//   for (auto &arg : arguments) {
+//     if (arg->get_node_type() != AST_NODE_UNPACK_ELEMENT) {
+//       continue;
+//     }
+
+//     auto element = (ASTUnpackElement *)arg;
+
+//     if (element->tag != ASTUnpackElement::TUPLE_ELEMENT) {
+//       continue;
+//     }
+
+//     const auto &tuple = element->tuple;
+//     const std::string temp_id = tuple.source_temp_id;
+
+//     auto it = std::find(seen_sources.begin(), seen_sources.end(), temp_id);
+
+//     if (it != seen_sources.end()) {
+//       continue;
+//     }
+
+//     emit_line_directive(arg);
+//     code << indent() << "auto " << temp_id << " = ";
+//     tuple.source_tuple->accept(this);
+//     code << ";\n";
+
+//     seen_sources.push_back(temp_id);
+//   }
+// }
+
+// void Emitter::visit(ASTCall *node) {
 //   std::vector<Type *> generic_args;
 //   if (node->has_generics()) {
 //     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
 //   }
+
+//   collect_and_declare_unpack_elements_before_call(node->arguments->arguments);
 
 //   auto resolved_func_type = node->callee->resolved_type;
 
@@ -680,12 +750,12 @@
 //     node->callee->accept(this);
 //     code << mangled_type_args(generic_args);
 //     code << "(";
-//     emit_arguments_with_defaults(node->callee, node->arguments);
+//     emit_arguments_with_defaults(node->callee, node->arguments, generic_args);
 //     code << ")";
 //   }
 // }
 
-// void OldEmitter::visit(ASTLiteral *node) {
+// void Emitter::visit(ASTLiteral *node) {
 //   auto type = type_to_string(node->resolved_type);
 //   std::string output;
 //   switch (node->tag) {
@@ -697,9 +767,43 @@
 //         output = std::format("\"{}\"", node->value.get_str());
 //       } else {
 //         auto str = node->value.get_str();
-//         code << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_strings_actual_length(str));
+//         code << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
 //         return;
 //       }
+//     } break;
+//     case ASTLiteral::MultiLineString: {
+//       auto str = node->value.get_str();
+//       size_t length = 0;
+//       std::stringstream ss;
+//       ss << "(str) { .data = ";
+
+//       size_t start = 0;
+//       while (start < str.size()) {
+//         size_t end = str.find('\n', start);
+//         if (end == std::string::npos) end = str.size();
+//         std::string line = str.substr(start, end - start);
+
+//         ss << "\"";
+//         // Emit the actual line content, escaping quotes and backslashes
+//         for (char c : line) {
+//           if (c == '\\' || c == '"') ss << '\\';
+//           ss << c;
+//         }
+//         length += line.size();
+
+//         if (end < str.size()) {
+//           ss << "\\n\"";
+//           length += 1;  // for the newline
+//         } else {
+//           ss << "\"";
+//         }
+
+//         start = end + 1;
+//       }
+
+//       ss << ", .length = " << length << " }";
+//       code << ss.str();
+//       return;
 //     } break;
 //     case ASTLiteral::Float:
 //       if (node->resolved_type != f64_type()) {
@@ -722,7 +826,8 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTUnaryExpr *node) {
+// void Emitter::visit(ASTUnaryExpr *node) {
+//   // ! What the hell is this doing
 //   if (node->op == TType::Sub) {
 //     auto type = type_to_string(node->operand->resolved_type);
 //     code << '(' << type << ')';
@@ -738,9 +843,12 @@
 
 //   // we always do these as postfix unary since if we don't it's kinda undefined
 //   // behaviour and it messes up unary expressions at the end of dot expressions
+
 //   if (node->op == TType::Increment || node->op == TType::Decrement) {
 //     node->operand->accept(this);
 //     code << ttype_get_operator_string(node->op, node->source_range);
+//   } else if (node->op == TType::And && node->operand->is_temporary_value()) {
+//     take_pointer_to_value(node->operand->resolved_type, node->operand);
 //   } else {
 //     code << '(';
 //     code << ttype_get_operator_string(node->op, node->source_range);
@@ -750,10 +858,28 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTBinExpr *node) {
+// void Emitter::visit(ASTBinExpr *node) {
 //   auto left_ty = node->left->resolved_type;
 //   if (left_ty && node->is_operator_overload) {
 //     call_operator_overload(node->source_range, OPERATION_BINARY, node->op, node->left, node->right);
+//     return;
+//   }
+
+//   if (left_ty->is_fixed_sized_array()) {
+//     throw_warning(WARNING_ARRAY_ASSIGNMENT_MEMCPY, "Assigning to a fixed array incurs a memcpy, and relies on libc.",
+//                   node->source_range);
+
+//     code << "memcpy(";
+//     node->left->accept(this);
+//     code << ", ";
+
+//     if (node->right->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+//       code << "(" << type_to_string(left_ty->base_type) << "[])";
+//     }
+
+//     node->right->accept(this);
+
+//     code << ", sizeof(" << type_to_string(left_ty) << "))";
 //     return;
 //   }
 
@@ -773,14 +899,12 @@
 //       }
 //     }
 //   }
-  
 //   space();
 //   node->right->accept(this);
 //   code << ")";
-//   return;
 // }
 
-// void OldEmitter::visit(ASTExprStatement *node) {
+// void Emitter::visit(ASTExprStatement *node) {
 //   emit_line_directive(node);
 //   code << indent();
 //   node->expression->accept(this);
@@ -788,7 +912,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTVariable *node) {
+// void Emitter::visit(ASTVariable *node) {
 //   if (node->is_emitted) {
 //     return;
 //   } else {
@@ -796,21 +920,47 @@
 //   }
 
 //   emit_line_directive(node);
-//   auto name = emit_symbol(ctx.scope->lookup(node->name));
+
+//   auto variable = ctx.scope->lookup(node->name);
+
+//   if (!variable) {
+//     throw_error(
+//         std::format(
+//             "INTERNAL_COMPILER_ERROR: variable '{}' somehow wasn't able to be found while emitting it's declaration",
+//             node->name),
+//         node->source_range);
+//     return;
+//   }
+
+//   auto name = emit_symbol(variable);
+
+//   // We exclude initializer lists, and array types. this is because arrays are not assignable in C, and init lists have
+//   // temporary memory that would go out of scope after the global ini function
+//   const bool is_init_list = node->type->resolved_type->basename.str_ptr->starts_with("InitList");
+//   const bool is_array = node->type->resolved_type->is_fixed_sized_array();
 
 //   // TODO!: @Cooper-Pilot I don't know how to make this work but we need to just mark this as global so we can get
 //   // global static initializers. We have to somehow tell the dependency emitter to forward declare it as extern at the
 //   // correct moment.
-//   const bool is_global_variable = !node->is_local && !node->is_constexpr; /*  || node->is_static; */
-
-//   // if (node->is_static) {
-//   //   node->type->accept(dep_emitter);
-//   //   reflection_externs << "extern " << type_to_string(node->type->resolved_type) << " " << name << ";\n";
-//   // }
+//   const bool is_global_variable =
+//       !node->is_local && !node->is_constexpr && !is_init_list && !is_array; /*  || node->is_static; */
 
 //   if (node->type->resolved_type == Type::INVALID_TYPE) {
 //     throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
 //   }
+
+//   if (node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+//     auto init_list = (ASTInitializerList *)node->value.get();
+//     if (init_list->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
+//       for (const auto &v : init_list->values) {
+//         if (v->get_node_type() == AST_NODE_UNPACK_ELEMENT) {
+//           collect_and_declare_unpack_elements_before_call(init_list->values);
+//           break;
+//         }
+//       }
+//     }
+//   }
+
 //   auto type = node->type->resolved_type;
 //   auto handle_initialization = [&]() {
 //     if (node->value.is_not_null() && emit_default_value) {
@@ -862,7 +1012,7 @@
 //   if (is_global_variable && !node->is_extern) {
 //     // Emit the 'forward declaration' or whatever.
 
-//     if (type->extensions.is_fixed_sized_array()) {
+//     if (type->is_fixed_sized_array()) {
 //       code << get_declaration_type_signature_and_identifier(name, type);
 //     } else {
 //       node->type->accept(this);
@@ -881,13 +1031,13 @@
 //     // Now, we emit the initialization logic into the global ini builder.
 //     code << name;
 
-//     if (type->extensions.is_fixed_sized_array()) {
+//     if (type->is_fixed_sized_array()) {
 //       if (node->value.is_not_null()) {
 //         code << " = ";
 //         node->value.get()->accept(this);
 //       } else if (emit_default_init) {
-//         code << " = {0}"; // I think this is wholly unneccesary. I think a global, non-initialized array will be zeroed
-//                           // in modern C.
+//         code << " = {0}";  // I think this is wholly unneccesary. I think a global, non-initialized array will be zeroed
+//                            // in modern C.
 //       }
 //       code << ";\n";
 //       return;
@@ -904,7 +1054,7 @@
 //       handle_initialization();
 //     }
 //   } else {
-//     if (type->extensions.is_fixed_sized_array()) {
+//     if (type->is_fixed_sized_array()) {
 //       code << get_declaration_type_signature_and_identifier(name, type);
 //       if (node->value.is_not_null()) {
 //         code << " = ";
@@ -936,8 +1086,8 @@
 //   return;
 // }
 
-// void OldEmitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-//   if (node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
+// void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
+//   if (node->name == "main" || node->is_entry) {
 //     return;
 //   }
 //   if (!node->generic_parameters.empty()) {
@@ -968,7 +1118,7 @@
 //     decl->is_declared = true;
 //   }
 
-//   if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
+//   if (node->is_exported) {
 //     code << "extern ";
 //   }
 
@@ -979,7 +1129,7 @@
 //     auto return_function_type = static_cast<FunctionTypeInfo *>(returns->info);
 
 //     // we take fixed array extensions as pointer here because it's invalid and would get casted off anyway.
-//     auto depth = returns->extensions.extensions.size();
+//     auto depth = returns->extensions.size();
 //     auto extensions = std::string(depth, '*');
 
 //     code << type_to_string(return_function_type->return_type) << "(" << extensions << name;
@@ -994,8 +1144,8 @@
 //   code << ";\n";
 // }
 
-// void OldEmitter::emit_extern_function(ASTFunctionDeclaration *node) {
-//   if (node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
+// void Emitter::emit_extern_function(ASTFunctionDeclaration *node) {
+//   if (node->name == "main" || node->is_entry) {
 //     throw_error("entry point function cannot be extern", node->source_range);
 //   }
 
@@ -1007,7 +1157,7 @@
 //         code << ", ";
 //       }
 //     }
-//     if (HAS_FLAG(node->flags, FUNCTION_IS_VARARGS)) {
+//     if (node->is_varargs) {
 //       code << ", ...);";
 //     } else {
 //       code << ")";
@@ -1032,7 +1182,7 @@
 //   newline();
 // }
 
-// void OldEmitter::visit(ASTStructDeclaration *node) {
+// void Emitter::visit(ASTStructDeclaration *node) {
 //   if (node->is_emitted) {
 //     return;
 //   }
@@ -1054,39 +1204,33 @@
 //   emit_default_init = false;
 //   emit_default_value = false;
 
-//   auto type = node->resolved_type;
-//   auto info = (type->info->as<StructTypeInfo>());
+//   const Type *type = node->resolved_type;
+//   const StructTypeInfo *info = (type->info->as<StructTypeInfo>());
 
-//   std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
-//   auto name = info->scope->full_name();
+//   const std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
+//   const std::string name = info->scope->full_name();
 
-//   if (HAS_FLAG(info->flags, STRUCT_IS_FORWARD_DECLARED) || node->is_fwd_decl) {
+//   if (info->is_forward_declared || node->is_forward_declared) {
 //     // We don't care about extern here.
 //     code << indent() << type_tag << " " << name << " " << name << ";\n";
 //     return;
 //   }
 
-//   auto previous_scope = ctx.scope;
-//   ctx.set_scope(info->scope);
-//   Defer _defer2([&] { ctx.set_scope(previous_scope); });
-
-//   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
+//   ENTER_SCOPE(info->scope);
+//   if (info->is_anonymous) {
 //     code << indent() << (node->is_union ? "union" : "struct") << " {\n";
 //   } else {
 //     code << type_tag << " " << name << " {\n";
 //   }
+
 //   indent_level++;
-
-//   auto old = emit_default_init;
-
+//   bool old = emit_default_init;
 //   emit_default_init = false;
-
 //   Defer _defer1([&] { emit_default_init = old; });
 
 //   for (const auto &subtype : node->subtypes) {
 //     subtype->accept(this);
 //   }
-
 //   for (const auto &member : node->members) {
 //     indented("");
 //     auto type = member.type->resolved_type;
@@ -1100,7 +1244,7 @@
 //       auto name = member.name.get_str();
 //       auto name_nullable = Nullable(&name);
 //       code << get_function_pointer_type_string(type, name_nullable);
-//     } else if (type->extensions.is_fixed_sized_array()) {
+//     } else if (type->is_fixed_sized_array()) {
 //       code << get_declaration_type_signature_and_identifier(member.name.get_str(), type);
 //     } else {
 //       member.type->accept(this);
@@ -1110,25 +1254,24 @@
 //     semicolon();
 //     newline();
 //   }
-
 //   indent_level--;
 
 //   // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
-//   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
+//   if (info->is_anonymous) {
 //     code << indent() << "};\n";
 //   } else {
 //     code << indent() << "} " << name << ";\n";
 //   }
 // }
 
-// void OldEmitter::visit(ASTEnumDeclaration *node) {
+// void Emitter::visit(ASTEnumDeclaration *node) {
 //   if (node->is_emitted) {
 //     return;
 //   } else {
 //     node->is_emitted = true;
 //   }
 //   size_t n = 0;
-//   code << "typedef enum {\n";
+//   code << "typedef enum: " << type_to_string(node->underlying_type) << " {\n";
 //   indent_level++;
 //   auto scope = node->resolved_type->info->scope;
 //   for (const auto &[key, value] : node->key_values) {
@@ -1150,11 +1293,11 @@
 //   code << indent() << "} " << scope->full_name() << ";\n";
 // }
 
-// void OldEmitter::visit(ASTParamDecl *node) {
+// void Emitter::visit(ASTParamDecl *node) {
 //   auto type = node->resolved_type;
 
 //   if (node->tag == ASTParamDecl::Normal) {
-//     if (type->is_kind(TYPE_FUNCTION) || type->extensions.is_fixed_sized_array()) {
+//     if (type->is_kind(TYPE_FUNCTION) || type->is_fixed_sized_array()) {
 //       code << get_declaration_type_signature_and_identifier(node->normal.name.get_str(), type);
 //     } else {
 //       node->normal.type->accept(this);
@@ -1167,7 +1310,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTParamsDecl *node) {
+// void Emitter::visit(ASTParamsDecl *node) {
 //   code << "(";
 //   size_t i = 0;
 //   for (const auto &param : node->params) {
@@ -1185,7 +1328,7 @@
 //   }
 // }
 
-// void OldEmitter::visit(ASTProgram *) {
+// void Emitter::visit(ASTProgram *) {
 //   static const auto testing = compile_command.has_flag("test");
 //   ctx.set_scope(ctx.root_scope);
 
@@ -1203,7 +1346,6 @@
 
 //   if ((has_user_defined_main || testing) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
 //     auto env_scope = ctx.scope->find_type_id("Env", {})->info->scope;
-
 //     code << "void ela_run_global_initializers() {\n";
 //     const auto global_init = global_initializer_builder.str();
 //     code << global_init;
@@ -1213,18 +1355,19 @@
 
 //   // TODO: if we're freestanding, we should just emit ID's only for typeof().
 //   if (is_freestanding && reflected_upon_types.size()) {
-//     throw_error("You cannot use runtime type reflection in a freestanding or "
-//                 "nostdlib environment, due to a lack of a `core` library. To be changed in the future",
-//                 {});
+//     throw_error(
+//         "You cannot use runtime type reflection in a freestanding or "
+//         "nostdlib environment, due to a lack of a `core` library. To be changed in the future",
+//         {});
 //   }
 // }
 
-// void OldEmitter::visit(ASTDotExpr *node) {
+// void Emitter::visit(ASTDotExpr *node) {
 //   auto base_ty_id = node->base->resolved_type;
 //   auto base_ty = base_ty_id;
 //   auto op = ".";
 
-//   if (base_ty->extensions.is_pointer()) {
+//   if (base_ty->is_pointer()) {
 //     op = "->";
 //   }
 
@@ -1241,10 +1384,10 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTIndex *node) {
+// void Emitter::visit(ASTIndex *node) {
 //   auto left_ty = node->base->resolved_type;
 //   if (left_ty && node->is_operator_overload) {
-//     code << "(*"; // always dereference via subscript. for `type[10] = 10` and such.
+//     code << "(*";  // always dereference via index. for `type[10] = 10` and such.
 //     call_operator_overload(node->source_range, OPERATION_INDEX, TType::LBrace, node->base, node->index);
 //     code << ")";
 
@@ -1258,10 +1401,10 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTInitializerList *node) {
+// void Emitter::visit(ASTInitializerList *node) {
 //   auto type = node->resolved_type;
 
-//   if (!type->extensions.is_fixed_sized_array()) {
+//   if (!type->is_fixed_sized_array()) {
 //     code << "(" + type_to_string(type) + ")";
 //   }
 
@@ -1300,7 +1443,7 @@
 //   }
 // }
 
-// void OldEmitter::visit(ASTRange *node) {
+// void Emitter::visit(ASTRange *node) {
 //   code << "(" << type_to_string(node->resolved_type) << ") {";
 //   code << ".begin = ";
 //   node->left->accept(this);
@@ -1310,7 +1453,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTTuple *node) {
+// void Emitter::visit(ASTTuple *node) {
 //   auto type = node->resolved_type;
 //   auto name = "(" + type_to_string(type) + ")";
 //   code << name << " {";
@@ -1318,19 +1461,17 @@
 //     auto &value = node->values[i];
 //     code << ".$" << std::to_string(i) << " = ";
 //     value->accept(this);
-//     if (i != node->values.size() - 1)
-//       code << ", ";
+//     if (i != node->values.size() - 1) code << ", ";
 //   }
 //   code << "}";
 //   return;
 // }
 
 // // This needs serious work. It's crap.
-// void OldEmitter::visit(ASTDestructure *node) {
+// void Emitter::visit(ASTDestructure *node) {
 //   emit_line_directive(node);
 //   auto type = node->resolved_type;
 
-//   auto scope = type->info->scope;
 //   size_t index = 0;
 //   static int temp_idx = 0;
 
@@ -1345,33 +1486,20 @@
 
 //   emit_line_directive(node);
 
-//   auto is_tuple = type->is_kind(TYPE_TUPLE);
-
-//   for (auto name : scope->ordered_symbols) {
-//     auto symbol = scope->local_lookup(name);
-//     if (symbol->is_function() || symbol->is_type())
-//       continue;
-
-//     if (is_tuple) {
-//       // tuples just have .0 .1 .2 .3 which isn't valid in
-//       // C, so we have to prefix it with a cash.
-//       name = "$" + name.get_str();
-//     }
-
-//     if (index > node->elements.size())
-//       break;
+//   for (auto [name, sym_type, _, __] : type->info->members) {
+//     if (index > node->elements.size()) break;
 
 //     auto semantic = node->elements[index].semantic;
 
 //     if (node->op == TType::ColonEquals) {
 //       code << "auto " << node->elements[index++].identifier.get_str() << " = ";
-//       if (semantic == VALUE_SEMANTIC_POINTER) {
+//       if (is_pointer_semantic(semantic)) {
 //         code << "&";
 //       }
 //       code << identifier << "." << name.get_str() << ";\n";
 //     } else {
 //       code << node->elements[index++].identifier.get_str() << " = ";
-//       if (semantic == VALUE_SEMANTIC_POINTER) {
+//       if (is_pointer_semantic(semantic)) {
 //         code << "&";
 //       }
 //       code << identifier << "." << name.get_str() << ";\n";
@@ -1382,7 +1510,7 @@
 // }
 
 // // This should be preferred in almost every case it can be; It properly emits function pointers, arrays etc.
-// std::string OldEmitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+// std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
 //   std::stringstream tss;
 
 //   std::string sym_name;
@@ -1401,7 +1529,7 @@
 //   std::string base_type_str = type_to_string(type->base_type == Type::INVALID_TYPE ? type : type->base_type);
 //   std::string identifier = sym_name;
 
-//   for (const auto &ext : type->extensions.extensions) {
+//   for (const auto &ext : type->extensions) {
 //     if (ext.type == TYPE_EXT_POINTER_MUT || ext.type == TYPE_EXT_POINTER_CONST) {
 //       base_type_str += "*";
 //     } else if (ext.type == TYPE_EXT_ARRAY) {
@@ -1416,27 +1544,28 @@
 // // Identifier may contain a fixed buffer size like name[30] due to the way
 // // function pointers have to work in C.
 // // I wish this oculd be simpler.
-// std::string OldEmitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
+// std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
 //                                                       bool type_erase_self) {
 //   if (!type->is_kind(TYPE_FUNCTION)) {
-//     throw_error("internal compiler error: tried to get a function pointer from "
-//                 "a non-function type",
-//                 {});
+//     throw_error(
+//         "internal compiler error: tried to get a function pointer from "
+//         "a non-function type",
+//         {});
 //   }
 
 //   std::stringstream ss;
 
 //   int pointer_depth = 0;
 //   TypeExtensions other_extensions;
-//   for (auto ext : type->extensions.extensions) {
+//   for (auto ext : type->extensions) {
 //     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT)
 //       pointer_depth++;
 //     else
-//       other_extensions.extensions.push_back(ext);
+//       other_extensions.push_back(ext);
 //   }
 
 //   auto type_prefix = std::string(pointer_depth, '*');
-//   auto type_postfix = other_extensions.to_string();
+//   auto type_postfix = extensions_to_string(other_extensions);
 
 //   auto info = (type->info->as<FunctionTypeInfo>());
 //   auto return_type = info->return_type;
@@ -1467,9 +1596,9 @@
 //   return ss.str();
 // }
 
-// bool OldEmitter::should_emit_function(OldEmitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
+// bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
 //   // if we're not testing, don't emit for test functions
-//   if (!test_flag && HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
+//   if (!test_flag && node->is_test) {
 //     return false;
 //   }
 
@@ -1488,21 +1617,21 @@
 //   auto sym_name = emit_symbol(sym);
 
 //   // generate a test based on this function pointer.
-//   if (test_flag && HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
+//   if (test_flag && node->is_test) {
 //     visitor->test_functions << "($ela_test){.name = \"" << sym_name << "\", .function = &" << sym_name << "},";
 //     visitor->num_tests++;
 //   }
 //   // dont emit a main if we're in test mode.
-//   if (test_flag && (HAS_FLAG(node->flags, FUNCTION_IS_ENTRY) || node->name == "main")) {
+//   if (test_flag && (node->is_entry || node->name == "main")) {
 //     return false;
 //   }
 //   return true;
 // }
 
-// std::string OldEmitter::type_to_string_with_extensions(const TypeExtensions &extensions, const std::string &base) {
+// std::string Emitter::type_to_string_with_extensions(const TypeExtensions &extensions, const std::string &base) {
 //   std::stringstream ss;
 //   ss << base;
-//   for (const auto ext : extensions.extensions) {
+//   for (const auto ext : extensions) {
 //     if (ext.type == TYPE_EXT_ARRAY) {
 //       ss << "[" << std::to_string(ext.array_size) << "]";
 //     } else if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
@@ -1512,7 +1641,7 @@
 //   return ss.str();
 // }
 
-// std::string OldEmitter::type_to_string(Type *type) {
+// std::string Emitter::type_to_string(Type *type) {
 //   auto output = std::string{};
 //   switch (type->kind) {
 //     case TYPE_DYN: {
@@ -1546,7 +1675,7 @@
 //   return output;
 // }
 
-// void OldEmitter::visit(ASTImpl *node) {
+// void Emitter::visit(ASTImpl *node) {
 //   if (!node->generic_parameters.empty()) {
 //     return;
 //   }
@@ -1571,14 +1700,14 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTCast *node) {
+// void Emitter::visit(ASTCast *node) {
 //   auto type_string = type_to_string(node->target_type->resolved_type);
 //   code << "(" << type_string << ")";
 //   node->expression->accept(this);
 //   return;
 // }
 
-// void OldEmitter::visit(ASTChoiceDeclaration *node) {
+// void Emitter::visit(ASTChoiceDeclaration *node) {
 //   if (!node->generic_parameters.empty()) {
 //     return;
 //   }
@@ -1624,7 +1753,7 @@
 
 //   emit_default_init = old_init;
 //   code << "typedef struct " << name << " {\n";
-//   code << "  int index;\n"; // TODO: we can compress this by the max value of the discriminant.
+//   code << "  int index;\n";  // TODO: we can compress this by the max value of the discriminant.
 //   code << "  union {\n";
 //   for (const auto &variant : node->variants) {
 //     auto variant_name = variant.name.get_str();
@@ -1640,7 +1769,7 @@
 // }
 
 // // Helper function to emit deferred statements
-// void OldEmitter::emit_deferred_statements(DeferBlockType type) {
+// void Emitter::emit_deferred_statements(DeferBlockType type) {
 //   auto defer_block = defer_blocks.rbegin();
 //   while (defer_block->type != type) {
 //     if (defer_block == defer_blocks.rend()) {
@@ -1659,7 +1788,7 @@
 //   }
 // }
 
-// void OldEmitter::emit_lambda(ASTLambda *node) {
+// void Emitter::emit_lambda(ASTLambda *node) {
 //   if (node->is_emitted) {
 //     return;
 //   } else {
@@ -1674,7 +1803,7 @@
 //   newline();
 // }
 
-// void OldEmitter::visit(ASTFunctionDeclaration *node) {
+// void Emitter::visit(ASTFunctionDeclaration *node) {
 //   auto emit_function_signature_and_body = [&](const std::string &name) {
 //     auto returns = node->return_type->resolved_type;
 
@@ -1682,7 +1811,7 @@
 //       auto return_function_type = static_cast<FunctionTypeInfo *>(returns->info);
 
 //       // we take fixed array extensions as pointer here because it's invalid and would get casted off anyway.
-//       auto depth = returns->extensions.extensions.size();
+//       auto depth = returns->extensions.size();
 //       auto extensions = std::string(depth, '*');
 
 //       code << type_to_string(return_function_type->return_type) << "(" << extensions << name;
@@ -1716,11 +1845,11 @@
 //     }
 //     auto name = emit_symbol(sym) + mangled_type_args(node->generic_arguments);
 
-//     if (node->name != "main" && DOESNT_HAVE_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
-//       if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
+//     if (node->name != "main" && !node->is_entry) {
+//       if (node->is_forward_declared) {
 //         emit_forward_declaration(node);
 //         return;
-//       } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE)) {
+//       } else if (node->is_inline) {
 //         // We have to use static here otherwise the standalone inline function has
 //         // external linkage.
 //         // We should have a way to specify static linkage anyway.
@@ -1728,12 +1857,11 @@
 //       }
 //     }
 
-//     if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
+//     if (node->is_exported) {
 //       code << "extern  ";
 //     }
 
-//     if ((node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) && !is_freestanding &&
-//         !compile_command.has_flag("nostdlib")) {
+//     if ((node->name == "main" || node->is_entry) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
 //       has_user_defined_main = true;
 //       user_defined_entry_point = node->name;
 //       node->return_type->accept(this);
@@ -1763,7 +1891,7 @@
 //     return;
 //   }
 
-//   if (HAS_FLAG(node->flags, FUNCTION_IS_EXTERN)) {
+//   if (node->is_extern) {
 //     emit_extern_function(node);
 //     return;
 //   }
@@ -1773,7 +1901,7 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTReturn *node) {
+// void Emitter::visit(ASTReturn *node) {
 //   if (emitting_function_with_defer ||
 //       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
 //     if (node->expression.is_not_null()) {
@@ -1825,24 +1953,25 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTBreak *node) {
+// void Emitter::visit(ASTBreak *node) {
 //   emit_line_directive(node);
 //   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
 //   indented("break;\n");
 // }
 
-// void OldEmitter::visit(ASTContinue *node) {
+// void Emitter::visit(ASTContinue *node) {
 //   emit_line_directive(node);
 //   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
 //   indented("continue;\n");
 // }
 
-// void OldEmitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
+// void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
 
-// void OldEmitter::visit(ASTBlock *node) {
+// void Emitter::visit(ASTBlock *node) {
 //   code << "{\n";
 //   indent_level++;
 //   auto old_scope = ctx.scope;
+
 //   ctx.set_scope(node->scope);
 
 //   defer_blocks.emplace_back();
@@ -1851,6 +1980,7 @@
 //     if (statement->get_node_type() == AST_NODE_VARIABLE) {
 //       indented("");
 //     }
+//     code.cursor = code.length();
 //     statement->accept(this);
 //   }
 
@@ -1863,9 +1993,9 @@
 //   return;
 // }
 
-// void OldEmitter::visit(ASTLambda *node) { code << node->unique_identifier.get_str(); }
+// void Emitter::visit(ASTLambda *node) { code << node->unique_identifier.get_str(); }
 
-// void OldEmitter::emit_tuple(Type *type) {
+// void Emitter::emit_tuple(Type *type) {
 //   if (type->base_type != Type::INVALID_TYPE) {
 //     type = type->base_type;
 //   }
@@ -1881,24 +2011,27 @@
 //   auto info = type->info->as<TupleTypeInfo>();
 //   for (size_t i = 0; i < info->types.size(); ++i) {
 //     auto type = info->types[i];
-//     if (type->is_kind(TYPE_FUNCTION)) {
-//       auto name = "$" + std::to_string(i);
+
+//     auto name = "$" + std::to_string(i);
+//     if (type->is_fixed_sized_array()) {
+//       code << get_declaration_type_signature_and_identifier(name, type);
+//     } else if (type->is_kind(TYPE_FUNCTION)) {
 //       code << indent() << get_function_pointer_type_string(type, &name, false) << ";\n";
 //     } else {
-//       code << indent() << type_to_string(type) << " $" << std::to_string(i) << ";\n";
+//       code << indent() << type_to_string(type) << " " << name << ";\n";
 //     }
 //   }
 //   indent_level--;
 //   code << "} " << name << ";\n";
 // }
 
-// void OldEmitter::visit(ASTSize_Of *node) {
+// void Emitter::visit(ASTSize_Of *node) {
 //   code << "sizeof(";
 //   node->target_type->accept(this);
 //   code << ")";
 // }
 
-// void OldEmitter::call_operator_overload(const SourceRange &range, OperationKind operation, TType op, ASTExpr *left,
+// void Emitter::call_operator_overload(const SourceRange &range, OperationKind operation, TType op, ASTExpr *left,
 //                                      ASTExpr *right) {
 //   auto call = ASTMethodCall{};
 //   auto dot = ASTDotExpr{};
@@ -1923,10 +2056,23 @@
 //   code << ")";
 // }
 
-// std::string OldEmitter::emit_symbol(Symbol *symbol) {
-//   if (symbol->is_local() || (symbol->is_function() && symbol->function.declaration &&
-//                              HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
+// std::string Emitter::emit_symbol(Symbol *symbol) {
+//   if (symbol == nullptr) {
+//     throw_error("Symbol was nullptr at emit time", {});
+//     return {};
+//   }
+
+//   if (symbol->is_local ||
+//       (symbol->is_function && symbol->function.declaration && symbol->function.declaration->is_extern)) {
 //     return symbol->name.get_str();
+//   }
+
+//   if (symbol->is_variable) {
+//     ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+//     // ! variable is sometimes null when is_variable is true. Why?
+//     if (variable && variable->is_extern) {
+//       return symbol->name.get_str();
+//     }
 //   }
 
 //   auto full_name = symbol->scope->full_name();
@@ -1937,7 +2083,7 @@
 //   return full_name;
 // };
 
-// void OldEmitter::visit(ASTDyn_Of *node) {
+// void Emitter::visit(ASTDyn_Of *node) {
 //   if (node->is_emitted) {
 //     return;
 //   }
@@ -1954,6 +2100,7 @@
 //   auto object_scope_bare = node->object->resolved_type->get_element_type();
 //   auto object_scope = object_scope_bare->info->scope;
 
+//   // TODO: we should use a vtable instead of fields.
 //   for (auto &[name, method_type] : dyn_info->methods) {
 //     indent();
 //     code << "." << name.get_str() << " = ";
@@ -1965,7 +2112,7 @@
 //   code << "}";
 // }
 
-// void OldEmitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
+// void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
 //   if (trait->dyn_emitted) {
 //     return;
 //   }
@@ -1991,29 +2138,64 @@
 //   newline_indented();
 // }
 
-// void OldEmitter::visit(ASTMethodCall *node) {
+// void Emitter::take_pointer_to_value(Type *base_type, ASTExpr *expr) {
+//   auto temp_name = get_temporary_variable();
+//   *inserting_at_cursor = true;
+//   code << type_to_string(base_type) << " " << temp_name << " = ";
+//   expr->accept(this);
+//   code << ";\n";
+//   *inserting_at_cursor = false;
+//   code << "&" << temp_name;
+// }
+
+// void Emitter::visit(ASTMethodCall *node) {
 //   std::vector<Type *> generic_args = node->callee->member.get_resolved_generics();
 
-//   auto symbol = ctx.get_symbol(node->callee).get();
-//   // Call a function pointer via a dot expression
-//   if (symbol->is_variable()) {
-//     {
-//       // Implicitly pass the 'dyn.instance' when calling the function pointers
-//       // that the dyn thingy sets up.
-//       auto object = node->callee->base;
-//       auto obj_type = object->resolved_type;
+//   collect_and_declare_unpack_elements_before_call(node->arguments->arguments);
 
-//       if (obj_type->is_kind(TYPE_DYN)) {
-//         auto &args = node->arguments->arguments;
-//         auto dot = ast_alloc<ASTDotExpr>();
-//         dot->base = object;
-//         dot->member = ASTPath::Segment{"instance"};
-//         dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
-//         args.insert(args.begin(), dot);
+//   auto symbol = ctx.get_symbol(node->callee).get();
+
+//   // Call a function pointer via a dot expression
+//   if (symbol->is_variable) {
+//     auto func = node->callee;
+
+//     // Implicitly pass the 'dyn.instance' when calling the function pointers
+//     // that the dyn thingy sets up.
+//     auto object = node->callee->base;
+//     auto obj_type = object->resolved_type;
+
+//     if (obj_type->is_kind(TYPE_DYN)) {
+//       auto old_code = std::move(code);
+//       code = {};
+
+//       auto temp = get_temporary_variable();
+//       code << type_to_string(obj_type) << " " << temp << " = ";
+//       object->accept(this);
+//       code << ";\n";
+
+//       old_code.inserting_at_cursor = true;
+//       old_code << code.str();
+//       old_code.inserting_at_cursor = false;
+
+//       code = std::move(old_code);
+
+//       code << temp << "." << node->callee->member.identifier.get_str();
+//       code << "(" << temp << ".instance";
+
+//       if (node->arguments->arguments.size() > 1) {
+//         code << ", ";
+//         ASTArguments rem_args;
+//         rem_args.arguments.assign(node->arguments->arguments.begin() + 1, node->arguments->arguments.end());
+//         emit_arguments_with_defaults(func, &rem_args, generic_args);
+//       } else {
+//         ASTArguments empty_args;
+//         emit_arguments_with_defaults(func, &empty_args, generic_args);
 //       }
+
+//       code << ")";
+//       return;
 //     }
 
-//     auto func = node->callee;
 //     func->accept(this);
 //     code << mangled_type_args(generic_args);
 //     node->arguments->accept(this);
@@ -2039,30 +2221,33 @@
 
 //   // Emit the self arg.
 //   {
-//     if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
+//     if (self_param_ty->is_pointer() && !base_type->is_pointer()) {
 //       auto base_node_ty = node->callee->base->get_node_type();
 
 //       // TODO: It would be preferable to use a compound literal here, but we'd have to get all the fields from structs
 //       // so I don't think we can. I don't know what kind of memory implications this might have, it may be messed up
 //       // idk.
+
+//       // using this ({ static }) pattern is totally horrible.
+//       // it is not thread safe at all, and should never be in our code.
+//       // if we can find another way to do this, excellent.
+
+//       // if not, we'll just have some constructs not be thread safe until eventually
+//       // we finally get that THIR/LLVM port finished.
+
 //       if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
-//         code << "({ static " << type_to_string(base_type) << " __temp; __temp = ";
-//         node->callee->base->accept(this);
-//         code << "; &__temp; })";
+//         take_pointer_to_value(base_type, node->callee->base);
 //       } else {
 //         code << "&";
 //         node->callee->base->accept(this);
 //       }
 
-//     } else if (!self_param_ty->extensions.is_pointer() && base_type->extensions.is_pointer()) {
+//     } else if (!self_param_ty->is_pointer() && base_type->is_pointer()) {
 //       code << "*";
 //       node->callee->base->accept(this);
 //     } else {
 //       node->callee->base->accept(this);
 //     }
-
-//     // ASTExpr *base = node->callee->base;
-//     // base->accept(this);
 
 //     bool has_default_params = false;
 //     for (const auto &param : symbol->function.declaration->params->params) {
@@ -2078,12 +2263,12 @@
 //     }
 //   }
 
-//   emit_arguments_with_defaults(node->callee, node->arguments);
+//   emit_arguments_with_defaults(node->callee, node->arguments, generic_args);
 
 //   code << ")";
 // }
 
-// void OldEmitter::visit(ASTPath *node) {
+// void Emitter::visit(ASTPath *node) {
 //   auto symbol = ctx.get_symbol(node);
 //   if (!symbol) {
 //     throw_error("internal compiler error: failed to emit path symbol.", node->source_range);
@@ -2095,13 +2280,14 @@
 //   This probably should be limited to exclusively be done on 'if' statements, or anything that's followed by a block
 //   and has statement semantics. it needs to be scoped, and also that scope only should be reachable upon success.
 // */
-// void OldEmitter::visit(ASTPatternMatch *node) {
-//   throw_error("pattern matches cannot exist outside of 'if' statements currently. they will be expanded to 'while', "
-//               "'switch', and possibly other nodes in the future.",
-//               node->source_range);
+// void Emitter::visit(ASTPatternMatch *node) {
+//   throw_error(
+//       "pattern matches cannot exist outside of 'if' statements currently. they will be expanded to 'while', "
+//       "'switch', and possibly other nodes in the future.",
+//       node->source_range);
 // }
 
-// void OldEmitter::emit_choice_marker_variant_instantiation(Type *type, ASTPath *value) {
+// void Emitter::emit_choice_marker_variant_instantiation(Type *type, ASTPath *value) {
 //   const auto last_segment = value->segments.back();
 //   const auto info = type->info->as<ChoiceTypeInfo>();
 //   const auto variant_type = info->get_variant_type(last_segment.identifier);
@@ -2116,7 +2302,7 @@
 //   }
 // }
 
-// void OldEmitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments) {
+// void Emitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments) {
 //   const auto choice_type = path->resolved_type;
 //   const auto info = choice_type->info->as<ChoiceTypeInfo>();
 //   const auto last_segment = path->segments.back();
@@ -2125,7 +2311,7 @@
 //   const auto type_string = type_to_string(choice_type);
 
 //   code << "(" << type_string << ") {\n";
-//   code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)+1) << ",\n";
+//   code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)) << ",\n";
 //   ASTTuple tuple;
 
 //   code << "." << variant_name.get_str() << " = ";
@@ -2137,7 +2323,7 @@
 //   code << "}";
 // }
 
-// void OldEmitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer) {
+// void Emitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer) {
 //   const auto choice_type = path->resolved_type;
 //   const auto info = choice_type->info->as<ChoiceTypeInfo>();
 //   const auto last_segment = path->segments.back();
@@ -2145,7 +2331,7 @@
 //   const auto type_string = type_to_string(choice_type);
 
 //   code << "(" << type_string << ") {\n";
-//   code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)+1) << ",\n";
+//   code << ".index = " << std::to_string(info->get_variant_discriminant(variant_name)) << ",\n";
 //   code << "." << variant_name.get_str() << " = " << "{";
 //   for (const auto &[name, value] : initializer->key_values) {
 //     code << "." << name.get_str() << " = ";
@@ -2156,9 +2342,28 @@
 //   code << "}";
 // }
 
-// void OldEmitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern) {
-//   ctx.set_scope(pattern->scope);
+// std::string Emitter::declare_temporary_for_pattern_match(bool is_pointer, Type *object_type, ASTPatternMatch *pattern) {
+//   static size_t idx = 0;
+//   const std::string patmatch_target = "$pat_match_target" + std::to_string(idx++);
+//   if (is_pointer) {
+//     code << type_to_string(object_type) << " " << patmatch_target << " = ";
+//     pattern->object->accept(this);
+//   } else {
+//     code << type_to_string(object_type->take_pointer_to(true)) << " " << patmatch_target << " = ";
+//     if (pattern->object->is_temporary_value()) {
+//       take_pointer_to_value(pattern->object->resolved_type, pattern->object);
+//     } else {
+//       code << "&";
+//       pattern->object->accept(this);
+//     }
+//   }
+//   code << ";\n";
+//   return patmatch_target;
+// }
+
+// void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern) {
 //   auto old_scope = ctx.scope;
+//   ctx.set_scope(pattern->target_block->scope);
 //   Defer _([&] { ctx.scope = old_scope; });
 
 //   auto path = pattern->target_type_path;
@@ -2170,7 +2375,7 @@
 //   const auto variant_index = info->get_variant_discriminant(segment.identifier);
 
 //   const auto object_type = pattern->object->resolved_type;
-//   const auto is_pointer = object_type->extensions.is_pointer();
+//   const auto is_pointer = object_type->is_pointer();
 
 //   static std::string the_register;
 //   if (the_if->is_expression) {
@@ -2183,17 +2388,13 @@
 //     newline();
 //   }
 
-//   code << "if (";
-//   pattern->object->accept(this);
-//   if (is_pointer) {
-//     code << "->";
-//   } else {
-//     code << ".";
-//   }
+//   const auto patmatch_target = declare_temporary_for_pattern_match(is_pointer, object_type, pattern);
 
+//   code << "if (";
+//   code << patmatch_target << "->";
 //   code << "index == " << variant_index << ") {\n";
-//   // within the if block
-//   emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+
+//   emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type);
 //   the_if->block->accept(this);
 //   // exiting the if block.
 //   code << "}\n";
@@ -2205,13 +2406,13 @@
 //   if (the_if->is_expression) {
 //     cf_expr_return_register = nullptr;
 //     code << the_register;
-//     code << ";\n});\n";
+//     code << ";\n})\n";
 //   }
 // }
 
-// void OldEmitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *pattern) {
-//   ctx.set_scope(pattern->scope);
+// void Emitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *pattern) {
 //   auto old_scope = ctx.scope;
+//   ctx.set_scope(pattern->target_block->scope);
 //   Defer _([&] { ctx.scope = old_scope; });
 
 //   auto path = pattern->target_type_path;
@@ -2223,32 +2424,24 @@
 //   const auto variant_index = info->get_variant_discriminant(segment.identifier);
 
 //   const auto object_type = pattern->object->resolved_type;
-//   const auto is_pointer = object_type->extensions.is_pointer();
+//   const auto is_pointer = object_type->is_pointer();
 
-//   code << "while (";
-//   pattern->object->accept(this);
-//   if (is_pointer) {
-//     code << "->";
-//   } else {
-//     code << ".";
-//   }
+//   code << "while (true) {\n";
+//   const auto patmatch_target = declare_temporary_for_pattern_match(is_pointer, object_type, pattern);
+//   code << "if (";
+//   code << patmatch_target << "->";
 //   code << "index == " << variant_index << ") {\n";
 //   // ? within the while's block
-
-//   emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+//   emit_pattern_match_destructure(patmatch_target, segment.identifier.get_str(), pattern, variant_type);
 //   // the_if->block->scope->parent = ctx.scope;
 //   the_while->block->accept(this);
 
 //   // ? exiting the while's block.
-//   code << "}\n";
+//   code << "} else break; \n}\n";
 // }
 
-// void OldEmitter::emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
-//                                              Type *variant_type) {
-//   const auto object_type = object->resolved_type;
-//   const auto is_pointer = object_type->extensions.is_pointer();
-
-//   /* I'm just gonna use auto in here cause im lazy. */
+// void Emitter::emit_pattern_match_destructure(const std::string &temp_register, const std::string &variant_name,
+//                                              ASTPatternMatch *pattern, Type *variant_type) {
 //   if (variant_type->is_kind(TYPE_STRUCT)) {
 //     for (StructPattern::Part &part : pattern->struct_pattern.parts) {
 //       auto type = part.resolved_type;
@@ -2256,9 +2449,9 @@
 //       /*
 //         Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
 //       */
-//       if (type->extensions.is_fixed_sized_array()) {
+//       if (type->is_fixed_sized_array()) {
 //         // mut doesn't really matter here.
-//         type = type->get_element_type()->take_pointer_to(MUT);
+//         type = type->get_element_type()->take_pointer_to(true);
 //       }
 
 //       code << get_declaration_type_signature_and_identifier(part.var_name.get_str(), type) << " = ";
@@ -2266,14 +2459,7 @@
 //         code << "&";
 //       };
 //       code << "(";
-//       object->accept(this);
-
-//       if (is_pointer) {
-//         code << "->";
-//       } else {
-//         code << ".";
-//       }
-
+//       code << temp_register << "->";
 //       code << variant_name << "." << part.field_name.get_str() << ");\n";
 //     }
 //   } else if (variant_type->is_kind(TYPE_TUPLE)) {
@@ -2284,7 +2470,7 @@
 //       /*
 //         Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
 //       */
-//       if (type->extensions.is_fixed_sized_array()) {
+//       if (type->is_fixed_sized_array()) {
 //         // mut doesn't really matter here.
 //         type = type->get_element_type()->take_pointer_to(MUT);
 //       }
@@ -2294,12 +2480,7 @@
 //         code << "&";
 //       }
 //       code << "(";
-//       object->accept(this);
-//       if (is_pointer) {
-//         code << "->";
-//       } else {
-//         code << ".";
-//       }
+//       code << temp_register << "->";
 //       code << variant_name << ".$" << std::to_string(index++) << ");\n";
 //     }
 //   } else if (variant_type == void_type()) {
@@ -2307,10 +2488,10 @@
 //   }
 // }
 
-// void OldEmitter::emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target_temp_identifier,
+// void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target_temp_identifier,
 //                                                  const SwitchBranch &the_case, ASTPatternMatch *pattern) {
-//   ctx.set_scope(pattern->scope);
 //   auto old_scope = ctx.scope;
+//   ctx.set_scope(pattern->target_block->scope);
 //   Defer _([&] { ctx.scope = old_scope; });
 
 //   const auto path = pattern->target_type_path;
@@ -2320,8 +2501,8 @@
 
 //   const auto variant_name = segment.identifier;
 //   const auto variant_type = info->get_variant_type(variant_name);
-//   const auto variant_index = info->get_variant_discriminant(variant_name)+1;
-//   const auto is_pointer = target_type->extensions.is_pointer();
+//   const auto variant_index = info->get_variant_discriminant(variant_name);
+//   const auto is_pointer = target_type->is_pointer();
 
 //   code << "if (" << target_temp_identifier;
 //   if (is_pointer) {
@@ -2332,7 +2513,7 @@
 //   code << std::to_string(variant_index);
 //   code << ") {\n";
 
-//   { // TODO: we should try to make this work with the exiting method to do this,
+//   {  // TODO: we should try to make this work with the exiting method to do this,
 //     // Copy pasting this is annoying.
 //     if (variant_type->is_kind(TYPE_STRUCT)) {
 //       for (const StructPattern::Part &part : pattern->struct_pattern.parts) {
@@ -2340,7 +2521,7 @@
 //         /*
 //           Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
 //         */
-//         if (type->extensions.is_fixed_sized_array()) {
+//         if (type->is_fixed_sized_array()) {
 //           // mut doesn't really matter here.
 //           type = type->get_element_type()->take_pointer_to(MUT);
 //         }
@@ -2365,7 +2546,7 @@
 //         /*
 //           Here we cast arrays to pointers since arrays are not assignable but we still want to take references to them.
 //         */
-//         if (type->extensions.is_fixed_sized_array()) {
+//         if (type->is_fixed_sized_array()) {
 //           // mut doesn't really matter here.
 //           type = type->get_element_type()->take_pointer_to(MUT);
 //         }
@@ -2382,8 +2563,6 @@
 //         }
 //         code << variant_name.get_str() << ".$" << std::to_string(index++) << ");\n";
 //       }
-//     } else if (variant_type == void_type()) {
-//       return;
 //     }
 //   }
 
@@ -2392,18 +2571,17 @@
 //   code << "}\n";
 // }
 
-// void OldEmitter::visit(ASTSwitch *node) {
+// void Emitter::visit(ASTSwitch *node) {
 //   auto type = node->expression->resolved_type;
 //   bool use_default_eq_operator = true;
 
-//   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer()) {
+//   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer()) {
 //     use_default_eq_operator = false;
 //   }
 
-  
 //   // This is static to help with the lifetime issues taking an `address of` here would cause.
 //   static std::string the_register;
-//   if (!node->is_statement) {
+//   if (!node->is_statement) {  // Declare a temporary for the C extension "Expression block";
 //     code << "({";
 //     the_register = "register$" + std::to_string(cf_expr_return_id++);
 //     cf_expr_return_register = &the_register;
@@ -2422,14 +2600,14 @@
 
 //   const auto target_type = node->expression->resolved_type;
 
-//   auto emit_switch_case = [&](ASTExpr *target, const SwitchBranch &_case, bool first) {
+//   const auto emit_branch = [&](ASTExpr *target, const SwitchBranch &branch, bool first) {
 //     emit_line_directive(target);
 //     if (!first) {
 //       code << indent() << "else ";
 //     }
 
-//     if (_case.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
-//       emit_pattern_match_for_switch_case(target_type, target_unique_id, _case, (ASTPatternMatch *)_case.expression);
+//     if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
+//       emit_pattern_match_for_switch_case(target_type, target_unique_id, branch, (ASTPatternMatch *)branch.expression);
 //       return;
 //     }
 
@@ -2437,23 +2615,23 @@
 //     if (use_default_eq_operator) {
 //       code << target_unique_id;
 //       code << " == ";
-//       _case.expression->accept(this);
+//       branch.expression->accept(this);
 //     } else {
-//       call_operator_overload(target->source_range, OPERATION_BINARY, TType::EQ, target, _case.expression);
+//       call_operator_overload(target->source_range, OPERATION_BINARY, TType::EQ, target, branch.expression);
 //     }
 //     code << ") ";
-//     _case.block->accept(this);
+//     branch.block->accept(this);
 //   };
 
 //   bool first = true;
-//   for (const auto &_case : node->branches) {
-//     emit_switch_case(node->expression, _case, first);
+//   for (const auto &branch : node->branches) {
+//     emit_branch(node->expression, branch, first);
 //     first = false;
 //   }
 
-//   if (node->default_case.is_not_null()) {
+//   if (node->default_branch.is_not_null()) {
 //     code << "else {\n";
-//     node->default_case.get()->accept(this);
+//     node->default_branch.get()->accept(this);
 //     code << "}\n";
 //   }
 
@@ -2463,19 +2641,17 @@
 //     semicolon();
 //     code << "})";
 //   }
-
 // }
 
-// void OldEmitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
+// void Emitter::emit_default_construction(Type *type, std::vector<std::pair<InternedString, ASTExpr *>> values) {
 //   parenthesized(type_to_string(type));
 
-//   if (type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions() &&
-//       HAS_FLAG(type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
+//   if (type->is_kind(TYPE_STRUCT) && type->has_no_extensions() && type->info->as<StructTypeInfo>()->is_union) {
 //     code << "{}";
 //     return;
 //   }
 
-//   if (type->extensions.is_pointer()) {
+//   if (type->is_pointer()) {
 //     code << "NULL";
 //     return;
 //   }
@@ -2506,7 +2682,7 @@
 //           goto NORMAL;
 //       } else {
 //       NORMAL:
-//         code << "(" << type_to_string(type) << ")";
+//         // code << "(" << type_to_string(type) << ")";
 //         initializer->accept(this);
 //       }
 //       indent_level--;
@@ -2517,24 +2693,27 @@
 //       code << "." << member.name.get_str() << " = ";
 //       value->accept(this);
 //       code << ",";
-//     } else if (member.type->is_kind(TYPE_STRUCT) && member.type->extensions.has_no_extensions() &&
-//                DOESNT_HAVE_FLAG(member.type->info->as<StructTypeInfo>()->flags, STRUCT_FLAG_IS_UNION)) {
+//     } else if (member.type->is_kind(TYPE_STRUCT) && member.type->has_no_extensions() &&
+//                !member.type->info->as<StructTypeInfo>()->is_union) {
 //       code << "." << member.name.get_str() << " = ";
 //       emit_default_construction(member.type);
 //       code << ",";
 //     }
 //   }
-  
+
 //   code << "}";
 // }
 
-// void OldEmitter::emit_arguments_no_parens(ASTArguments *node) {
+// void Emitter::emit_arguments_no_parens(ASTArguments *node) {
+//   bool first = true;
 //   for (size_t i = 0; i < node->arguments.size(); ++i) {
-//     if (i != 0) {
+//     auto argument = node->arguments[i];
+
+//     if (!first) {
 //       code << ", ";
 //     }
+//     first = false;
 
-//     auto argument = node->arguments[i];
 //     auto type = argument->resolved_type;
 
 //     /*
@@ -2544,18 +2723,17 @@
 //       auto path = (ASTPath *)argument;
 //       emit_choice_marker_variant_instantiation(type, path);
 //     } else {
-//       node->arguments[i]->accept(this);
+//       argument->accept(this);
 //     }
 //   }
 // }
 
-// void OldEmitter::visit(ASTWhereStatement *node) {
+// void Emitter::visit(ASTWhereStatement *node) {
 //   if (node->should_compile) {
 //     node->block->accept(this);
 //     return;
 //   }
-//   if (node->branch.is_null())
-//     return;
+//   if (node->branch.is_null()) return;
 
 //   auto branch = node->branch.get();
 //   if (branch->where_stmt.is_not_null()) {
@@ -2565,5 +2743,16 @@
 //   if (branch->block.is_not_null()) {
 //     branch->block.get()->accept(this);
 //     return;
+//   }
+// }
+
+// // This does nothing here, it's delegated to the unpack elements.
+// void Emitter::visit(ASTUnpackExpr *) {}
+
+// void Emitter::visit(ASTUnpackElement *node) {
+//   if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {
+//     code << node->tuple.source_temp_id + ".$" + std::to_string(node->tuple.element_index) << '\n';
+//   } else {
+//     node->range_literal_value->accept(this);
 //   }
 // }

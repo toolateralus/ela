@@ -10,12 +10,14 @@
 
 #include "interned_string.hpp"
 
+
 enum struct TType {
   Eof = -1,
   Identifier,
   Integer,
   Float,
   String,
+  MultiLineString,
   Char,
 
   Assign,
@@ -122,6 +124,7 @@ enum struct TType {
   Extern,
 
   Self,
+  Using,
 };
 
 #define TTYPE_CASE(type) \
@@ -130,6 +133,8 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(MultiLineString);
+    TTYPE_CASE(Using);
     TTYPE_CASE(Extern);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
@@ -294,6 +299,7 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"using", TType::Using},
     {"const", TType::Const},
     {"mut", TType::Mut},
     {"module", TType::Module},

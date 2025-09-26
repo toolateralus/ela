@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-
+#include <string>
+#include <algorithm>
 
 struct StringBuilder {
   constexpr static size_t block_length = 8192 * 12;
@@ -13,8 +14,7 @@ struct StringBuilder {
     Block *next = nullptr;
 
     explicit Block(size_t block_length)
-        : data(static_cast<char *>(std::calloc(block_length, sizeof(char)))), length(0), next(nullptr) {
-    }
+        : data(static_cast<char *>(std::calloc(block_length, sizeof(char)))), length(0), next(nullptr) {}
 
     ~Block() {
       length = 0;
@@ -31,16 +31,17 @@ struct StringBuilder {
 
   Block *root;
   Block *current;
+  bool inserting_at_cursor = false;
+  size_t cursor = 0;
 
   inline StringBuilder() : root(new Block(block_length)), current(root) {}
 
   inline ~StringBuilder() { delete root; }
 
   // Copy constructor
-  StringBuilder(const StringBuilder& other)
-      : root(new Block(block_length)), current(root) {
-    Block* src = other.root;
-    Block* dst = root;
+  StringBuilder(const StringBuilder &other) : root(new Block(block_length)), current(root) {
+    Block *src = other.root;
+    Block *dst = root;
     while (src) {
       if (src != other.root) {
         dst->next = new Block(block_length);
@@ -55,19 +56,19 @@ struct StringBuilder {
   }
 
   // Move constructor
-  StringBuilder(StringBuilder&& other) noexcept
-      : root(other.root), current(other.current) {
+  StringBuilder(StringBuilder &&other) noexcept
+      : root(other.root), current(other.current), inserting_at_cursor(other.inserting_at_cursor), cursor(other.cursor) {
     other.root = nullptr;
     other.current = nullptr;
   }
 
   // Copy assignment
-  StringBuilder& operator=(const StringBuilder& other) {
+  StringBuilder &operator=(const StringBuilder &other) {
     if (this != &other) {
       delete root;
       root = new Block(block_length);
-      Block* src = other.root;
-      Block* dst = root;
+      Block *src = other.root;
+      Block *dst = root;
       while (src) {
         if (src != other.root) {
           dst->next = new Block(block_length);
@@ -83,7 +84,7 @@ struct StringBuilder {
   }
 
   // Move assignment
-  StringBuilder& operator=(StringBuilder&& other) noexcept {
+  StringBuilder &operator=(StringBuilder &&other) noexcept {
     if (this != &other) {
       delete root;
       root = other.root;
@@ -94,7 +95,7 @@ struct StringBuilder {
     return *this;
   }
 
-  inline StringBuilder &operator<<(const std::string &str) {
+  void insert(const std::string &str) {
     size_t str_len = str.length();
     size_t remaining_space = block_length - current->length;
 
@@ -125,6 +126,15 @@ struct StringBuilder {
         }
       }
     }
+  }
+
+  inline StringBuilder &operator<<(const std::string &str) {
+    if (inserting_at_cursor) {
+      insert_at(cursor, str);
+      cursor += str.length();
+      return *this;
+    }
+    insert(str);
     return *this;
   }
 
@@ -137,11 +147,9 @@ struct StringBuilder {
     return os;
   }
 
-  inline StringBuilder &operator<<(const char *str) { 
-    return *this << std::string(str); 
-  }
+  inline StringBuilder &operator<<(const char *str) { return *this << std::string(str); }
 
-  inline StringBuilder &operator<<(char c) {
+  void insert(char c) {
     if (current->length < block_length) {
       current->data[current->length++] = c;
     } else {
@@ -149,6 +157,15 @@ struct StringBuilder {
       current = current->next;
       current->data[current->length++] = c;
     }
+  }
+
+  inline StringBuilder &operator<<(char c) {
+    if (inserting_at_cursor) {
+      insert_at(cursor, std::string(1, c));
+      cursor++;
+      return *this;
+    }
+    insert(c);
     return *this;
   }
 
@@ -180,5 +197,23 @@ struct StringBuilder {
   inline void clear() {
     delete root;
     root = new Block(block_length);
+    current = root;
+  }
+
+  inline void insert_at(size_t pos, const std::string &s) {
+    size_t cur_len = length();
+    if (pos >= cur_len) {
+      insert(s);
+      return;
+    }
+
+    std::string full = str();
+    std::string prefix = full.substr(0, pos);
+    std::string suffix = full.substr(pos);
+
+    clear();
+    if (!prefix.empty()) insert(prefix);
+    if (!s.empty()) insert(s);
+    if (!suffix.empty()) insert(suffix);
   }
 };

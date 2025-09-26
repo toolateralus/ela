@@ -161,6 +161,7 @@ struct TypeInfo {
 
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
+  bool is_forward_declared = false;
 };
 
 struct ChoiceTypeInfo : TypeInfo {
@@ -239,6 +240,7 @@ Type *f64_type();
 Type *f32_type();
 
 Type *is_fn_trait();
+
 Type *is_fn_ptr_trait();
 Type *is_tuple_trait();
 Type *is_array_trait();
@@ -252,6 +254,15 @@ Type *is_union_trait();
 Type *is_pointer_trait();
 Type *is_mut_pointer_trait();
 Type *is_const_pointer_trait();
+Type *is_slice_trait();
+Type *is_slice_mut_trait();
+
+// Kind of a specific trait to be compiler implemented,
+// but it will greatly improve compile time reflection capabilities
+// when writing serialization/ transmittion libraries.
+Type *blittable_trait();
+
+void assess_and_try_add_blittable_trait(Type *type);
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
@@ -312,6 +323,10 @@ struct Type {
   // the actual name of the type, without extensions and generics.
   InternedString basename{};
 
+  bool fwd_decl_is_emitted = false;
+  bool tuple_is_emitted = false;
+  bool dyn_emitted = false;
+
   // TODO: refactor the way type extensions work.
   // most of this should just be on the type itself,
   // especially the querying methods, it's a pain to get the extensions everywhere.
@@ -367,9 +382,7 @@ struct Type {
   // it just returns a new set.
   inline TypeExtensions append_extension(const TypeExtensions &to_append) const {
     auto these = this->extensions;
-    for (const auto &ext : to_append) {
-      these.push_back({ext});
-    }
+    these.append_range(to_append);
     return these;
   }
 

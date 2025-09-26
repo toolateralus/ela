@@ -13,6 +13,10 @@
 // {
 
 // clang-format off
+
+void ASTUnpackElement::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTUnpackExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
+
 void ASTDyn_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTModule::accept(VisitorBase *visitor) { visitor->visit(this); }
@@ -68,3 +72,7 @@ void ASTPath::accept(VisitorBase *visitor) { visitor->visit(this); }
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
+
+size_t temporary_variable_index = 0;
+std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }

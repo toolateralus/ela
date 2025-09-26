@@ -6,8 +6,8 @@
 // #include "visitor.hpp"
 // #include <set>
 
-// void OldResolver::declare_type(Type *type) {
-//   auto extensions = type->extensions.extensions;
+// void Resolver::declare_type(Type *type) {
+//   auto extensions = type->extensions;
 
 //   // TODO:
 //   // ! @Cooper-Pilot
@@ -27,11 +27,11 @@
 //   define_type(type);
 // }
 
-// void OldResolver::define_type(Type *type) {
+// void Resolver::define_type(Type *type) {
 //   if (type->base_type != Type::INVALID_TYPE) {
 //     type = type->base_type;
 //   }
-  
+
 //   switch (type->kind) {
 //     case TYPE_FUNCTION: {
 //       auto info = type->info->as<FunctionTypeInfo>();
@@ -65,7 +65,7 @@
 //       auto trait_type = info->trait_type;
 //       auto trait_info = trait_type->info->as<TraitTypeInfo>();
 //       for (auto [name, sym] : trait_info->scope->symbols) {
-//         if (sym.is_function() && !sym.is_generic_function()) {
+//         if (sym.is_function && !sym.is_generic_function()) {
 //           auto declaration = sym.function.declaration;
 //           for (auto param : declaration->params->params) {
 //             if (type_is_valid(param->resolved_type)) {
@@ -87,7 +87,22 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTStructDeclaration *node) {
+// void Resolver::visit(ASTStructDeclaration *node) {
+//   static std::unordered_set<ASTStructDeclaration *> visitation_set{};
+
+//   if (visitation_set.contains(node)) {
+//     throw_error(
+//         "Self referential type detected, which is invalid. The struct would be infinitely sized. Did you mean to add a "
+//         "pointer to a field's type?",
+//         node->source_range);
+//   }
+
+//   visitation_set.insert(node);
+
+//   Defer _defer([&] {
+//     visitation_set.erase(node);
+//   });
+
 //   if (!node->generic_parameters.empty()) {
 //     return;
 //   }
@@ -98,6 +113,7 @@
 //   for (auto subtype : node->subtypes) {
 //     subtype->accept(this);
 //   }
+
 //   for (auto member : node->members) {
 //     declare_type(member.type->resolved_type);
 //     if (member.default_value) {
@@ -106,7 +122,7 @@
 //   }
 // }
 
-// void emit_dependencies_for_reflection(OldResolver *dep_resolver, Type *id) {
+// void emit_dependencies_for_reflection(Resolver *dep_resolver, Type *id) {
 //   static std::set<Type *> visited = {};
 //   if (visited.contains(id)) {
 //     return;
@@ -115,13 +131,13 @@
 //   }
 
 //   auto type = id;
-//   if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
+//   if (type->is_pointer() || type->is_fixed_sized_array()) {
 //     type = type->get_element_type();
 //   }
 //   auto scope = type->info->scope;
 
 //   for (auto &[name, symbol] : scope->symbols) {
-//     if (symbol.is_function() && !symbol.is_generic_function()) {
+//     if (symbol.is_function && !symbol.is_generic_function()) {
 //       symbol.function.declaration->accept(dep_resolver);
 //     } else if (type_is_valid(symbol.resolved_type)) {
 //       emit_dependencies_for_reflection(dep_resolver, symbol.resolved_type);
@@ -129,7 +145,7 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTProgram *node) {
+// void Resolver::visit(ASTProgram *node) {
 //   ctx.set_scope(ctx.root_scope);
 
 //   if (auto env_sym = ctx.root_scope->local_lookup("Env")) {
@@ -161,19 +177,19 @@
 //     }
 //   }
 
-//   for (auto type: reflected_upon_types) {
+//   for (auto type : reflected_upon_types) {
 //     emit_dependencies_for_reflection(this, type);
 //   }
 
 //   auto emit_symbol = [&](InternedString name) {
 //     if (auto sym = ctx.root_scope->local_lookup(name)) {
-//       if (sym->is_variable()) {
+//       if (sym->is_variable) {
 //         auto ast = sym->variable.declaration.get();
 //         ast->accept(this);
 //         ast->accept(emitter);
-//       } else if (sym->is_function()) {
+//       } else if (sym->is_function) {
 //         sym->function.declaration->accept(this);
-//       } else if (sym->is_type()) {
+//       } else if (sym->is_type) {
 //         define_type(sym->resolved_type);
 //       }
 //     }
@@ -189,7 +205,7 @@
 //   ctx.set_scope(ctx.root_scope);
 // }
 
-// void OldResolver::visit(ASTBlock *node) {
+// void Resolver::visit(ASTBlock *node) {
 //   auto old_scope = ctx.scope;
 //   ctx.set_scope(node->scope);
 //   Defer _([&] { ctx.set_scope(old_scope); });
@@ -199,7 +215,7 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTFunctionDeclaration *node) {
+// void Resolver::visit(ASTFunctionDeclaration *node) {
 //   if (visited_functions.contains(node)) {
 //     emitter->emit_forward_declaration(node);
 //     return;
@@ -220,13 +236,13 @@
 //   node->accept(emitter);
 // }
 
-// void OldResolver::visit(ASTParamsDecl *node) {
+// void Resolver::visit(ASTParamsDecl *node) {
 //   for (auto param : node->params) {
 //     param->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTParamDecl *node) {
+// void Resolver::visit(ASTParamDecl *node) {
 //   declare_type(node->resolved_type);
 //   if (node->tag == ASTParamDecl::Normal && node->normal.default_value) {
 //     /*
@@ -236,16 +252,16 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTVariable *node) {
+// void Resolver::visit(ASTVariable *node) {
 //   node->type->accept(this);
 //   if (node->value) {
 //     node->value.get()->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTExprStatement *node) { node->expression->accept(this); }
+// void Resolver::visit(ASTExprStatement *node) { node->expression->accept(this); }
 
-// void OldResolver::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
+// void Resolver::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
 //   auto call = ASTMethodCall{};
 //   auto dot = ASTDotExpr{};
 //   dot.base = base;
@@ -259,7 +275,7 @@
 //   call.accept(this);
 // }
 
-// void OldResolver::visit(ASTBinExpr *node) {
+// void Resolver::visit(ASTBinExpr *node) {
 //   if (node->is_operator_overload) {
 //     visit_operator_overload(node->left, get_operator_overload_name(node->op, OPERATION_BINARY), node->right);
 //   } else {
@@ -268,18 +284,16 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTUnaryExpr *node) {
+// void Resolver::visit(ASTUnaryExpr *node) {
 //   if (node->is_operator_overload) {
 //     visit_operator_overload(node->operand, get_operator_overload_name(node->op, OPERATION_UNARY), nullptr);
 //   } else {
-//     if (node->op == TType::Mul) {
-//       define_type(node->operand->resolved_type);
-//     }
+//     define_type(node->operand->resolved_type);
 //     node->operand->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTIndex *node) {
+// void Resolver::visit(ASTIndex *node) {
 //   if (node->is_operator_overload) {
 //     visit_operator_overload(node->base, get_operator_overload_name(TType::LBrace, OPERATION_INDEX), node->index);
 //   } else {
@@ -290,9 +304,9 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTPath *node) {
+// void Resolver::visit(ASTPath *node) {
 //   auto type = node->resolved_type;
-//   if (type && type->kind == TYPE_ENUM) {
+//   if (type && type->kind == TYPE_ENUM && type->declaring_node) {
 //     type->declaring_node.get()->accept(this);
 //     type->declaring_node.get()->accept(emitter);
 //   }
@@ -313,18 +327,18 @@
 //     ASTDeclaration *instantiation = nullptr;
 //     if (!seg.generic_arguments.empty()) {
 //       auto generic_args = emitter->typer.get_generic_arg_types(seg.generic_arguments);
-//       if (symbol->is_type()) {
+//       if (symbol->is_type) {
 //         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
 //         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
 //         auto type = instantiation->resolved_type;
 //         scope = type->info->scope;
-//       } else if (symbol->is_function()) {
+//       } else if (symbol->is_function) {
 //         instantiation = find_generic_instance(symbol->function.declaration->generic_instantiations, generic_args);
 //       }
 //     } else {
-//       if (symbol->is_module()) {
+//       if (symbol->is_module) {
 //         scope = symbol->module.declaration->scope;
-//       } else if (symbol->is_type()) {
+//       } else if (symbol->is_type) {
 //         scope = symbol->resolved_type->info->scope;
 //       }
 //     }
@@ -332,17 +346,14 @@
 //     if (instantiation) {
 //       instantiation->accept(this);
 //       instantiation->accept(emitter);
-//     } else if (symbol->is_variable() && symbol->variable.declaration) {
-//       // for global variables
-//       auto decl = symbol->variable.declaration.get();
-//       if (!decl->declaring_block) {
+//     } else if (symbol->is_variable && symbol->variable.declaration) {
+//       if (!symbol->is_local) {
 //         symbol->variable.declaration.get()->accept(this);
 //         symbol->variable.declaration.get()->accept(emitter);
 //       }
-//     } else if (symbol->is_function() && symbol->function.declaration) {
-//       // TODO: we should change how template retrival works;
+//     } else if (symbol->is_function && symbol->function.declaration) {
 //       symbol->function.declaration->accept(this);
-//     } else if (symbol->is_type()) {
+//     } else if (symbol->is_type) {
 //       if (auto decl = symbol->type.declaration.get()) {
 //         decl->accept(this);
 //         decl->accept(emitter);
@@ -351,37 +362,37 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTLiteral *) {}
+// void Resolver::visit(ASTLiteral *) {}
 
-// void OldResolver::visit(ASTType *node) { define_type(node->resolved_type); }
+// void Resolver::visit(ASTType *node) { define_type(node->resolved_type); }
 
-// void OldResolver::visit(ASTType_Of *node) {
+// void Resolver::visit(ASTType_Of *node) {
 //   node->target->accept(this);
 //   reflected_upon_types.insert(node->target->resolved_type);
 // }
 
-// void OldResolver::visit(ASTCall *node) {
+// void Resolver::visit(ASTCall *node) {
 //   node->arguments->accept(this);
 //   node->callee->accept(this);
 // }
 
-// void OldResolver::visit(ASTArguments *node) {
+// void Resolver::visit(ASTArguments *node) {
 //   for (auto arg : node->arguments) {
 //     arg->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTReturn *node) {
+// void Resolver::visit(ASTReturn *node) {
 //   if (node->expression.is_not_null()) {
 //     node->expression.get()->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTContinue *) {}
+// void Resolver::visit(ASTContinue *) {}
 
-// void OldResolver::visit(ASTBreak *) {}
+// void Resolver::visit(ASTBreak *) {}
 
-// void OldResolver::visit(ASTFor *node) {
+// void Resolver::visit(ASTFor *node) {
 //   define_type(node->iterator_type);
 //   define_type(node->iterable_type);
 //   define_type(node->identifier_type);
@@ -405,7 +416,7 @@
 //   node->block->accept(this);
 // }
 
-// void OldResolver::visit(ASTIf *node) {
+// void Resolver::visit(ASTIf *node) {
 //   node->condition->accept(this);
 //   node->block->accept(this);
 //   if (node->_else.is_not_null()) {
@@ -413,7 +424,7 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTElse *node) {
+// void Resolver::visit(ASTElse *node) {
 //   if (node->_if) {
 //     node->_if.get()->accept(this);
 //   }
@@ -422,19 +433,19 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTWhile *node) {
+// void Resolver::visit(ASTWhile *node) {
 //   if (node->condition) {
 //     node->condition.get()->accept(this);
 //   }
 //   node->block->accept(this);
 // }
 
-// void OldResolver::visit(ASTDotExpr *node) {
+// void Resolver::visit(ASTDotExpr *node) {
 //   define_type(node->base->resolved_type);
 //   node->base->accept(this);
 // }
 
-// void OldResolver::visit(ASTInitializerList *node) {
+// void Resolver::visit(ASTInitializerList *node) {
 //   if (node->target_type) node->target_type.get()->accept(this);
 //   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
 //     for (const auto &value : node->values) {
@@ -448,24 +459,23 @@
 //   declare_type(node->resolved_type);
 // }
 
-// void OldResolver::visit(ASTEnumDeclaration *node) {
+// void Resolver::visit(ASTEnumDeclaration *node) {
 //   for (const auto &[key, value] : node->key_values) {
 //     value->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTRange *node) {
+// void Resolver::visit(ASTRange *node) {
 //   node->left->accept(this);
 //   node->right->accept(this);
 // }
 
-// void OldResolver::visit(ASTSwitch *node) {
+// void Resolver::visit(ASTSwitch *node) {
 //   node->expression->accept(this);
 
 //   auto type = node->expression->resolved_type;
 
-//   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer() &&
-//       !node->branches.empty()) {
+//   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer() && !node->branches.empty()) {
 //     visit_operator_overload(node->expression, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
 //                             node->branches[0].expression);
 //   }
@@ -474,29 +484,29 @@
 //     $case.block->accept(this);
 //     $case.expression->accept(this);
 //   }
-//   if (auto default_case = node->default_case.get()) {
+//   if (auto default_case = node->default_branch.get()) {
 //     default_case->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTTuple *node) {
+// void Resolver::visit(ASTTuple *node) {
 //   for (const auto &value : node->values) {
 //     value->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTDestructure *node) {
+// void Resolver::visit(ASTDestructure *node) {
 //   define_type(node->right->resolved_type);
 //   node->right->accept(this);
 // }
 
-// void OldResolver::visit(ASTSize_Of *node) { node->target_type->accept(this); }
+// void Resolver::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-// void OldResolver::visit(ASTAlias *) {}
+// void Resolver::visit(ASTAlias *) {}
 
-// void OldResolver::visit(ASTImport *) {}
+// void Resolver::visit(ASTImport *) {}
 
-// void OldResolver::visit(ASTImpl *node) {
+// void Resolver::visit(ASTImpl *node) {
 //   auto old_scope = ctx.scope;
 //   ctx.set_scope(node->scope);
 //   Defer _([&] { ctx.set_scope(old_scope); });
@@ -514,9 +524,9 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTDefer *node) { node->statement->accept(this); }
+// void Resolver::visit(ASTDefer *node) { node->statement->accept(this); }
 
-// void OldResolver::visit(ASTChoiceDeclaration *node) {
+// void Resolver::visit(ASTChoiceDeclaration *node) {
 //   if (!node->generic_parameters.empty()) {
 //     return;
 //   }
@@ -543,29 +553,29 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTCast *node) {
+// void Resolver::visit(ASTCast *node) {
 //   node->expression->accept(this);
 //   node->target_type->accept(this);
 // }
 
-// void OldResolver::visit(ASTTraitDeclaration *) {}
+// void Resolver::visit(ASTTraitDeclaration *) {}
 
-// void OldResolver::visit(ASTLambda *node) {
+// void Resolver::visit(ASTLambda *node) {
 //   node->params->accept(this);
 //   node->block->accept(this);
 //   emitter->emit_lambda(node);
 // }
 
-// void OldResolver::visit(ASTWhere *node) {
+// void Resolver::visit(ASTWhere *node) {
 //   for (const auto &[target, predicate] : node->constraints) {
 //     target->accept(this);
 //     predicate->accept(this);
 //   }
 // }
 
-// void OldResolver::visit(ASTModule *) {}
+// void Resolver::visit(ASTModule *) {}
 
-// void OldResolver::visit(ASTDyn_Of *node) {
+// void Resolver::visit(ASTDyn_Of *node) {
 //   declare_type(node->resolved_type);
 //   define_type(node->resolved_type);
 
@@ -579,8 +589,8 @@
 //           std::format("Internal compiler error: couldn't find method {} in dynof({})", name, element_type->to_string()),
 //           node->source_range);
 //     }
-//     if (!sym->is_function() || sym->is_generic_function()) {
-//       printf("%d\n", sym->flags);
+
+//     if (!sym->is_function || sym->is_generic_function()) {
 //       throw_error(std::format("Internal compiler error: {} is not a valid method in dynof", name), node->source_range);
 //     }
 //     auto decl = sym->function.declaration;
@@ -588,12 +598,12 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTPatternMatch *node) {
+// void Resolver::visit(ASTPatternMatch *node) {
 //   node->object->accept(this);
 //   node->target_type_path->accept(this);
 // }
 
-// void OldResolver::visit(ASTMethodCall *node) {
+// void Resolver::visit(ASTMethodCall *node) {
 //   node->arguments->accept(this);
 //   node->callee->accept(this);
 //   auto symbol_nullable = ctx.get_symbol(node->callee);
@@ -613,7 +623,7 @@
 //   }
 // }
 
-// void OldResolver::visit(ASTWhereStatement *node) {
+// void Resolver::visit(ASTWhereStatement *node) {
 //   if (node->should_compile) {
 //     node->block->accept(this);
 //     return;
@@ -628,5 +638,20 @@
 //   if (branch->block.is_not_null()) {
 //     branch->block.get()->accept(this);
 //     return;
+//   }
+// }
+
+// // This does nothing here, it's delegated to the unpack elements.
+// void Resolver::visit(ASTUnpackExpr *) {}
+
+// void Resolver::visit(ASTUnpackElement *node) {
+//   if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {
+//     node->tuple.source_tuple->accept(this);
+//     TupleTypeInfo *info = node->tuple.source_tuple->resolved_type->info->as<TupleTypeInfo>();
+//     Type *element_type = info->types[node->tuple.element_index];
+//     define_type(element_type);
+//     define_type(node->tuple.source_tuple->resolved_type);
+//   } else {
+//     node->range_literal_value->accept(this);
 //   }
 // }
