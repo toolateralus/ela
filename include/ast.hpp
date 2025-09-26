@@ -1075,11 +1075,13 @@ struct ASTPatternMatch : ASTExpr {
         break;
     }
   }
+  
   /*
     the left hand side of the 'is', e.g { if x is ... }
                                              ^<- object.
   */
   ASTExpr *object;
+
   /*
     the type thats being matched
     e.g

@@ -1,4 +1,5 @@
 #include "constexpr.hpp"
+#include <print>
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -393,10 +394,11 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
 // TODO: handle iterators.
 Value *CTInterpreter::visit_for(ASTFor *node) {
   InternedString loop_var_name;
+
   if (node->left_tag == ASTFor::IDENTIFIER) {
     loop_var_name = node->left.identifier;
   } else {
-    return null_value();
+    throw_error("loop destructures not implemented in compile time", node->source_range);
   }
 
   ASTRange *range;
@@ -447,6 +449,7 @@ Value *CTInterpreter::visit_for(ASTFor *node) {
 }
 
 Value *CTInterpreter::visit_continue(ASTContinue *) { return continue_value(); }
+
 Value *CTInterpreter::visit_break(ASTBreak *) { return break_value(); }
 
 Value *CTInterpreter::visit_return(ASTReturn *node) {
@@ -472,6 +475,7 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   auto function = visit(call->callee);
   std::vector<Value *> evaluated_args;
   evaluated_args.reserve(call->arguments->arguments.size());
+
   for (const auto &arg : call->arguments->arguments) {
     evaluated_args.push_back(visit(arg));
   }
@@ -482,6 +486,25 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
     return result ? result : null_value();
   } else if (function->get_value_type() == ValueType::FUNCTION) {
     return function->as<FunctionValue>()->call(this, evaluated_args);
+  }
+  if (call->callee->get_node_type() == AST_NODE_PATH && call->callee->resolved_type &&
+      call->callee->resolved_type->is_kind(TYPE_CHOICE)) {
+    const auto path = (ASTPath *)call->callee;
+    const auto choice_type = path->resolved_type;
+    const auto info = choice_type->info->as<ChoiceTypeInfo>();
+    const auto last_segment = path->segments.back();
+    const auto variant_name = last_segment.identifier;
+    const auto variant_type = info->get_variant_type(variant_name);
+
+    auto tuple = default_value_of_t(variant_type, this)->as<ObjectValue>();
+    auto choice = default_value_of_t(choice_type, this)->as<ObjectValue>();
+    choice->values["index"] = new_int(info->get_variant_discriminant(variant_name));
+    for (size_t i = 0; i < evaluated_args.size(); ++i) {
+      std::println("{} = {}", i, evaluated_args[i]->to_string());
+      tuple->values[std::format("${}", i)] = evaluated_args[i];
+    }
+    choice->values[std::format("${}", variant_name)] = tuple;
+    return choice;
   } else {
     throw_error("Unable to call non-function symbol", call->source_range);
   }
@@ -571,15 +594,21 @@ LValue *CTInterpreter::get_index_lvalue(ASTIndex *node) {
   size_t index = index_v->value;
 
   if (base->get_value_type() == ValueType::POINTER && node->is_pointer_subscript) {
+    // This shouldn't ever happen.. but I guess? we'll assume it's valid. but this basically says this is legal:
+    /*
+      int x = 0;
+      int *ptr = &x;
+      ptr[0] = 10;
+    */
+    // Why would you ever do this?
+    PointerValue *pv = base->as<PointerValue>();
+    Value **p = &pv->ptr[index];
+    return new_lvalue(p);
   } else if (base->get_value_type() == ValueType::RAW_POINTER && node->is_pointer_subscript) {
     RawPointerValue *raw = base->as<RawPointerValue>();
     const size_t sz = raw->type->base_type->size_in_bytes();
     char *p = raw->ptr + (sz * index);
-
-    // TODO: this just seems wrong. what if raw->type->base_type isn't a pointer?
-    // Instead of having all the lvalue and pointer structs and shit,
-    // we just need a Memory or something, if we can.
-
+    // TODO: see the RawPointerValue::dereference() to see why this happens, and why it shouldnt happen.
     return new_lvalue(new_raw_pointer(raw->type->base_type, p));
   }
 
@@ -765,16 +794,28 @@ Value *CTInterpreter::visit_impl(ASTImpl *node) {
 }
 
 Value *CTInterpreter::visit_if(ASTIf *node) {
-  auto cond_value = visit(node->condition);
-  if (cond_value->get_value_type() != ValueType::BOOLEAN) {
-    return null_value();
+  bool cond;
+
+  if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    auto cond_value = visit(node->condition);
+    cond = cond_value->is_truthy();
+
+    if (cond) {
+      // we already executed the then block.
+      return null_value();
+    }
+
+  } else {
+    auto cond_value = visit(node->condition);
+    cond = cond_value->is_truthy();
   }
-  bool cond = ((BoolValue *)cond_value)->value;
+
   if (cond) {
     return visit(node->block);
   } else if (node->_else) {
     return visit(node->_else.get());
   }
+
   return null_value();
 }
 
@@ -808,9 +849,20 @@ Value *CTInterpreter::visit_else(ASTElse *node) {
   return null_value();
 }
 
+Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *node) {
+  Value *object = visit(node->object);
+  Type *target_type = node->target_type_path->resolved_type;
+
+  if (object->type == target_type) {
+    visit(node->target_block);
+    return new_bool(false);
+  }
+
+  return new_bool(true);
+}
+
 Value *CTInterpreter::visit_unpack_element(ASTUnpackElement *) { return null_value(); }
 Value *CTInterpreter::visit_unpack(ASTUnpack *) { return null_value(); }
-Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return null_value(); }
 Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
 Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
 Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }

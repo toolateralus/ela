@@ -25,23 +25,44 @@ bool BoolValue::is_truthy() const { return value; }
 bool StringValue::is_truthy() const { return !value.empty(); }
 
 PointerValue* new_pointer(Value** value) { return value_arena_alloc<PointerValue>((*value)->value_type, value); }
+
+CharValue* new_char(char val) { return value_arena_alloc<CharValue>(val); }
 IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
-FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
-BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
 IntValue* new_int(size_t val) { return value_arena_alloc<IntValue>(val); }
+
+FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
 FloatValue* new_float(double val) { return value_arena_alloc<FloatValue>(val); }
+
+BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
 BoolValue* new_bool(bool val) { return value_arena_alloc<BoolValue>(val); }
+
 StringValue* new_string(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
 StringValue* new_string(const std::string& str) { return value_arena_alloc<StringValue>(str); }
-CharValue* new_char(char val) { return value_arena_alloc<CharValue>(val); }
-NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
-ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
-FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
+
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
 
+NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
+
+ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
+FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
+
 ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }
 ReturnValue* return_value() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
+
+LValue* new_lvalue(Value** managed) {
+  auto lvalue = value_arena_alloc<LValue>();
+  lvalue->kind = LValue::MANAGED;
+  lvalue->managed = managed;
+  return lvalue;
+}
+
+LValue* new_lvalue(RawPointerValue* raw) {
+  auto lvalue = value_arena_alloc<LValue>();
+  lvalue->kind = LValue::RAW;
+  lvalue->raw = raw;
+  return lvalue;
+}
 
 #include "constexpr.hpp"
 
@@ -409,20 +430,6 @@ Value* RawPointerValue::dereference() const {
   }
 
   return null_value();
-}
-
-LValue* new_lvalue(Value** managed) {
-  auto lvalue = value_arena_alloc<LValue>();
-  lvalue->kind = LValue::MANAGED;
-  lvalue->managed = managed;
-  return lvalue;
-}
-
-LValue* new_lvalue(RawPointerValue* raw) {
-  auto lvalue = value_arena_alloc<LValue>();
-  lvalue->kind = LValue::RAW;
-  lvalue->raw = raw;
-  return lvalue;
 }
 
 void RawPointerValue::assign_from(Value* v) {
