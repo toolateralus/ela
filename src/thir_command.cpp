@@ -29,9 +29,10 @@ int CompileCommand::compile() {
     Typer typer{context};
     THIRGen thir_gen(context);
     Emitter emitter;
+    Resolver resolver(emitter);
     typer.visit(root);
     auto thir = thir_gen.visit_program(root);
-    emitter.emit_program((THIRProgram *)thir);
+    resolver.visit_node(thir);
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
     output << BOILERPLATE_C_CODE << '\n';
