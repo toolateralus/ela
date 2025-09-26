@@ -14,7 +14,7 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
 }
 
 Value *CTInterpreter::visit_path(ASTPath *node) {
-  auto lvalue = get_lvalue(node)->as<LValue>();
+  auto lvalue = get_lvalue(node);
   if (lvalue->kind == LValue::RAW) {
     auto raw = lvalue->raw;
     return raw;
@@ -284,7 +284,7 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       node->op = old_op;
 
       // make it permanent
-      auto lvalue = get_lvalue(node->left)->as<LValue>();
+      auto lvalue = get_lvalue(node->left);
       switch (lvalue->kind) {
         case LValue::MANAGED:
           *lvalue->managed = right;
@@ -296,7 +296,7 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       return res;
     }
     case TType::Assign: {
-      auto lvalue = get_lvalue(node->left)->as<LValue>();
+      auto lvalue = get_lvalue(node->left);
       switch (lvalue->kind) {
         case LValue::MANAGED:
           *lvalue->managed = right;
@@ -312,34 +312,6 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
   }
 
   return null_value();
-}
-
-// This is just for assigning via a *x = 0 kinda dereference.
-Value *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
-  auto operand = visit(node->operand);
-
-  if (node->op == TType::Mul) {
-    bool is_pointer = operand->get_value_type() == ValueType::POINTER,
-         is_raw_pointer = operand->get_value_type() == ValueType::RAW_POINTER;
-
-    if (!is_pointer && !is_raw_pointer) {
-      throw_error(
-          std::format(
-              "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
-              (int)operand->get_value_type()),
-          node->source_range);
-    }
-
-    if (is_pointer) {
-      PointerValue *pointer = operand->as<PointerValue>();
-      return new_lvalue(pointer->ptr);
-    } else if (is_raw_pointer) {
-      RawPointerValue *pointer = operand->as<RawPointerValue>();
-      return new_lvalue(pointer);
-    }
-  }
-  static Value *the_null_value = null_value();
-  return new_lvalue(&the_null_value);
 }
 
 Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
@@ -371,7 +343,7 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
       return null_value();
     }
     case TType::And: {
-      auto lvalue = get_lvalue(node->operand)->as<LValue>();
+      auto lvalue = get_lvalue(node->operand);
       return new_pointer(lvalue->managed);
     }
     case TType::Mul: {
@@ -516,9 +488,36 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return null_value();
 }
 
-Value *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
+Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
+  LValue *lvalue = get_dot_expr_lvalue(dot);
+  if (lvalue->kind == LValue::MANAGED) {
+    return *lvalue->managed;
+  } else if (lvalue->kind == LValue::RAW) {
+    return lvalue->raw->dereference();
+  }
+  return null_value();
+}
+
+Value *CTInterpreter::visit_index(ASTIndex *node) {
+  LValue *lvalue = get_index_lvalue(node);
+  if (lvalue->kind == LValue::MANAGED) {
+    return *lvalue->managed;
+  } else if (lvalue->kind == LValue::RAW) {
+    return lvalue->raw->dereference();
+  }
+  return null_value();
+}
+
+LValue *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
   Value *base = visit(dot->base);
   static Value *the_null_value = null_value();
+
+  // Auto dereference
+  if (base->get_value_type() == ValueType::POINTER) {
+    base = *base->as<PointerValue>()->ptr;
+  } else if (base->get_value_type() == ValueType::RAW_POINTER) {
+    base = base->as<RawPointerValue>()->dereference();
+  }
 
   if (base->get_value_type() != ValueType::OBJECT) {
     throw_error("cannot use '.' expression on a non-object at compile time", dot->source_range);
@@ -538,14 +537,106 @@ Value *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
   }
 }
 
+// This is just for assigning via a *x = 0 kinda dereference.
+LValue *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
+  auto operand = visit(node->operand);
 
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) { return *get_dot_expr_lvalue(dot)->as<LValue>()->managed; }
-Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_lvalue(node)->as<LValue>()->managed; }
+  if (node->op == TType::Mul) {
+    bool is_pointer = operand->get_value_type() == ValueType::POINTER,
+         is_raw_pointer = operand->get_value_type() == ValueType::RAW_POINTER;
 
-Value *CTInterpreter::get_index_lvalue(ASTIndex *node) {
-  ArrayValue *base = (ArrayValue *)visit(node->base);
-  IntValue *index = (IntValue *)visit(node->index);
-  return new_lvalue(&base->values[index->value]);
+    if (!is_pointer && !is_raw_pointer) {
+      throw_error(
+          std::format(
+              "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
+              (int)operand->get_value_type()),
+          node->source_range);
+    }
+
+    if (is_pointer) {
+      PointerValue *pointer = operand->as<PointerValue>();
+      return new_lvalue(pointer->ptr);
+    } else if (is_raw_pointer) {
+      RawPointerValue *pointer = operand->as<RawPointerValue>();
+      return new_lvalue(pointer);
+    }
+  }
+  static Value *the_null_value = null_value();
+  return new_lvalue(&the_null_value);
+}
+
+LValue *CTInterpreter::get_index_lvalue(ASTIndex *node) {
+  Value *base = visit(node->base);
+  IntValue *index_v = (IntValue *)visit(node->index);
+  size_t index = index_v->value;
+
+  if (base->get_value_type() == ValueType::POINTER && node->is_pointer_subscript) {
+  } else if (base->get_value_type() == ValueType::RAW_POINTER && node->is_pointer_subscript) {
+    RawPointerValue *raw = base->as<RawPointerValue>();
+    const size_t sz = raw->type->base_type->size_in_bytes();
+    char *p = raw->ptr + (sz * index);
+
+    // TODO: this just seems wrong. what if raw->type->base_type isn't a pointer?
+    // Instead of having all the lvalue and pointer structs and shit,
+    // we just need a Memory or something, if we can.
+
+    return new_lvalue(new_raw_pointer(raw->type->base_type, p));
+  }
+
+  if (base->get_value_type() != ValueType::ARRAY) {
+    throw_error("cannot index-- operator overloading not implemented at compile time", node->source_range);
+  }
+
+  ArrayValue *array = (ArrayValue *)base;
+  return new_lvalue(&array->values[index]);
+}
+
+LValue *CTInterpreter::get_lvalue(ASTNode *node) {
+  if (node->get_node_type() == AST_NODE_UNARY_EXPR) {
+    return get_unary_lvalue((ASTUnaryExpr *)node);
+  }
+  if (node->get_node_type() == AST_NODE_DOT_EXPR) {
+    return get_dot_expr_lvalue((ASTDotExpr *)node);
+  }
+  if (node->get_node_type() == AST_NODE_INDEX) {
+    return get_index_lvalue((ASTIndex *)node);
+  }
+
+  static Value *the_null_value = null_value();
+
+  Symbol *symbol;
+  {
+    ENTER_SCOPE(current_scope);
+    symbol = ctx.get_symbol(node).get();
+  }
+
+  if (!symbol) {
+    symbol = ctx.get_symbol(node).get();
+  }
+
+  if (!symbol) {
+    return new_lvalue(&the_null_value);
+  }
+
+  if (symbol->value == nullptr) {
+    if (symbol->is_variable && symbol->variable.initial_value.get()) {
+      symbol->value = visit(symbol->variable.initial_value.get());
+    }
+
+    if (symbol->is_function && symbol->function.declaration) {
+      if (symbol->function.declaration->is_extern) {
+        symbol->value = try_link_extern_function(symbol);
+      } else {
+        symbol->value = visit(symbol->function.declaration);
+      }
+    }
+  }
+
+  if (symbol->value == nullptr) {
+    return new_lvalue(&the_null_value);
+  }
+
+  return new_lvalue(&symbol->value);
 }
 
 Value *CTInterpreter::visit_range(ASTRange *node) {
@@ -586,7 +677,7 @@ Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
   auto result = fn->call(this, args);
 
   {  // this should always be managed. 'self' will never be a raw pointer.
-    auto self_ptr = get_lvalue(node->callee->base)->as<LValue>();
+    auto self_ptr = get_lvalue(node->callee->base);
     *self_ptr->managed = self_val;
   }
 
@@ -644,9 +735,8 @@ Value *CTInterpreter::visit_variable(ASTVariable *variable) {
   }
 
   // TODO: handle other implicit casts.
-  if (symbol->value && symbol->value->get_value_type() == ValueType::RAW_POINTER) {
-    auto raw = symbol->value->as<RawPointerValue>();
-    raw->type = variable->type->resolved_type;
+  if (symbol->value) {
+    symbol->value->type = variable->type->resolved_type;
   }
 
   return null_value();
@@ -672,54 +762,6 @@ Value *CTInterpreter::try_link_extern_function(Symbol *symbol) {
 Value *CTInterpreter::visit_impl(ASTImpl *node) {
   throw_error("creating \"impl\"'s in a #run or #eval directive is not allowed", node->source_range);
   return null_value();
-}
-
-Value *CTInterpreter::get_lvalue(ASTNode *node) {
-  if (node->get_node_type() == AST_NODE_UNARY_EXPR) {
-    return get_unary_lvalue((ASTUnaryExpr *)node);
-  }
-  if (node->get_node_type() == AST_NODE_DOT_EXPR) {
-    return get_dot_expr_lvalue((ASTDotExpr *)node);
-  }
-  if (node->get_node_type() == AST_NODE_INDEX) {
-    return get_index_lvalue((ASTIndex *)node);
-  }
-
-  static Value *the_null_value = null_value();
-
-  Symbol *symbol;
-  {
-    ENTER_SCOPE(current_scope);
-    symbol = ctx.get_symbol(node).get();
-  }
-
-  if (!symbol) {
-    symbol = ctx.get_symbol(node).get();
-  }
-
-  if (!symbol) {
-    return new_lvalue(&the_null_value);
-  }
-
-  if (symbol->value == nullptr) {
-    if (symbol->is_variable && symbol->variable.initial_value.get()) {
-      symbol->value = visit(symbol->variable.initial_value.get());
-    }
-
-    if (symbol->is_function && symbol->function.declaration) {
-      if (symbol->function.declaration->is_extern) {
-        symbol->value = try_link_extern_function(symbol);
-      } else {
-        symbol->value = visit(symbol->function.declaration);
-      }
-    }
-  }
-
-  if (symbol->value == nullptr) {
-    return new_lvalue(&the_null_value);
-  }
-
-  return new_lvalue(&symbol->value);
 }
 
 Value *CTInterpreter::visit_if(ASTIf *node) {

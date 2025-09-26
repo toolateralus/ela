@@ -40,7 +40,8 @@ inline T* value_arena_alloc(Args&&... args) {
 struct ASTNode;
 struct Value {
   const ValueType value_type = ValueType::NULLPTR;
-  Value(ValueType vt = ValueType::NULLPTR) : value_type(vt) {}
+  Type* type;
+  Value(ValueType vt) : value_type(vt) {}
   Value() = delete;
   virtual ~Value() {}
 
@@ -53,12 +54,13 @@ struct Value {
   virtual ValueType get_value_type() const;
   virtual ASTNode* to_ast() const { return nullptr; }
   virtual std::string to_string() const;
-};
 
+  inline bool is(ValueType type) const { return type == this->value_type; }
+};
 
 struct IntValue : Value {
   size_t value;
-  IntValue(size_t val = 0) : Value(ValueType::INTEGER), value(val) {}
+  IntValue(size_t val = 0) : Value(ValueType::INTEGER), value(val) { type = s64_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -66,7 +68,7 @@ struct IntValue : Value {
 
 struct FloatValue : Value {
   double value;
-  FloatValue(double val = 0.0) : Value(ValueType::FLOATING), value(val) {}
+  FloatValue(double val = 0.0) : Value(ValueType::FLOATING), value(val) { type = f64_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -74,7 +76,7 @@ struct FloatValue : Value {
 
 struct BoolValue : Value {
   bool value;
-  BoolValue(bool val = false) : Value(ValueType::BOOLEAN), value(val) {}
+  BoolValue(bool val = false) : Value(ValueType::BOOLEAN), value(val) { type = bool_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -82,7 +84,12 @@ struct BoolValue : Value {
 
 struct StringValue : Value {
   std::string value;
-  StringValue(const std::string& str = "") : Value(ValueType::STRING), value(str) {}
+
+  StringValue(const std::string& str = "") : Value(ValueType::STRING), value(str) {
+    // TODO: assign a correct type here.
+    type = global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_MUT}});
+  }
+
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -90,7 +97,7 @@ struct StringValue : Value {
 
 struct CharValue : Value {
   char value;
-  CharValue(char c = '\0') : Value(ValueType::CHARACTER), value(c) {}
+  CharValue(char c = '\0') : Value(ValueType::CHARACTER), value(c) { type = u8_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -130,7 +137,7 @@ const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 struct ObjectValue : Value {
   Type* type = nullptr;
   std::map<InternedString, Value*> values{};
-  ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT), type(t) {}
+  ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT) { type = t; }
 
   bool is_truthy() const override;
 
@@ -140,10 +147,9 @@ struct ObjectValue : Value {
 };
 
 struct ArrayValue : Value {
-  Type* type = nullptr;
   std::vector<Value*> values{};
-  ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), type(type), values(arr) {}
-  ArrayValue(Type* type) : Value(ValueType::ARRAY), type(type), values({}) {}
+  ArrayValue(Type* type, const std::vector<Value*>& arr) : Value(ValueType::ARRAY), values(arr) { this->type = type; }
+  ArrayValue(Type* type) : Value(ValueType::ARRAY), values({}) { this->type = type; }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -154,7 +160,11 @@ struct PointerValue : Value {
   Value** ptr;
 
   PointerValue(ValueType pointee_value_type, Value** ptr)
-      : Value(ValueType::POINTER), pointee_value_type(pointee_value_type), ptr(ptr) {}
+      : Value(ValueType::POINTER), pointee_value_type(pointee_value_type), ptr(ptr) {
+    if (ptr && *ptr && (*ptr)->type) {
+      type = (*ptr)->type->take_pointer_to(true);
+    }
+  }
 
   bool is_truthy() const override { return ptr; }
 
@@ -165,8 +175,7 @@ struct PointerValue : Value {
 
 struct RawPointerValue : Value {
   char* ptr;
-  Type* type;
-  RawPointerValue(Type* t, char* p) : Value(ValueType::RAW_POINTER), ptr(p), type(t) {}
+  RawPointerValue(Type* type, char* p) : Value(ValueType::RAW_POINTER), ptr(p) { this->type = type; }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
@@ -175,26 +184,19 @@ struct RawPointerValue : Value {
   void assign_from(Value*);
 };
 
-
 struct LValue : Value {
   enum Kind { MANAGED, RAW } kind;
   Value** managed;
 
-  LValue(): Value(ValueType::LVALUE) {}
+  LValue() : Value(ValueType::LVALUE) {}
 
-  RawPointerValue *raw;
+  RawPointerValue* raw;
 
-  bool is_truthy() const override {
-    return raw || managed;
-  }
+  bool is_truthy() const override { return raw || managed; }
 
-  ValueType get_value_type() const override {
-    return ValueType::LVALUE;
-  }
+  ValueType get_value_type() const override { return ValueType::LVALUE; }
 
-  ASTNode* to_ast() const override {
-    return nullptr;
-  }
+  ASTNode* to_ast() const override { return nullptr; }
 };
 
 struct ASTBlock;
@@ -239,7 +241,7 @@ ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
 
 LValue* new_lvalue(Value** managed);
-LValue* new_lvalue(RawPointerValue *raw);
+LValue* new_lvalue(RawPointerValue* raw);
 
 ContinueValue* continue_value();
 BreakValue* break_value();

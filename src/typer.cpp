@@ -3852,7 +3852,9 @@ void Typer::visit(ASTUnpackElement *) {
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
   CTInterpreter interpreter(ctx);
+  
   auto result = interpreter.visit(node->node_to_run);
+
   if (result->get_value_type() == ValueType::RETURN) {
     auto return_v = result->as<ReturnValue>();
     if (return_v->value.is_null()) {

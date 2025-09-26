@@ -371,6 +371,13 @@ Value* RawPointerValue::dereference() const {
 
   auto inner = type->base_type;
 
+  if (!inner) {
+    // This is a non-pointer raw pointer.
+    // this shouldn't happen but right now we have to do this,
+    // for returning lvalue's to elements during pointer subscript, etc.
+    inner = type;
+  }
+
   switch (inner->kind) {
     case TYPE_SCALAR: {
       const auto sinfo = inner->info->as<ScalarTypeInfo>();
