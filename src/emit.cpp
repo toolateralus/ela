@@ -723,11 +723,12 @@ void Emitter::collect_and_declare_unpack_elements_before_call(std::vector<ASTExp
       continue;
     }
 
+    *inserting_at_cursor = true;
     emit_line_directive(arg);
     code << indent() << "auto " << temp_id << " = ";
     tuple.source_tuple->accept(this);
     code << ";\n";
-
+    *inserting_at_cursor = false;
     seen_sources.push_back(temp_id);
   }
 }

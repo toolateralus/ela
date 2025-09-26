@@ -1,6 +1,7 @@
 #include "value.hpp"
 #include <cstring>
 #include "ast.hpp"
+#include "interned_string.hpp"
 #include "type.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
@@ -72,14 +73,10 @@ Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> argum
 
   for (const auto param : this->parameters->params) {
     if (param->tag == ASTParamDecl::Normal) {
-      temp_scope->insert_local_variable(param->normal.name, param->resolved_type, nullptr, MUT);
-      auto symbol = temp_scope->local_lookup(param->normal.name);
-      symbol->value = *it;
-      ++it;
+      interpreter->set_value(param->normal.name, *it);
     } else {
-      temp_scope->insert_local_variable("self", param->resolved_type, nullptr, param->mutability);
-      auto symbol = temp_scope->local_lookup("self");
-      symbol->value = *it;
+      const static InternedString name = InternedString{"self"};
+      interpreter->set_value(name, *it);
     }
   }
 

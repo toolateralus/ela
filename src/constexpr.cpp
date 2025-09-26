@@ -771,7 +771,7 @@ Value *CTInterpreter::visit_variable(ASTVariable *variable) {
   return null_value();
 }
 
-void CTInterpreter::set_value(InternedString &name, Value *value) {
+void CTInterpreter::set_value(const InternedString &name, Value *value) {
   auto symbol = ctx.scope->lookup(name);
   if (symbol) {
     symbol->value = value;

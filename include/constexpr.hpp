@@ -24,7 +24,7 @@ struct CTInterpreter {
   }
 
   Value *try_link_extern_function(Symbol *name);
-  void set_value(InternedString &name, Value *value);
+  void set_value(const InternedString &name, Value *value);
   
   LValue *get_lvalue(ASTNode *node);
   LValue *get_dot_expr_lvalue(ASTDotExpr *dot);
