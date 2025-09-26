@@ -1147,10 +1147,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTRN_MTCH_PTR_MUT;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_MTCH_PTR_CONST;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 }
               }
 

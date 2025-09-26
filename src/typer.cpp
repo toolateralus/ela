@@ -3429,9 +3429,9 @@ void Typer::visit(ASTPatternMatch *node) {
         }
 
         auto type_id = symbol->resolved_type;
-        if (part.semantic == PTR_MTCH_PTR_CONST) {
+        if (part.semantic == PATTERN_MATCH_PTR_CONST) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_CONST}});
-        } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
+        } else if (part.semantic == PATTERN_MATCH_PTR_MUT) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
 
@@ -3456,9 +3456,9 @@ void Typer::visit(ASTPatternMatch *node) {
       auto index = 0;
       for (auto &part : node->tuple_pattern.parts) {
         auto type_id = info->types[index];
-        if (part.semantic == PTR_MTCH_PTR_CONST) {
+        if (part.semantic == PATTERN_MATCH_PTR_CONST) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_CONST}});
-        } else if (part.semantic == PTRN_MTCH_PTR_MUT) {
+        } else if (part.semantic == PATTERN_MATCH_PTR_MUT) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
         part.resolved_type = type_id;
