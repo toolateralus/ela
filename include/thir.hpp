@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena.hpp"
+#include "binding.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -269,8 +270,11 @@ struct ReflectionInfo {
 struct THIRGen {
   THIRGen(Context &ctx) : ctx(ctx) {}
   Context &ctx;
-  // We use this for some temporary AST generation, primarily used during desugaring things like For loops.
+
   std::map<Symbol *, THIR *> symbol_map;
+
+  Binder binder {};
+
   THIR *entry_point;
 
   // The "return override register" is used to capture the result of a block or function,
@@ -280,7 +284,6 @@ struct THIRGen {
   Nullable<THIRVariable> return_override_register;
   size_t return_override_register_index = 0;
 
-  // Here, the variable is the original, and the unary expression is the address-of you can use to refer to the type.
   std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
 
   Type *type_ptr_list = nullptr;
@@ -325,6 +328,7 @@ struct THIRGen {
   void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
                                           std::vector<THIR *> &statements, Type *variant_type,
                                           const InternedString &variant_name);
+                                          
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
