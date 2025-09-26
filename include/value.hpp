@@ -168,6 +168,8 @@ struct RawPointerValue : Value {
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
+
+  Value* dereference() const;
 };
 
 struct ASTBlock;

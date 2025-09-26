@@ -1309,3 +1309,5 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
+
+

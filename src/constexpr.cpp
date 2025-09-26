@@ -292,11 +292,40 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
-  auto unary = (ASTUnaryExpr *)node;
-  auto operand = visit(unary->operand);
+// This is just for assigning via a *x = 0 kinda dereference.
+Value **CTInterpreter::get_unary_expr_ptr(ASTUnaryExpr *node) {
+  auto operand = visit(node->operand);
 
-  switch (unary->op) {
+  if (node->op == TType::Mul) {
+    bool is_pointer = operand->get_value_type() == ValueType::POINTER,
+         is_raw_pointer = operand->get_value_type() == ValueType::RAW_POINTER;
+
+    if (!is_pointer && !is_raw_pointer) {
+      throw_error(
+          std::format(
+              "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
+              (int)operand->get_value_type()),
+          node->source_range);
+    }
+
+    if (is_pointer) {
+      PointerValue *pointer = operand->as<PointerValue>();
+      return pointer->ptr;
+    } else if (is_raw_pointer) {
+      RawPointerValue *pointer = operand->as<RawPointerValue>();
+      // TODO: fix this hack lol.
+      static Value *ptr;
+      ptr = pointer->dereference();
+      return &ptr;
+    }
+  }
+  static Value *the_null_value = null_value();
+  return &the_null_value;
+}
+
+Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
+  auto operand = visit(node->operand);
+  switch (node->op) {
     case TType::Sub: {
       if (operand->get_value_type() == ValueType::FLOATING) {
         double v = ((FloatValue *)operand)->value;
@@ -323,20 +352,32 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
       return null_value();
     }
     case TType::And: {
-      return new_pointer(&operand);
+      return new_pointer(get_value(node->operand));
     }
     case TType::Mul: {
-      if (operand->get_value_type() != ValueType::POINTER) {
-        throw_error("cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up",
-                    node->source_range);
+      bool is_pointer = operand->get_value_type() == ValueType::POINTER,
+           is_raw_pointer = operand->get_value_type() == ValueType::RAW_POINTER;
+
+      if (!is_pointer && !is_raw_pointer) {
+        throw_error(
+            std::format(
+                "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
+                (int)operand->get_value_type()),
+            node->source_range);
       }
-      auto pointer = operand->as<PointerValue>();
-      return *pointer->ptr;
+
+      if (is_pointer) {
+        PointerValue *pointer = operand->as<PointerValue>();
+        return *pointer->ptr;
+      } else if (is_raw_pointer) {
+        RawPointerValue *pointer = operand->as<RawPointerValue>();
+        // TODO: we need to handle assignment into pointers (*i = 0);
+        return pointer->dereference();
+      }
     }
     default:
       return null_value();
   }
-
   return null_value();
 }
 
@@ -606,6 +647,9 @@ Value *CTInterpreter::visit_impl(ASTImpl *node) {
 }
 
 Value **CTInterpreter::get_value(ASTNode *node) {
+  if (node->get_node_type() == AST_NODE_UNARY_EXPR) {
+    return get_unary_expr_ptr((ASTUnaryExpr *)node);
+  }
   if (node->get_node_type() == AST_NODE_DOT_EXPR) {
     return get_dot_expr_ptr((ASTDotExpr *)node);
   }

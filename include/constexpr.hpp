@@ -28,6 +28,7 @@ struct CTInterpreter {
   Value **get_value(ASTNode *node);
   Value **get_dot_expr_ptr(ASTDotExpr *dot);
   Value **get_index_ptr(ASTIndex *node);
+  Value **get_unary_expr_ptr(ASTUnaryExpr *node);
 
   Value *visit_method_call(ASTMethodCall *node);
   Value *visit_path(ASTPath *node);

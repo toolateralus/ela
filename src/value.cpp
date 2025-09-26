@@ -328,7 +328,7 @@ ASTNode* ArrayValue::to_ast() const {
   init->resolved_type = type;
   // TODO: figure out if we need this type allocated.
   init->target_type = ast_alloc<ASTType>();
-  init->target_type.get()->resolved_type = type->base_type; // pass the base type to array initializers
+  init->target_type.get()->resolved_type = type->base_type;  // pass the base type to array initializers
   init->tag = ASTInitializerList::INIT_LIST_COLLECTION;
   for (const auto& value : this->values) {
     init->values.push_back((ASTExpr*)value->to_ast());
@@ -362,3 +362,41 @@ ASTNode* RawPointerValue::to_ast() const {
 
 ContinueValue* continue_value() { return value_arena_alloc<ContinueValue>(); }
 BreakValue* break_value() { return value_arena_alloc<BreakValue>(); }
+
+Value* RawPointerValue::dereference() const {
+  if (!ptr) {
+    return null_value();
+  }
+
+  auto inner = type->base_type;
+  switch (inner->kind) {
+    case TYPE_SCALAR: {
+      const auto sinfo = inner->info->as<ScalarTypeInfo>();
+      switch (sinfo->scalar_type) {
+        case TYPE_VOID:
+          return null_value(); // this should be an error.
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+          return new_int(*(size_t*)ptr);
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+          return new_float(*(double*)ptr);
+        case TYPE_CHAR:
+          return new_float(*(char*)ptr);
+        case TYPE_BOOL:
+          return new_float(*(bool*)ptr);
+          break;
+      }
+    } break;
+    // TODO: handle all cases here.
+    default:
+      break;
+  }
+  return null_value();
+}
