@@ -1,0 +1,48 @@
+import io;
+
+/* 
+  Error at definition: /home/josh/source/c++/ela/repro/122.ela:19:31
+  impl io::StreamWriter {
+    fn writef!<TupleT>(*mut self, fmt: str, tuple: TupleT, options: fmt::FormatOptions, allocator: dyn Allocator) {
+      using formatted_string := fmt::format(fmt, tuple, options, allocator);
+                                ^^^
+      self.write_many(formatted_string.as_slice());
+    }
+  }
+
+
+  error: symbol fmt's scope could not be resolved in path
+          at: /home/josh/source/c++/ela/repro/122.ela:26:17
+  }
+
+
+  fn main() {
+    io::get_stdout().writef("Hello, World!%", ('\n',), fmt::FormatOptions::default(), get_global_allocator());
+                  ^^^
+
+  }
+*/
+import fmt;
+
+/*  
+  This can be bypassed by using
+
+  import fmt::{
+    FormatOptions,
+    format
+  }
+
+  but clearly something is wrong with how scopes are imported.
+*/
+
+impl io::StreamWriter {
+  fn writef!<TupleT>(*mut self, fmt: str, tuple: TupleT, options: fmt::FormatOptions, allocator: dyn Allocator) {
+    using formatted_string := fmt::format(fmt, tuple, options, allocator);
+    self.write_many(formatted_string.as_slice());
+  }
+}
+
+
+fn main() {
+  io::get_stdout().writef("Hello, World!%", ('\n',), fmt::FormatOptions::default(), get_global_allocator());
+}

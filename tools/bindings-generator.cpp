@@ -7,10 +7,11 @@
 #include <iomanip>
 #include <iostream>
 #include <ostream>
+#include <set>
 #include <sstream>
 #include <string>
-#include <unordered_map>
 #include <fstream>
+#include <unordered_map>
 #include <vector>
 #include <print>
 
@@ -37,22 +38,23 @@ static std::unordered_map<std::string, bool> emitted_types;
 #define LOG(message, data) data->logfile << "[" << current_timestamp() << "] INFO: " << message << "\n";
 #define ERROR(message, data) data->logfile << "[" << current_timestamp() << "] ERROR: " << message << "\n";
 
-static inline std::string get_source_location_clang(CXCursor cursor) {
-  unsigned line, column;
-  CXString fileName;
-  CXSourceLocation location = clang_getCursorLocation(cursor);
-  clang_getPresumedLocation(location, &fileName, &line, &column);
-  std::string fileNameStr = clang_getCString(fileName);
-  clang_disposeString(fileName);
-  return std::format("{}:{}:{}", line, column, fileNameStr);
-}
-
 inline std::string current_timestamp() {
   auto now = std::chrono::system_clock::now();
   auto in_time_t = std::chrono::system_clock::to_time_t(now);
   std::stringstream ss;
   ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X");
   return ss.str();
+}
+
+static const std::set<std::string> ela_reserved_words = {
+  "fn", "type", "struct", "union", "enum", "module", "import", "export", "if", "else", "for", "while", "return",
+  "break", "continue", "const", "mut", "true", "false", "null", "defer", "using", "with", "as", "in", "is"
+};
+
+static inline void sanitize_identifier(std::string& name) {
+  if (ela_reserved_words.count(name)) {
+    name.append("_");
+  }
 }
 
 struct ClangVisitData {
@@ -108,7 +110,7 @@ static inline std::string wrapgen_get_pointer_type_name(CXType type) {
       if (!is_const && !is_mut) {
         is_const = true;
       }
-      result += "*const ";
+      result += "*";
     } else {
       result += "*mut ";
     }
@@ -143,7 +145,12 @@ static inline std::string wrapgen_get_type_name(CXType type) {
 
   if (type.kind == CXType_ConstantArray) {
     long long arraySize = clang_getArraySize(type);
-    std::string result = "[" + std::to_string(arraySize) + "; " + wrapgen_get_type_name(clang_getArrayElementType(type)) + "]";
+    std::string result =
+        "[" + wrapgen_get_type_name(clang_getArrayElementType(type)) + "; " + std::to_string(arraySize) + "]";
+    return result;
+  } else if (type.kind == CXType_IncompleteArray || type.kind == CXType_VariableArray) {
+    // TODO: we assume it's mut here but idk. should be more accurate.
+    std::string result = "*mut " + wrapgen_get_type_name(clang_getArrayElementType(type));
     return result;
   }
 
@@ -219,7 +226,7 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         args += wrapgen_get_type_name(clang_getArgType(pointeeType, i));
       }
 
-      data->output << "alias " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
+      data->output << "type " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
     } else if (underlyingType.kind == CXType_FunctionProto) {
       std::string returnType = wrapgen_get_type_name(clang_getResultType(underlyingType));
       std::string args;
@@ -230,9 +237,9 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         }
         args += wrapgen_get_type_name(clang_getArgType(underlyingType, i));
       }
-      data->output << "alias " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
+      data->output << "type " << typeName << " :: fn(" << args << ") -> " << returnType << ";\n";
     } else {
-      data->output << "alias " << typeName << " :: " << underlyingTypeName << ";\n";
+      data->output << "type " << typeName << " :: " << underlyingTypeName << ";\n";
     }
   }
 }
@@ -256,7 +263,7 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
 
   clang_visitChildren(
       cursor,
-      [](CXCursor c, CXCursor parent, CXClientData client_data) {
+      [](CXCursor c, CXCursor _, CXClientData client_data) {
         ClangVisitData *data = (ClangVisitData *)client_data;
         std::stringstream &temp_output = *(std::stringstream *)client_data;
         std::stringstream &anon_output = *(std::stringstream *)client_data;
@@ -309,7 +316,7 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
   data->output << temp_output.str();
 }
 
-static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor parent, CXClientData client_data) {
+static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor _, CXClientData client_data) {
   CXCursorKind kind = clang_getCursorKind(cursor);
   ClangVisitData *data = (ClangVisitData *)client_data;
   if (kind == CXCursor_FunctionDecl) {
@@ -328,6 +335,8 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
       CXString arg_name = clang_getCursorSpelling(arg_cursor);
       std::string arg_name_str = clang_getCString(arg_name);
       clang_disposeString(arg_name);
+
+      sanitize_identifier(arg_name_str);
 
       if (arg_name_str.empty()) {
         arg_name_str = "param" + std::to_string(i);
@@ -386,33 +395,6 @@ static inline std::string preprocess_header(const std::string &filename) {
   return buffer.str();
 }
 
-static inline std::string find_system_header(const std::string &header) {
-  std::vector<std::string> common_paths = {
-#ifdef __linux__
-      "/usr/include/",
-      "/usr/local/include/",
-      "/usr/include/x86_64-linux-gnu/",
-#elif defined(__APPLE__)
-      "/usr/include/",
-      "/usr/local/include/",
-      "/Library/Developer/CommandLineTools/usr/include/",
-#elif defined(_WIN32)
-      "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Include\\",
-      "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\",
-#endif
-  };
-
-  for (const auto &path : common_paths) {
-    std::string full_path = path + header;
-    char abs_path[PATH_MAX];
-    if (realpath(full_path.c_str(), abs_path) != nullptr) {
-      return std::string(abs_path);
-    }
-  }
-
-  return "";
-}
-
 static inline ClangVisitData wrapgen_import_c_header_into_module(const std::string &filename) {
   CXIndex index = clang_createIndex(0, 0);
   std::string preprocessed_code = preprocess_header(filename);
@@ -443,7 +425,7 @@ static inline ClangVisitData wrapgen_import_c_header_into_module(const std::stri
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <header-file>\n";
+    std::cerr << "Usage: " << argv[0] << " <input-filename>\n";
     return 1;
   }
 
@@ -469,6 +451,12 @@ int main(int argc, char **argv) {
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     return 1;
+  }
+
+  try {
+    std::filesystem::remove(filename + ".inc");
+    std::filesystem::remove("wrapgen.log");
+  } catch (const std::exception &) {
   }
 
   return 0;

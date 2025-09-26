@@ -24,6 +24,10 @@
 			<key>include</key>
 			<string>#keywords</string>
 		</dict>
+    <dict>
+      <key>include</key>
+			<string>#generic_block</string>
+		</dict>
 		<dict>
 			<key>include</key>
 			<string>#functions_and_declarations</string>
@@ -139,7 +143,6 @@
 					<key>name</key>
 					<string>invalid.illegal.stray-comment-end.ela</string>
 				</dict>
-
 				<dict>
 					<key>include</key>
 					<string>#line_comment</string>
@@ -152,13 +155,13 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch|dyn|module|extern)\b</string>
+					<string>\b(if|then|else|for|while|defer|return|switch|dyn|module|extern)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(break|прерв|continue|продолжать)\b</string>
+					<string>\b(break|прерв|continue)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
@@ -200,7 +203,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\&mut|\&const|\*mut|\*const|mut|const|где|where|as|как|in|в|is|является|import)\b</string>
+					<string>\b(\&amp;mut|\&amp;const|\*mut|\*const|mut|const|using|where|as|in|is|import)\b</string>
 					<key>name</key>
 					<string>keyword.function.ela</string>
 				</dict>
@@ -224,7 +227,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|структ|enum|перечень|union|союз|trait|интерфейс|impl|реализуйте)\b(?:(\{)(\}))?</string>
+					<string>\b(struct|enum|union|trait|impl)\b(?:(\{)(\}))?</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -237,7 +240,7 @@
 				<!-- Basic Types -->
 				<dict>
 					<key>match</key>
-					<string>\b(s8|s16|s32|s64)\b</string>
+					<string>\b(s8|s16|s32|context|s64)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -272,7 +275,59 @@
 					<string>storage.type.ela</string>
 				</dict>
 			</array>
-		</dict>
+    </dict>
+    <key>generic_block</key>
+    <dict>
+      <key>begin</key>
+      <string>!&lt;|&lt;</string>
+      <key>beginCaptures</key>
+      <dict>
+        <key>0</key>
+        <dict>
+          <key>name</key>
+          <string>keyword.operator.generic.ela</string>
+        </dict>
+      </dict>
+      <key>end</key>
+      <string>&gt;</string>
+      <key>endCaptures</key>
+      <dict>
+        <key>0</key>
+        <dict>
+          <key>name</key>
+          <string>keyword.operator.generic.ela</string>
+        </dict>
+      </dict>
+      <key>name</key>
+      <string>meta.generic.ela</string>
+      <key>patterns</key>
+      <array>
+        <dict>
+          <key>include</key>
+          <string>#keywords</string>
+        </dict>
+        <dict>
+          <key>include</key>
+          <string>#types</string>
+        </dict>
+        <dict>
+          <key>include</key>
+          <string>#functions_and_declarations</string>
+        </dict>
+        <dict>
+          <key>include</key>
+          <string>#strings</string>
+        </dict>
+        <dict>
+          <key>include</key>
+          <string>#char</string>
+        </dict>
+        <dict>
+          <key>include</key>
+          <string>#string_escaped_char</string>
+        </dict>
+      </array>
+    </dict>
 		<key>functions_and_declarations</key>
 		<dict>
 			<key>patterns</key>
@@ -348,6 +403,18 @@
 		<dict>
 			<key>patterns</key>
 			<array>
+        <dict>
+        <key>match</key>
+        <string>(\b[[:alpha:]_][[:alnum:]_]*[!]?)\s*(?=!&lt;|&lt;)</string>
+        <key>captures</key>
+        <dict>
+          <key>1</key>
+          <dict>
+            <key>name</key>
+            <string>support.function.ela</string>
+          </dict>
+        </dict>
+      </dict>
 				<dict>
 					<key>match</key>
 					<string>\\(\\|[abefnrut"0]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{3})</string>

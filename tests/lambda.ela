@@ -1,3 +1,5 @@
+import assertion::*;
+
 type Lambda :: fn(s32, s32) -> s32;
 
 fn takes_lambda(lambda: Lambda, a: s32, b: s32) -> s32{
@@ -10,19 +12,23 @@ fn takes_lambda(lambda: Lambda, a: s32, b: s32) -> s32{
     return a + b;
   }
   {
-    assert("lambda add failed", n(1, 2) == 3);
-    assert("inline lambda failed", 
-        fn(a: s32, b: s32) -> s32 { return a + b; }(1, 2) == 3
+    assert(n(1, 2) == 3, "lambda add failed");
+    assert(
+        fn(a: s32, b: s32) -> s32 { return a + b; }(1, 2) == 3,
+        "inline lambda failed"
     );
   }
   {
-    assert("lambda arg failed", takes_lambda(n, 1, 2) == 3);
-    assert("lambda inline arg failed", takes_lambda(fn(a: s32, b: s32) -> s32 { return a + b; }, 1, 2) == 3);
+    assert(takes_lambda(n, 1, 2) == 3, "lambda arg failed");
+    assert(
+      takes_lambda(fn(a: s32, b: s32) -> s32 { return a + b; }, 1, 2) == 3,
+      "lambda inline arg failed"
+    );
   }
     
   {
     lambda_expr_body := fn() -> s32 => 3;
-    assert("lambda expr body failed", lambda_expr_body() == 3);
-    assert("lambda expr body inline failed", (fn() -> s32 => 3)() == 3);
+    assert(lambda_expr_body() == 3, "lambda expr body failed");
+    assert((fn() -> s32 => 3)() == 3, "lambda expr body inline failed");
   }
 }

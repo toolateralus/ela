@@ -1,3 +1,4 @@
+import assertion::*;
 
 
 
@@ -5,6 +6,9 @@ struct WithDefaultField {
   field: f32 = 100.0,
 }
 
+fn generic_with_default_param!<T>(mut f: T, f1: T = 100.0) -> f32 where T: f32 {
+  return f = f1;
+}
 
 fn with_default_parameter(f: f32, f1: f32 = 100.0) -> f32 {
   return f1 * f;
@@ -20,11 +24,11 @@ impl WithDefaultField {
   }
 }
 
-
 #test fn test_defaults() {
   wdf: WithDefaultField;
-  assert_eq("WithDefaultField.field != 100.0, which was the expected default value", wdf.field, 100.0);
-  assert_eq("with_default_parameter != 200.0, which was expected result", with_default_parameter(2), 200.0);
-  assert_eq("WithDefaultField::associated_with_default_parameter != 200.0, which was expected result", WithDefaultField::associated_with_default_parameter(2), 200.0);
-  assert_eq("method_with_default_parameter != 200.0, which was expected result", wdf.method_with_default_parameter(), 200.0);
+  assert_eq(wdf.field, 100.0, "WithDefaultField.field != 100.0, which was the expected default value");
+  assert_eq(with_default_parameter(2), 200.0, "with_default_parameter != 200.0, which was expected result");
+  assert_eq(WithDefaultField::associated_with_default_parameter(2), 200.0, "WithDefaultField::associated_with_default_parameter != 200.0, which was expected result");
+  assert_eq(wdf.method_with_default_parameter(), 200.0, "method_with_default_parameter != 200.0, which was expected result");
+  assert_eq(generic_with_default_param(100.0), 100.0, "generic with default param != 100.0");
 }

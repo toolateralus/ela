@@ -1,3 +1,5 @@
+import assertion::*;
+
 fn func_returns_tuple() -> (s32, s32) {
   return (10, 10);
 }
@@ -11,18 +13,18 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
 #test fn test_tuple_array() {
   array : [(s32, s32); 1] = .[(10, 10)];
   a, b := array[0];
-  assert("Storing tuple in array failed", a == 10 && b == 10);
+  assert(a == 10 && b == 10, "Storing tuple in array failed");
 }
 
 #test fn test_tuple_fn_interactions() {
   {
     a, b := func_returns_tuple();
-    assert("returning tuple from function failed", a == 10 && b == 10);
+    assert(a == 10 && b == 10, "returning tuple from function failed");
   }
 
   tuple := (0, 0);
   a, b := func_takes_tuple_arg(tuple);
-  assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
+  assert(a == 10 && b == 10, "returning tuple from function that took it as arg and mutated it failed");
 }
 
 #test fn test_nested_tuple() {
@@ -30,7 +32,7 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
   {
     _, tup := nested;
     a, b := tup;
-    assert("nested tup failed", a == 2 && b == 3 && _ == 1);
+    assert(a == 2 && b == 3 && _ == 1, "nested tup failed");
   }
 }
 
@@ -38,13 +40,13 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
   t1 : (s32, s32, s32) = (0, 1, 2);
   {
     a,b,c := t1;
-    assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
+    assert(a == 0 && b == 1 && c == 2, "Declaring typed tuple failed.");
   }
 
   t2 := (3, 2, 1, 0);
   {
     a,b,c,d := t2;
-    assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
+    assert(a == 3 && b == 2 && c == 1 && d == 0, "Destructuring inferred tuple failed.");
   }
 }
 
@@ -53,14 +55,14 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
   *ptr = (10, 10);
   {
     a, b := *ptr; 
-    assert("mallocing with tuple failed", a == 10 && b == 10);
+    assert(a == 10 && b == 10, "mallocing with tuple failed");
   }
 
   mut ptr_arr: List!<*mut (s32, s32)>;
   ptr_arr.push(ptr);
   {
     a, b := *(ptr_arr[0]);
-    assert("mallocing into tuple array failed", a == 10 && b == 10);
+    assert(a == 10 && b == 10, "mallocing into tuple array failed");
   }   
 
   std::c::free(ptr);
@@ -70,7 +72,5 @@ fn func_takes_tuple_arg(tuple: (s32, s32)) -> (s32, s32) {
   &mut x, &mut y := (10, 20);
   *x = 100;
   *y = 200;
-  assert("tdr fail", *x == 100 && *y == 200);
+  assert(*x == 100 && *y == 200, "tdr fail");
 }
-
-

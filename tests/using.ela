@@ -1,0 +1,26 @@
+import assertion::*;
+
+struct Destroyable {
+  memory: *mut u8,
+}
+impl Destroyable {
+  fn new(ptr: *mut u8) -> Self {
+    return .{
+      memory: ptr,
+    };
+  }
+}
+
+impl Destroy for Destroyable {
+  fn destroy(*mut self, recursive: bool = false) {
+    *self.memory = 255; // Write 255 to the memory location
+  }
+}
+
+#test fn test_using() {
+  mut value: u8 = 0;
+  using destroyable := Destroyable::new(&mut value) {
+    assert_eq(*destroyable.memory, 0, "memory should be 0 inside using");
+  }
+  assert_eq(value, 255, "destroy did not write 255 to memory");
+}

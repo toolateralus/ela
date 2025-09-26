@@ -22,3 +22,27 @@
 - Added the ability for enumerators to reference other enumerators in an enum declaration. 
     useful for making an 'All' flag, or what have  you.
 --------------------------------------------------------------------------------------------------------------------
+
+
+-------- (toolateralus) 7/2/2025, 9:54:19 AM ---------------------------------------------------------------------
+- Added default methods to `#flags` enums which are in non-freestanding modules which use the standard library.
+  - `set(..) // unset(..) // replace(..) // check(..)`
+
+- Added a rough outline of structural typing. Lots of work needs to be done for the implicit conversions to work, if you want you can
+  use the experimental/broken 'thir-temp' branch, where it does work. we're waiting on that to be completed, and merge back into main, for this
+  to be a stable, usable feature.
+
+  however, structurally ascribed types do work fine. so if i declare a variable `mut x: struct { x: f32, y: f32 }`
+  this is treated as a normal, nominal type, and it is re-used when used in various places.
+
+- At some point we changed `#self` to Self. it's just cleaner, and more sensible. it is a keyword, unlike `self`.
+
+- I fell behind on this changelog. I am sure I am forgetting stuff; I haven't been working all that much on the compiler,
+  but there have been some significant changes.
+--------------------------------------------------------------------------------------------------------------------
+
+
+-------- (toolateralus) 7/7/2025, 10:46:02 AM ----------------------------------------------------------------------
+- Added back explicit casting any pointer type to any other pointer type. this is needed for many low level memory reinterpretations,
+  and casting to *void or *u8 just to cast back out is insanely clunky and makes worse code, not safer.
+--------------------------------------------------------------------------------------------------------------------

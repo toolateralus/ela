@@ -31,6 +31,8 @@ struct TestCompound!<T, T1> where T: s32, T1: s64 {
 
 }
 
+
+// This test will just yield compile errors, no need for runtime assertions.
 #test fn test_instantiation_of_wheres() {
   s1: TestStruct1!<TestStruct>;
   s2: TestStruct3!<TestStruct>;
@@ -43,7 +45,4 @@ struct TestCompound!<T, T1> where T: s32, T1: s64 {
   s7: TestStruct5!<f32>;
   _s8: TestCompound!<s32, s64>;
 }
-
-
-
 

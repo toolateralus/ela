@@ -1,3 +1,5 @@
+import assertion::*;
+
 struct Vec2 {
   x: f32,
   y: f32,
@@ -20,7 +22,7 @@ impl Add!<Vec2, Vec2> for Vec2 {
   mut a, mut b := (Vec2.{x: 1, y: 1}, Vec2.{x: 1, y: 1});
   
   result := a.add(b);
-  assert("+ failed",  result.x == 2 && result.y == 2);
+  assert(result.x == 2 && result.y == 2, "+ failed");
 }
 
 trait Sub!<Right, Result> {
@@ -70,21 +72,21 @@ impl Vec2 {
   mut a, b := (Vec2.{x: 3, y: 2}, Vec2.{x: 1, y: 1});
   
   result := a.sub(b);
-  assert("- failed",  result.x == 2 && result.y == 1);
+  assert(result.x == 2 && result.y == 1, "- failed");
 }
 
 #test fn test_neg() {
   mut a := Vec2.{x: 3, y: 2};
   
   result := a.neg();
-  assert("neg failed",  result.x == -3 && result.y == -2);
+  assert(result.x == -3 && result.y == -2, "neg failed");
 }
 
 #test fn test_index() {
   mut a := Vec2.{x: 3, y: 2};
   
-  assert("index 0 failed", a[0] == 3);
-  assert("index 1 failed", a[1] == 2);
+  assert(a[0] == 3, "index 0 failed");
+  assert(a[1] == 2, "index 1 failed");
 }
 
 impl Vec2 {
@@ -101,6 +103,6 @@ impl Vec2 {
 
   *a = 300.0;
 
-  assert_eq("deref assign failed", a.x, 300.0);
-  assert_eq("deref assign failed", *a, 300.0);
+  assert_eq(a.x, 300.0, "deref assign failed");
+  assert_eq(*a, 300.0, "deref assign failed");
 }

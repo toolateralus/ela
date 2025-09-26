@@ -18,8 +18,13 @@
     "languages": [
       {
         "id": "ela",
-        "aliases": ["Ela", "ela"],
-        "extensions": [".ela"],
+        "aliases": [
+          "Ela",
+          "ela"
+        ],
+        "extensions": [
+          ".ela"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -30,5 +35,8 @@
         "path": "./syntaxes/ela.tmLanguage"
       }
     ]
+  },
+  "dependencies": {
+    "vsce": "^2.15.0"
   }
 }

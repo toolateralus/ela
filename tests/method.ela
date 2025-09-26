@@ -1,3 +1,5 @@
+import assertion::*;
+
 ;
 
 struct IHaveAMethod {}
@@ -13,6 +15,6 @@ impl IHaveAMethod {
 
 #test fn test_method() {
   mut owner: IHaveAMethod ;
-  assert("failed to get 0.0 from method.", owner.method() == 0.0);
-  assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
+  assert(owner.method() == 0.0, "failed to get 0.0 from method.");
+  assert(owner.parameter_method(0.0) == 0.0, "failed to get 0.0 from method (passing back param).");
 }

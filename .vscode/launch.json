@@ -14,7 +14,7 @@
         "${file}"
       ],
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -30,7 +30,7 @@
         "--nl"
       ],
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -41,7 +41,7 @@
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -52,7 +52,7 @@
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     // If you have an ela_source/main.ela you can use these configurations to test
@@ -69,7 +69,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -84,7 +84,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -97,7 +97,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
     {
@@ -120,7 +120,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
   ]
