@@ -613,25 +613,7 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
   return symbol_map[symbol] = visit_function_declaration(symbol->function.declaration);
 }
 
-THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
-  if (ast->generic_parameters.size()) {
-    for (auto &monomorphization : ast->generic_instantiations) {
-      visit_function_declaration((ASTFunctionDeclaration *)monomorphization.declaration);
-    }
-    return nullptr;
-  }
-  THIR_ALLOC(THIRFunction, thir, ast);
-  Symbol *symbol;
-  if (ast->declaring_type) {
-    symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
-  } else {
-    symbol = ctx.scope->local_lookup(ast->name);
-  }
-  symbol_map[symbol] = thir;
-
-  ENTER_SCOPE(ast->scope);
-  convert_function_flags(thir, ast);
-  convert_function_attributes(thir, ast->attributes);
+void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   for (const auto &param : ast->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
     if (param->tag == ASTParamDecl::Normal) {
@@ -659,6 +641,29 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
         .default_value = thir_param->value,
     });
   }
+}
+
+THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  if (ast->generic_parameters.size()) {
+    for (auto &monomorphization : ast->generic_instantiations) {
+      visit_function_declaration((ASTFunctionDeclaration *)monomorphization.declaration);
+    }
+    return nullptr;
+  }
+
+  THIR_ALLOC(THIRFunction, thir, ast);
+  Symbol *symbol;
+  if (ast->declaring_type) {
+    symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
+  } else {
+    symbol = ctx.scope->local_lookup(ast->name);
+  }
+  symbol_map[symbol] = thir;
+
+  ENTER_SCOPE(ast->scope);
+  convert_function_flags(thir, ast);
+  convert_function_attributes(thir, ast->attributes);
+  convert_parameters(ast, thir);
 
   if (thir->name == "main" || thir->is_entry) {
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
@@ -671,7 +676,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     thir->is_entry = true;
   }
 
-  if (thir->is_exported || thir->is_extern || thir->is_no_mangle) {
+  if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
     thir->name = ast->name;
   } else {
     thir->name = ast->scope->full_name();

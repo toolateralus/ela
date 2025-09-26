@@ -309,6 +309,8 @@ struct THIRGen {
     return override_register;
   }
 
+  void convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir);
+
   // This will either point to the entire THIRProgram, or, it will point to a function, either being `fn main()` or any
   // `@[entry]` tagged function.
   inline THIR *get_entry_point() const { return entry_point; }
@@ -356,6 +358,7 @@ struct THIRGen {
                    std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);
   THIR *visit_function_declaration_via_symbol(Symbol *symbol);
+
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);
   THIR *visit_continue(ASTContinue *node);
