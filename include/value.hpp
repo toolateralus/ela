@@ -55,27 +55,6 @@ struct Value {
   virtual std::string to_string() const;
 };
 
-struct LValue : Value {
-  enum Kind { MANAGED, RAW } kind;
-  Value** managed;
-
-  LValue(): Value(ValueType::LVALUE) {}
-
-  void* raw;
-  Type* raw_type;
-
-  bool is_truthy() const override {
-    return raw || managed;
-  }
-
-  ValueType get_value_type() const override {
-    return ValueType::LVALUE;
-  }
-
-  ASTNode* to_ast() const override {
-    return nullptr;
-  }
-};
 
 struct IntValue : Value {
   size_t value;
@@ -191,8 +170,31 @@ struct RawPointerValue : Value {
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   ASTNode* to_ast() const override;
-
   Value* dereference() const;
+
+  void assign_from(Value*);
+};
+
+
+struct LValue : Value {
+  enum Kind { MANAGED, RAW } kind;
+  Value** managed;
+
+  LValue(): Value(ValueType::LVALUE) {}
+
+  RawPointerValue *raw;
+
+  bool is_truthy() const override {
+    return raw || managed;
+  }
+
+  ValueType get_value_type() const override {
+    return ValueType::LVALUE;
+  }
+
+  ASTNode* to_ast() const override {
+    return nullptr;
+  }
 };
 
 struct ASTBlock;
@@ -237,7 +239,7 @@ ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
 
 LValue* new_lvalue(Value** managed);
-LValue* new_lvalue(Type* type, void* unmanaged);
+LValue* new_lvalue(RawPointerValue *raw);
 
 ContinueValue* continue_value();
 BreakValue* break_value();

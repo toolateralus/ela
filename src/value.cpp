@@ -1,4 +1,5 @@
 #include "value.hpp"
+#include <cstring>
 #include "ast.hpp"
 #include "type.hpp"
 
@@ -410,10 +411,40 @@ LValue* new_lvalue(Value** managed) {
   return lvalue;
 }
 
-LValue* new_lvalue(Type* type, void* raw) {
+LValue* new_lvalue(RawPointerValue* raw) {
   auto lvalue = value_arena_alloc<LValue>();
   lvalue->kind = LValue::RAW;
   lvalue->raw = raw;
-  lvalue->raw_type = type;
   return lvalue;
+}
+
+void RawPointerValue::assign_from(Value* v) {
+  switch (v->get_value_type()) {
+    case ValueType::NULLPTR:
+      ptr = nullptr;
+      break;
+    case ValueType::FLOATING:
+      memcpy(ptr, &v->as<FloatValue>()->value, sizeof(double));
+      break;
+    case ValueType::BOOLEAN:
+      memcpy(ptr, &v->as<BoolValue>()->value, sizeof(int));
+      break;
+    case ValueType::STRING:
+      strcpy(ptr, v->as<StringValue>()->value.c_str());
+      break;
+    case ValueType::CHARACTER:
+      *ptr = v->as<CharValue>()->value;
+      break;
+    case ValueType::INTEGER:
+      memcpy(ptr, &v->as<IntValue>()->value, sizeof(size_t));
+      break;
+
+    // Not sure how we're going to handle these cases.
+    case ValueType::ARRAY:
+    case ValueType::POINTER:
+    case ValueType::RAW_POINTER:
+      break;
+    default:
+      break;
+  }
 }

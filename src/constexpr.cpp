@@ -13,7 +13,15 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
   return interpeter.visit(node);
 }
 
-Value *CTInterpreter::visit_path(ASTPath *node) { return *get_lvalue(node)->as<LValue>()->managed; }
+Value *CTInterpreter::visit_path(ASTPath *node) {
+  auto lvalue = get_lvalue(node)->as<LValue>();
+  if (lvalue->kind == LValue::RAW) {
+    auto raw = lvalue->raw;
+    return raw;
+  } else {
+    return *lvalue->managed;
+  }
+}
 
 Value *CTInterpreter::visit_block(ASTBlock *node) {
   ENTER_SCOPE(node->scope);
@@ -276,15 +284,28 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       node->op = old_op;
 
       // make it permanent
-      auto left_ptr = get_lvalue(node->left)->as<LValue>()->managed;
-      *left_ptr = right;
-
+      auto lvalue = get_lvalue(node->left)->as<LValue>();
+      switch (lvalue->kind) {
+        case LValue::MANAGED:
+          *lvalue->managed = right;
+          break;
+        case LValue::RAW:
+          lvalue->raw->assign_from(right);
+          break;
+      }
       return res;
     }
     case TType::Assign: {
-      auto left_ptr = get_lvalue(node->left)->as<LValue>()->managed;
-      *left_ptr = right;
-      break;
+      auto lvalue = get_lvalue(node->left)->as<LValue>();
+      switch (lvalue->kind) {
+        case LValue::MANAGED:
+          *lvalue->managed = right;
+          break;
+        case LValue::RAW:
+          lvalue->raw->assign_from(right);
+          break;
+      }
+      return lvalue;
     }
     default:
       break;
@@ -314,7 +335,7 @@ Value *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
       return new_lvalue(pointer->ptr);
     } else if (is_raw_pointer) {
       RawPointerValue *pointer = operand->as<RawPointerValue>();
-      return new_lvalue(pointer->type, pointer->ptr);
+      return new_lvalue(pointer);
     }
   }
   static Value *the_null_value = null_value();
@@ -370,7 +391,6 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
         return *pointer->ptr;
       } else if (is_raw_pointer) {
         RawPointerValue *pointer = operand->as<RawPointerValue>();
-        // TODO: we need to handle assignment into pointers (*i = 0);
         return pointer->dereference();
       }
     }
@@ -518,15 +538,15 @@ Value *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
   }
 }
 
+
 Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) { return *get_dot_expr_lvalue(dot)->as<LValue>()->managed; }
+Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_lvalue(node)->as<LValue>()->managed; }
 
 Value *CTInterpreter::get_index_lvalue(ASTIndex *node) {
   ArrayValue *base = (ArrayValue *)visit(node->base);
   IntValue *index = (IntValue *)visit(node->index);
   return new_lvalue(&base->values[index->value]);
 }
-
-Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_lvalue(node)->as<LValue>()->managed; }
 
 Value *CTInterpreter::visit_range(ASTRange *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
@@ -565,8 +585,10 @@ Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
 
   auto result = fn->call(this, args);
 
-  auto self_ptr = get_lvalue(node->callee->base)->as<LValue>();
-  *self_ptr->managed = self_val;
+  {  // this should always be managed. 'self' will never be a raw pointer.
+    auto self_ptr = get_lvalue(node->callee->base)->as<LValue>();
+    *self_ptr->managed = self_val;
+  }
 
   return result;
 }
@@ -619,6 +641,12 @@ Value *CTInterpreter::visit_variable(ASTVariable *variable) {
     symbol->value = visit(variable->value.get());
   } else {
     symbol->value = default_value_of_t(variable->type->resolved_type, this);
+  }
+
+  // TODO: handle other implicit casts.
+  if (symbol->value && symbol->value->get_value_type() == ValueType::RAW_POINTER) {
+    auto raw = symbol->value->as<RawPointerValue>();
+    raw->type = variable->type->resolved_type;
   }
 
   return null_value();
