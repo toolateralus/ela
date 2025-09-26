@@ -27,7 +27,8 @@ enum class ValueType {
   EXTERN_FUNCTION = 11,
   RETURN = 12,
   CONTINUE = 13,
-  BREAK = 14
+  BREAK = 14,
+  LVALUE = 15,
 };
 
 template <typename T, typename... Args>
@@ -52,6 +53,28 @@ struct Value {
   virtual ValueType get_value_type() const;
   virtual ASTNode* to_ast() const { return nullptr; }
   virtual std::string to_string() const;
+};
+
+struct LValue : Value {
+  enum Kind { MANAGED, RAW } kind;
+  Value** managed;
+
+  LValue(): Value(ValueType::LVALUE) {}
+
+  void* raw;
+  Type* raw_type;
+
+  bool is_truthy() const override {
+    return raw || managed;
+  }
+
+  ValueType get_value_type() const override {
+    return ValueType::LVALUE;
+  }
+
+  ASTNode* to_ast() const override {
+    return nullptr;
+  }
 };
 
 struct IntValue : Value {
@@ -212,6 +235,9 @@ ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);
 ArrayValue* new_array(Type* type);
 ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
+
+LValue* new_lvalue(Value** managed);
+LValue* new_lvalue(Type* type, void* unmanaged);
 
 ContinueValue* continue_value();
 BreakValue* break_value();

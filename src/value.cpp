@@ -369,12 +369,13 @@ Value* RawPointerValue::dereference() const {
   }
 
   auto inner = type->base_type;
+
   switch (inner->kind) {
     case TYPE_SCALAR: {
       const auto sinfo = inner->info->as<ScalarTypeInfo>();
       switch (sinfo->scalar_type) {
         case TYPE_VOID:
-          return null_value(); // this should be an error.
+          return (Value*)this;
         case TYPE_S8:
         case TYPE_S16:
         case TYPE_S32:
@@ -398,5 +399,21 @@ Value* RawPointerValue::dereference() const {
     default:
       break;
   }
+
   return null_value();
+}
+
+LValue* new_lvalue(Value** managed) {
+  auto lvalue = value_arena_alloc<LValue>();
+  lvalue->kind = LValue::MANAGED;
+  lvalue->managed = managed;
+  return lvalue;
+}
+
+LValue* new_lvalue(Type* type, void* raw) {
+  auto lvalue = value_arena_alloc<LValue>();
+  lvalue->kind = LValue::RAW;
+  lvalue->raw = raw;
+  lvalue->raw_type = type;
+  return lvalue;
 }

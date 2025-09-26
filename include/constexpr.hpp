@@ -25,10 +25,11 @@ struct CTInterpreter {
 
   Value *try_link_extern_function(Symbol *name);
   void set_value(InternedString &name, Value *value);
-  Value **get_value(ASTNode *node);
-  Value **get_dot_expr_ptr(ASTDotExpr *dot);
-  Value **get_index_ptr(ASTIndex *node);
-  Value **get_unary_expr_ptr(ASTUnaryExpr *node);
+  
+  Value *get_lvalue(ASTNode *node);
+  Value *get_dot_expr_lvalue(ASTDotExpr *dot);
+  Value *get_index_lvalue(ASTIndex *node);
+  Value *get_unary_lvalue(ASTUnaryExpr *node);
 
   Value *visit_method_call(ASTMethodCall *node);
   Value *visit_path(ASTPath *node);

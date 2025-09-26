@@ -13,7 +13,7 @@ Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
   return interpeter.visit(node);
 }
 
-Value *CTInterpreter::visit_path(ASTPath *node) { return *get_value(node); }
+Value *CTInterpreter::visit_path(ASTPath *node) { return *get_lvalue(node)->as<LValue>()->managed; }
 
 Value *CTInterpreter::visit_block(ASTBlock *node) {
   ENTER_SCOPE(node->scope);
@@ -276,24 +276,25 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
       node->op = old_op;
 
       // make it permanent
-      auto left_ptr = get_value(node->left);
+      auto left_ptr = get_lvalue(node->left)->as<LValue>()->managed;
       *left_ptr = right;
 
       return res;
     }
     case TType::Assign: {
-      auto left_ptr = get_value(node->left);
+      auto left_ptr = get_lvalue(node->left)->as<LValue>()->managed;
       *left_ptr = right;
       break;
     }
     default:
       break;
   }
+
   return null_value();
 }
 
 // This is just for assigning via a *x = 0 kinda dereference.
-Value **CTInterpreter::get_unary_expr_ptr(ASTUnaryExpr *node) {
+Value *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
   auto operand = visit(node->operand);
 
   if (node->op == TType::Mul) {
@@ -310,17 +311,14 @@ Value **CTInterpreter::get_unary_expr_ptr(ASTUnaryExpr *node) {
 
     if (is_pointer) {
       PointerValue *pointer = operand->as<PointerValue>();
-      return pointer->ptr;
+      return new_lvalue(pointer->ptr);
     } else if (is_raw_pointer) {
       RawPointerValue *pointer = operand->as<RawPointerValue>();
-      // TODO: fix this hack lol.
-      static Value *ptr;
-      ptr = pointer->dereference();
-      return &ptr;
+      return new_lvalue(pointer->type, pointer->ptr);
     }
   }
   static Value *the_null_value = null_value();
-  return &the_null_value;
+  return new_lvalue(&the_null_value);
 }
 
 Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
@@ -352,7 +350,8 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
       return null_value();
     }
     case TType::And: {
-      return new_pointer(get_value(node->operand));
+      auto lvalue = get_lvalue(node->operand)->as<LValue>();
+      return new_pointer(lvalue->managed);
     }
     case TType::Mul: {
       bool is_pointer = operand->get_value_type() == ValueType::POINTER,
@@ -497,7 +496,7 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return null_value();
 }
 
-Value **CTInterpreter::get_dot_expr_ptr(ASTDotExpr *dot) {
+Value *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
   Value *base = visit(dot->base);
   static Value *the_null_value = null_value();
 
@@ -508,26 +507,26 @@ Value **CTInterpreter::get_dot_expr_ptr(ASTDotExpr *dot) {
   ObjectValue *object = (ObjectValue *)base;
 
   if (object->values.contains(dot->member.identifier)) {
-    return &object->values[dot->member.identifier];
+    return new_lvalue(&object->values[dot->member.identifier]);
   } else {
     throw_warning(WARNING_COUNT,
                   std::format("Accessing a dot expression during compile time, but the object didn't have a property "
                               "{}, so it got ignored",
                               dot->member.identifier),
                   dot->source_range);
-    return &the_null_value;
+    return new_lvalue(&the_null_value);
   }
 }
 
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) { return *get_dot_expr_ptr(dot); }
+Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) { return *get_dot_expr_lvalue(dot)->as<LValue>()->managed; }
 
-Value **CTInterpreter::get_index_ptr(ASTIndex *node) {
+Value *CTInterpreter::get_index_lvalue(ASTIndex *node) {
   ArrayValue *base = (ArrayValue *)visit(node->base);
   IntValue *index = (IntValue *)visit(node->index);
-  return &base->values[index->value];
+  return new_lvalue(&base->values[index->value]);
 }
 
-Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_ptr(node); }
+Value *CTInterpreter::visit_index(ASTIndex *node) { return *get_index_lvalue(node)->as<LValue>()->managed; }
 
 Value *CTInterpreter::visit_range(ASTRange *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
@@ -566,8 +565,9 @@ Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
 
   auto result = fn->call(this, args);
 
-  auto self_ptr = get_value(node->callee->base);
-  *self_ptr = self_val;
+  auto self_ptr = get_lvalue(node->callee->base)->as<LValue>();
+  *self_ptr->managed = self_val;
+
   return result;
 }
 
@@ -646,15 +646,15 @@ Value *CTInterpreter::visit_impl(ASTImpl *node) {
   return null_value();
 }
 
-Value **CTInterpreter::get_value(ASTNode *node) {
+Value *CTInterpreter::get_lvalue(ASTNode *node) {
   if (node->get_node_type() == AST_NODE_UNARY_EXPR) {
-    return get_unary_expr_ptr((ASTUnaryExpr *)node);
+    return get_unary_lvalue((ASTUnaryExpr *)node);
   }
   if (node->get_node_type() == AST_NODE_DOT_EXPR) {
-    return get_dot_expr_ptr((ASTDotExpr *)node);
+    return get_dot_expr_lvalue((ASTDotExpr *)node);
   }
   if (node->get_node_type() == AST_NODE_INDEX) {
-    return get_index_ptr((ASTIndex *)node);
+    return get_index_lvalue((ASTIndex *)node);
   }
 
   static Value *the_null_value = null_value();
@@ -670,7 +670,7 @@ Value **CTInterpreter::get_value(ASTNode *node) {
   }
 
   if (!symbol) {
-    return &the_null_value;
+    return new_lvalue(&the_null_value);
   }
 
   if (symbol->value == nullptr) {
@@ -688,10 +688,10 @@ Value **CTInterpreter::get_value(ASTNode *node) {
   }
 
   if (symbol->value == nullptr) {
-    return &the_null_value;
+    return new_lvalue(&the_null_value);
   }
 
-  return &symbol->value;
+  return new_lvalue(&symbol->value);
 }
 
 Value *CTInterpreter::visit_if(ASTIf *node) {
