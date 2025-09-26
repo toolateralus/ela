@@ -1473,7 +1473,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
     }
 
     info->scope->insert_variable(key, node_ty, value, CONST);
-    info->members.push_back({key, node_ty});
+    info->members.push_back({key, node_ty, value, nullptr});
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
     } else {
