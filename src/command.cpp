@@ -6,6 +6,8 @@
 #include "ast.hpp"
 #include <cstdlib>
 #include <filesystem>
+#include "emit.hpp"
+#include "resolver.hpp"
 
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
@@ -27,9 +29,8 @@ int CompileCommand::compile() {
     Typer type_visitor{context};
     type_visitor.visit(root);
 
-    Emitter emit(context, type_visitor);
-    Resolver dep_resolver(context, &emit);
-    emit.dep_emitter = &dep_resolver;
+    Emitter emit;
+    Resolver dep_resolver(emit);
 
     static const auto testing = compile_command.has_flag("test");
     const bool is_freestanding =
@@ -54,9 +55,6 @@ int CompileCommand::compile() {
     if (testing) {
       emit.code << "#define TESTING\n";
     }
-
-    root->accept(&dep_resolver);
-    root->accept(&emit);
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);

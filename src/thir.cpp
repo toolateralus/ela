@@ -1555,5 +1555,8 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
           "ignored cases",
           node->source_range);
       return nullptr;
+    default:
+      throw_error("AST node not supported by THIR generator. needs to be implemented", node->source_range);
+      return nullptr;
   }
 }
