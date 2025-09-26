@@ -1059,39 +1059,6 @@ size_t Type::size_in_bytes() const {
     return sizeof(void *);
   }
 
-  if (kind == TYPE_SCALAR) {
-    switch (info->as<ScalarTypeInfo>()->scalar_type) {
-      case TYPE_S8:
-        return 1;
-      case TYPE_U8:
-        return 1;
-      case TYPE_S16:
-        return 2;
-      case TYPE_U16:
-        return 2;
-      case TYPE_S32:
-        return 4;
-      case TYPE_U32:
-        return 4;
-      case TYPE_S64:
-        return 8;
-      case TYPE_U64:
-        return 8;
-      case TYPE_FLOAT:
-        return 4;
-      case TYPE_DOUBLE:
-        return 8;
-      case TYPE_CHAR:
-        return 1;
-      case TYPE_BOOL:
-        return 1;
-      case TYPE_VOID:
-        return 0;
-      default:
-        return sizeof(void *);
-    }
-  }
-
   if (is_pointer()) {
     return sizeof(void *);
   }
@@ -1133,6 +1100,39 @@ size_t Type::size_in_bytes() const {
     // Round up to max alignment
     offset = (offset + max_align - 1) & ~(max_align - 1);
     return offset;
+  }
+
+  if (kind == TYPE_SCALAR) {
+    switch (info->as<ScalarTypeInfo>()->scalar_type) {
+      case TYPE_S8:
+        return 1;
+      case TYPE_U8:
+        return 1;
+      case TYPE_S16:
+        return 2;
+      case TYPE_U16:
+        return 2;
+      case TYPE_S32:
+        return 4;
+      case TYPE_U32:
+        return 4;
+      case TYPE_S64:
+        return 8;
+      case TYPE_U64:
+        return 8;
+      case TYPE_FLOAT:
+        return 4;
+      case TYPE_DOUBLE:
+        return 8;
+      case TYPE_CHAR:
+        return 1;
+      case TYPE_BOOL:
+        return 1;
+      case TYPE_VOID:
+        return 0;
+      default:
+        return sizeof(void *);
+    }
   }
 
   return sizeof(void *);

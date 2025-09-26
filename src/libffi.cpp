@@ -489,7 +489,20 @@ struct FFIContext {
   }
 };
 
-Value* unmarshal_scalar_return(ScalarTypeInfo* info, const std::vector<uint8_t>& ret_storage) {
+Value *unmarshal_pointer_value(Type *rtype, const std::vector<uint8_t>& ret_storage) {
+  char* ptr = nullptr;
+  memcpy(&ptr, ret_storage.data(), sizeof(char*));
+  return new_raw_pointer(rtype, ptr);
+}
+
+Value* unmarshal_scalar_return(Type *rtype, ScalarTypeInfo* info, const std::vector<uint8_t>& ret_storage) {
+  if (ret_storage.empty()) {
+    return null_value();
+  }
+
+  if (rtype->is_pointer()) {
+    return unmarshal_pointer_value(rtype, ret_storage);
+  }
   switch (info->scalar_type) {
     case TYPE_FLOAT: {
       float tmp;
@@ -607,5 +620,5 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, co
     return null_value();
   }
 
-  return unmarshal_scalar_return(ret_ty_scalar_info, ret_storage);
+  return unmarshal_scalar_return(ret_type, ret_ty_scalar_info, ret_storage);
 }
