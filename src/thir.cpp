@@ -150,6 +150,11 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
   }
 
   auto callee = thir->callee = visit_node(ast->callee);
+
+  if (!callee) {
+    throw_error("cannot call forward declared functions with the THIR currently", ast->source_range);
+  }
+
   extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
   return thir;
 }
@@ -424,9 +429,8 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
         std::erase_if(key_values, [&](const auto &kv) { return kv.first == subkey; });
       }
 
-      auto *initialization =
-          (THIRAggregateInitializer *)initialize(source_range, member.type, subinitializer_elements);
-      
+      auto *initialization = (THIRAggregateInitializer *)initialize(source_range, member.type, subinitializer_elements);
+
       // get the keys from that initializer and drop them in here.
       for (auto &[key, value] : initialization->key_values) {
         thir->key_values.push_back({key, value});
@@ -773,24 +777,40 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
 
   current_statement_list->push_back(cached_expr);
 
+  // when applicable:
+  // gets cleared for every branch, and populated for every branch
+  std::vector<THIR *> extra_statements_generated_by_pattern_match;
+
   const auto get_condition_comparator = [&](size_t index) -> THIR * {
     auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
     auto left = cached_expr;
-    auto right = visit_node(ast->branches[index].expression);
+
     if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
-      THIR_ALLOC(THIRBinExpr, binexpr, ast);
-      binexpr->left = left;
-      binexpr->right = right;
-      binexpr->op = TType::EQ;
-      binexpr->type = bool_type();
-      return binexpr;
+      auto &branch = ast->branches[index];
+      THIR *condition;
+
+      if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
+        // clear -> populate extra statements.
+        extra_statements_generated_by_pattern_match.clear();
+        condition = visit_pattern_match((ASTPatternMatch *)branch.expression, branch.block->scope,
+                                        extra_statements_generated_by_pattern_match);
+      } else {
+        THIR_ALLOC(THIRBinExpr, binexpr, ast);
+        binexpr->left = left;
+        binexpr->right = visit_node(ast->branches[index].expression);
+        binexpr->op = TType::EQ;
+        binexpr->type = bool_type();
+        condition = binexpr;
+      }
+
+      return condition;
     } else {  // call an operator overload
       THIR_ALLOC(THIRCall, overload_call, ast);
       auto scope = left->type->info->scope;
       auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
       overload_call->callee = visit_function_declaration_via_symbol(symbol);
       overload_call->arguments.push_back(left);
-      overload_call->arguments.push_back(right);
+      overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
       return overload_call;
     }
   };
@@ -798,6 +818,9 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   THIR_ALLOC(THIRIf, first_case, ast)
   first_case->condition = get_condition_comparator(0);
   first_case->block = (THIRBlock *)visit_node(ast->branches[0].block);
+  for (auto &stmt : extra_statements_generated_by_pattern_match) {
+    first_case->block->statements.insert(first_case->block->statements.begin(), stmt);
+  }
   first_case->is_statement = true;
 
   THIRIf *the_if = first_case;
@@ -806,6 +829,9 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     THIR_ALLOC(THIRIf, thir_branch, ast)
     thir_branch->condition = get_condition_comparator(i);
     thir_branch->block = (THIRBlock *)visit_node(ast_branch.block);
+    for (auto &stmt : extra_statements_generated_by_pattern_match) {
+      thir_branch->block->statements.insert(thir_branch->block->statements.begin(), stmt);
+    }
     thir_branch->is_statement = true;
     the_if->_else = thir_branch;
     the_if = thir_branch;

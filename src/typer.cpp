@@ -486,6 +486,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
         break;
     }
   }
+  
   if (node->name == "main") {
     node->is_entry = true;
   }
