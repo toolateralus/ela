@@ -970,7 +970,7 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTUnpackExpr : ASTExpr {
+struct ASTUnpack : ASTExpr {
   // the source of the unpack, such as a variable, function result, literal, etc.
   ASTExpr *expression;
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }

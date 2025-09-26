@@ -65,7 +65,7 @@ struct VisitorBase {
   virtual void visit(ASTChoiceDeclaration *node) = 0;
   virtual void visit(ASTModule *node) = 0;
   virtual void visit(ASTType_Of *node) = 0;
-  virtual void visit(ASTUnpackExpr *node) = 0;
+  virtual void visit(ASTUnpack *node) = 0;
   virtual void visit(ASTUnpackElement *node) = 0;
   virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
@@ -206,7 +206,7 @@ struct Typer : VisitorBase {
   void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
-  void visit(ASTUnpackExpr *node) override;
+  void visit(ASTUnpack *node) override;
 
   bool visit_where_predicate(Type *type, ASTExpr *node);
   bool visit_where_predicate_throws(Type *type, ASTExpr *node);
@@ -379,7 +379,7 @@ struct Emitter : VisitorBase {
   void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
-  void visit(ASTUnpackExpr *node) override;
+  void visit(ASTUnpack *node) override;
   void visit(ASTUnpackElement *node) override;
 
   void visit(ASTStatementList *node) override {
@@ -460,7 +460,7 @@ struct Resolver : VisitorBase {
   void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
-  void visit(ASTUnpackExpr *node) override;
+  void visit(ASTUnpack *node) override;
   void visit(ASTUnpackElement *node) override;
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {

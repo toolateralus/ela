@@ -327,7 +327,8 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
     }
     case TType::Mul: {
       if (operand->get_value_type() != ValueType::POINTER) {
-        throw_error("cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up", node->source_range);
+        throw_error("cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up",
+                    node->source_range);
       }
       auto pointer = operand->as<PointerValue>();
       return *pointer->ptr;
@@ -412,6 +413,9 @@ Value *CTInterpreter::visit_for(ASTFor *node) {
 
   return null_value();
 }
+
+Value *CTInterpreter::visit_continue(ASTContinue *) { return continue_value(); }
+Value *CTInterpreter::visit_break(ASTBreak *) { return break_value(); }
 
 Value *CTInterpreter::visit_return(ASTReturn *node) {
   if (node->expression) {
@@ -559,23 +563,11 @@ Value *CTInterpreter::visit_size_of(ASTSize_Of *node) {
   return new_int(node->target_type->resolved_type->size_in_bytes());
 }
 
-Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }
-
-
 Value *CTInterpreter::visit_type_of(ASTType_Of *) {
-  ObjectValue *object = (ObjectValue *)default_value_of_t(ctx.root_scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}}), this);
+  ObjectValue *object =
+      (ObjectValue *)default_value_of_t(ctx.root_scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}}), this);
   return object;
 }
-
-Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
-Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
-Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }
-Value *CTInterpreter::visit_continue(ASTContinue *) { return null_value(); }
-Value *CTInterpreter::visit_break(ASTBreak *) { return null_value(); }
-Value *CTInterpreter::visit_if(ASTIf *) { return null_value(); }
-Value *CTInterpreter::visit_else(ASTElse *) { return null_value(); }
-Value *CTInterpreter::visit_while(ASTWhile *) { return null_value(); }
-Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return null_value(); }
 
 Value *CTInterpreter::visit_variable(ASTVariable *variable) {
   current_scope->insert_local_variable(variable->name, variable->type->resolved_type, nullptr, variable->mutability);
@@ -606,24 +598,6 @@ Value *CTInterpreter::try_link_extern_function(Symbol *symbol) {
   auto function = symbol->function.declaration;
   auto fti = function->resolved_type->info->as<FunctionTypeInfo>();
   return value_arena_alloc<ExternFunctionValue>(function->name, fti);
-}
-
-// These will never do anything in here. typing is already complete.
-Value *CTInterpreter::visit_program(ASTProgram *) { return null_value(); }
-Value *CTInterpreter::visit_struct_declaration(ASTStructDeclaration *) { return null_value(); }
-Value *CTInterpreter::visit_choice_declaration(ASTChoiceDeclaration *) { return null_value(); }
-Value *CTInterpreter::visit_enum_declaration(ASTEnumDeclaration *) { return null_value(); }
-
-// We might support these later, so you can have compile-time-only API's and types,
-// that are temporary and not used in your main program.
-Value *CTInterpreter::visit_module(ASTModule *node) {
-  throw_error("Declaring modules a #run or #eval directive is not allowed", node->source_range);
-  return null_value();
-}
-
-Value *CTInterpreter::visit_import(ASTImport *node) {
-  throw_error("Importing in a #run or #eval directive is not allowed", node->source_range);
-  return null_value();
 }
 
 Value *CTInterpreter::visit_impl(ASTImpl *node) {
@@ -675,3 +649,55 @@ Value **CTInterpreter::get_value(ASTNode *node) {
 
   return &symbol->value;
 }
+
+Value *CTInterpreter::visit_if(ASTIf *node) {
+  auto cond_value = visit(node->condition);
+  if (cond_value->get_value_type() != ValueType::BOOLEAN) {
+    return null_value();
+  }
+  bool cond = ((BoolValue *)cond_value)->value;
+  if (cond) {
+    return visit(node->block);
+  } else if (node->_else) {
+    return visit(node->_else.get());
+  }
+  return null_value();
+}
+
+Value *CTInterpreter::visit_while(ASTWhile *node) {
+  const auto should_continue = [&]() {
+    if (node->condition.is_not_null()) {
+      return visit(node->condition.get())->is_truthy();
+    }
+    return true;
+  };
+
+  while (should_continue()) {
+    auto result = visit(node->block);
+    if (result->get_value_type() == ValueType::BREAK) {
+      break;
+    }
+    if (result->get_value_type() == ValueType::RETURN) {
+      return result;
+    }
+  }
+  return null_value();
+}
+
+Value *CTInterpreter::visit_else(ASTElse *node) {
+  if (node->_if) {
+    return visit(node->_if.get());
+  }
+  if (node->block) {
+    return visit(node->block.get());
+  }
+  return null_value();
+}
+
+Value *CTInterpreter::visit_unpack_element(ASTUnpackElement *) { return null_value(); }
+Value *CTInterpreter::visit_unpack(ASTUnpack *) { return null_value(); }
+Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *) { return null_value(); }
+Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
+Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
+Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }
+Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }

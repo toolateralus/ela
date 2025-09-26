@@ -26,6 +26,8 @@ enum class ValueType {
   // Internal to interpreter.
   EXTERN_FUNCTION = 11,
   RETURN = 12,
+  CONTINUE = 13,
+  BREAK = 14
 };
 
 template <typename T, typename... Args>
@@ -106,6 +108,18 @@ struct ReturnValue : Value {
   bool is_truthy() const override { return false; }
   ValueType get_value_type() const override { return value_type; }
   Nullable<Value> value = nullptr;
+};
+
+struct ContinueValue : Value {
+  ContinueValue() : Value(ValueType::CONTINUE) {}
+  bool is_truthy() const override { return false; }
+  ValueType get_value_type() const override { return value_type; }
+};
+
+struct BreakValue : Value {
+  BreakValue() : Value(ValueType::BREAK) {}
+  bool is_truthy() const override { return false; }
+  ValueType get_value_type() const override { return value_type; }
 };
 
 const static NullValue* SHARED_NULL_VALUE = new NullValue();
@@ -196,6 +210,9 @@ ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);
 ArrayValue* new_array(Type* type);
 ReturnValue* return_value(Value* value);
 ReturnValue* return_value();
+
+ContinueValue* continue_value();
+BreakValue* break_value();
 
 template <class T>
 RawPointerValue* new_raw_pointer(Type* type, T* ptr) {

@@ -26,7 +26,7 @@
 
 // clang-format off
 void ASTUnpackElement::accept(VisitorBase *visitor) { NODE_VISIT() }
-void ASTUnpackExpr::accept(VisitorBase *visitor) { NODE_VISIT() }
+void ASTUnpack::accept(VisitorBase *visitor) { NODE_VISIT() }
 
 void ASTDyn_Of::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTWhere::accept(VisitorBase *visitor) { NODE_VISIT() }

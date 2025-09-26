@@ -2748,7 +2748,7 @@ void Emitter::visit(ASTWhereStatement *node) {
 }
 
 // This does nothing here, it's delegated to the unpack elements.
-void Emitter::visit(ASTUnpackExpr *) {}
+void Emitter::visit(ASTUnpack *) {}
 
 void Emitter::visit(ASTUnpackElement *node) {
   if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {

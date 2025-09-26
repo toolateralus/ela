@@ -640,7 +640,7 @@ void Resolver::visit(ASTWhereStatement *node) {
 }
 
 // This does nothing here, it's delegated to the unpack elements.
-void Resolver::visit(ASTUnpackExpr *) {}
+void Resolver::visit(ASTUnpack *) {}
 
 void Resolver::visit(ASTUnpackElement *node) {
   if (node->tag == ASTUnpackElement::TUPLE_ELEMENT) {

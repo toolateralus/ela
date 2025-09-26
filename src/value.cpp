@@ -360,4 +360,5 @@ ASTNode* RawPointerValue::to_ast() const {
   return nullptr;
 }
 
-
+ContinueValue* continue_value() { return value_arena_alloc<ContinueValue>(); }
+BreakValue* break_value() { return value_arena_alloc<BreakValue>(); }

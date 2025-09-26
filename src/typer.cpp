@@ -3767,7 +3767,7 @@ void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, c
   info->scope->insert_function("destroy", destroy_method_type_id, declaration);
 }
 
-void Typer::visit(ASTUnpackExpr *node) {
+void Typer::visit(ASTUnpack *node) {
   ASTExpr *expr = node->expression;
   expr->accept(this);
 
@@ -3863,9 +3863,13 @@ void Typer::visit(ASTRun *node) {
   }
 
   auto ast = result->to_ast();
-  ast->accept(this);
 
-  if (parent_prev && node->replace_prev_parent) {
-    parent_prev->accept_typed_replacement(ast);
+  if (ast) {
+    ast->accept(this);
+    if (parent_prev && node->replace_prev_parent) {
+      parent_prev->accept_typed_replacement(ast);
+    }
+  } else {
+    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected", node->source_range);
   }
 }
