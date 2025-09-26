@@ -1024,13 +1024,13 @@ struct ASTTraitDeclaration : ASTDeclaration {
   void accept(VisitorBase *visitor) override;
 };
 
-enum PatternMatchPointerSemantic { PTRN_MTCH_PTR_NONE, PTRN_MTCH_PTR_MUT, PTR_MTCH_PTR_CONST };
+enum PatternMatchPointerSemantic { PATTERN_MATCH_PTR_NONE, PATTERN_MATCH_PTR_MUT, PATTERN_MATCH_PTR_CONST };
 
 struct TuplePattern {
   struct Part {
     Mutability mutability = CONST;
     InternedString var_name;
-    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
+    PatternMatchPointerSemantic semantic = PATTERN_MATCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;
@@ -1041,7 +1041,7 @@ struct StructPattern {
     InternedString field_name;
     InternedString var_name;
     Mutability mutability = CONST;
-    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
+    PatternMatchPointerSemantic semantic = PATTERN_MATCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;

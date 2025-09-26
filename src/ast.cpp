@@ -688,12 +688,12 @@ void Parser::parse_pattern_match_value_semantic(auto &part) {
     expect(TType::And);
     if (peek().type == TType::Mut) {
       expect(TType::Mut);
-      part.semantic = PTRN_MTCH_PTR_MUT;
+      part.semantic = PATTERN_MATCH_PTR_MUT;
     } else {
       if (peek().type == TType::Const) {
         expect(TType::Const);
       }
-      part.semantic = PTR_MTCH_PTR_CONST;
+      part.semantic = PATTERN_MATCH_PTR_CONST;
     }
   }
 }
@@ -1115,10 +1115,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTRN_MTCH_PTR_MUT;
+                  part.semantic = PATTERN_MATCH_PTR_MUT;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_MTCH_PTR_CONST;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 }
               }
 
