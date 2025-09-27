@@ -763,7 +763,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 
   thir->is_global = !ast->is_local;
 
-  auto symbol = ctx.scope->local_lookup(ast->name);
+  auto symbol = ast->declaring_scope->local_lookup(ast->name);
   symbol_map[symbol] = thir;
 
   if (!ast->is_local) {
