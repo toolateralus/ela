@@ -418,13 +418,12 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
     const auto type = function->type;
     const auto info = type->info->as<FunctionTypeInfo>();
 
-    // !!! TODO: make this just do the first one, not all
+    
     FunctionTypeInfo new_info;
+    new_info.params_len = info->params_len;
+    memcpy(new_info.parameter_types, info->parameter_types, sizeof(void*) * info->params_len);
     new_info.return_type = info->return_type;
-    for (size_t i = 0; i < info->params_len; ++i) {
-      new_info.params_len++;
-      new_info.parameter_types[i] = void_type()->take_pointer_to(true);
-    }
+    new_info.parameter_types[0] = void_type()->take_pointer_to(true);
 
     auto new_type = global_find_function_type_id(new_info, {{TYPE_EXT_POINTER_CONST}});
 
@@ -743,18 +742,19 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRFunction, thir, ast);
-  Symbol *symbol;
+
+  Symbol *symbol = nullptr;
   if (ast->declaring_type) {
     symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
   } else {
-    symbol = ctx.scope->local_lookup(ast->name);
+    symbol = ast->declaring_scope->local_lookup(ast->name);
   }
 
-  if (auto thir = get_thir(symbol)) {
-    return thir;
+  if (!symbol) {
+    throw_error("Unable to find symbol for function", ast->source_range);
   }
 
-  bind(symbol, thir);
+  
   bind(ast, thir);
 
   ENTER_SCOPE(ast->scope);

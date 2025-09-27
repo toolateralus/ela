@@ -1275,6 +1275,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
 // #undef USE_GENERIC_PANIC_HANDLER
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range) {
+
 #ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
   set_panic_handler(generic_instantiation_panic_handler);
@@ -3543,7 +3544,8 @@ void Typer::visit(ASTPath *node) {
   }
 
   if (symbol && symbol->is_module) {
-    throw_error("A path cannot refer only to a module, it must refer to a type or function or variable.", node->source_range);
+    throw_error("A path cannot refer only to a module, it must refer to a type or function or variable.",
+                node->source_range);
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;

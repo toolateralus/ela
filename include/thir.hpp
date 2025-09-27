@@ -269,10 +269,23 @@ struct THIRGen {
   std::map<ASTNode *, THIR *> ast_map;
 
   inline void bind(ASTNode *ast, THIR *thir) {
+    if (!thir) {
+      throw_error("Bound a null thir to an AST", {});
+    }
+    if (!ast) {
+      throw_error("Bound a null AST to a thir", {});
+    }
     ast_map[ast] = thir;
   }
 
   inline void bind(Symbol *sym, THIR *thir) {
+    if (!thir) {
+      throw_error("Bound a null thir to a symbol", {});
+    }
+    if (!sym) {
+      throw_error("Bound a null symbol to a thir", {});
+    }
+
     symbol_map[sym] = thir;
   }
 
