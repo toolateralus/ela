@@ -25,7 +25,6 @@ struct Arena final {
   Arena &operator=(const Arena &) = delete;
   Arena &operator=(Arena &&) = delete;
 
-
   inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
   inline ~Arena() { delete[] data; delete next; }
