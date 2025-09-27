@@ -371,7 +371,6 @@ struct THIRGen {
   THIR *initialize(const SourceRange &source_range, Type *type,
                    std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);
-  THIR *visit_function_declaration_via_symbol(Symbol *symbol);
 
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);

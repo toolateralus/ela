@@ -185,7 +185,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     }
 
     thir->arguments.push_back(self);
-    thir->callee = visit_function_declaration_via_symbol(symbol);
+    thir->callee = visit_node(ast->callee);
   }
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -329,7 +329,7 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_function_declaration_via_symbol(symbol);
+    overload_call->callee = visit_node(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->left));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
@@ -346,7 +346,7 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_function_declaration_via_symbol(symbol);
+    overload_call->callee = visit_node(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->operand));
     return overload_call;
   }
@@ -362,7 +362,7 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     THIR_ALLOC(THIRCall, overload_call, ast);
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_function_declaration_via_symbol(symbol);
+    overload_call->callee = visit_node(symbol->function.declaration);
     overload_call->arguments.push_back(visit_node(ast->base));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
@@ -400,19 +400,19 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   auto object_type_nonptr = ast->object->resolved_type->get_element_type();
   auto scope = object_type_nonptr->info->scope;
 
-  const auto get_function_pointer = [&](Symbol *symbol) -> THIR * {
-    auto function = visit_function_declaration_via_symbol(symbol);
-    auto addr = take_address_of(function, symbol->function.declaration);
+  const auto get_function_pointer = [&](ASTFunctionDeclaration *func) -> THIR * {
+    auto function = visit_node(func);
+    auto addr = take_address_of(function, func);
     
     const auto type = function->type;
     const auto info = type->info->as<FunctionTypeInfo>();
 
+    // !!! TODO: make this just do the first one, not all
     FunctionTypeInfo new_info;
     new_info.return_type = info->return_type;
     for (size_t i = 0; i < info->params_len; ++i) {
       new_info.params_len++;
       new_info.parameter_types[i] = void_type()->take_pointer_to(true);
-
     }
 
     auto new_type = global_find_function_type_id(new_info, {{TYPE_EXT_POINTER_CONST}});
@@ -424,7 +424,7 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
     auto symbol = scope->local_lookup(name);
     dynof->key_values.push_back({
         name,
-        get_function_pointer(symbol),
+        get_function_pointer(symbol->function.declaration),
     });
   }
 
@@ -690,13 +690,6 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
   }
 }
 
-THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
-  if (auto thir = symbol_map[symbol]) {
-    return thir;
-  }
-  auto thir = visit_function_declaration(symbol->function.declaration);
-  return symbol_map[symbol] = thir;
-}
 
 void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   for (const auto &param : ast->params->params) {
@@ -891,7 +884,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
       THIR_ALLOC(THIRCall, overload_call, ast);
       auto scope = left->type->info->scope;
       auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
-      overload_call->callee = visit_function_declaration_via_symbol(symbol);
+      overload_call->callee = visit_node(symbol->function.declaration);
       overload_call->arguments.push_back(left);
       overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
       return overload_call;
@@ -994,7 +987,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
         (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast) : iterable_var;
 
     THIR_ALLOC(THIRCall, iter_call, ast);
-    iter_call->callee = visit_function_declaration_via_symbol(iter_symbol);
+    iter_call->callee = visit_node(iter_symbol->function.declaration);
     iter_call->arguments.push_back(iter_arg);
 
     const auto *info = iter_call->callee->type->info->as<FunctionTypeInfo>();
@@ -1013,7 +1006,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
       (next_expects_ptr && !iterator_var->type->is_pointer()) ? take_address_of(iterator_var, ast) : iterator_var;
 
   THIR_ALLOC(THIRCall, next_call, ast);
-  next_call->callee = visit_function_declaration_via_symbol(next_symbol);
+  next_call->callee = visit_node(next_symbol->function.declaration);
 
   const auto *next_info = next_call->callee->type->info->as<FunctionTypeInfo>();
   next_call->type = next_info->return_type;
