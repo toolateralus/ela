@@ -1,5 +1,4 @@
 #include "thir.hpp"
-#include <cstdint>
 #include <deque>
 #include <format>
 #include <string>
@@ -328,7 +327,7 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
   return thir;
 }
 
-THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vector<THIR *> &statements) {
+THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, std::vector<THIR *> &statements) {
   static size_t id = 0;
   auto cached_object = make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++),
                                      take_address_of(visit_node(ast->object), ast->object), ast->object);
@@ -343,7 +342,8 @@ THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vect
   const InternedString variant_name = segment.identifier;
 
   auto condition = visit_pattern_match_condition(ast, cached_object, discriminant);
-  make_destructure_for_pattern_match(ast, cached_object, scope, statements, variant_type, variant_name);
+  make_destructure_for_pattern_match(ast, cached_object, ast->target_block->scope, statements, variant_type,
+                                     variant_name);
   return condition;
 }
 
@@ -419,7 +419,7 @@ THIR *THIRGen::visit_tuple(ASTTuple *ast) {
   }
   return thir;
 }
-// Use THIRAggregateInitializer here.
+
 THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   throw_error("visit_dyn_of not implemented", ast->source_range);
   return nullptr;
@@ -708,16 +708,22 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&func, THIRFunction *&t
       thir_param->type = param->resolved_type;
     }
 
-    uint64_t binding = UINT64_MAX;
+    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, parameter_var);
+    parameter_var->source_range = param->source_range;
+    parameter_var->type = param->resolved_type;
+    parameter_var->name = param->tag == ASTParamDecl::Normal ? param->normal.name : "self";
+    parameter_var->is_global = false;
+    parameter_var->is_statement = true;
+    parameter_var->is_pseudo_var = true;
+
     auto param_sym = ctx.scope->local_lookup(thir_param->name);
     ASTVariable *variable = (ASTVariable *)param_sym->variable.declaration.get();
-    binder.bind(variable);
-    binding = variable->binding;
+    binder.bind(variable, parameter_var);
 
     thir->parameters.push_back(THIRParameter{
         .name = thir_param->name,
         .default_value = thir_param->value,
-        .binding = binding,
+        .binding = variable->binding,
     });
   }
 }
@@ -743,7 +749,6 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   THIR_ALLOC(THIRFunction, thir, ast);
   binder.bind(ast, thir);
-
 
   if (!ast->scope) {
     return thir;
@@ -874,8 +879,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
       if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
         // clear -> populate extra statements.
         extra_statements_generated_by_pattern_match.clear();
-        condition = visit_pattern_match((ASTPatternMatch *)branch.expression, branch.block->scope,
-                                        extra_statements_generated_by_pattern_match);
+        condition =
+            visit_pattern_match((ASTPatternMatch *)branch.expression, extra_statements_generated_by_pattern_match);
       } else {
         THIR_ALLOC(THIRBinExpr, binexpr, ast);
         binexpr->left = left;
@@ -1103,7 +1108,8 @@ THIR *THIRGen::visit_if(ASTIf *ast) {
 
   std::vector<THIR *> statements;
   if (ast->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
-    thir->condition = visit_pattern_match((ASTPatternMatch *)ast->condition, ast->block->scope, statements);
+    ASTPatternMatch *patmatch = (ASTPatternMatch *)ast->condition;
+    thir->condition = visit_pattern_match(patmatch, statements);
   } else {
     thir->condition = visit_node(ast->condition);
   }
@@ -1679,12 +1685,4 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
       throw_error("AST node not supported by THIR generator. needs to be implemented", node->source_range);
       return nullptr;
   }
-}
-
-
-void THIRGen::bind_symbol(Symbol *sym, THIR *thir) {
-  if (!sym) {
-    throw_error("Unable to bind symbol to thir, symbol was null", thir->source_range);
-  }
-  symbol_map[sym] = thir;
 }

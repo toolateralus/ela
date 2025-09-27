@@ -487,7 +487,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
         break;
     }
   }
-  
+
   if (node->name == "main") {
     node->is_entry = true;
   }
@@ -1401,6 +1401,7 @@ void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(lambda_unique_id++);
   node->params->accept(this);
   node->return_type->accept(this);
+
   ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
   std::vector<int> param_types;
   FunctionTypeInfo info;
@@ -3344,8 +3345,6 @@ void Typer::visit(ASTMethodCall *node) {
       type = func_decl->resolved_type;
     }
   } else {
-
-    
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     auto object = node->callee->base;
@@ -3434,10 +3433,17 @@ void Typer::visit(ASTPatternMatch *node) {
         } else if (part.semantic == PATTERN_MATCH_PTR_MUT) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
-
         part.resolved_type = type_id;
-
-        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability);
+        
+        // TODO: probably remove this hacky shit
+        auto variable = ast_alloc<ASTVariable>();
+        {  // make a stub variable so THIR generation has something to work with
+          variable->type = ast_alloc<ASTType>();
+          variable->type->resolved_type = part.resolved_type;
+          variable->name = part.var_name;
+          variable->mutability = part.mutability;
+        }
+        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability, variable);
       }
     } break;
     case ASTPatternMatch::TUPLE: {
@@ -3462,7 +3468,17 @@ void Typer::visit(ASTPatternMatch *node) {
           type_id = global_find_type_id(type_id, {{TYPE_EXT_POINTER_MUT}});
         }
         part.resolved_type = type_id;
-        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability);
+        
+        // TODO: probably remove this hacky shit
+        auto variable = ast_alloc<ASTVariable>();
+        {  // make a stub variable so THIR generation has something to work with
+          variable->type = ast_alloc<ASTType>();
+          variable->type->resolved_type = part.resolved_type;
+          variable->name = part.var_name;
+          variable->mutability = part.mutability;
+        }
+
+        ctx.scope->insert_local_variable(part.var_name, type_id, nullptr, part.mutability, variable);
         index++;
       }
     } break;
@@ -3855,7 +3871,7 @@ void Typer::visit(ASTUnpackElement *) {
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
   CTInterpreter interpreter(ctx);
-  
+
   auto result = interpreter.visit(node->node_to_run);
 
   if (result->get_value_type() == ValueType::RETURN) {
@@ -3875,6 +3891,7 @@ void Typer::visit(ASTRun *node) {
       parent_prev->accept_typed_replacement(ast);
     }
   } else {
-    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected", node->source_range);
+    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected",
+                  node->source_range);
   }
 }

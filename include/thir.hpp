@@ -86,6 +86,10 @@ struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
   bool is_global;
+
+  // This means that this variable doesn't actually represent a declaration in the program,
+  // rather, it's a stub just used to access certain things like parameters.
+  bool is_pseudo_var = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -324,7 +328,7 @@ struct THIRGen {
                                           const InternedString &variant_name);
 
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
-  THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
+  THIR *visit_pattern_match(ASTPatternMatch *node, std::vector<THIR *> &statements);
 
   THIR *make_structural_typing_bitcast(Type *to, const THIR *expr);
 

@@ -521,6 +521,11 @@ void Emitter::emit_expr(const THIR *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
+  // See the definition to understand this.
+  if (thir->is_pseudo_var) {
+    return;
+  }
+
   indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   code << " = ";
   emit_expr(thir->value);
