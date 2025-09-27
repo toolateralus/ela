@@ -487,7 +487,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
         break;
     }
   }
-  
+
   if (node->name == "main") {
     node->is_entry = true;
   }
@@ -3224,6 +3224,12 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
 
         if (!part.generic_arguments.empty()) {
           if (symbol->is_type) {
+            auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
+
+            if (!decl) {
+              throw_error("Cannot apply generic arguments to that type", node->source_range);
+            }
+
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
                                       part.get_resolved_generics());
@@ -3344,8 +3350,6 @@ void Typer::visit(ASTMethodCall *node) {
       type = func_decl->resolved_type;
     }
   } else {
-
-    
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     auto object = node->callee->base;
@@ -3473,9 +3477,11 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   size_t index = 0;
   Type *previous_type = nullptr;
+  Symbol *symbol = nullptr;
+
   for (auto &segment : node->segments) {
     auto &ident = segment.identifier;
-    auto symbol = scope->lookup(ident);
+    symbol = scope->lookup(ident);
     if (!symbol) {
       throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
     }
@@ -3501,7 +3507,12 @@ void Typer::visit(ASTPath *node) {
       }
       ASTDeclaration *instantiation = nullptr;
       if (symbol->is_type) {
-        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
+        auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
+
+        if (!decl) {
+          throw_error("cannot apply generic arguments to that type", node->source_range);
+        }
+
         instantiation = visit_generic(decl, generic_args, node->source_range);
         auto type = instantiation->resolved_type;
         scope = type->info->scope;
@@ -3529,6 +3540,10 @@ void Typer::visit(ASTPath *node) {
                   node->source_range);
     }
     index++;
+  }
+
+  if (symbol && symbol->is_module) {
+    throw_error("A path cannot refer only to a module, it must refer to a type or function or variable.", node->source_range);
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
@@ -3855,7 +3870,7 @@ void Typer::visit(ASTUnpackElement *) {
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
   CTInterpreter interpreter(ctx);
-  
+
   auto result = interpreter.visit(node->node_to_run);
 
   if (result->get_value_type() == ValueType::RETURN) {
@@ -3875,6 +3890,7 @@ void Typer::visit(ASTRun *node) {
       parent_prev->accept_typed_replacement(ast);
     }
   } else {
-    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected", node->source_range);
+    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected",
+                  node->source_range);
   }
 }

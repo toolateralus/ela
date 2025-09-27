@@ -732,9 +732,6 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->generic_parameters.size()) {
-    for (auto &monomorphization : ast->generic_instantiations) {
-      visit_function_declaration((ASTFunctionDeclaration *)monomorphization.declaration);
-    }
     return nullptr;
   }
 
