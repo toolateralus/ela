@@ -113,12 +113,14 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
 
     size_t i = 0;
     for (; i < ast_args.size(); ++i) {
-      out_args.push_back(visit_node(ast_args[i]));
+      const auto arg = visit_node(ast_args[i]);
+      out_args.push_back(arg);
     }
 
     for (; i < params.size(); ++i) {
       if (params[i].default_value) {
-        out_args.push_back(params[i].default_value);
+        const auto value = params[i].default_value;
+        out_args.push_back(value);
       }
     }
   } else {
@@ -582,13 +584,24 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   symbol_map[symbol] = thir;
   thir->block = (THIRBlock *)visit_node(ast->block);
   thir->name = ast->unique_identifier;
+
   for (const auto &ast_param : ast->params->params) {
     THIRParameter thir_param = {
-        .name = ast_param->normal.name,
+      .name = ast_param->normal.name,
     };
+    THIR_ALLOC(THIRVariable, var, ast_param);
+    var->name = ast_param->normal.name;
+    var->type = ast_param->resolved_type;
+    var->is_global = false;
+
     if (ast_param->normal.default_value) {
       thir_param.default_value = visit_node(ast_param->normal.default_value.get());
+      var->value = thir_param.default_value;
     }
+
+    auto symbol = ast->block->scope->local_lookup(ast_param->normal.name);
+    symbol_map[symbol] = var;
+
     thir->parameters.push_back(thir_param);
   }
   return thir;

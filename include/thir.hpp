@@ -44,6 +44,7 @@ enum struct THIRNodeType : unsigned char {
   While,
 };
 
+
 struct THIR {
   // This is purely used to handle putting semicolons after expression statements, without needing an 'expression
   // statement' node This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper

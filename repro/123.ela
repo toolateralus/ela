@@ -1,0 +1,22 @@
+/* 
+  This has to be run with '--nostdlib' on the thir-temp
+*/
+
+
+extern fn printf(fmt: *u8, ...);
+
+fn func(v: *u8) {
+  printf(v);
+}
+
+/* 
+  Uncomment this and observe the bugs.
+  func := fn(v: *u8) {
+    printf(v);
+  }
+*/
+
+fn main() -> s32 {
+  func("Hello, World!\n"c);
+  return 0;
+}
