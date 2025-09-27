@@ -1,7 +1,6 @@
 #pragma once
 
 #include "arena.hpp"
-#include "binding.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -284,9 +283,6 @@ struct THIRGen {
   inline THIR *get_thir(Symbol *sym) {
     return symbol_map[sym];
   }
-
-
-  Binder binder {};
 
   THIR *entry_point;
   THIRProgram *program;
