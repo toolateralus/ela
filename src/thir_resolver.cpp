@@ -93,6 +93,7 @@ void Resolver::visit_index(const THIRIndex *thir) {
   visit_node(thir->base);
 }
 void Resolver::visit_aggregate_initializer(const THIRAggregateInitializer *thir) {
+  declare_or_define_type(thir->type);
   for (const auto &[_, value] : thir->key_values) {
     visit_node(value);
   }

@@ -368,8 +368,23 @@ THIR *THIRGen::visit_tuple(ASTTuple *ast) {
 }
 // Use THIRAggregateInitializer here.
 THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
-  throw_error("visit_dyn_of not implemented", ast->source_range);
-  return nullptr;
+  THIR_ALLOC(THIRAggregateInitializer, dynof, ast);
+
+  dynof->key_values.push_back({"instance", visit_node(ast->object)});
+
+  auto dyn_info = ast->resolved_type->info->as<DynTypeInfo>();
+  auto object_type_nonptr = ast->object->resolved_type->get_element_type();
+  auto scope = object_type_nonptr->info->scope;
+
+  for (auto &[name, method_type] : dyn_info->methods) {
+    auto symbol = scope->local_lookup(name);
+    dynof->key_values.push_back({
+        name,
+        take_address_of(visit_function_declaration_via_symbol(symbol), symbol->function.declaration),
+    });
+  }
+
+  return dynof;
 }
 
 THIR *THIRGen::visit_range(ASTRange *ast) {

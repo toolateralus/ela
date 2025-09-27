@@ -81,7 +81,7 @@ struct Emitter {
   void emit_struct_body(Type *thir);
   void emit_type(const THIRType *thir);
   void forward_declare_type(const Type *type);
-  void emit_dyn_dispatch_object_struct(const Type *type);
+  void emit_dyn_dispatch_object_struct(Type *type);
 
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);

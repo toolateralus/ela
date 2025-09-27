@@ -411,7 +411,25 @@ void Emitter::forward_declare_type(const Type *type) {
   }
 }
 
-void Emitter::emit_dyn_dispatch_object_struct(const Type *) {}
+void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
+  if (type->dyn_emitted) {
+    return;
+  }
+
+  type->dyn_emitted = true;
+
+  auto info = type->info->as<DynTypeInfo>();
+  auto &methods = info->methods;
+
+  auto name = c_type_string(type);
+  code << "typedef struct " << name << " {\n";
+  indented("void *instance;\n");
+  for (const auto &[method_name, method_type] : methods) {
+    std::string method_pointer_name = method_name.get_str();
+    indented(get_function_pointer_type_string(method_type, &method_pointer_name, false) + ";\n");
+  }
+  code << "} " << name << ";\n";
+}
 
 void Emitter::emit_type(const THIRType *thir) {
   switch (thir->type->kind) {

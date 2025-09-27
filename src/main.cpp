@@ -58,7 +58,6 @@ std::unordered_set<InternedString> include_set;
 int ignored_warnings = 0;
 
 
-
 bool run_on_finished = false;
 
 #include <string>

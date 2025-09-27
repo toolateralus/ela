@@ -3043,7 +3043,7 @@ void Typer::visit(ASTDyn_Of *node) {
 
   if (!object_type->is_mut_pointer()) {
     throw_error(
-        "'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a "
+        "'dynof' requires the first argument, the instance to create a dyn dispatch object for, must be a "
         "mutable pointer. eventually we'll have const dyn's",
         node->source_range);
   }
