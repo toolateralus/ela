@@ -157,6 +157,20 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
   return thir;
 }
 
+THIR *THIRGen::try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *target, const bool requires_self_ptr) {
+  if (!target->type->is_pointer() && requires_self_ptr) {
+    THIR_ALLOC(THIRUnaryExpr, thir, base)
+    thir->op = TType::And;
+    thir->operand = target;
+    return thir;
+  } else if (target->type->is_pointer() && !requires_self_ptr) {
+    THIR_ALLOC(THIRUnaryExpr, thir, base)
+    thir->op = TType::Mul;
+    thir->operand = target;
+    return thir;
+  }
+  return target;
+}
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   const auto base = ast->callee->base;
@@ -167,21 +181,11 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   } else {
     // Push the self argument
     auto self = visit_node(base);
-    const auto requires_self_ptr = symbol->function.declaration->params->params[0]->self.is_pointer;
-    auto base_type = self->type;
+
+    const auto requires_self_ptr = symbol->function.declaration->requires_self_ptr();
 
     // auto dereference / address of logic.
-    if (!base_type->is_pointer() && requires_self_ptr) {
-      THIR_ALLOC(THIRUnaryExpr, thir, base)
-      thir->op = TType::And;
-      thir->operand = self;
-      self = thir;
-    } else if (base_type->is_pointer() && !requires_self_ptr) {
-      THIR_ALLOC(THIRUnaryExpr, thir, base)
-      thir->op = TType::Mul;
-      thir->operand = self;
-      self = thir;
-    }
+    self = try_deref_or_take_ptr_to_if_needed(base, self, requires_self_ptr);
 
     thir->arguments.push_back(self);
 
@@ -283,12 +287,12 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         var->name = part.var_name;
         var->type = part.resolved_type;
         var->value = make_member_access(ast->source_range, variant_member_access,
-                                        {{part.resolved_type, std::to_string(index++)}});
+                                        {{part.resolved_type, "$" + std::to_string(index++)}});
         if (part.semantic == PATTERN_MATCH_PTR_MUT || part.semantic == PATTERN_MATCH_PTR_CONST) {
           var->value = take_address_of(var->value, ast);
         }
         statements.insert(statements.begin(), var);
-
+        
         auto symbol = block_scope->lookup(part.var_name);
         bind(symbol, var);
       }
@@ -341,7 +345,8 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(visit_node(ast->left));
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
+        ast->left, visit_node(ast->left), symbol->function.declaration->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
@@ -358,7 +363,8 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(visit_node(ast->operand));
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
+        ast->operand, visit_node(ast->operand), symbol->function.declaration->requires_self_ptr()));
     return overload_call;
   }
 }
@@ -374,7 +380,8 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(visit_node(ast->base));
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
+        ast->base, visit_node(ast->base), symbol->function.declaration->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->index));
     return overload_call;
   }
@@ -418,10 +425,9 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
     const auto type = function->type;
     const auto info = type->info->as<FunctionTypeInfo>();
 
-    
     FunctionTypeInfo new_info;
     new_info.params_len = info->params_len;
-    memcpy(new_info.parameter_types, info->parameter_types, sizeof(void*) * info->params_len);
+    memcpy(new_info.parameter_types, info->parameter_types, sizeof(void *) * info->params_len);
     new_info.return_type = info->return_type;
     new_info.parameter_types[0] = void_type()->take_pointer_to(true);
 
@@ -451,6 +457,15 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
 THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
+
+
+  if(type->is_pointer()) {
+    THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
+    literal->value = "nullptr";
+    literal->source_range = source_range;
+    literal->is_statement = false;
+    return literal;
+  }
 
   // TODO: might need more ignored things here
   if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->is_fixed_sized_array()) {
@@ -754,7 +769,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     throw_error("Unable to find symbol for function", ast->source_range);
   }
 
-  
+  // TODO: fix the typing issues with functions not being found
   bind(ast, thir);
 
   ENTER_SCOPE(ast->scope);
@@ -814,7 +829,14 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 void THIRGen::extract_thir_values_for_type_members(Type *type) {
   for (auto &member : type->info->members) {
     if (member.default_value) {
-      member.thir_value = visit_node(member.default_value.get());
+      auto value = member.default_value.get();
+      member.thir_value = visit_node(value);
+
+      // !TERRIBLE HACK
+      // For some reason enumeration values like -1 would randomly cast to (u64)
+      if (value->resolved_type != type->info->as<EnumTypeInfo>()->underlying_type) {
+        member.thir_value = make_cast(member.thir_value.get(), type->info->as<EnumTypeInfo>()->underlying_type);
+      }
     }
   }
 }
@@ -891,8 +913,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
     auto left = cached_expr;
 
+    auto &branch = ast->branches[index];
     if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
-      auto &branch = ast->branches[index];
       THIR *condition;
 
       if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
@@ -915,7 +937,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
       auto scope = left->type->info->scope;
       auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
       overload_call->callee = visit_node(symbol->function.declaration);
-      overload_call->arguments.push_back(left);
+      overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
+          branch.expression, left, symbol->function.declaration->requires_self_ptr()));
       overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
       return overload_call;
     }
@@ -1031,9 +1054,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
   // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
-  bool next_expects_ptr = next_symbol && next_symbol->function.declaration->params->params[0]->self.is_pointer;
-  THIR *next_arg =
-      (next_expects_ptr && !iterator_var->type->is_pointer()) ? take_address_of(iterator_var, ast) : iterator_var;
+
+  auto next_arg = try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var, next_symbol->function.declaration->requires_self_ptr());
 
   THIR_ALLOC(THIRCall, next_call, ast);
   next_call->callee = visit_node(next_symbol->function.declaration);
@@ -1077,7 +1099,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   const auto some_type = next_var->type->info->as<ChoiceTypeInfo>()->get_variant_type("Some");
   const auto value_type = some_type->info->members[0].type;
 
-  auto unwrapped_some = make_member_access(ast->source_range, next_var, {{some_type, "Some"}, {value_type, "0"}});
+  auto unwrapped_some = make_member_access(ast->source_range, next_var, {{some_type, "Some"}, {value_type, "$0"}});
 
   if (ast->left_tag == ASTFor::DESTRUCTURE) {
     static size_t id = 0;

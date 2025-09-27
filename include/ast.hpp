@@ -606,6 +606,10 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
 
+  bool requires_self_ptr() const {
+    return params->has_self && params->params[0]->self.is_pointer;
+  }
+
   bool has_defer = false;
   bool is_declared = false;
   Type *declaring_type = Type::INVALID_TYPE;

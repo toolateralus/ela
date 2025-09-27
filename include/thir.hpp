@@ -345,6 +345,7 @@ struct THIRGen {
   // typically these will just return void.
   std::vector<THIR *> *current_statement_list;
 
+  THIR *try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *self, const bool requires_self_ptr);
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
 

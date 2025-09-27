@@ -201,11 +201,7 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
     code << '.';
   }
 
-  if (thir->base->type->is_kind(TYPE_TUPLE)) {
-    code << '$' + thir->member.get_str();
-  } else {
-    code << thir->member.get_str();
-  }
+  code << thir->member.get_str();
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
@@ -432,6 +428,13 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
 }
 
 void Emitter::emit_type(const THIRType *thir) {
+
+  // TODO: stop doing this hack;
+  if (thir->type->basename == "va_list") {
+    return;
+  }
+
+
   switch (thir->type->kind) {
     case TYPE_SCALAR:
     case TYPE_FUNCTION:
