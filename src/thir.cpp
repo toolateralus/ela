@@ -207,6 +207,17 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   }
 
   auto symbol = ctx.get_symbol(ast).get();
+
+  if (!symbol_map.contains(symbol)) {
+    if (symbol->is_variable) {
+      auto variable = symbol->variable.declaration.get();
+      visit_node(variable);
+    } else {
+      auto function = symbol->function.declaration;
+      visit_node(function);
+    }
+  }
+
   return symbol_map[symbol];
 }
 
@@ -645,8 +656,6 @@ static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDec
   reciever->is_test = function->is_test;
 }
 
-// TODO: fix the overlap between the flags and attributes. we should just have the flags, the typer
-// should bake all the attributes into the appropriate location via flags/bools.
 static inline void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
   for (const auto &attr : attrs) {
     switch (attr.tag) {

@@ -11,8 +11,8 @@ void ASTResolver::visit_enum(ASTEnumDeclaration *) {}
 void ASTResolver::visit_alias(ASTAlias *) {}
 void ASTResolver::visit_import(ASTImport *) {}
 void ASTResolver::visit_impl(ASTImpl *) {}
-void ASTResolver::visit_choice(ASTChoiceDeclaration *) {}
 void ASTResolver::visit_trait(ASTTraitDeclaration *) {}
+void ASTResolver::visit_choice(ASTChoiceDeclaration *) {}
 void ASTResolver::visit_module(ASTModule *) {}
 
 
