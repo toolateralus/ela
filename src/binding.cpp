@@ -1,44 +1,66 @@
 #include "binding.hpp"
 #include <vector>
 #include "ast.hpp"
+#include "thir.hpp"
 
 template <class T>
-T *binding_alloc() {
+static inline T *binding_alloc() {
   return new (binding_arena.allocate(sizeof(T))) T();
 }
 
-std::vector<uint64_t> Binder::bind(ASTFunctionDeclaration *f) {
-  // If it has generic instantiations, we only dump the monomorphizations, and discard the template.
-  if (f->generic_instantiations.size()) {
-    std::vector<uint64_t> result{};
-    for (auto &instantiation : f->generic_instantiations) {
-      const auto inner_result = bind((ASTFunctionDeclaration *)instantiation.declaration);
-      // This _should always_ be of one length, the inner result.
-      // but this is safer, and easier than a check.
-      result.append_range(inner_result);
-    }
-    return result;
-  }
-
+// This only works for one known-concrete function
+void Binder::bind(ASTFunctionDeclaration *f, THIR *thir) {
   FunctionBinding *binding = binding_alloc<FunctionBinding>();
   binding->type = f->resolved_type;
-  binding->node = f;
   binding->uid = bindings.size();
-  return {binding->uid};
+
+  {
+    binding->node = f;
+    f->binding = binding->uid;
+  }
+
+  if (thir) {
+    thir->binding = binding->uid;
+    binding->thir = thir;
+  }
+
+  bindings.push_back(binding);
 }
 
-uint64_t Binder::bind(ASTVariable *v) {
+// If it has generic instantiations, we only dump the monomorphizations, and discard the template.
+void Binder::bind(ASTFunctionDeclaration *f, FunctionGenerator thir_generator) {
+  if (f->generic_instantiations.size()) {
+    for (auto &instantiation : f->generic_instantiations) {
+      bind((ASTFunctionDeclaration *)instantiation.declaration, thir_generator);
+    }
+    return;
+  }
+  bind(f, thir_generator(f));
+}
+
+void Binder::bind(ASTVariable *v, THIR *thir) {
+  const auto finish_binding = [&](auto binding) {
+    binding->uid = bindings.size();
+    v->binding = binding->uid;
+    binding->node = v;
+    if (thir) {
+      thir->binding = binding->uid;
+      binding->thir = thir;
+    }
+    bindings.push_back(binding);
+  };
+
   if (v->is_local) {
     LocalBinding *binding = binding_alloc<LocalBinding>();
     binding->type = v->resolved_type;
     binding->node = v;
-    binding->uid = bindings.size();
-    return binding->uid;
+    finish_binding(binding);
   } else {
     GlobalBinding *binding = binding_alloc<GlobalBinding>();
     binding->type = v->resolved_type;
     binding->node = v;
-    binding->uid = bindings.size();
-    return binding->uid;
+    finish_binding(binding);
   }
 }
+
+void Binder::bind(ASTVariable *v) { return bind(v, nullptr); }

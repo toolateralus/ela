@@ -1,4 +1,5 @@
 #include "thir.hpp"
+#include <cstdint>
 #include <deque>
 #include <format>
 #include <string>
@@ -103,6 +104,17 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   ! These three are going to be tough, with generics and all.
   @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
 */
+void THIRGen::bind(ASTNode *node, THIR *value, Binding *binding) {
+  if (!binding) {
+    throw_error("Failed to get binding for finalization of cross references", node->source_range);
+    return;
+  }
+  binding->thir = value;
+  value->binding = binding->uid;
+  node->binding = binding->uid;
+  binding->node = node;
+}
+
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                  std::vector<THIR *> &out_args) {
   // Only handle default arguments for function calls that have a definition, not function pointers.
@@ -113,14 +125,22 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
 
     size_t i = 0;
     for (; i < ast_args.size(); ++i) {
-      out_args.push_back(visit_node(ast_args[i]));
+      auto value = visit_node(ast_args[i]);
+      bind(ast_args[i], value, binder.get(params[i].binding));
+      out_args.push_back(value);
     }
 
     for (; i < params.size(); ++i) {
-      if (params[i].default_value) {
-        out_args.push_back(params[i].default_value);
+      auto value = params[i].default_value;
+      if (value) {
+        // TODO: figure out if it's bad if some lack AST associations
+        auto binding = binder.get(params[i].binding);
+        value->binding = binding->uid;
+        binding->thir = value;
+        out_args.push_back(value);
       }
     }
+
   } else {
     // Other calls, via function pointers, variables, non-symbol calls &c &c.
     for (const auto &argument : in_args->arguments) {
@@ -203,8 +223,35 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
     return get_choice_type_instantiation_boilerplate(ast);
   }
 
-  auto symbol = ctx.get_symbol(ast).get();
-  return symbol_map[symbol];
+  if (ast && valid_binding(ast->binding)) {
+    auto binding = binder.get(ast->binding);
+    return binding->thir;
+  }
+
+  if (auto symbol = ctx.get_symbol(ast).get()) {
+    if (symbol->is_variable) {
+      auto variable = symbol->variable.declaration.get();
+      if (variable && valid_binding(variable->binding)) {
+        auto binding = binder.get(variable->binding);
+        // finish resolving bindings to references for caching, so we dont have to
+        // search again.
+        ast->binding = binding->uid;
+        return binding->thir;
+      }
+    } else if (symbol->is_function) {
+      auto function = symbol->function.declaration;
+      if (function && valid_binding(function->binding)) {
+        auto binding = binder.get(function->binding);
+        // finish resolving bindings to references for caching, so we dont have to
+        // search again.
+        ast->binding = binding->uid;
+        return binding->thir;
+      }
+    }
+  }
+
+  throw_error("unable to get binding for path", ast->source_range);
+  return nullptr;
 }
 
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
@@ -236,8 +283,11 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         }
         statements.insert(statements.begin(), var);
 
-        auto symbol = block_scope->lookup(part.var_name);
-        bind_symbol(symbol, var);
+        {
+          Symbol *symbol = block_scope->lookup(part.var_name);
+          ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+          binder.bind(variable, var);
+        }
       }
     } break;
     case ASTPatternMatch::TUPLE: {
@@ -254,8 +304,11 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         }
         statements.insert(statements.begin(), var);
 
-        auto symbol = block_scope->lookup(part.var_name);
-        bind_symbol(symbol, var);
+        {
+          Symbol *symbol = block_scope->lookup(part.var_name);
+          ASTVariable *variable = (ASTVariable *)symbol->variable.declaration.get();
+          binder.bind(variable, var);
+        }
       }
     } break;
     default:
@@ -541,13 +594,19 @@ THIR *THIRGen::visit_cast(ASTCast *ast) {
 
 THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   auto symbol = ctx.scope->lookup(ast->unique_identifier);
-  if (auto thir = symbol_map[symbol]) {
-    return thir;
+
+  if (auto binding = binder.get(ast->binding)) {
+    return binding->thir;
   }
+
   THIR_ALLOC(THIRFunction, thir, ast);
-  bind_symbol(symbol, thir);
+
+  // TODO: this might not work. dunno. binding a function as a variable in this way.
+  binder.bind((ASTVariable *)symbol->variable.declaration.get(), thir);
+
   thir->block = (THIRBlock *)visit_node(ast->block);
   thir->name = ast->unique_identifier;
+
   for (const auto &ast_param : ast->params->params) {
     THIRParameter thir_param = {
         .name = ast_param->normal.name,
@@ -615,17 +674,25 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
 }
 
 THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
-  if (auto thir = symbol_map[symbol]) {
-    return thir;
+  if (!symbol || !symbol->is_function) {
+    throw_error("binder not setup for non-function function declaration fetching?", {});
   }
-  THIR *thir = visit_function_declaration(symbol->function.declaration);
-  bind_symbol(symbol, thir);
-  return thir;
+
+  if (auto binding = binder.get(symbol->function.declaration->binding)) {
+    return binding->thir;
+  }
+
+  // TODO: we need to select the generic instantiation,
+  binder.bind(symbol->function.declaration,
+              [&](ASTFunctionDeclaration *decl) { return visit_function_declaration(decl); });
+
+  return visit_function_declaration(symbol->function.declaration);
 }
 
-void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
-  for (const auto &param : ast->params->params) {
+void THIRGen::convert_parameters(ASTFunctionDeclaration *&func, THIRFunction *&thir) {
+  for (const auto &param : func->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
+
     if (param->tag == ASTParamDecl::Normal) {
       thir_param->name = param->normal.name;
       thir_param->type = param->normal.type->resolved_type;
@@ -641,14 +708,16 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
       thir_param->type = param->resolved_type;
     }
 
-    if (!ast->is_forward_declared) {
-      auto param_sym = ctx.scope->local_lookup(thir_param->name);
-      bind_symbol(param_sym, thir_param);
-    }
+    uint64_t binding = UINT64_MAX;
+    auto param_sym = ctx.scope->local_lookup(thir_param->name);
+    ASTVariable *variable = (ASTVariable *)param_sym->variable.declaration.get();
+    binder.bind(variable);
+    binding = variable->binding;
 
     thir->parameters.push_back(THIRParameter{
         .name = thir_param->name,
         .default_value = thir_param->value,
+        .binding = binding,
     });
   }
 }
@@ -661,20 +730,24 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     return nullptr;
   }
 
+  if (ast->is_forward_declared) {
+    // This should never get called in attempt to fetch a function, only the declaration sitting in the code.
+    // so it should be safe to return null?
+    auto symbol = ctx.get_symbol(ast);
+    if (symbol.get() && symbol.get()->function.declaration) {
+      ast = symbol.get()->function.declaration;
+    } else {
+      return nullptr;
+    }
+  }
+
   THIR_ALLOC(THIRFunction, thir, ast);
-  Symbol *symbol;
-  if (ast->declaring_type) {
-    symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
-  } else {
-    symbol = ctx.scope->local_lookup(ast->name);
-  }
+  binder.bind(ast, thir);
 
-  if (!symbol) {
-    // This is expected for forward declarations.
-    return nullptr;
-  }
 
-  bind_symbol(symbol, thir);
+  if (!ast->scope) {
+    return thir;
+  }
 
   ENTER_SCOPE(ast->scope);
   convert_function_flags(thir, ast);
@@ -708,11 +781,8 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
 THIR *THIRGen::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
-
   thir->is_global = !ast->is_local;
-
-  auto symbol = ctx.scope->lookup(ast->name);
-  bind_symbol(symbol, thir);
+  binder.bind(ast, thir);
 
   if (!ast->is_local) {
     thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
@@ -997,7 +1067,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     for (const DestructureElement &element : ast->left.destructure) {
       const auto member = *members_iter;
       const auto member_access = make_member_access(ast->source_range, cached_base, {{element.type, member.name}});
-      const auto variable = make_variable(element.identifier, member_access, ast);
+      THIRVariable *variable = make_variable(element.identifier, member_access, ast);
       members_iter++;
 
       if (is_pointer_semantic(element.semantic)) {
@@ -1005,7 +1075,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
       }
 
       auto symbol = ctx.scope->local_lookup(element.identifier);
-      bind_symbol(symbol, variable);
+      ASTVariable *ast_var = (ASTVariable *)symbol->variable.declaration.get();
+      binder.bind(ast_var, variable);
       statements.push_back(variable);
     }
 
@@ -1013,13 +1084,15 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     THIRBlock *block = (THIRBlock *)thir->block;
     block->statements.insert(block->statements.begin(), statements.begin(), statements.end());
   } else {
-    const auto identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
+    const auto thir_identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
     const auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
-    bind_symbol(identifier_symbol, identifier_var);
+
+    ASTVariable *ast_var = (ASTVariable *)identifier_symbol->variable.declaration.get();
+    binder.bind(ast_var, thir_identifier_var);
 
     thir->block = visit_node(ast->block);
     THIRBlock *block = (THIRBlock *)thir->block;
-    block->statements.insert(block->statements.begin(), identifier_var);
+    block->statements.insert(block->statements.begin(), thir_identifier_var);
   }
 
   return thir;
@@ -1108,7 +1181,9 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
     }
 
     auto symbol = ctx.scope->local_lookup(element.identifier);
-    bind_symbol(symbol, var);
+
+    ASTVariable *ast_var = (ASTVariable *)symbol->variable.declaration.get();
+    binder.bind(ast_var, var);
 
     current_statement_list->push_back(var);
   }
@@ -1207,10 +1282,16 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
       "name",
       make_str(name, {}),
   });
+
+  auto symbol = type->info->scope->lookup(name);
+  auto binding = binder.get(symbol->function.declaration->binding);
+  auto method_thir = binding->thir;
+
   thir->key_values.push_back({
       "pointer",
-      symbol_map[type->info->scope->lookup(name)],
+      method_thir,
   });
+
   return thir;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <functional>
@@ -109,6 +110,7 @@ struct ASTNode {
         return false;
     }
   }
+
   ControlFlow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
@@ -117,6 +119,9 @@ struct ASTNode {
   SourceRange source_range{};
   Type *resolved_type = Type::INVALID_TYPE;
   bool is_emitted = false;
+  
+  uint64_t binding = UINT64_MAX;
+
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;

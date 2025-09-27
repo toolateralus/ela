@@ -8,7 +8,6 @@
 #include "strings.hpp"
 #include "type.hpp"
 #include "ast.hpp"
-#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -54,6 +53,8 @@ struct THIR {
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
   SourceRange source_range;
+
+  uint64_t binding = UINT64_MAX;
 
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
@@ -118,6 +119,7 @@ struct THIRBlock : THIR {
 struct THIRParameter {
   InternedString name;
   THIR *default_value;
+  uint64_t binding;
 };
 
 struct THIRFunction : THIR {
@@ -265,12 +267,7 @@ struct THIRGen {
   THIRGen(Context &ctx) : ctx(ctx) {}
   Context &ctx;
 
-  std::map<Symbol *, THIR *> symbol_map;
-
-
-  void bind_symbol(Symbol *, THIR *);
-
-  Binder binder {};
+  Binder binder{};
 
   THIR *entry_point;
 
@@ -325,7 +322,7 @@ struct THIRGen {
   void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
                                           std::vector<THIR *> &statements, Type *variant_type,
                                           const InternedString &variant_name);
-                                          
+
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
@@ -338,6 +335,7 @@ struct THIRGen {
   THIR *visit_unary_expr(ASTUnaryExpr *node);
   THIR *visit_literal(ASTLiteral *node);
 
+  void bind(ASTNode *node, THIR *value, Binding *binding);
   void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                           std::vector<THIR *> &out_args);
 
