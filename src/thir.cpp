@@ -231,7 +231,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         var->type = part.resolved_type;
         var->value =
             make_member_access(ast->source_range, variant_member_access, {{part.resolved_type, part.field_name}});
-        if (part.semantic == PATTERN_MATCH_PTR_NONE || part.semantic == PATTERN_MATCH_PTR_CONST) {
+        if (part.semantic == PATTERN_MATCH_PTR_MUT || part.semantic == PATTERN_MATCH_PTR_CONST) {
           var->value = take_address_of(var->value, ast);
         }
         statements.insert(statements.begin(), var);
