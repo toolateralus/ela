@@ -113,7 +113,9 @@ struct ASTNode {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
-  Nullable<ASTBlock> declaring_block;
+  
+  Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
+  Scope *declaring_scope;
   SourceRange source_range{};
   Type *resolved_type = Type::INVALID_TYPE;
   bool is_emitted = false;
@@ -151,7 +153,7 @@ struct Attribute {
 
 struct ASTStatement : ASTNode {
   std::vector<Attribute> attributes = {};
-  virtual ASTNodeType get_node_type() const override  = 0;
+  virtual ASTNodeType get_node_type() const override = 0;
   virtual void accept_typed_replacement(ASTNode *) override {
     printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
   }
@@ -468,10 +470,8 @@ struct ASTVariable : ASTStatement {
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
-  
-  void accept_typed_replacement(ASTNode *node) override {
-    value = (ASTExpr*)node;
-  }
+
+  void accept_typed_replacement(ASTNode *node) override { value = (ASTExpr *)node; }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -1082,7 +1082,7 @@ struct ASTPatternMatch : ASTExpr {
         break;
     }
   }
-  
+
   /*
     the left hand side of the 'is', e.g { if x is ... }
                                              ^<- object.
@@ -1308,11 +1308,13 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
 
 #define NODE_ALLOC(type, node, range, defer, parser) \
   type *node = ast_alloc<type>();                    \
+  node->declaring_scope = parser->ctx.scope;         \
   auto range = parser->begin_node();                 \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred) \
   type *node = ast_alloc<type>();                                          \
+  node->declaring_scope = parser->ctx.scope;                               \
   auto range = parser->begin_node();                                       \
   Defer defer([&] {                                                        \
     parser->end_node(node, range);                                         \

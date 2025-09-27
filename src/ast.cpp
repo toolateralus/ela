@@ -1642,6 +1642,7 @@ ASTStatement *Parser::parse_using_stmt() {
     return noop;
   }
 }
+
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
