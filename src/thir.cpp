@@ -249,7 +249,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
           var->value = take_address_of(var->value, ast);
         }
         statements.insert(statements.begin(), var);
-
+        
         auto symbol = block_scope->lookup(part.var_name);
         symbol_map[symbol] = var;
       }
