@@ -267,6 +267,9 @@ struct THIRGen {
 
   std::map<Symbol *, THIR *> symbol_map;
 
+
+  void bind_symbol(Symbol *, THIR *);
+
   Binder binder {};
 
   THIR *entry_point;

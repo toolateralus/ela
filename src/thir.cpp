@@ -237,7 +237,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         statements.insert(statements.begin(), var);
 
         auto symbol = block_scope->lookup(part.var_name);
-        symbol_map[symbol] = var;
+        bind_symbol(symbol, var);
       }
     } break;
     case ASTPatternMatch::TUPLE: {
@@ -255,7 +255,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         statements.insert(statements.begin(), var);
 
         auto symbol = block_scope->lookup(part.var_name);
-        symbol_map[symbol] = var;
+        bind_symbol(symbol, var);
       }
     } break;
     default:
@@ -545,7 +545,7 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
     return thir;
   }
   THIR_ALLOC(THIRFunction, thir, ast);
-  symbol_map[symbol] = thir;
+  bind_symbol(symbol, thir);
   thir->block = (THIRBlock *)visit_node(ast->block);
   thir->name = ast->unique_identifier;
   for (const auto &ast_param : ast->params->params) {
@@ -618,7 +618,9 @@ THIR *THIRGen::visit_function_declaration_via_symbol(Symbol *symbol) {
   if (auto thir = symbol_map[symbol]) {
     return thir;
   }
-  return symbol_map[symbol] = visit_function_declaration(symbol->function.declaration);
+  THIR *thir = visit_function_declaration(symbol->function.declaration);
+  bind_symbol(symbol, thir);
+  return thir;
 }
 
 void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
@@ -641,7 +643,7 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 
     if (!ast->is_forward_declared) {
       auto param_sym = ctx.scope->local_lookup(thir_param->name);
-      symbol_map[param_sym] = thir_param;
+      bind_symbol(param_sym, thir_param);
     }
 
     thir->parameters.push_back(THIRParameter{
@@ -666,7 +668,13 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   } else {
     symbol = ctx.scope->local_lookup(ast->name);
   }
-  symbol_map[symbol] = thir;
+
+  if (!symbol) {
+    // This is expected for forward declarations.
+    return nullptr;
+  }
+
+  bind_symbol(symbol, thir);
 
   ENTER_SCOPE(ast->scope);
   convert_function_flags(thir, ast);
@@ -703,8 +711,8 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 
   thir->is_global = !ast->is_local;
 
-  auto symbol = ctx.scope->local_lookup(ast->name);
-  symbol_map[symbol] = thir;
+  auto symbol = ctx.scope->lookup(ast->name);
+  bind_symbol(symbol, thir);
 
   if (!ast->is_local) {
     thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
@@ -997,7 +1005,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
       }
 
       auto symbol = ctx.scope->local_lookup(element.identifier);
-      symbol_map[symbol] = variable;
+      bind_symbol(symbol, variable);
       statements.push_back(variable);
     }
 
@@ -1007,7 +1015,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   } else {
     const auto identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
     const auto identifier_symbol = ctx.scope->lookup(ast->left.identifier);
-    symbol_map[identifier_symbol] = identifier_var;
+    bind_symbol(identifier_symbol, identifier_var);
 
     thir->block = visit_node(ast->block);
     THIRBlock *block = (THIRBlock *)thir->block;
@@ -1100,7 +1108,7 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
     }
 
     auto symbol = ctx.scope->local_lookup(element.identifier);
-    symbol_map[symbol] = var;
+    bind_symbol(symbol, var);
 
     current_statement_list->push_back(var);
   }
@@ -1590,4 +1598,12 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
       throw_error("AST node not supported by THIR generator. needs to be implemented", node->source_range);
       return nullptr;
   }
+}
+
+
+void THIRGen::bind_symbol(Symbol *sym, THIR *thir) {
+  if (!sym) {
+    throw_error("Unable to bind symbol to thir, symbol was null", thir->source_range);
+  }
+  symbol_map[sym] = thir;
 }
