@@ -3477,9 +3477,11 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   size_t index = 0;
   Type *previous_type = nullptr;
+  Symbol *symbol = nullptr;
+
   for (auto &segment : node->segments) {
     auto &ident = segment.identifier;
-    auto symbol = scope->lookup(ident);
+    symbol = scope->lookup(ident);
     if (!symbol) {
       throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
     }
@@ -3538,6 +3540,10 @@ void Typer::visit(ASTPath *node) {
                   node->source_range);
     }
     index++;
+  }
+
+  if (symbol && symbol->is_module) {
+    throw_error("A path cannot refer only to a module, it must refer to a type or function or variable.", node->source_range);
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
