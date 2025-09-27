@@ -898,8 +898,11 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
 THIR *THIRGen::visit_program(ASTProgram *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
+
+  program = thir;
   entry_point = thir;  // We default to using the entire program as an entry point (for emitting), but if we get a
                        // main/@[entry] function, this gets replaced.
+
   ENTER_STMT_VEC(thir->statements);
 
   for (const auto &ast_statement : ast->statements) {
@@ -1519,7 +1522,6 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
       }
       return nullptr;
     }
-
     // These nodes can return many nodes, so they always return void, and push the nodes manually.
     case AST_NODE_TUPLE_DECONSTRUCTION: {
       visit_destructure((ASTDestructure *)node);

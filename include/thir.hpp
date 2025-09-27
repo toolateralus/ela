@@ -271,6 +271,7 @@ struct THIRGen {
   Binder binder {};
 
   THIR *entry_point;
+  THIR *program;
 
   // The "return override register" is used to capture the result of a block or function,
   // mainly for things like defer, early returns, or blocks that yield values. Instead of returning
