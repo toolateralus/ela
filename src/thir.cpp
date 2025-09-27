@@ -169,9 +169,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   const auto base = ast->callee->base;
-  const auto member = ast->callee->member;
-  const auto type_scope = base->resolved_type->info->scope;
-  const auto symbol = type_scope->local_lookup(member.identifier);
+  const auto symbol = ctx.get_symbol(ast->callee).get();
 
   if (symbol->is_variable) {
     thir->callee = visit_dot_expr(ast->callee);
