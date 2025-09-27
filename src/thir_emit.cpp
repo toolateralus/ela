@@ -467,10 +467,6 @@ void Emitter::emit_function(const THIRFunction *thir) {
     entry_point = thir;
   }
 
-  if (thir->is_no_return) {
-    throw_error("emit_function:no_return is not yet implemented", thir->source_range);
-  }
-
   code << c_type_string(info->return_type);
   code << ' ' << thir->name.get_str() << "(";
 
