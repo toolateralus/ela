@@ -594,13 +594,13 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   }
   THIR_ALLOC(THIRFunction, thir, ast);
   symbol_map[symbol] = thir;
-  thir->block = (THIRBlock *)visit_node(ast->block);
   thir->name = ast->unique_identifier;
 
   for (const auto &ast_param : ast->params->params) {
     THIRParameter thir_param = {
       .name = ast_param->normal.name,
     };
+
     THIR_ALLOC(THIRVariable, var, ast_param);
     var->name = ast_param->normal.name;
     var->type = ast_param->resolved_type;
@@ -616,6 +616,9 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
 
     thir->parameters.push_back(thir_param);
   }
+
+  thir->block = (THIRBlock *)visit_node(ast->block);
+
   return thir;
 }
 
