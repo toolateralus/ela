@@ -148,20 +148,13 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     
   }
 
-  auto symbol = ctx.get_symbol(ast->callee);
-  THIR *callee;
+  thir->callee = visit_node(ast->callee);
 
-  if (symbol.get() && symbol.get()->is_function && symbol.get()->function.declaration) {
-    callee = thir->callee = visit_function_declaration_via_symbol(symbol.get());
-  } else {
-    callee = thir->callee = visit_node(ast->callee);
-  }
-
-  if (!callee) {
+  if (!thir->callee) {
     throw_error("INTERNAL COMPILER ERROR: unable to locate callee for function", ast->source_range);
   }
 
-  extract_arguments_desugar_defaults(callee, ast->arguments, thir->arguments);
+  extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
 }
 
@@ -204,18 +197,38 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   }
 
   auto symbol = ctx.get_symbol(ast).get();
-
-  if (!symbol_map.contains(symbol)) {
-    if (symbol->is_variable) {
-      auto variable = symbol->variable.declaration.get();
-      visit_node(variable);
-    } else {
-      auto function = symbol->function.declaration;
-      visit_node(function);
-    }
+  if (symbol_map.contains(symbol)) {
+    return symbol_map[symbol];
   }
 
-  return symbol_map[symbol];
+  if (symbol->is_variable) {
+    auto var_ast = symbol->variable.declaration.get();
+    if (!var_ast) {
+      throw_error("INTERNAL COMPILER ERROR: variable declaration null in path", ast->source_range);
+    }
+    return visit_node(var_ast);
+  }
+
+  ASTDeclaration * decl = nullptr;
+  if (symbol->is_function) {
+    decl = symbol->function.declaration;
+  } else if (symbol->is_type) {
+    decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
+  }
+
+  if (!decl) {
+    throw_error("INTERNAL COMPILER ERROR: Invalid type in path", ast->source_range);
+  }
+
+  if (!decl->generic_parameters.empty()) {
+    decl = find_generic_instance(decl->generic_instantiations, ast->segments.back().get_resolved_generics());
+  }
+
+  if (ast_map.contains(decl)) {
+    return ast_map[decl];
+  } else {
+    return visit_node(decl);
+  }
 }
 
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
