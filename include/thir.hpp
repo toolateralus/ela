@@ -372,6 +372,7 @@ struct THIRGen {
 
   THIR *take_address_of(const THIR *node, ASTNode *ast);
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
+  THIR *make_cast(THIR *operand, Type *type);
   THIR *make_str(const InternedString &value, const SourceRange &src_range);
   THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
 

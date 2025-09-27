@@ -376,11 +376,30 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   auto object_type_nonptr = ast->object->resolved_type->get_element_type();
   auto scope = object_type_nonptr->info->scope;
 
+  const auto get_function_pointer = [&](Symbol *symbol) -> THIR * {
+    auto function = visit_function_declaration_via_symbol(symbol);
+    auto addr = take_address_of(function, symbol->function.declaration);
+    
+    const auto type = function->type;
+    const auto info = type->info->as<FunctionTypeInfo>();
+
+    FunctionTypeInfo new_info;
+    new_info.return_type = info->return_type;
+    for (size_t i = 0; i < info->params_len; ++i) {
+      new_info.params_len++;
+      new_info.parameter_types[i] = void_type()->take_pointer_to(true);
+    }
+
+    auto new_type = global_find_function_type_id(new_info, {{TYPE_EXT_POINTER_CONST}});
+
+    return make_cast(addr, new_type); 
+  };
+
   for (auto &[name, method_type] : dyn_info->methods) {
     auto symbol = scope->local_lookup(name);
     dynof->key_values.push_back({
         name,
-        take_address_of(visit_function_declaration_via_symbol(symbol), symbol->function.declaration),
+        get_function_pointer(symbol),
     });
   }
 
@@ -1605,4 +1624,12 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
       throw_error("AST node not supported by THIR generator. needs to be implemented", node->source_range);
       return nullptr;
   }
+}
+
+THIR *THIRGen::make_cast(THIR *operand, Type *type) {
+  THIR_ALLOC_NO_SRC_RANGE(THIRCast, cast);
+  cast->source_range = operand->source_range;
+  cast->type = type;
+  cast->operand = operand;
+  return cast;
 }
