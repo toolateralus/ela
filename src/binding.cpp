@@ -39,8 +39,10 @@ void Binder::bind(ASTFunctionDeclaration *f, FunctionGenerator thir_generator) {
 }
 
 void Binder::bind(ASTVariable *v, THIR *thir) {
-  const auto finish_binding = [&](auto binding) {
+  const auto bind = [&](auto binding) {
     binding->uid = bindings.size();
+    binding->type = v->resolved_type;
+    binding->node = v;
     v->binding = binding->uid;
     binding->node = v;
     if (thir) {
@@ -52,14 +54,10 @@ void Binder::bind(ASTVariable *v, THIR *thir) {
 
   if (v->is_local) {
     LocalBinding *binding = binding_alloc<LocalBinding>();
-    binding->type = v->resolved_type;
-    binding->node = v;
-    finish_binding(binding);
+    bind(binding);
   } else {
     GlobalBinding *binding = binding_alloc<GlobalBinding>();
-    binding->type = v->resolved_type;
-    binding->node = v;
-    finish_binding(binding);
+    bind(binding);
   }
 }
 

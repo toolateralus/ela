@@ -125,7 +125,9 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
     size_t i = 0;
     for (; i < ast_args.size(); ++i) {
       auto value = visit_node(ast_args[i]);
-      bind(ast_args[i], value, binder.get(params[i].binding));
+      if (params.size() > i) {
+        bind(ast_args[i], value, binder.get(params[i].binding));
+      }
       out_args.push_back(value);
     }
 
@@ -736,16 +738,17 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     return nullptr;
   }
 
-  if (ast->is_forward_declared) {
-    // This should never get called in attempt to fetch a function, only the declaration sitting in the code.
-    // so it should be safe to return null?
-    auto symbol = ctx.get_symbol(ast);
-    if (symbol.get() && symbol.get()->function.declaration) {
-      ast = symbol.get()->function.declaration;
-    } else {
-      return nullptr;
-    }
-  }
+  // TODO: this should not happen. we don't handle externs properly anymore
+  // if (ast->is_forward_declared) {
+  //   // This should never get called in attempt to fetch a function, only the declaration sitting in the code.
+  //   // so it should be safe to return null?
+  //   auto symbol = ctx.get_symbol(ast);
+  //   if (symbol.get() && symbol.get()->function.declaration) {
+  //     ast = symbol.get()->function.declaration;
+  //   } else {
+  //     return nullptr;
+  //   }
+  // }
 
   THIR_ALLOC(THIRFunction, thir, ast);
   binder.bind(ast, thir);
