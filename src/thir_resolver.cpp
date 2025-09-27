@@ -72,7 +72,9 @@ void Resolver::emit_type_definition(Type *type) {
 }
 void Resolver::visit_program(const THIRProgram *thir) {
   for (const auto &stmt : thir->statements) {
-    visit_node(stmt);
+    if (stmt) {
+      visit_node(stmt);
+    }
   }
 }
 void Resolver::visit_bin_expr(const THIRBinExpr *thir) {

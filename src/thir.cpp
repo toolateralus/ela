@@ -145,7 +145,6 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     tuple.values = ast->arguments->arguments;
     thir->key_values.push_back({variant_name, visit_node(&tuple)});
     return thir;
-    
   }
 
   thir->callee = visit_node(ast->callee);
@@ -164,7 +163,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   const auto symbol = ctx.get_symbol(ast->callee).get();
 
   if (symbol->is_variable) {
-    thir->callee = visit_dot_expr(ast->callee);
+    thir->callee = visit_node(ast->callee);
   } else {
     // Push the self argument
     auto self = visit_node(base);
@@ -185,8 +184,23 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     }
 
     thir->arguments.push_back(self);
-    thir->callee = visit_node(ast->callee);
+
+    auto fn_sym = ctx.get_symbol(ast->callee);
+    auto fn = fn_sym.get()->function.declaration;
+
+    if (fn->generic_parameters.size()) {
+      auto generics = ast->callee->member.get_resolved_generics();
+      auto function = find_generic_instance(fn->generic_instantiations, generics);
+      thir->callee = visit_function_declaration((ASTFunctionDeclaration *)function);
+    } else {
+      thir->callee = visit_function_declaration(fn);
+    }
   }
+
+  if (!thir->callee) {
+    throw_error("THIRGen unable to get callee for method", ast->source_range);
+  }
+
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
 }
@@ -209,7 +223,7 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
     return visit_node(var_ast);
   }
 
-  ASTDeclaration * decl = nullptr;
+  ASTDeclaration *decl = nullptr;
   if (symbol->is_function) {
     decl = symbol->function.declaration;
   } else if (symbol->is_type) {
@@ -234,9 +248,6 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
-  // TODO:
-  // I am pretty sure this is okay to do? Dot expressions cant have generics,
-  // this was just for parsing ease and QOL
   thir->member = ast->member.identifier;
   return thir;
 }
@@ -259,7 +270,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
           var->value = take_address_of(var->value, ast);
         }
         statements.insert(statements.begin(), var);
-        
+
         auto symbol = block_scope->lookup(part.var_name);
         bind(symbol, var);
       }
@@ -403,7 +414,7 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   const auto get_function_pointer = [&](ASTFunctionDeclaration *func) -> THIR * {
     auto function = visit_node(func);
     auto addr = take_address_of(function, func);
-    
+
     const auto type = function->type;
     const auto info = type->info->as<FunctionTypeInfo>();
 
@@ -417,7 +428,7 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
 
     auto new_type = global_find_function_type_id(new_info, {{TYPE_EXT_POINTER_CONST}});
 
-    return make_cast(addr, new_type); 
+    return make_cast(addr, new_type);
   };
 
   for (auto &[name, method_type] : dyn_info->methods) {
@@ -612,7 +623,7 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
 
   for (const auto &ast_param : ast->params->params) {
     THIRParameter thir_param = {
-      .name = ast_param->normal.name,
+        .name = ast_param->normal.name,
     };
 
     THIR_ALLOC(THIRVariable, var, ast_param);
@@ -690,7 +701,6 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
   }
 }
 
-
 void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   for (const auto &param : ast->params->params) {
     THIR_ALLOC(THIRVariable, thir_param, param);
@@ -711,7 +721,7 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 
     if (!ast->is_forward_declared) {
       auto param_sym = ctx.scope->local_lookup(thir_param->name);
-      
+
       bind(param_sym, thir_param);
       bind(param, thir_param);
     }
@@ -728,12 +738,20 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     return nullptr;
   }
 
+  if (auto thir = get_thir(ast)) {
+    return thir;
+  }
+
   THIR_ALLOC(THIRFunction, thir, ast);
   Symbol *symbol;
   if (ast->declaring_type) {
     symbol = ast->declaring_type->info->scope->local_lookup(ast->name);
   } else {
     symbol = ctx.scope->local_lookup(ast->name);
+  }
+
+  if (auto thir = get_thir(symbol)) {
+    return thir;
   }
 
   bind(symbol, thir);
@@ -765,7 +783,6 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
   }
 
-  current_statement_list->push_back(thir);
   return thir;
 }
 
@@ -823,6 +840,19 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
 THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
+
+  for (const auto &member : ast->resolved_type->info->members) {
+    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
+    var->source_range = ast->source_range;
+    var->is_global = true;
+    var->is_statement = true;
+    var->name = member.name;
+    var->value = member.thir_value.get();
+    var->type = member.type;
+    auto symbol = ast->resolved_type->info->scope->local_lookup(member.name);
+    bind(symbol, var);
+  }
+
   return thir;
 }
 
@@ -1252,12 +1282,19 @@ THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
   thir->base = base;
   auto [type, member] = parts.front();
   thir->member = member;
+  if (!type) {
+    throw_error("THIRGen tried to make member access but type was null", range);
+  }
+
   thir->type = type;
   parts.pop_front();
   THIRMemberAccess *last_part = thir;
   while (!parts.empty()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRMemberAccess, member_access);
     auto [type, member] = parts.front();
+    if (!type) {
+      throw_error("THIRGen tried to make member access but type was null", range);
+    }
     parts.pop_front();
     member_access->base = last_part;
     member_access->member = member;
