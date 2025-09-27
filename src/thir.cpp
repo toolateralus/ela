@@ -146,6 +146,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     tuple.values = ast->arguments->arguments;
     thir->key_values.push_back({variant_name, visit_node(&tuple)});
     return thir;
+    
   }
 
   auto symbol = ctx.get_symbol(ast->callee);
