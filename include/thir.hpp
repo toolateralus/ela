@@ -267,6 +267,24 @@ struct THIRGen {
   Context &ctx;
 
   std::map<Symbol *, THIR *> symbol_map;
+  std::map<ASTNode *, THIR *> ast_map;
+
+  inline void bind(ASTNode *ast, THIR *thir) {
+    ast_map[ast] = thir;
+  }
+
+  inline void bind(Symbol *sym, THIR *thir) {
+    symbol_map[sym] = thir;
+  }
+
+  inline THIR *get_thir(ASTNode *ast) {
+    return ast_map[ast];
+  }
+
+  inline THIR *get_thir(Symbol *sym) {
+    return symbol_map[sym];
+  }
+
 
   Binder binder {};
 
