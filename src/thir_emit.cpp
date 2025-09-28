@@ -177,7 +177,7 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
 
 void Emitter::emit_literal(const THIRLiteral *thir) {
   if (thir->value == "null") {
-    code << "NULL";
+    code << "nullptr";
     return;
   }
 
@@ -203,8 +203,10 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
+  code << '(';
   code << '(' << c_type_string(thir->type) << ')';
   emit_expr(thir->operand);
+  code << ')';
 }
 
 void Emitter::emit_offset_of(const THIROffsetOf *thir) {
@@ -426,12 +428,10 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
 }
 
 void Emitter::emit_type(const THIRType *thir) {
-
   // TODO: stop doing this hack;
   if (thir->type->basename == "va_list") {
     return;
   }
-
 
   switch (thir->type->kind) {
     case TYPE_SCALAR:
@@ -457,18 +457,37 @@ void Emitter::emit_function(const THIRFunction *thir) {
   if (thir->is_extern || thir->is_exported) {
     code << "extern ";
   }
-  
+
   if (thir->is_inline) {
     code << "static inline ";
-  }
-  
-  if (thir->is_test) {
-    // TODO: emit test functions into a fixture again.
-    throw_error("emit_function:test not yet implemented", thir->source_range);
   }
 
   if (thir->is_entry) {
     entry_point = thir;
+  }
+
+  if (info->return_type->kind == TYPE_FUNCTION) {
+    std::string outer_params_decl;
+    auto param_iter = thir->parameters.begin();
+    for (size_t i = 0; i < info->params_len; ++i) {
+      const auto parameter = *param_iter;
+      if (i) outer_params_decl += ", ";
+      outer_params_decl += get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
+      param_iter++;
+    }
+    if (thir->is_varargs) {
+      if (!outer_params_decl.empty()) outer_params_decl += ", ";
+      outer_params_decl += "...";
+    }
+
+    std::string ident = std::string("*") + thir->name.get_str() + "(" + outer_params_decl + ")";
+    code << get_function_pointer_type_string(info->return_type, &ident, false);
+    if (thir->block) {
+      emit_block(thir->block);
+    } else {
+      code << ";\n";
+    }
+    return;
   }
 
   code << c_type_string(info->return_type);
@@ -554,7 +573,6 @@ void Emitter::emit_return(const THIRReturn *thir) {
   code << ";\n";
 }
 
-// TODO: add default argument emission.
 void Emitter::emit_call(const THIRCall *thir) {
   EXPR_BEGIN(thir);
   emit_expr(thir->callee);

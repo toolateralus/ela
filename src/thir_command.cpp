@@ -31,8 +31,12 @@ int CompileCommand::compile() {
     Emitter emitter;
     Resolver resolver(emitter);
     typer.visit(root);
+    
     auto thir = thir_gen.visit_program(root);
     resolver.visit_node(thir);
+
+
+
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
 
@@ -44,12 +48,11 @@ int CompileCommand::compile() {
     output << BOILERPLATE_C_CODE << '\n';
     output << emitter.code.str();
 
-    output << TESTING_BOILERPLATE << '\n';
-    output << std::format(MAIN_FMT, "#error todo find the freaking initialize symbol");
-
-
-
-
+    emitter.code.clear();
+    // Emit our main last always
+    THIRFunction *ep = thir_gen.emit_runtime_entry_point();
+    emitter.emit_function(ep);
+    output << emitter.code.str();
   });
 
   if (has_flag("no-compile")) {
@@ -129,7 +132,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       if (i + 1 < args.size() && args[i + 1] == "raylib") {
         init_string = RAYLIB_INIT_CODE;
       } else {
-        init_string = MAIN_INIT_CODE;
+        init_string = HELLO_WORLD_INIT_CODE;
       }
     } else if (arg == "lldb") {
       run_on_finished = false;
