@@ -43,6 +43,13 @@ int CompileCommand::compile() {
 
     output << BOILERPLATE_C_CODE << '\n';
     output << emitter.code.str();
+
+    output << TESTING_BOILERPLATE << '\n';
+    output << std::format(MAIN_FMT, "#error todo find the freaking initialize symbol");
+
+
+
+
   });
 
   if (has_flag("no-compile")) {

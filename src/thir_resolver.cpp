@@ -1,3 +1,4 @@
+#include "interned_string.hpp"
 #include "resolver.hpp"
 #include "emit.hpp"
 #include "thir.hpp"
@@ -144,12 +145,29 @@ void Resolver::visit_variable(const THIRVariable *thir) {
   }
 }
 void Resolver::visit_function(const THIRFunction *thir) {
+  static std::set<InternedString> emitted {};
+
+  #error "No, don't do this"
+
+  // !TODO REMOVE THIS **** IT'S ****ING AWFUL
+  if (emitted.contains(thir->name)) {
+    return;
+  }
+
+  if (thir->block) {
+    emitted.insert(thir->name);
+  }
+
   if (emitted_functions.contains(thir)) {
     return;
   }
-  emitted_functions.insert(thir);
+
+  if (thir->block) {
+    emitted_functions.insert(thir);
+  }
 
   const auto type = thir->type->info->as<FunctionTypeInfo>();
+
   for (size_t i = 0; i < type->params_len; ++i) {
     emit_type_definition(type->parameter_types[i]);
   }

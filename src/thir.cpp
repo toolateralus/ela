@@ -292,7 +292,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
           var->value = take_address_of(var->value, ast);
         }
         statements.insert(statements.begin(), var);
-        
+
         auto symbol = block_scope->lookup(part.var_name);
         bind(symbol, var);
       }
@@ -383,7 +383,14 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
         ast->base, visit_node(ast->base), symbol->function.declaration->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->index));
-    return overload_call;
+
+    // We always dereference index operator overLOADs
+    THIR_ALLOC(THIRUnaryExpr, deref, ast);
+    deref->type = overload_call->type->base_type;
+    deref->op = TType::Mul;
+    deref->operand = overload_call;
+
+    return deref;
   }
 }
 
@@ -458,8 +465,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
 
-
-  if(type->is_pointer()) {
+  if (type->is_pointer()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
     literal->value = "nullptr";
     literal->source_range = source_range;
@@ -769,7 +775,6 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     throw_error("Unable to find symbol for function", ast->source_range);
   }
 
-  // TODO: fix the typing issues with functions not being found
   bind(ast, thir);
 
   ENTER_SCOPE(ast->scope);
@@ -1055,7 +1060,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
 
-  auto next_arg = try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var, next_symbol->function.declaration->requires_self_ptr());
+  auto next_arg = try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var,
+                                                     next_symbol->function.declaration->requires_self_ptr());
 
   THIR_ALLOC(THIRCall, next_call, ast);
   next_call->callee = visit_node(next_symbol->function.declaration);

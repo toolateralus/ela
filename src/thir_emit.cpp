@@ -194,13 +194,11 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
 
 void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   emit_expr(thir->base);
-
   if (thir->base->type->is_pointer()) {
     code << "->";
   } else {
     code << '.';
   }
-
   code << thir->member.get_str();
 }
 
@@ -459,13 +457,16 @@ void Emitter::emit_function(const THIRFunction *thir) {
   if (thir->is_extern || thir->is_exported) {
     code << "extern ";
   }
+  
   if (thir->is_inline) {
     code << "static inline ";
   }
+  
   if (thir->is_test) {
     // TODO: emit test functions into a fixture again.
     throw_error("emit_function:test not yet implemented", thir->source_range);
   }
+
   if (thir->is_entry) {
     entry_point = thir;
   }
