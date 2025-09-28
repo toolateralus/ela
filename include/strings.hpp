@@ -155,6 +155,8 @@ fn main() {
 }
 )__";
 
+static constexpr auto USER_MAIN_FUNCTION_NAME = "__ela_main_";
+
 /* Macro to decide what to run at main. We could just do this in the compiler, idk why we have this. */
 static constexpr auto TESTING_BOILERPLATE = R"__(
 #ifdef TESTING

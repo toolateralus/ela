@@ -31,8 +31,12 @@ int CompileCommand::compile() {
     Emitter emitter;
     Resolver resolver(emitter);
     typer.visit(root);
+    
     auto thir = thir_gen.visit_program(root);
     resolver.visit_node(thir);
+
+
+
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
 
@@ -43,13 +47,13 @@ int CompileCommand::compile() {
 
     output << BOILERPLATE_C_CODE << '\n';
     output << emitter.code.str();
-
     output << TESTING_BOILERPLATE << '\n';
-    output << std::format(MAIN_FMT, "#error todo find the freaking initialize symbol");
 
-
-
-
+    emitter.code.clear();
+    // Emit our main last always
+    THIRFunction *ep = thir_gen.emit_runtime_entry_point();
+    emitter.emit_function(ep);
+    output << emitter.code.str();
   });
 
   if (has_flag("no-compile")) {

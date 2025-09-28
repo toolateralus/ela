@@ -788,12 +788,10 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
           "multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found",
           ast->source_range);
     }
-
     entry_point = thir;
     thir->is_entry = true;
-  }
-
-  if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
+    thir->name = USER_MAIN_FUNCTION_NAME;
+  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
     thir->name = ast->name;
   } else {
     thir->name = ast->scope->full_name();
@@ -1738,4 +1736,85 @@ THIR *THIRGen::make_cast(THIR *operand, Type *type) {
   cast->type = type;
   cast->operand = operand;
   return cast;
+}
+
+THIRFunction *THIRGen::emit_runtime_entry_point() {
+  
+  // TODO: implement global static initializers in the emitter.
+  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { 
+    global_ini->name = "ela_run_global_initializers";
+  }
+
+  Type *const_u8_ptr_ptr_type = char_ptr_type()->take_pointer_to(false);  // u8 const* const*;
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, main) {  // setup main function, get type, parameters, etc.
+    FunctionTypeInfo main_info{};
+    main_info.params_len = 2;
+    main_info.parameter_types[0] = s32_type();             // int
+    main_info.parameter_types[1] = const_u8_ptr_ptr_type;  // u8 **
+    main_info.return_type = s32_type();
+
+    Type *main_type = global_find_function_type_id(main_info, {});
+
+    main->name = "main";
+    main->type = main_type;
+
+    THIRParameter argv = {.name = "argv"}, argc = {.name = "argc"};
+    main->parameters.push_back(argc);
+    main->parameters.push_back(argv);
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRBlock, block) {  // Create block for main.
+    {                                          // Call Env::initialize(argc, argv);
+      // Find the damn call
+      ASTFunctionDeclaration *env_initialize = nullptr;
+      ASTPath env_initialize_path;
+      env_initialize_path.push_segment("Env");
+      env_initialize_path.push_segment("initialize");
+      auto symbol = ctx.get_symbol(&env_initialize_path).get();
+      env_initialize = symbol->function.declaration;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRCall, initialize);
+      initialize->callee = visit_node(env_initialize);
+      initialize->type = env_initialize->return_type->resolved_type;
+
+      // Parameterize the damn call
+      THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv);
+      argv->name = "argv";
+      argv->is_global = false;
+      argv->type = const_u8_ptr_ptr_type;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argc);
+      argc->name = "argc";
+      argc->is_global = false;
+      argc->type = s32_type();
+
+      initialize->arguments.push_back(argc);
+      initialize->arguments.push_back(argv);
+      initialize->is_statement = true;
+      // Call the damn call
+      block->statements.push_back(initialize);
+    }
+    { // Call __ela_main_();
+      // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
+      THIRFunction *entry_point = (THIRFunction*)this->entry_point;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRCall, entry_call)
+      entry_call->callee = entry_point;
+      entry_call->arguments = {};
+      entry_call->is_statement = true;
+
+      FunctionTypeInfo entry_type;
+      entry_type.return_type = void_type();
+      entry_type.is_varargs = false;
+      entry_type.params_len = 0;
+      entry_call->type = global_find_function_type_id(entry_type, {});
+      block->statements.push_back(entry_call);
+    }
+  }
+
+
+
+  main->block = block;
+  return main;
 }

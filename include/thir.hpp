@@ -427,4 +427,6 @@ struct THIRGen {
   ReflectionInfo create_reflection_type_struct(Type *type);
   THIR *to_reflection_type_struct(Type *type);
   void emit_destructure_for_pattern_match(ASTPatternMatch *pattern_match, std::vector<THIR *> &statements);
+
+  THIRFunction *emit_runtime_entry_point();
 };

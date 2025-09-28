@@ -653,10 +653,21 @@ Type *u8_ptr_type() {
   return type;
 }
 
+Type *char_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
+  return type;
+}
+
+Type *char_ptr_type() {
+  static Type *type = global_find_type_id(char_type(), {{TYPE_EXT_POINTER_CONST}});
+  return type;
+}
+
 Type *u8_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
 }
+
 Type *s64_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
   return type;
@@ -714,14 +725,27 @@ void init_type_system() {
   {
     bool_type();
     void_type();
+    char_type();
+    char_ptr_type();
   }
 
-  is_const_pointer_trait();
-  is_mut_pointer_trait();
-  is_pointer_trait();
-
-  is_tuple_trait();
-  is_array_trait();
+  { // initialize trait types.
+    is_fn_ptr_trait();
+    is_fn_trait();
+    is_tuple_trait();
+    is_struct_trait();
+    is_enum_trait();
+    is_choice_trait();
+    is_dyn_trait();
+    is_union_trait();
+    is_array_trait();
+    is_pointer_trait();
+    is_mut_pointer_trait();
+    is_const_pointer_trait();
+    is_slice_trait();
+    is_slice_mut_trait();
+    blittable_trait();
+  }
 }
 
 bool type_is_numerical(const Type *t) {
