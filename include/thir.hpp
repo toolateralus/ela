@@ -265,6 +265,8 @@ struct THIRGen {
   THIRGen(Context &ctx) : ctx(ctx) {}
   Context &ctx;
 
+  std::vector<THIRFunction *> test_functions;
+
   std::map<Symbol *, THIR *> symbol_map;
   std::map<ASTNode *, THIR *> ast_map;
 
@@ -344,6 +346,8 @@ struct THIRGen {
   // This is always a program, module, or block. it's for visit functions that need to return many nodes, from one call.
   // typically these will just return void.
   std::vector<THIR *> *current_statement_list;
+
+  THIR *visit_unpack_element(ASTUnpackElement *ast);
 
   THIR *try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *self, const bool requires_self_ptr);
   THIR *visit_method_call(ASTMethodCall *node);

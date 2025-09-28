@@ -42,18 +42,15 @@ static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath 
   return false;
 }
 
-static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplate(ASTPath *ast) {
+static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplate(ASTPath *ast, THIRGen *thirgen) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
   const auto type = ast->resolved_type;
   const auto path = ast;
   const auto variant_name = path->segments.back().identifier;
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto discriminant = info->get_variant_discriminant(variant_name);
-  THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, discriminant_literal);
-  // TODO: optimize the discriminant type size based on the number of variants in a choice type.
-  discriminant_literal->value = std::to_string(discriminant);
-  discriminant_literal->type = u32_type();
-  thir->key_values.push_back({DISCRIMINANT_KEY, discriminant_literal});
+  auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type());
+  thir->key_values.push_back({DISCRIMINANT_KEY, literal});
   return thir;
 }
 
@@ -139,7 +136,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     const auto variant_name = path->segments.back().identifier;
     const auto type = ast->callee->resolved_type;
     const auto info = type->info->as<ChoiceTypeInfo>();
-    const auto thir = get_choice_type_instantiation_boilerplate(path);
+    const auto thir = get_choice_type_instantiation_boilerplate(path, this);
     ASTTuple tuple;
     tuple.resolved_type = info->get_variant_type(variant_name);
     tuple.values = ast->arguments->arguments;
@@ -211,7 +208,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
 
 THIR *THIRGen::visit_path(ASTPath *ast) {
   if (should_emit_choice_type_marker_variant_instantiation(ast)) {
-    return get_choice_type_instantiation_boilerplate(ast);
+    return get_choice_type_instantiation_boilerplate(ast, this);
   }
 
   auto symbol = ctx.get_symbol(ast).get();
@@ -380,13 +377,16 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     auto scope = ast->base->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-        ast->base, visit_node(ast->base), symbol->function.declaration->requires_self_ptr()));
+
+    auto self = try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base),
+                                                   symbol->function.declaration->requires_self_ptr());
+
+    overload_call->arguments.push_back(self);
     overload_call->arguments.push_back(visit_node(ast->index));
 
     // We always dereference index operator overLOADs
     THIR_ALLOC(THIRUnaryExpr, deref, ast);
-    deref->type = overload_call->type->base_type;
+    deref->type = ast->resolved_type;
     deref->op = TType::Mul;
     deref->operand = overload_call;
 
@@ -563,7 +563,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         // Choice variant instantiation
         const auto path = ast->target_type.get()->normal.path;
         const auto info = ast->resolved_type->info->as<ChoiceTypeInfo>();
-        const auto thir = get_choice_type_instantiation_boilerplate(path);
+        const auto thir = get_choice_type_instantiation_boilerplate(path, this);
         const auto variant_name = path->segments.back().identifier;
         const auto variant_type = info->get_variant_type(variant_name);
 
@@ -605,13 +605,15 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   return nullptr;
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) { return to_reflection_type_struct(ast->target->resolved_type); }
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { 
+  return to_reflection_type_struct(ast->target->resolved_type); 
+}
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
   thir->operand = visit_node(ast->expression);
   thir->type = ast->target_type->resolved_type;
-
+  // TODO: why is thir->operand->type null here sometimes?
   if (thir->operand->type->is_kind(TYPE_STRUCT) && thir->operand->type->info->as<StructTypeInfo>()->is_structural) {
     auto addr = take_address_of(thir->operand, ast);
 
@@ -754,6 +756,13 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 }
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  const static bool is_testing = compile_command.has_flag("test");
+
+  if (ast->is_test && !is_testing) {
+    // TODO: is this acceptable?
+    return nullptr;
+  }
+
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
@@ -799,6 +808,10 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
+  }
+
+  if (is_testing && ast->is_test) {
+    test_functions.push_back(thir);
   }
 
   return thir;
@@ -1198,8 +1211,7 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
   return thir;
 }
 
-THIR *THIRGen::visit_defer(ASTDefer *ast) {
-  throw_error("visit_defer not implemented", ast->source_range);
+THIR *THIRGen::visit_defer(ASTDefer *) {
   return nullptr;
 }
 
@@ -1499,11 +1511,19 @@ THIR *THIRGen::get_generic_args_list(Type *type) {
 }
 
 ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
+  // for recursive calls
+  ReflectionInfo& reflection_info = reflected_upon_types[type];
+  if (reflection_info.has_been_created()) {
+    return reflection_info;
+  }
+
   static Type *type_type = ctx.scope->find_type_id("Type", {});
   ReflectionInfo info;
   info.created = true;
   info.definition =
       make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+
+  reflected_upon_types[type] = info;
 
   info.definition->is_global = true;
   info.definition->is_statement = true;
@@ -1582,10 +1602,10 @@ THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
   return deref;
 }
 
-THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
-  if (node->is_expr() && instantiate_conversions) {
-    const ASTExpr *expr = (ASTExpr *)node;
-    THIR *result = visit_node(node, false);
+THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
+  if (ast->is_expr() && instantiate_conversions) {
+    const ASTExpr *expr = (ASTExpr *)ast;
+    THIR *result = visit_node(ast, false);
 
     if (!expr->conversion.has_value) {
       return result;
@@ -1596,15 +1616,15 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
       return make_structural_typing_bitcast((Type *)expr->conversion.to, result);
     }
 
-    THIR_ALLOC(THIRCast, cast, node);
+    THIR_ALLOC(THIRCast, cast, ast);
     cast->type = (Type *)expr->conversion.to;
     cast->operand = result;
     return cast;
   }
 
-  switch (node->get_node_type()) {
+  switch (ast->get_node_type()) {
     case AST_NODE_STATEMENT_LIST: {
-      for (const auto &ast_stmt : ((ASTStatementList *)node)->statements) {
+      for (const auto &ast_stmt : ((ASTStatementList *)ast)->statements) {
         if (auto thir = visit_node(ast_stmt)) {
           current_statement_list->push_back(thir);
         }
@@ -1613,100 +1633,100 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
     }
     // These nodes can return many nodes, so they always return void, and push the nodes manually.
     case AST_NODE_TUPLE_DECONSTRUCTION: {
-      visit_destructure((ASTDestructure *)node);
+      visit_destructure((ASTDestructure *)ast);
       return nullptr;
     }
     case AST_NODE_WHERE_STATEMENT: {
-      visit_where_statement((ASTWhereStatement *)node);
+      visit_where_statement((ASTWhereStatement *)ast);
       return nullptr;
     }
     case AST_NODE_IMPL: {
-      visit_impl((ASTImpl *)node);
+      visit_impl((ASTImpl *)ast);
       return nullptr;
     }
     case AST_NODE_IMPORT: {
-      visit_import((ASTImport *)node);
+      visit_import((ASTImport *)ast);
       return nullptr;
     }
     case AST_NODE_MODULE: {
-      visit_module((ASTModule *)node);
+      visit_module((ASTModule *)ast);
       return nullptr;
     }
 
     // Actual nodes.
     case AST_NODE_IF:
-      return visit_if((ASTIf *)node);
+      return visit_if((ASTIf *)ast);
     case AST_NODE_LAMBDA:
-      return visit_lambda((ASTLambda *)node);
+      return visit_lambda((ASTLambda *)ast);
     case AST_NODE_BIN_EXPR:
-      return visit_bin_expr((ASTBinExpr *)node);
+      return visit_bin_expr((ASTBinExpr *)ast);
     case AST_NODE_UNARY_EXPR:
-      return visit_unary_expr((ASTUnaryExpr *)node);
+      return visit_unary_expr((ASTUnaryExpr *)ast);
     case AST_NODE_LITERAL:
-      return visit_literal((ASTLiteral *)node);
+      return visit_literal((ASTLiteral *)ast);
     case AST_NODE_PATH:
-      return visit_path((ASTPath *)node);
+      return visit_path((ASTPath *)ast);
     case AST_NODE_TUPLE:
-      return visit_tuple((ASTTuple *)node);
+      return visit_tuple((ASTTuple *)ast);
     case AST_NODE_CALL:
-      return visit_call((ASTCall *)node);
+      return visit_call((ASTCall *)ast);
     case AST_NODE_METHOD_CALL:
-      return visit_method_call((ASTMethodCall *)node);
+      return visit_method_call((ASTMethodCall *)ast);
     case AST_NODE_DOT_EXPR:
-      return visit_dot_expr((ASTDotExpr *)node);
+      return visit_dot_expr((ASTDotExpr *)ast);
     case AST_NODE_INDEX:
-      return visit_index((ASTIndex *)node);
+      return visit_index((ASTIndex *)ast);
     case AST_NODE_INITIALIZER_LIST:
-      return visit_initializer_list((ASTInitializerList *)node);
+      return visit_initializer_list((ASTInitializerList *)ast);
     case AST_NODE_SIZE_OF:
-      return visit_size_of((ASTSize_Of *)node);
+      return visit_size_of((ASTSize_Of *)ast);
     case AST_NODE_TYPE_OF:
-      return visit_type_of((ASTType_Of *)node);
+      return visit_type_of((ASTType_Of *)ast);
     case AST_NODE_DYN_OF:
-      return visit_dyn_of((ASTDyn_Of *)node);
+      return visit_dyn_of((ASTDyn_Of *)ast);
     case AST_NODE_CAST:
-      return visit_cast((ASTCast *)node);
+      return visit_cast((ASTCast *)ast);
     case AST_NODE_RANGE:
-      return visit_range((ASTRange *)node);
+      return visit_range((ASTRange *)ast);
     case AST_NODE_SWITCH:
-      return visit_switch((ASTSwitch *)node);
+      return visit_switch((ASTSwitch *)ast);
     case AST_NODE_PATTERN_MATCH:
       throw_error(
           "INTERNAL COMPILER ERROR:THIR :: you cannot visit a PatternMatch without explicitly calling into it, with "
           "the list of statements it needs to unload into.",
-          node->source_range);
+          ast->source_range);
       return nullptr;
     // Statement nodes
     case AST_NODE_BLOCK:
-      return visit_block((ASTBlock *)node);
+      return visit_block((ASTBlock *)ast);
     case AST_NODE_FUNCTION_DECLARATION:
-      return visit_function_declaration((ASTFunctionDeclaration *)node);
+      return visit_function_declaration((ASTFunctionDeclaration *)ast);
     case AST_NODE_RETURN:
-      return visit_return((ASTReturn *)node);
+      return visit_return((ASTReturn *)ast);
     case AST_NODE_CONTINUE:
-      return visit_continue((ASTContinue *)node);
+      return visit_continue((ASTContinue *)ast);
     case AST_NODE_BREAK:
-      return visit_break((ASTBreak *)node);
+      return visit_break((ASTBreak *)ast);
     case AST_NODE_FOR:
-      return visit_for((ASTFor *)node);
+      return visit_for((ASTFor *)ast);
     case AST_NODE_ELSE:
-      return visit_else((ASTElse *)node);
+      return visit_else((ASTElse *)ast);
     case AST_NODE_WHILE:
-      return visit_while((ASTWhile *)node);
+      return visit_while((ASTWhile *)ast);
     case AST_NODE_STRUCT_DECLARATION:
-      return visit_struct_declaration((ASTStructDeclaration *)node);
+      return visit_struct_declaration((ASTStructDeclaration *)ast);
     case AST_NODE_ENUM_DECLARATION:
-      return visit_enum_declaration((ASTEnumDeclaration *)node);
+      return visit_enum_declaration((ASTEnumDeclaration *)ast);
     case AST_NODE_CHOICE_DECLARATION:
-      return visit_choice_declaration((ASTChoiceDeclaration *)node);
+      return visit_choice_declaration((ASTChoiceDeclaration *)ast);
     case AST_NODE_VARIABLE:
-      return visit_variable((ASTVariable *)node);
+      return visit_variable((ASTVariable *)ast);
     case AST_NODE_EXPR_STATEMENT:
-      return visit_expr_statement((ASTExprStatement *)node);
+      return visit_expr_statement((ASTExprStatement *)ast);
     case AST_NODE_DEFER:
-      return visit_defer((ASTDefer *)node);
+      return visit_defer((ASTDefer *)ast);
     case AST_NODE_PROGRAM:
-      return visit_program((ASTProgram *)node);
+      return visit_program((ASTProgram *)ast);
 
     // Ignored nodes.
     case AST_NODE_NOOP:
@@ -1719,13 +1739,22 @@ THIR *THIRGen::visit_node(ASTNode *node, bool instantiate_conversions) {
     case AST_NODE_PARAM_DECL:
     case AST_NODE_ARGUMENTS:
     case AST_NODE_WHERE:
+    case AST_NODE_UNPACK:
       throw_error(
           "INTERNAL COMPILER ERROR: ast node not supported by thir gen. it's likely it just needs to be moved to the "
           "ignored cases",
-          node->source_range);
+          ast->source_range);
       return nullptr;
+    case AST_NODE_UNPACK_ELEMENT: {
+      return visit_unpack_element((ASTUnpackElement *)ast);
+    } break;
+    case AST_NODE_RUN:
+      throw_error("AST node type not yet supported by the THIRGen", ast->source_range);
+      return nullptr;
+      break;
+
     default:
-      throw_error("AST node not supported by THIR generator. needs to be implemented", node->source_range);
+      throw_error("AST node not supported by THIR generator. needs to be implemented", ast->source_range);
       return nullptr;
   }
 }
@@ -1739,11 +1768,8 @@ THIR *THIRGen::make_cast(THIR *operand, Type *type) {
 }
 
 THIRFunction *THIRGen::emit_runtime_entry_point() {
-  
   // TODO: implement global static initializers in the emitter.
-  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { 
-    global_ini->name = "ela_run_global_initializers";
-  }
+  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { global_ini->name = "ela_run_global_initializers"; }
 
   Type *const_u8_ptr_ptr_type = char_ptr_type()->take_pointer_to(false);  // u8 const* const*;
 
@@ -1795,9 +1821,13 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
       // Call the damn call
       block->statements.push_back(initialize);
     }
-    { // Call __ela_main_();
+
+    const bool is_testing = compile_command.has_flag("test");
+
+    if (!is_testing && !compile_command.has_flag("freestanding")) {
+      // Call __ela_main_();
       // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
-      THIRFunction *entry_point = (THIRFunction*)this->entry_point;
+      THIRFunction *entry_point = (THIRFunction *)this->entry_point;
 
       THIR_ALLOC_NO_SRC_RANGE(THIRCall, entry_call)
       entry_call->callee = entry_point;
@@ -1811,10 +1841,80 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
       entry_call->type = global_find_function_type_id(entry_type, {});
       block->statements.push_back(entry_call);
     }
+
+    if (is_testing) {
+      ASTVariable *all_tests_list_ast;
+      // List!<Test> and Test type fetching
+      ASTFunctionDeclaration *push_function;
+      Type *test_struct_type;
+      {
+        ASTPath test_path;
+        test_path.push_segment("testing");
+        test_path.push_segment("Test");
+
+        auto test_struct_sym = ctx.get_symbol(&test_path);
+        test_struct_type = test_struct_sym.get()->resolved_type;
+
+        ASTPath all_tests_list_path;
+        all_tests_list_path.push_segment("testing");
+        all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
+
+        auto all_tests_list = ctx.get_symbol(&all_tests_list_path).get();
+        all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
+
+        push_function =
+            all_tests_list_ast->type->resolved_type->info->scope->local_lookup("push")->function.declaration;
+      }
+
+      const auto list_ptr = take_address_of(get_thir(all_tests_list_ast), all_tests_list_ast);
+
+      for (const auto &function : test_functions) {
+        THIR_ALLOC_NO_SRC_RANGE(THIRCall, push_call)
+        push_call->callee = visit_node(push_function);
+        push_call->is_statement = true;
+        push_call->type = void_type();
+        block->statements.push_back(push_call);
+
+        THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_init);
+        auto fn_ptr = take_address_of(function, all_tests_list_ast);
+        test_init->key_values = {{"function", fn_ptr}, {"name", make_str(function->name, function->source_range)}};
+        test_init->type = test_struct_type;
+
+        push_call->arguments = {list_ptr, test_init};
+      }
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRCall, _run_all_tests_call) {
+        ASTPath run_all_tests;
+        run_all_tests.push_segment("testing");
+        run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
+
+        auto _run_all_tests_function = ctx.get_symbol(&run_all_tests);
+
+        ASTFunctionDeclaration *ast_func = _run_all_tests_function.get()->function.declaration;
+
+        _run_all_tests_call->callee = visit_node(ast_func);
+        _run_all_tests_call->arguments = {};
+        _run_all_tests_call->type = void_type();
+        _run_all_tests_call->is_statement = true;
+        block->statements.push_back(_run_all_tests_call);
+      }
+    }
   }
-
-
 
   main->block = block;
   return main;
+}
+
+THIR *THIRGen::visit_unpack_element(ASTUnpackElement *ast) {
+  switch (ast->tag) {
+    case ASTUnpackElement::TUPLE_ELEMENT: {
+      THIR_ALLOC(THIRMemberAccess, thir, ast);
+      thir->member = "$" + std::to_string(ast->tuple.element_index);
+      thir->base = visit_node(ast->tuple.source_tuple);
+      return thir;
+    }
+    case ASTUnpackElement::RANGE_ELEMENT: {
+      return visit_node(ast->range_literal_value);
+    } break;
+  }
 }

@@ -47,7 +47,6 @@ int CompileCommand::compile() {
 
     output << BOILERPLATE_C_CODE << '\n';
     output << emitter.code.str();
-    output << TESTING_BOILERPLATE << '\n';
 
     emitter.code.clear();
     // Emit our main last always
@@ -133,7 +132,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       if (i + 1 < args.size() && args[i + 1] == "raylib") {
         init_string = RAYLIB_INIT_CODE;
       } else {
-        init_string = MAIN_INIT_CODE;
+        init_string = HELLO_WORLD_INIT_CODE;
       }
     } else if (arg == "lldb") {
       run_on_finished = false;
