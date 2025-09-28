@@ -605,9 +605,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   return nullptr;
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) { 
-  return to_reflection_type_struct(ast->target->resolved_type); 
-}
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { return to_reflection_type_struct(ast->target->resolved_type); }
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
@@ -1211,9 +1209,7 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
   return thir;
 }
 
-THIR *THIRGen::visit_defer(ASTDefer *) {
-  return nullptr;
-}
+THIR *THIRGen::visit_defer(ASTDefer *) { return nullptr; }
 
 void THIRGen::visit_destructure(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
@@ -1350,9 +1346,12 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
       "name",
       make_str(name, {}),
   });
+
+  auto method = type->info->scope->lookup(name)->function.declaration;
+
   thir->key_values.push_back({
       "pointer",
-      symbol_map[type->info->scope->lookup(name)],
+      take_address_of(visit_node(method), method),
   });
   return thir;
 }
@@ -1512,7 +1511,7 @@ THIR *THIRGen::get_generic_args_list(Type *type) {
 
 ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   // for recursive calls
-  ReflectionInfo& reflection_info = reflected_upon_types[type];
+  ReflectionInfo &reflection_info = reflected_upon_types[type];
   if (reflection_info.has_been_created()) {
     return reflection_info;
   }

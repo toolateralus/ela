@@ -102,6 +102,7 @@ void Resolver::visit_aggregate_initializer(const THIRAggregateInitializer *thir)
     visit_node(value);
   }
 }
+
 void Resolver::visit_collection_initializer(const THIRCollectionInitializer *thir) {
   for (const auto &value : thir->values) {
     visit_node(value);
