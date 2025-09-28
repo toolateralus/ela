@@ -723,22 +723,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
     visit_function_header(method, false, false, {});
 
-    type_scope->insert_function(method->name, method->resolved_type, method);
-    auto &symbol = type_scope->symbols[method->name];
-    symbol.is_forward_declared = true;
-    symbol.is_function = true;
-
-    impl_scope.symbols[method->name] = symbol;
-  }
-
-  for (const auto &method : node->methods) {
-    method->declaring_type = target_ty;
-    if (!method->generic_parameters.empty()) {
-      continue;
-    }
-
     if (auto symbol = type_scope->local_lookup(method->name)) {
-      if (!symbol->is_forward_declared) {
+      if (!symbol->is_forward_declared && !method->is_forward_declared) {
         throw_error("Redefinition of method", method->source_range);
       } else {
         symbol->is_forward_declared = false;
@@ -749,10 +735,15 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       } else {
         type_scope->insert_function(method->name, method->resolved_type, method);
       }
-      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-      if (method->is_extern || method->is_forward_declared) {
-        continue;
-      }
+    }
+
+    impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+  }
+
+  for (const auto &method : node->methods) {
+    method->declaring_type = target_ty;
+    if (!method->generic_parameters.empty() || method->is_extern || method->is_forward_declared) {
+      continue;
     }
 
     visit_function_body(method);

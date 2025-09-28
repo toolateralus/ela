@@ -103,6 +103,17 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug ela_source/main compilation, stop on entry",
+      "program": "${workspaceFolder}/bin/ela",
+      "args": [
+        "main.ela"
+      ],
+      "cwd": "${workspaceFolder}/ela_source",
+      "stopOnEntry": true
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug ela_source/main executable",
       "program": "${workspaceFolder}/ela_source/main",
       "args": [],
