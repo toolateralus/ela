@@ -31,11 +31,8 @@ int CompileCommand::compile() {
     THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);
-    
-    auto thir = thir_gen.visit_program(root);
-    resolver.visit_node(thir);
 
-
+    resolver.visit_node(thir_gen.visit_program(root));
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);

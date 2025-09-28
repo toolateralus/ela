@@ -753,6 +753,31 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
   }
 }
 
+void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
+  if (thir->name == "main" || thir->is_entry) {
+    if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
+      throw_error(
+          "multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found",
+          ast->source_range);
+    }
+    entry_point = thir;
+    thir->is_entry = true;
+    thir->name = USER_MAIN_FUNCTION_NAME;
+  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
+    thir->name = ast->name;
+  } else {
+    std::string name;
+    if (ast->declaring_type) {
+      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.get_str();
+    } else {
+      name = ast->scope->full_name();
+    }
+    if (ast->generic_arguments.size()) {
+      name += "$" + mangled_type_args(ast->generic_arguments);
+    }
+    thir->name = name;
+  }
+}
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   const static bool is_testing = compile_command.has_flag("test");
 
@@ -789,29 +814,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   convert_function_attributes(thir, ast->attributes);
   convert_parameters(ast, thir);
 
-  if (thir->name == "main" || thir->is_entry) {
-    if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
-      throw_error(
-          "multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found",
-          ast->source_range);
-    }
-    entry_point = thir;
-    thir->is_entry = true;
-    thir->name = USER_MAIN_FUNCTION_NAME;
-  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
-    thir->name = ast->name;
-  } else {
-    std::string name;
-    if (ast->declaring_type)  {
-      name = ast->declaring_type->info->scope->full_name() + ast->name.get_str();
-    } else {
-      name = ast->scope->full_name();
-    }
-    if (ast->generic_arguments.size()) {
-      name += mangled_type_args(ast->generic_arguments);
-    }
-    thir->name = name;
-  }
+  mangle_function_name_for_thir(ast, thir);
 
   if (ast->block) {
     thir->block = (THIRBlock *)visit_block(ast->block.get());
@@ -828,6 +831,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   THIR_ALLOC(THIRVariable, thir, ast);
 
   thir->is_global = !ast->is_local;
+  thir->is_static = ast->is_static;
 
   auto symbol = ast->declaring_scope->local_lookup(ast->name);
   bind(ast, thir);

@@ -167,10 +167,11 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
     emit_expr(thir->operand);
     code << "; &temp; })";
   } else {
+    code << '(';
     code << ttype_get_operator_string(thir->op, thir->source_range);
     code << '(';
     emit_expr(thir->operand);
-    code << ')';
+    code << "))";
   }
   EXPR_TERMINATE(thir);
 }
@@ -274,6 +275,31 @@ void Emitter::emit_while(const THIRWhile *thir) {
   }
   code << ')';
   emit_block(thir->block);
+}
+
+
+void Emitter::emit_type(const THIRType *thir) {
+  // TODO: stop doing this hack;
+  if (thir->type->basename == "va_list") {
+    return;
+  }
+
+  switch (thir->type->kind) {
+    case TYPE_SCALAR:
+    case TYPE_FUNCTION:
+    case TYPE_TRAIT:
+      return;
+    case TYPE_DYN:
+      return emit_dyn_dispatch_object_struct(thir->type);
+    case TYPE_TUPLE:
+      return emit_tuple(thir->type);
+    case TYPE_STRUCT:
+      return emit_struct(thir->type);
+    case TYPE_ENUM:
+      return emit_enum(thir->type);
+    case TYPE_CHOICE:
+      return emit_choice(thir->type);
+  }
 }
 
 void Emitter::emit_tuple(Type *type) {
@@ -427,29 +453,6 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
   code << "} " << name << ";\n";
 }
 
-void Emitter::emit_type(const THIRType *thir) {
-  // TODO: stop doing this hack;
-  if (thir->type->basename == "va_list") {
-    return;
-  }
-
-  switch (thir->type->kind) {
-    case TYPE_SCALAR:
-    case TYPE_FUNCTION:
-    case TYPE_TRAIT:
-      return;
-    case TYPE_DYN:
-      return emit_dyn_dispatch_object_struct(thir->type);
-    case TYPE_TUPLE:
-      return emit_tuple(thir->type);
-    case TYPE_STRUCT:
-      return emit_struct(thir->type);
-    case TYPE_ENUM:
-      return emit_enum(thir->type);
-    case TYPE_CHOICE:
-      return emit_choice(thir->type);
-  }
-}
 
 void Emitter::emit_function(const THIRFunction *thir) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
@@ -558,7 +561,12 @@ void Emitter::emit_expr(const THIR *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
-  indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+  if (thir->is_static) {
+    indented("static " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+  } else {
+    indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+  }
+
   code << " = ";
   emit_expr(thir->value);
   code << ";\n";
@@ -589,23 +597,9 @@ void Emitter::emit_call(const THIRCall *thir) {
 }
 
 void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
+
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
 
-using ReflectionMap = const std::unordered_map<const Type *, ReflectionInfo> &;
-
-void Emitter::emit_reflection_forward_declarations(ReflectionMap reflected_upon_types) {
-  code << "typedef struct Type Type;\n";
-  for (const auto &[_, info] : reflected_upon_types) {
-    auto &def = info.definition;
-    code << "extern Type " << def->name.get_str() << ";\n";
-  }
-}
-
-void Emitter::emit_reflection_declarations(ReflectionMap reflected_upon_types) {
-  for (const auto &[_, info] : reflected_upon_types) {
-    emit_variable(info.definition);
-  }
-}
 
 void Emitter::emit_node(const THIR *thir) {
   emit_line_directive(thir);

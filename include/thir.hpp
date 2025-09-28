@@ -84,7 +84,8 @@ struct THIRProgram : THIR {
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
-  bool is_global;
+  bool is_static : 1 = false;
+  bool is_global : 1 = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -400,6 +401,7 @@ struct THIRGen {
                    std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);
 
+  void mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFunction *&thir);
   THIR *visit_function_declaration(ASTFunctionDeclaration *node);
   THIR *visit_variable(ASTVariable *node);
   THIR *visit_continue(ASTContinue *node);
