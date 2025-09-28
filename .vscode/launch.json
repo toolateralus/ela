@@ -90,19 +90,6 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug ela_source/main compilation",
-      "program": "${workspaceFolder}/bin/ela",
-      "args": [
-        "main.ela"
-      ],
-      "cwd": "${workspaceFolder}/ela_source",
-      "env": {
-        // "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
-      }
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
       "name": "Debug ela_source/main compilation, stop on entry",
       "program": "${workspaceFolder}/bin/ela",
       "args": [
