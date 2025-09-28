@@ -27,10 +27,10 @@ int CompileCommand::compile() {
 
   lower.run<void>("typing & lowering to C", [&] {
     Typer typer{context};
+    typer.visit(root);
     THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);
-    typer.visit(root);
     
     auto thir = thir_gen.visit_program(root);
     resolver.visit_node(thir);

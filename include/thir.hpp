@@ -262,7 +262,17 @@ struct ReflectionInfo {
 };
 
 struct THIRGen {
-  THIRGen(Context &ctx) : ctx(ctx) {}
+  THIRGen(Context &ctx) : ctx(ctx) {
+    auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
+    auto method_ty = ctx.scope->find_type_id("Method", {});
+    auto field_ty = ctx.scope->find_type_id("Field", {});
+    
+    auto list_decl = (ASTDeclaration*)ctx.scope->lookup("List")->type.declaration.get();
+
+    type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
+    method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
+    field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
+  }
   Context &ctx;
 
   std::vector<THIRFunction *> test_functions;
