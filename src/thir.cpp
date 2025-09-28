@@ -1519,16 +1519,14 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   static Type *type_type = ctx.scope->find_type_id("Type", {});
   ReflectionInfo info;
+  info.definition = make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
   info.created = true;
-  info.definition =
-      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
-
-  reflected_upon_types[type] = info;
-
+  
   info.definition->is_global = true;
   info.definition->is_statement = true;
-
   info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
+
+  reflected_upon_types[type] = info;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
   thir->type = type_type;
@@ -1789,7 +1787,6 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
     main->parameters.push_back(argc);
     main->parameters.push_back(argv);
   }
-
   THIR_ALLOC_NO_SRC_RANGE(THIRBlock, block) {  // Create block for main.
     {                                          // Call Env::initialize(argc, argv);
       // Find the damn call

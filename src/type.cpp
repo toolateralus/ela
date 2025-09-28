@@ -484,7 +484,12 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   type->set_base(base);
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
+
+  // ! THIS SHOULD NOT INHERIT THE NODES SCOPE, 
+  // ! IT SHOULD HAVE IT'S OWN SCOPE THAT'S DETACHED FROM THE ROOT SCOPE
+  // ! ALL TYPES SUFFER THIS ISSUE, IT NEEDS TO BE FIXED.
   info->scope = scope;
+
   info->scope->name = base;
   type->set_info(info);
 
