@@ -24,8 +24,10 @@ void Resolver::declare_or_define_type(Type *type) {
       return;
     }
   }
+  
   emit_type_definition(type);
 }
+
 // formerly `define_type`
 void Resolver::emit_type_definition(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {

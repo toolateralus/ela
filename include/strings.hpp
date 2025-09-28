@@ -178,5 +178,6 @@ typedef unsigned char u8;
 void ela_run_global_initializers();
 
 #include <stdarg.h> // for 'va_list'
+#include <stddef.h> // for 'offsetof'
 
 )__";

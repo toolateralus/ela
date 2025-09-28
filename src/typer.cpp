@@ -762,6 +762,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
     for (auto trait_method : trait->methods) {
       auto method = (ASTFunctionDeclaration *)deep_copy_ast(trait_method);
+      method->declaring_type = target_ty;
+
       if (auto impl_symbol = impl_scope.local_lookup(method->name)) {
         method->accept(this);
         if (!impl_method_matches_trait(method->resolved_type, impl_symbol->resolved_type)) {
@@ -774,10 +776,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
           }
         }
       } else if (!method->is_forward_declared) {
-        method->declaring_type = target_ty;
-
+        
         if (!method->generic_parameters.empty()) {
-          // TODO: actually generate a signature for a generic function so that you can compare them
           type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC, method);
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
           continue;
@@ -824,6 +824,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (target_ty->is_kind(TYPE_TRAIT)) {
     for (Type *type : type_table) {
       if (type->implements(target_ty)) {
+        // ! ????????
         // We patch up any already-implemented types when adding a method to a trait.
         // You can't add new trait methods, just defaults.
         node->target->resolved_type = type;

@@ -55,6 +55,7 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
     new_node->block = (ASTBlock *)copy_node(node->block.get());
     node->block.get()->scope->parent = new_node->scope;
   }
+  
   current_scope = old_scope;
   return new_node;
 }

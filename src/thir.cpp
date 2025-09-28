@@ -801,7 +801,16 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
     thir->name = ast->name;
   } else {
-    thir->name = ast->scope->full_name();
+    std::string name;
+    if (ast->declaring_type)  {
+      name = ast->declaring_type->info->scope->full_name() + ast->name.get_str();
+    } else {
+      name = ast->scope->full_name();
+    }
+    if (ast->generic_arguments.size()) {
+      name += mangled_type_args(ast->generic_arguments);
+    }
+    thir->name = name;
   }
 
   if (ast->block) {
@@ -1347,12 +1356,32 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
       make_str(name, {}),
   });
 
-  auto method = type->info->scope->lookup(name)->function.declaration;
+  if (type->kind != TYPE_TRAIT) {
+    ASTFunctionDeclaration *method;
+    if (type->base_type) {
+      method = type->base_type->info->scope->lookup(name)->function.declaration;
+    } else {
+      method = type->info->scope->lookup(name)->function.declaration;
+    }
 
-  thir->key_values.push_back({
-      "pointer",
-      take_address_of(visit_node(method), method),
-  });
+    if (method->generic_parameters.empty()) {
+      thir->key_values.push_back({
+          "pointer",
+          take_address_of(visit_node(method), method),
+      });
+    } else {
+      thir->key_values.push_back({
+          "pointer",
+          make_literal("nullptr", {}, void_type()->take_pointer_to(false)),
+      });
+    }
+  } else {
+    thir->key_values.push_back({
+        "pointer",
+        make_literal("nullptr", {}, void_type()->take_pointer_to(false)),
+    });
+  }
+
   return thir;
 }
 
@@ -1429,8 +1458,10 @@ THIR *THIRGen::get_methods_list(Type *type) {
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->type = method_type->make_array_of(length);
-  for (const auto &member : type->info->members) {
-    collection->values.push_back(get_method_struct(member.name.get_str(), member.type));
+  for (const auto &[name, member] : type->info->scope->symbols) {
+    if (member.is_function) {
+      collection->values.push_back(get_method_struct(name.get_str(), type));
+    }
   }
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
@@ -1517,7 +1548,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   }
 
   static Type *type_type = ctx.scope->find_type_id("Type", {});
-  
+
   ReflectionInfo &info = reflected_upon_types[type];
   info.created = true;
   info.definition =

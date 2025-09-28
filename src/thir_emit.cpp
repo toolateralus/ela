@@ -369,7 +369,7 @@ void Emitter::emit_enum(Type *type) {
     code << ",\n";
   }
 
-  code << "} " << type->basename.get_str() << ";\n";
+  code << "} " << c_type_string(type) << ";\n";
 }
 
 void Emitter::forward_declare_type(const Type *type) {
