@@ -1518,10 +1518,12 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   }
 
   static Type *type_type = ctx.scope->find_type_id("Type", {});
-  ReflectionInfo info;
-  info.definition = make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
-  info.created = true;
   
+  ReflectionInfo &info = reflected_upon_types[type];
+  info.created = true;
+  info.definition =
+      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+
   info.definition->is_global = true;
   info.definition->is_statement = true;
   info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);

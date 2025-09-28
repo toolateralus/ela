@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include "interned_string.hpp"
 #include "resolver.hpp"
 #include "emit.hpp"
@@ -138,7 +139,16 @@ void Resolver::visit_while(const THIRWhile *thir) {
   visit_node(thir->block);
 }
 void Resolver::visit_variable(const THIRVariable *thir) {
-  if (thir->value) visit_node(thir->value);
+  static std::unordered_set<const THIRVariable *> visited;
+  if (visited.contains(thir)) {
+    return;
+  } else {
+    visited.insert(thir);
+  }
+  
+  if (thir->value) { 
+    visit_node(thir->value);
+  }
   if (thir->is_global && !emitted_global_variables.contains(thir)) {
     emitter.emit_variable(thir);
     emitted_global_variables.insert(thir);
