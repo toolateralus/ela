@@ -1412,7 +1412,13 @@ ASTType *Parser::parse_type() {
     node->normal.path->source_range = range;
   }
 
+
   end_node(node, range);
+  
+  if (node->kind == ASTType::NORMAL && node->normal.path && node->normal.path->segments.empty()) {
+    throw_error("INTERNAL PARSER ERROR: parsed an empty path for a type", range);
+  }
+
   return node;
 }
 
@@ -2844,6 +2850,7 @@ ASTType *Parser::parse_function_type() {
                   "type (TODO MAKE THIS WARNING MAKE MORE SENSE)",
                   range);
   }
+
   output_type->extensions.insert(output_type->extensions.begin(), {TYPE_EXT_POINTER_MUT});
   FunctionTypeInfo info{};
   output_type->function.parameter_types = parse_parameter_types();

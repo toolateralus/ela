@@ -1,0 +1,17 @@
+
+struct Hello {}
+
+impl Hello {
+  fn exec!<TString, UserArg>(*mut self,
+    sql: TString,
+    callback: fn(*mut UserArg, *s32) -> s32 = null, // This was crashing the compiler during generic arg inference
+    user_arg: *mut UserArg = null) -> c_str {
+    return null;
+  }
+}
+
+
+fn main() {
+  mut h: Hello;
+  h.exec("haha", null, null);
+}

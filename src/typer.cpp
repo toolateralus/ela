@@ -1198,7 +1198,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
             for (const auto &generic : generics) {
               // ! This condition is terrible
-              if (generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
+              // ! Update: this condition is truly awful. FIXME. had to patch this because it crashes the compiler.
+              if (param->normal.type->kind == ASTType::NORMAL &&
+                  generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
                 is_generic = true;
                 break;
               }
@@ -3852,7 +3854,7 @@ void Typer::visit(ASTUnpackElement *) {
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
   CTInterpreter interpreter(ctx);
-  
+
   auto result = interpreter.visit(node->node_to_run);
 
   if (result->get_value_type() == ValueType::RETURN) {
@@ -3872,6 +3874,7 @@ void Typer::visit(ASTRun *node) {
       parent_prev->accept_typed_replacement(ast);
     }
   } else {
-    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected", node->source_range);
+    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected",
+                  node->source_range);
   }
 }

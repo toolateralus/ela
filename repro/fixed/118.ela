@@ -3,7 +3,7 @@ fn main() {
   // closed (brace wise).
   switch is Option!<s32>::Some(10) {
     Option!<s32>::None: {
-      std::printf("was none");
+      std::c::printf("was none\n"c);
     }
     Option!<s32>::Some(v): {
       std::printf("v=%", v);
