@@ -867,7 +867,7 @@ void Emitter::visit(ASTBinExpr *node) {
     return;
   }
 
-  if (left_ty->is_fixed_sized_array()) {
+  if (left_ty->is_fixed_sized_array() && node->op == TType::Assign) {
     throw_warning(WARNING_ARRAY_ASSIGNMENT_MEMCPY, "Assigning to a fixed array incurs a memcpy, and relies on libc.",
                   node->source_range);
 
@@ -925,6 +925,7 @@ void Emitter::visit(ASTVariable *node) {
 
   auto variable = ctx.scope->lookup(node->name);
 
+  // ! Why does this even happen????? happens when you emit constants and shit
   if (!variable) {
     throw_error(
         std::format(

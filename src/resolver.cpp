@@ -276,30 +276,27 @@ void Resolver::visit_operator_overload(ASTExpr *base, const std::string &operato
 void Resolver::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->left, get_operator_overload_name(node->op, OPERATION_BINARY), node->right);
-  } else {
-    node->left->accept(this);
-    node->right->accept(this);
-  }
+  } 
+  node->left->accept(this);
+  node->right->accept(this);
 }
 
 void Resolver::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->operand, get_operator_overload_name(node->op, OPERATION_UNARY), nullptr);
-  } else {
+  } 
     define_type(node->operand->resolved_type);
-    node->operand->accept(this);
-  }
+  node->operand->accept(this);
 }
 
 void Resolver::visit(ASTIndex *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->base, get_operator_overload_name(TType::LBrace, OPERATION_INDEX), node->index);
-  } else {
-    // make sure type is defined for size
-    define_type(node->base->resolved_type);
-    node->base->accept(this);
-    node->index->accept(this);
   }
+  // make sure type is defined for size
+  define_type(node->base->resolved_type);
+  node->base->accept(this);
+  node->index->accept(this);
 }
 
 void Resolver::visit(ASTPath *node) {

@@ -1,0 +1,11 @@
+// This typo crashes the compiler.
+// We forgot the ::. We always terminate imports with ; so if we see a non-; and non
+// :: symbol right after the first identifier, we should error.
+import assertion{
+  assert,
+};
+
+// Really, any syntax errors in import statements just crash.
+// This also causes an out of bounds vector access, just as above,
+// must be an empty path. again-- same solution
+import lib.ela;
