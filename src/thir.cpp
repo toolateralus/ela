@@ -63,30 +63,45 @@ THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
 
 THIR *THIRGen::visit_continue(ASTContinue *ast) {
   THIR_ALLOC(THIRContinue, thir, ast);
+  auto defers = collect_defers_up_to(DeferBoundary::LOOP);
+  for (auto d : defers) {
+    current_statement_list->push_back(d);
+  }
   return thir;
 }
 
 THIR *THIRGen::visit_break(ASTBreak *ast) {
   THIR_ALLOC(THIRBreak, thir, ast);
+  auto defers = collect_defers_up_to(DeferBoundary::LOOP);
+  for (auto d : defers) {
+    current_statement_list->push_back(d);
+  }
   return thir;
 }
 
 THIR *THIRGen::visit_return(ASTReturn *ast) {
-  // For defers and block expressions, we write to a variable instead of actually returning.
   if (return_override_register.is_not_null() && ast->expression) {
-    THIR_ALLOC(THIRBinExpr, thir, ast)
-    thir->op = TType::Assign;
-    thir->left = return_override_register.get();
-    thir->right = visit_node(ast->expression.get());
-    thir->is_statement = true;
-    return thir;
+    THIR_ALLOC(THIRBinExpr, assign_thir, ast)
+    assign_thir->op = TType::Assign;
+    assign_thir->left = return_override_register.get();
+    assign_thir->right = visit_node(ast->expression.get());
+    assign_thir->is_statement = true;
+
+    auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+    for (auto d : defers) current_statement_list->push_back(d);
+
+    return assign_thir;
   }
 
-  THIR_ALLOC(THIRReturn, thir, ast);
+  THIR_ALLOC(THIRReturn, ret, ast);
   if (ast->expression) {
-    thir->expression = visit_node(ast->expression.get());
+    ret->expression = visit_node(ast->expression.get());
   }
-  return thir;
+
+  auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+  for (auto d : defers) current_statement_list->push_back(d);
+
+  return ret;
 }
 
 THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
@@ -709,16 +724,6 @@ THIR *THIRGen::visit_block(ASTBlock *ast) {
     }
   }
 
-  // !
-  // TODO: this is gonna have to be a lot more complex than this. we have to look up at our parent blocks
-  // and grab up all their deferred statements on early returns.
-  // This is just the basic idea, append them at the end, and all the continues, breaks, and returns, when applicable.
-  // !
-  for (const auto &ast_deferred : deferred_statements) {
-    auto thir_deferred = visit_node(ast_deferred->statement);
-    thir->statements.push_back(thir_deferred);
-  }
-
   return thir;
 }
 
@@ -843,7 +848,12 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   mangle_function_name_for_thir(ast, thir);
 
   if (ast->block) {
+    enter_defer_boundary(DeferBoundary::FUNCTION);
     thir->block = (THIRBlock *)visit_block(ast->block.get());
+    auto func_defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+    for (auto d : func_defers) {
+      thir->block->statements.push_back(d);
+    }
   }
 
   if (is_testing && ast->is_test) {
@@ -1211,8 +1221,16 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
     bind(identifier_symbol, identifier_var);
 
-    thir->block = visit_node(ast->block);
-    THIRBlock *block = (THIRBlock *)thir->block;
+    enter_defer_boundary(DeferBoundary::LOOP);
+
+    THIRBlock *block = (THIRBlock *)visit_node(ast->block);
+    thir->block = block;
+
+    auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+    for (auto d : loop_defers) {
+      block->statements.push_back(d);
+    }
+
     block->statements.insert(block->statements.begin(), identifier_var);
   }
 
@@ -1264,11 +1282,40 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
   if (ast->condition) {
     thir->condition = visit_node(ast->condition.get());
   }
+
+  enter_defer_boundary(DeferBoundary::LOOP);
   thir->block = (THIRBlock *)visit_node(ast->block);
+  auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+  for (auto d : loop_defers) {
+    thir->block->statements.push_back(d);
+  }
+
   return thir;
 }
 
-THIR *THIRGen::visit_defer(ASTDefer *) { return nullptr; }
+THIR *THIRGen::visit_defer(ASTDefer *ast) {
+  std::vector<THIR *> tmp_stmts;
+  
+  {
+    ENTER_STMT_VEC(tmp_stmts);
+    if (auto s = visit_node(ast->statement)) {
+      tmp_stmts.push_back(s);
+    }
+  }
+
+  for (auto &s : tmp_stmts) {
+    if (s) s->is_statement = true;
+  }
+
+  if (defer_stack.empty()) {
+    throw_error("got a defer statement where we were not expecting it. they're only valid within functions and blocks",
+                ast->source_range);
+  }
+
+  defer_stack.back().defers.append_range(std::move(tmp_stmts));
+
+  return THIRNoop::shared();
+}
 
 void THIRGen::visit_destructure(ASTDestructure *ast) {
   const auto type = ast->right->resolved_type;
@@ -2043,4 +2090,27 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir,
   expr->type = value->type;
 
   global_initializer_function->block->statements.push_back(expr);
+}
+
+void THIRGen::enter_defer_boundary(DeferBoundary boundary) { defer_stack.push_back({boundary, {}}); }
+
+// inclusive
+std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
+  return {};
+  std::vector<THIR *> out;
+  while (!defer_stack.empty()) {
+    DeferFrame frame = std::move(defer_stack.back());
+    defer_stack.pop_back();
+    
+    // Execute defers in LIFO order: iterate the frame's defers from last to
+    // first. Each defer is a group of statements which should be emitted in
+    // the original order.
+    for (auto it = frame.defers.rbegin(); it != frame.defers.rend(); ++it) {
+      out.push_back(*it);
+    }
+    if (frame.boundary == boundary) {
+      break;
+    }
+  }
+  return out;
 }

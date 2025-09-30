@@ -273,6 +273,19 @@ struct ReflectionInfo {
   bool has_been_created() const { return created; }
 };
 
+enum struct DeferBoundary {
+  FUNCTION,
+  LOOP,
+};
+
+struct DeferFrame {
+  DeferBoundary boundary;
+  // Each defer may contain multiple statements; store as groups so that when we
+  // execute defers in LIFO order we keep the statements inside each defer in
+  // their original order.
+  std::vector<THIR *> defers;
+};
+
 struct THIRGen {
   THIRGen(Context &ctx) : ctx(ctx) {
     auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
@@ -308,6 +321,12 @@ struct THIRGen {
   std::vector<THIRFunction *> test_functions;
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;
+
+  std::vector<DeferFrame> defer_stack;
+
+  void enter_defer_boundary(DeferBoundary boundary);
+  // remove frames up to `boundary` and return defers in execution order
+  std::vector<THIR *> collect_defers_up_to(DeferBoundary boundary);
 
   std::map<Symbol *, THIR *> symbol_map;
   std::map<ASTNode *, THIR *> ast_map;
