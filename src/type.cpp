@@ -1165,6 +1165,13 @@ size_t Type::size_in_bytes() const {
     }
   }
 
+  if (kind == TYPE_DYN) {
+    auto dyn_info = info->as<DynTypeInfo>();
+    size_t method_ptrs_size = dyn_info->methods.size() * sizeof(void *);
+    size_t instance_size = sizeof(void *);
+    return method_ptrs_size + instance_size;
+  }
+
   return sizeof(void *);
 }
 
