@@ -485,7 +485,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
 
-  // ! THIS SHOULD NOT INHERIT THE NODES SCOPE, 
+  // ! THIS SHOULD NOT INHERIT THE NODES SCOPE,
   // ! IT SHOULD HAVE IT'S OWN SCOPE THAT'S DETACHED FROM THE ROOT SCOPE
   // ! ALL TYPES SUFFER THIS ISSUE, IT NEEDS TO BE FIXED.
   info->scope = scope;
@@ -734,7 +734,7 @@ void init_type_system() {
     char_ptr_type();
   }
 
-  { // initialize trait types.
+  {  // initialize trait types.
     is_fn_ptr_trait();
     is_fn_trait();
     is_tuple_trait();
@@ -1086,7 +1086,7 @@ void assess_and_try_add_blittable_trait(Type *type) {
 
 size_t Type::size_in_bytes() const {
   if (!info) {
-    return sizeof(void *);
+    throw_error("INTERNAL COMPILER ERROR: called 'size_in_bytes' on a type with no info", {});
   }
 
   if (is_pointer()) {
@@ -1099,80 +1099,27 @@ size_t Type::size_in_bytes() const {
     return elem_size * len;
   }
 
-  if (kind == TYPE_STRUCT && info->as<StructTypeInfo>()->is_union) {
-    auto struct_info = info->as<StructTypeInfo>();
-    size_t max_size = 0;
-    size_t max_align = 1;
-    for (auto &member : struct_info->members) {
-      max_size = std::max(max_size, member.type->size_in_bytes());
-      max_align = std::max(max_align, member.type->alignment_in_bytes());
-    }
-    // round up to max alignment
-    max_size = (max_size + max_align - 1) & ~(max_align - 1);
-    return max_size;
+  return info->size_in_bytes();
+}
+
+size_t ChoiceTypeInfo::size_in_bytes() const {
+  if (members.empty()) {
+    return sizeof(int32_t);
   }
 
-  if (kind == TYPE_STRUCT) {
-    auto struct_info = info->as<StructTypeInfo>();
-    size_t offset = 0;
-    size_t max_align = 1;
+  size_t max_size = 0;
+  size_t max_align = alignof(int32_t);
 
-    for (auto &member : struct_info->members) {
-      size_t member_size = member.type->size_in_bytes();
-      size_t align = member.type->alignment_in_bytes();
-      max_align = std::max(max_align, align);
-
-      // align the offset
-      offset = (offset + align - 1) & ~(align - 1);
-      offset += member_size;
-    }
-
-    // Round up to max alignment
-    offset = (offset + max_align - 1) & ~(max_align - 1);
-    return offset;
+  for (const auto &member : members) {
+    max_size = std::max(max_size, member.type->size_in_bytes());
+    max_align = std::max(max_align, member.type->alignment_in_bytes());
   }
 
-  if (kind == TYPE_SCALAR) {
-    switch (info->as<ScalarTypeInfo>()->scalar_type) {
-      case TYPE_S8:
-        return 1;
-      case TYPE_U8:
-        return 1;
-      case TYPE_S16:
-        return 2;
-      case TYPE_U16:
-        return 2;
-      case TYPE_S32:
-        return 4;
-      case TYPE_U32:
-        return 4;
-      case TYPE_S64:
-        return 8;
-      case TYPE_U64:
-        return 8;
-      case TYPE_FLOAT:
-        return 4;
-      case TYPE_DOUBLE:
-        return 8;
-      case TYPE_CHAR:
-        return 1;
-      case TYPE_BOOL:
-        return 1;
-      case TYPE_VOID:
-        return 0;
-      default:
-        return sizeof(void *);
-    }
-  }
+  max_size = (max_size + max_align - 1) & ~(max_align - 1);
+  size_t total_size = sizeof(int32_t) + max_size;
+  total_size = (total_size + max_align - 1) & ~(max_align - 1);
 
-  if (kind == TYPE_DYN) {
-    auto dyn_info = info->as<DynTypeInfo>();
-    size_t method_ptrs_size = dyn_info->methods.size() * sizeof(void *);
-    size_t instance_size = sizeof(void *);
-    return method_ptrs_size + instance_size;
-  }
-
-  return sizeof(void *);
+  return total_size;
 }
 
 size_t Type::alignment_in_bytes() const {
@@ -1215,3 +1162,48 @@ size_t Type::alignment_in_bytes() const {
 
   return alignof(void *);
 }
+
+size_t StructTypeInfo::size_in_bytes() const {
+  if (is_union) {
+    size_t max_size = 0;
+    size_t max_align = 1;
+
+    for (auto &member : members) {
+      max_size = std::max(max_size, member.type->size_in_bytes());
+      max_align = std::max(max_align, member.type->alignment_in_bytes());
+    }
+
+    // round up to max alignment
+    max_size = (max_size + max_align - 1) & ~(max_align - 1);
+    return max_size;
+  }
+
+  size_t offset = 0;
+  size_t max_align = 1;
+  for (auto &member: members) {
+    size_t member_size = member.type->size_in_bytes();
+    size_t align = member.type->alignment_in_bytes();
+    max_align = std::max(max_align, align);
+    offset = (offset + align - 1) & ~(align - 1);
+    offset += member_size;
+  }
+  offset = (offset + max_align - 1) & ~(max_align - 1);
+  return offset;
+}
+size_t EnumTypeInfo::size_in_bytes() const { return underlying_type->size_in_bytes(); }
+
+size_t TupleTypeInfo::size_in_bytes() const {
+  size_t offset = 0;
+  size_t max_align = 1;
+  for (auto &member : members) {
+    size_t member_size = member.type->size_in_bytes();
+    size_t align = member.type->alignment_in_bytes();
+    max_align = std::max(max_align, align);
+    offset = (offset + align - 1) & ~(align - 1);
+    offset += member_size;
+  }
+  offset = (offset + max_align - 1) & ~(max_align - 1);
+  return offset;
+}
+
+
