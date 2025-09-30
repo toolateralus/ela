@@ -1595,23 +1595,26 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type())});
 
-  thir->key_values.push_back({
-      "fields",
-      get_field_struct_list(type),
-  });
+  if (type->has_no_extensions()) {
+    thir->key_values.push_back({
+        "fields",
+        get_field_struct_list(type),
+    });
 
-  if (type->is_fixed_sized_array() || type->is_pointer()) {
+    thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
+
+  } else {
     thir->key_values.push_back({"element_type", to_reflection_type_struct(type->get_element_type())});
   }
 
-  thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
-
   thir->key_values.push_back({"traits", get_traits_list(type)});
 
+#if 0  // TODO: start doing this. it's super buggy and im just trying to get _something_ working.
   thir->key_values.push_back({
       "methods",
       get_methods_list(type),
   });
+#endif
 
   return info;
 }

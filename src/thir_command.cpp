@@ -43,6 +43,11 @@ int CompileCommand::compile() {
     }
 
     output << BOILERPLATE_C_CODE << '\n';
+
+    if (thir_gen.reflected_upon_types.size()) {
+      output << emitter.reflection_prelude(thir_gen.reflected_upon_types);
+    }
+
     output << emitter.code.str();
 
     emitter.code.clear();

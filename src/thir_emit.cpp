@@ -658,3 +658,12 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_while((const THIRWhile *)thir);
   }
 }
+
+std::string Emitter::reflection_prelude(const std::unordered_map<const Type *, ReflectionInfo> &info) {
+  StringBuilder code;
+  code << "typedef struct Type Type;\n";
+  for (const auto &[_, info]: info) {
+    code << "extern Type " << info.definition->name.get_str() << ";\n";
+  }
+  return code.str();
+}

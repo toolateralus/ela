@@ -84,4 +84,7 @@ struct Emitter {
   void emit_function(const THIRFunction *thir);
   void emit_block(const THIRBlock *thir);
   void emit_expression_block(const THIRExprBlock *thir);
+
+
+  std::string reflection_prelude(const std::unordered_map<const Type *, ReflectionInfo>&);
 };
