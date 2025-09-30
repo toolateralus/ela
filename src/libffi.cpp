@@ -98,13 +98,11 @@ std::unordered_map<std::string, void*> loaded_dl_libraries;
 
 void* try_load_symbol(const std::string& name) {
   if (loaded_ffi_extern_functions.contains(name)) {
-    printf("returning cached function\n");
     return loaded_ffi_extern_functions[name];
   }
 
   void* sym = dlsym(RTLD_DEFAULT, name.c_str());
   if (sym) {
-    printf("loaded function from RTLD_DEFAULT\n");
     loaded_ffi_extern_functions[name] = sym;
   }
 
@@ -133,7 +131,6 @@ void* try_load_symbol(const std::string& name) {
                     {});
       dlclose(the_lib);
     } else {
-      printf("loaded '%s' from '%s' at compile time.\n", name.c_str(), lib.c_str());
       loaded_dl_libraries[lib] = the_lib;
       loaded_ffi_extern_functions[name] = sym;
     }
@@ -142,9 +139,6 @@ void* try_load_symbol(const std::string& name) {
   return sym;
 }
 
-// --- nested allocation metadata ---
-// each NestedAlloc is a contiguous buffer we pass to C for an arg's pointer/array.
-// We keep elem_size/count to know how to writeback.
 struct NestedAlloc {
   size_t arg_index;
   size_t elem_size;
