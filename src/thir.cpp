@@ -648,8 +648,6 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
 
       thir->is_variable_length_array = ast->resolved_type->is_pointer();
 
-      printf("collection initializer at %s is pointer? %s\n", ast->source_range.ToString().c_str(), thir->is_variable_length_array ? "true": "false");
-
       return thir;
     }
   }
@@ -1539,13 +1537,15 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
       make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
   });
 
-  THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
-  offset_of->target_type = parent_type;
-  offset_of->target_field = name;
-  thir->key_values.push_back({
-      "offset",
-      offset_of,
-  });
+  if (parent_type->has_no_extensions()) {
+    THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
+    offset_of->target_type = parent_type;
+    offset_of->target_field = name;
+    thir->key_values.push_back({
+        "offset",
+        offset_of,
+    });
+  }
 
   if (parent_type->is_kind(TYPE_ENUM)) {
     const auto info = parent_type->info->as<EnumTypeInfo>();
@@ -1719,15 +1719,14 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type())});
 
-  if (type->has_no_extensions()) {
-    thir->key_values.push_back({
-        "fields",
-        get_field_struct_list(type),
-    });
+  thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
 
-    thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
+  thir->key_values.push_back({
+      "fields",
+      get_field_struct_list(type),
+  });
 
-  } else {
+  if (type->has_extensions()) {
     thir->key_values.push_back({"element_type", to_reflection_type_struct(type->get_element_type())});
   }
 
