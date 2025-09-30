@@ -308,7 +308,12 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
   switch (ast->pattern_tag) {
     case ASTPatternMatch::STRUCT: {
       auto &pattern = ast->struct_pattern;
-      for (const StructPattern::Part &part : pattern.parts) {
+      for (StructPattern::Part &part : pattern.parts) {
+        if (part.resolved_type->is_fixed_sized_array()) {
+          // mut doesn't really matter here.
+          part.resolved_type = part.resolved_type->get_element_type()->take_pointer_to(true);
+        }
+
         THIR_ALLOC(THIRVariable, var, ast)
         var->name = part.var_name;
         var->type = part.resolved_type;
@@ -326,7 +331,12 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
     case ASTPatternMatch::TUPLE: {
       auto &pattern = ast->tuple_pattern;
       size_t index = 0;
-      for (const TuplePattern::Part &part : pattern.parts) {
+      for (TuplePattern::Part &part : pattern.parts) {
+        // We have to take references to fixed arrays as pointers
+        if (part.resolved_type->is_fixed_sized_array()) {
+          part.resolved_type = part.resolved_type->get_element_type()->take_pointer_to(true);
+        }
+
         THIR_ALLOC(THIRVariable, var, ast)
         var->name = part.var_name;
         var->type = part.resolved_type;
@@ -640,16 +650,15 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-
       // InitList is basically just a fat pointered VLA, so we use an aggregate around the VLA.
       if (type->basename.str_ptr->starts_with("InitList$")) {
         const size_t length = ast->values.size();
-        
+
         /// typeof InitList!<T>.data;
-        TypeExtension extension = {.type = TYPE_EXT_ARRAY, length };
+        TypeExtension extension = {.type = TYPE_EXT_ARRAY, length};
         ast->resolved_type = global_find_type_id(type->generic_args[0], TypeExtensions{{extension}});
 
-        auto collection = (THIRCollectionInitializer*)visit_initializer_list(ast);
+        auto collection = (THIRCollectionInitializer *)visit_initializer_list(ast);
         collection->is_variable_length_array = true;
 
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
@@ -885,7 +894,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (ast->block) {
     auto saved_defer_stack = std::move(defer_stack);
     defer_stack.clear();
-    
+
     enter_defer_boundary(DeferBoundary::FUNCTION);
 
     thir->block = (THIRBlock *)visit_block(ast->block.get());
@@ -1740,8 +1749,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   thir->key_values.push_back({"id", make_literal(std::to_string(type->uid), {}, u64_type())});
 
   thir->key_values.push_back({
-    "name",
-    make_str(get_unmangled_name(type), {}),
+      "name",
+      make_str(get_unmangled_name(type), {}),
   });
 
   thir->key_values.push_back({
@@ -1765,8 +1774,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   thir->key_values.push_back({"traits", get_traits_list(type)});
 
   thir->key_values.push_back({
-    "methods",
-    get_methods_list(type),
+      "methods",
+      get_methods_list(type),
   });
 
   return info;
@@ -1996,7 +2005,8 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
 
     block->statements.push_back(global_initializer_call);
 
-    if (!compile_command.has_flag("nostdlib") && !compile_command.has_flag("freestanding")) {  // Call Env::initialize(argc, argv);
+    if (!compile_command.has_flag("nostdlib") &&
+        !compile_command.has_flag("freestanding")) {  // Call Env::initialize(argc, argv);
       // Find the damn call
       ASTFunctionDeclaration *env_initialize = nullptr;
       ASTPath env_initialize_path;
@@ -2146,9 +2156,7 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
 void THIRGen::enter_defer_boundary(DeferBoundary boundary) { defer_stack.push_back({boundary, {}}); }
 
-void THIRGen::exit_defer_boundary() {
-  defer_stack.pop_back();
-}
+void THIRGen::exit_defer_boundary() { defer_stack.pop_back(); }
 
 // inclusive
 std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
