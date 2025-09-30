@@ -1,6 +1,5 @@
 #include "thir.hpp"
 #include <deque>
-#include <format>
 #include <string>
 #include "ast.hpp"
 #include "constexpr.hpp"
@@ -10,6 +9,7 @@
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
+#include "visitor.hpp"
 
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.
@@ -100,8 +100,7 @@ THIR *THIRGen::visit_return(ASTReturn *ast) {
 
     auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
     if (!defers.empty()) {
-      static size_t return_tmp_id = 0;
-      THIRVariable *tmp = make_variable(std::format("$return_tmp${}", return_tmp_id++), expr_val, ast);
+      THIRVariable *tmp = make_variable(get_temporary_variable(), expr_val, ast);
       current_statement_list->push_back(tmp);
 
       for (auto d : defers) {
@@ -369,8 +368,6 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
 }
 
 THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vector<THIR *> &statements) {
-  static size_t id = 0;
-
   THIR *object = visit_node(ast->object);
 
   if (!ast->object->resolved_type->is_pointer()) {
@@ -378,7 +375,7 @@ THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vect
     object = take_address_of(object, ast->object);
   }
 
-  auto cached_object = make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++), object, ast->object);
+  auto cached_object = make_variable(get_temporary_variable(), object, ast->object);
 
   current_statement_list->push_back(cached_object);
   const Type *choice_type = ast->target_type_path->resolved_type;
@@ -426,6 +423,17 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     overload_call->callee = visit_node(symbol->function.declaration);
     overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
         ast->operand, visit_node(ast->operand), symbol->function.declaration->requires_self_ptr()));
+
+
+    if (symbol->name == "deref") {
+      THIR_ALLOC(THIRUnaryExpr, deref, ast);
+      deref->op = TType::Mul;
+      deref->operand = overload_call;
+      deref->type = ast->resolved_type;
+      deref->is_statement = overload_call->is_statement;
+      return deref;
+    } 
+
     return overload_call;
   }
 }
@@ -1022,9 +1030,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   // Build the switch as a THIRIf chain. Encapsulate construction so we can reuse for
   // both statement and expression forms (expression needs return override handling).
   const auto build_if_chain = [&]() -> THIRIf * {
-    static int idx = 0;
-
-    auto cached_expr = make_variable(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
+    auto cached_expr = make_variable(get_temporary_variable(),
                                      visit_node(ast->expression), ast->expression);
 
     current_statement_list->push_back(cached_expr);
@@ -1154,9 +1160,8 @@ THIRVariable *THIRGen::make_variable(const InternedString &name, THIR *value, AS
 THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRFor, thir, ast);
 
-  static size_t id = 0;
-  const InternedString result_key = std::format(THIR_FOR_LOOP_ITER_OPTION_KEY_FORMAT, id++);
-  const InternedString cached_key = std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, id);
+  const InternedString result_key = get_temporary_variable();
+  const InternedString cached_key = get_temporary_variable();
 
   ENTER_SCOPE(ast->block->scope);
 
@@ -1181,7 +1186,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     const auto *info = iter_call->callee->type->info->as<FunctionTypeInfo>();
     iter_call->type = info->return_type;
 
-    iterator_var = make_variable(std::format(THIR_FOR_LOOP_ITER_CACHED_KEY_FORMAT, ++id), iter_call, ast);
+    iterator_var = make_variable(get_temporary_variable(), iter_call, ast);
     current_statement_list->push_back(iterator_var);
   } else if (iterable_var->type->implements(iterator_trait())) {
     iterator_var = iterable_var;
@@ -1238,7 +1243,6 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   auto unwrapped_some = make_member_access(ast->source_range, next_var, {{some_type, "Some"}, {value_type, "$0"}});
 
   if (ast->left_tag == ASTFor::DESTRUCTURE) {
-    static size_t id = 0;
     std::vector<THIR *> statements;
 
     THIR *ptr_to_some = unwrapped_some;
@@ -1249,7 +1253,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
     // we take the address of when caching the result because 'for &x, &y in ...' needs to mutate the original.
     THIRVariable *cached_base =
-        make_variable(std::format(THIR_DESTRUCTURE_CAHCED_VARIABLE_KEY_FORMAT, id++), ptr_to_some, ast);
+        make_variable(get_temporary_variable(), ptr_to_some, ast);
     statements.push_back(cached_base);
     const auto type = value_type;
     auto members_iter = type->info->members.begin();
@@ -1734,7 +1738,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   ReflectionInfo &info = reflected_upon_types[type];
   info.created = true;
   info.definition =
-      make_variable(std::format(TYPE_INFO_IDENTIFIER_FORMAT, type->uid), initialize({}, type_type, {}), nullptr);
+      make_variable(get_temporary_variable(), initialize({}, type_type, {}), nullptr);
 
   info.definition->is_global = true;
   info.definition->is_statement = true;

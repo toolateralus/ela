@@ -607,6 +607,7 @@ Token get_unique_identifier() {
   return tok;
 }
 
+
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
   auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
