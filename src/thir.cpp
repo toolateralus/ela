@@ -622,14 +622,21 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       break;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
+
       // InitList is basically just a fat pointered VLA, so we use an aggregate around the VLA.
       if (type->basename.str_ptr->starts_with("InitList$")) {
         const size_t length = ast->values.size();
-        TypeExtension extension = {.type = TYPE_EXT_ARRAY, .array_size = length};
+        
+        /// typeof InitList!<T>.data;
+        TypeExtension extension = {.type = TYPE_EXT_ARRAY, length };
         ast->resolved_type = global_find_type_id(type->generic_args[0], TypeExtensions{{extension}});
+
+        auto collection = (THIRCollectionInitializer*)visit_initializer_list(ast);
+        collection->is_variable_length_array = true;
+
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
         thir->type = type;
-        thir->key_values.push_back({"data", visit_initializer_list(ast)});
+        thir->key_values.push_back({"data", collection});
         thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type())});
         return thir;
       }
@@ -638,7 +645,11 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       for (const auto &value : ast->values) {
         thir->values.push_back(visit_node(value));
       }
-      thir->is_variable_length_array = !ast->resolved_type->is_fixed_sized_array();
+
+      thir->is_variable_length_array = ast->resolved_type->is_pointer();
+
+      printf("collection initializer at %s is pointer? %s\n", ast->source_range.ToString().c_str(), thir->is_variable_length_array ? "true": "false");
+
       return thir;
     }
   }
