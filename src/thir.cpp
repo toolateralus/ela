@@ -1312,7 +1312,9 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
                 ast->source_range);
   }
 
-  defer_stack.back().defers.append_range(std::move(tmp_stmts));
+  // append the collected statements into the current frame's flat defer list
+  auto &vec = defer_stack.back().defers;
+  vec.insert(vec.end(), std::make_move_iterator(tmp_stmts.begin()), std::make_move_iterator(tmp_stmts.end()));
 
   return THIRNoop::shared();
 }
@@ -2096,7 +2098,6 @@ void THIRGen::enter_defer_boundary(DeferBoundary boundary) { defer_stack.push_ba
 
 // inclusive
 std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
-  return {};
   std::vector<THIR *> out;
   while (!defer_stack.empty()) {
     DeferFrame frame = std::move(defer_stack.back());
