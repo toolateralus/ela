@@ -18,19 +18,16 @@ struct CTInterpreter {
   Context &ctx;
 
   CTInterpreter(Context &context) : ctx(context) {
-    // create a detached temporary scope.
     root_scope = create_child(ctx.scope);
     current_scope = root_scope;
   }
 
   Value *try_link_extern_function(Symbol *name);
   void set_value(InternedString &name, Value *value);
-  
   LValue *get_lvalue(ASTNode *node);
   LValue *get_dot_expr_lvalue(ASTDotExpr *dot);
   LValue *get_index_lvalue(ASTIndex *node);
   LValue *get_unary_lvalue(ASTUnaryExpr *node);
-
   Value *visit_method_call(ASTMethodCall *node);
   Value *visit_path(ASTPath *node);
   Value *visit_pattern_match(ASTPatternMatch *node);

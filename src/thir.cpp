@@ -872,6 +872,12 @@ THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
+
+  // We just ignore these i think?
+  if (ast->is_forward_declared) {
+    return nullptr;
+  }
+
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
   return thir;
@@ -1397,7 +1403,7 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
   thir->key_values.push_back({"name", make_str(name, {})});
 
   thir->key_values.push_back({
-      "type",
+      "_type",
       to_reflection_type_struct(type),
   });
 
@@ -1407,7 +1413,7 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
   });
 
   THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
-  offset_of->target_type = type;
+  offset_of->target_type = parent_type;
   offset_of->target_field = name;
   thir->key_values.push_back({
       "offset",

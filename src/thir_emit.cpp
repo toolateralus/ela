@@ -1,3 +1,4 @@
+#include "builder.hpp"
 #include "emit.hpp"
 #include "core.hpp"
 #include "lex.hpp"
@@ -7,9 +8,10 @@
 #include "type.hpp"
 
 // These macros help with formatting the C code correctly.
-#define EXPR_BEGIN($node)    \
-  if ($node->is_statement) { \
-    indented();              \
+#define EXPR_BEGIN($node)       \
+  if ($node->is_statement) {    \
+    emit_line_directive($node); \
+    indented();                 \
   }
 #define EXPR_TERMINATE($node) \
   if ($node->is_statement) {  \
@@ -277,7 +279,6 @@ void Emitter::emit_while(const THIRWhile *thir) {
   emit_block(thir->block);
 }
 
-
 void Emitter::emit_type(const THIRType *thir) {
   // TODO: stop doing this hack;
   if (thir->type->basename == "va_list") {
@@ -375,6 +376,12 @@ void Emitter::emit_choice(Type *type) {
     } else if (variant.type->kind == TYPE_TUPLE) {
       const auto variant_name = variant.name.get_str();
       indented(c_type_string(variant.type) + ' ' + variant_name + ";\n");
+    } else if (variant.type == void_type()) {
+      // We emit empty structs here because it has no impact on type
+      // size and gives us a predictable memory layout, as well as
+      // making sense in runtime reflection.
+      const auto variant_name = variant.name.get_str();
+      indented("struct {}" + variant_name + ";\n");
     }
   }
   indent_level--;
@@ -453,7 +460,6 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
   code << "} " << name << ";\n";
 }
 
-
 void Emitter::emit_function(const THIRFunction *thir) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
@@ -475,7 +481,8 @@ void Emitter::emit_function(const THIRFunction *thir) {
     for (size_t i = 0; i < info->params_len; ++i) {
       const auto parameter = *param_iter;
       if (i) outer_params_decl += ", ";
-      outer_params_decl += get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
+      outer_params_decl +=
+          get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
       param_iter++;
     }
     if (thir->is_varargs) {
@@ -599,7 +606,6 @@ void Emitter::emit_call(const THIRCall *thir) {
 void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
-
 
 void Emitter::emit_node(const THIR *thir) {
   emit_line_directive(thir);
