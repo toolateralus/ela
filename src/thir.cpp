@@ -94,12 +94,30 @@ THIR *THIRGen::visit_return(ASTReturn *ast) {
   }
 
   THIR_ALLOC(THIRReturn, ret, ast);
-  if (ast->expression) {
-    ret->expression = visit_node(ast->expression.get());
-  }
 
-  auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
-  for (auto d : defers) current_statement_list->push_back(d);
+  if (ast->expression) {
+    THIR *expr_val = visit_node(ast->expression.get());
+
+    auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+    if (!defers.empty()) {
+      static size_t return_tmp_id = 0;
+      THIRVariable *tmp = make_variable(std::format("$return_tmp${}", return_tmp_id++), expr_val, ast);
+      current_statement_list->push_back(tmp);
+
+      for (auto d : defers) {
+        current_statement_list->push_back(d);
+      }
+
+      ret->expression = tmp;
+    } else {
+      ret->expression = expr_val;
+    }
+  } else {
+    auto defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+    for (auto d : defers) {
+      current_statement_list->push_back(d);
+    }
+  }
 
   return ret;
 }
