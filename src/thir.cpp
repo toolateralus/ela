@@ -2102,13 +2102,11 @@ std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
   while (!defer_stack.empty()) {
     DeferFrame frame = std::move(defer_stack.back());
     defer_stack.pop_back();
-    
-    // Execute defers in LIFO order: iterate the frame's defers from last to
-    // first. Each defer is a group of statements which should be emitted in
-    // the original order.
+ 
     for (auto it = frame.defers.rbegin(); it != frame.defers.rend(); ++it) {
       out.push_back(*it);
     }
+    
     if (frame.boundary == boundary) {
       break;
     }
