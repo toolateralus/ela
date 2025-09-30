@@ -95,28 +95,32 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   return thir;
 }
 
-/*
-  ! These three are going to be tough, with generics and all.
-  @Cooper-Pilot Need Sum Backup |:O| <- that's a face.
-*/
+
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
-                                                 std::vector<THIR *> &out_args) {
-  // Only handle default arguments for function calls that have a definition, not function pointers.
+                                                 std::vector<THIR *> &out_args, Nullable<THIR> self) {
+  out_args.clear();
   if (callee->get_node_type() == THIRNodeType::Function) {
     const auto function = (const THIRFunction *)callee;
     const auto &params = function->parameters;
     const auto &ast_args = in_args->arguments;
 
-    size_t i = 0;
-    for (; i < ast_args.size(); ++i) {
-      const auto arg = visit_node(ast_args[i]);
-      out_args.push_back(arg);
+    if (self.is_not_null()) {
+      out_args.push_back(self.get());
+    }
+  size_t param_index = out_args.size(); // start at current args (handles implicit self)
+    size_t ast_index = 0;
+
+    for (; param_index < params.size() && ast_index < ast_args.size(); ++param_index, ++ast_index) {
+      out_args.push_back(visit_node(ast_args[ast_index]));
     }
 
-    for (; i < params.size(); ++i) {
-      if (params[i].default_value) {
-        const auto value = params[i].default_value;
-        out_args.push_back(value);
+    for (; ast_index < ast_args.size(); ++ast_index) {
+      out_args.push_back(visit_node(ast_args[ast_index]));
+    }
+
+    for (; param_index < params.size(); ++param_index) {
+      if (params[param_index].default_value) {
+        out_args.push_back(params[param_index].default_value);
       }
     }
   } else {
@@ -173,18 +177,17 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   const auto base = ast->callee->base;
   const auto symbol = ctx.get_symbol(ast->callee).get();
 
+  THIR *self = nullptr;
   if (symbol->is_variable) {
     thir->callee = visit_node(ast->callee);
   } else {
     // Push the self argument
-    auto self = visit_node(base);
+    self = visit_node(base);
 
     const auto requires_self_ptr = symbol->function.declaration->requires_self_ptr();
 
     // auto dereference / address of logic.
     self = try_deref_or_take_ptr_to_if_needed(base, self, requires_self_ptr);
-
-    thir->arguments.push_back(self);
 
     auto fn_sym = ctx.get_symbol(ast->callee);
     auto fn = fn_sym.get()->function.declaration;
@@ -202,7 +205,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     throw_error("THIRGen unable to get callee for method", ast->source_range);
   }
 
-  extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
+  extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments, self);
   return thir;
 }
 
@@ -763,7 +766,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
     entry_point = thir;
     thir->is_entry = true;
     thir->name = USER_MAIN_FUNCTION_NAME;
-  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle || ast->is_forward_declared) {
+  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle) {
     thir->name = ast->name;
   } else {
     std::string name;
@@ -805,6 +808,10 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   if (!symbol) {
     throw_error("Unable to find symbol for function", ast->source_range);
+  }
+
+  if (ast->is_forward_declared) {
+    ast = symbol->function.declaration;
   }
 
   bind(ast, thir);

@@ -381,7 +381,7 @@ struct THIRGen {
   THIR *visit_literal(ASTLiteral *node);
 
   void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
-                                          std::vector<THIR *> &out_args);
+                                          std::vector<THIR *> &out_args, Nullable<THIR> self = nullptr);
 
   void extract_thir_values_for_type_members(Type *type);
 
