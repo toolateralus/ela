@@ -236,7 +236,12 @@ void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
 }
 
 void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir) {
-  code << "(" << c_type_string(thir->type) << "){";
+
+  if (thir->is_variable_length_array) {
+    code << "(" << c_type_string(thir->type) << "){";
+  } else {
+    code << '{';
+  }
   for (const auto &value : thir->values) {
     emit_expr(value);
     code << ", ";
@@ -245,7 +250,11 @@ void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir)
 }
 
 void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
-  code << "(" << c_type_string(thir->type) << "){0}";
+  if (thir->type->is_fixed_sized_array()) {
+    code << "{}";
+  } else {
+    code << "(" << c_type_string(thir->type) << "){0}";
+  }
 }
 
 void Emitter::emit_for(const THIRFor *thir) {

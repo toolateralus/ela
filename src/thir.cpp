@@ -489,7 +489,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
 
-  if (type->is_pointer()) {
+  if (type->is_pointer() && key_values.empty()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
     literal->value = "nullptr";
     literal->source_range = source_range;
@@ -623,6 +623,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
       for (const auto &value : ast->values) {
         thir->values.push_back(visit_node(value));
       }
+      thir->is_variable_length_array = !ast->resolved_type->is_fixed_sized_array();
       return thir;
     }
   }
@@ -1164,7 +1165,12 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     static size_t id = 0;
     std::vector<THIR *> statements;
 
-    const auto ptr_to_some = take_address_of(unwrapped_some, ast);
+    THIR *ptr_to_some = unwrapped_some;
+
+    if (!ptr_to_some->type->is_pointer()) {
+      ptr_to_some = take_address_of(ptr_to_some, ast);
+    }
+
     // we take the address of when caching the result because 'for &x, &y in ...' needs to mutate the original.
     THIRVariable *cached_base =
         make_variable(std::format(THIR_DESTRUCTURE_CAHCED_VARIABLE_KEY_FORMAT, id++), ptr_to_some, ast);
@@ -1477,6 +1483,7 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
   static Type *field_type = ctx.scope->find_type_id("Field", {});
   const auto length = type->info->members.size();
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->is_variable_length_array = true;
   collection->type = field_type->make_array_of(length);
   for (const auto &member : type->info->members) {
     collection->values.push_back(get_field_struct(member.name.get_str(), member.type, type));
@@ -1509,6 +1516,7 @@ THIR *THIRGen::get_methods_list(Type *type) {
   static Type *method_type = ctx.scope->find_type_id("Method", {});
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->is_variable_length_array = true;
   collection->type = method_type->make_array_of(length);
   for (const auto &[name, member] : type->info->scope->symbols) {
     if (member.is_function) {
@@ -1539,6 +1547,7 @@ THIR *THIRGen::get_traits_list(Type *type) {
   static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->is_variable_length_array = true;
   collection->type = type_type->make_array_of(length);
 
   for (const auto &trait : type->traits) {
@@ -1568,6 +1577,7 @@ THIR *THIRGen::get_generic_args_list(Type *type) {
   static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
+  collection->is_variable_length_array = true;
   collection->type = type_type->make_array_of(length);
 
   for (const auto &type_arg : type->generic_args) {
