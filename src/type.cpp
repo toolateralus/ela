@@ -1084,6 +1084,9 @@ void assess_and_try_add_blittable_trait(Type *type) {
   type->traits.push_back(blittable_trait());
 }
 
+
+// TODO: make sizing more platform dependent, and maybe we should make cross compilation a bit more
+// simple by using static definitions for these.
 size_t Type::size_in_bytes() const {
   if (!info) {
     throw_error("INTERNAL COMPILER ERROR: called 'size_in_bytes' on a type with no info", {});
@@ -1190,6 +1193,7 @@ size_t StructTypeInfo::size_in_bytes() const {
   offset = (offset + max_align - 1) & ~(max_align - 1);
   return offset;
 }
+
 size_t EnumTypeInfo::size_in_bytes() const { return underlying_type->size_in_bytes(); }
 
 size_t TupleTypeInfo::size_in_bytes() const {

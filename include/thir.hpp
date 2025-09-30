@@ -232,6 +232,7 @@ struct THIRAggregateInitializer : THIR {
 };
 
 struct THIRCollectionInitializer : THIR {
+  bool is_variable_length_array = false;
   std::vector<THIR *> values;
   THIRNodeType get_node_type() const override { return THIRNodeType::CollectionInitializer; }
 };

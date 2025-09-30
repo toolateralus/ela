@@ -664,10 +664,6 @@ struct ASTDotExpr : ASTExpr {
 };
 
 struct ASTMethodCall : ASTExpr {
-  /*
-    сперма хранится в яйцах.
-    (aka the generic arguments are stored in the base)
-  */
   ASTDotExpr *callee;
   ASTArguments *arguments;
   bool inserted_dyn_arg = false;

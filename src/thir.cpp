@@ -218,6 +218,11 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
     return symbol_map[symbol];
   }
 
+  if (!symbol) {
+    throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it",
+                ast->source_range);
+  }
+
   if (symbol->is_variable) {
     auto var_ast = symbol->variable.declaration.get();
     if (!var_ast) {
@@ -251,7 +256,14 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
+
   thir->member = ast->member.identifier;
+
+  // Tuple.0;
+  if (ast->member.identifier == "0" || atoi(ast->member.identifier.get_str().c_str()) != 0) {
+    thir->member = "$" + thir->member.get_str();
+  }
+
   return thir;
 }
 
@@ -315,8 +327,15 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
 
 THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vector<THIR *> &statements) {
   static size_t id = 0;
-  auto cached_object = make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++),
-                                     take_address_of(visit_node(ast->object), ast->object), ast->object);
+
+  THIR *object = visit_node(ast->object);
+
+  if (!ast->object->resolved_type->is_pointer()) {
+    // If the target object isnt a pointer, we always cache it as a pointer so mutations persist
+    object = take_address_of(object, ast->object);
+  }
+
+  auto cached_object = make_variable(std::format(THIR_PATTERN_MATCH_CACHED_KEY_FORMAT, id++), object, ast->object);
 
   current_statement_list->push_back(cached_object);
   const Type *choice_type = ast->target_type_path->resolved_type;
@@ -812,10 +831,6 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   if (!symbol) {
     throw_error("Unable to find symbol for function", ast->source_range);
   }
-
-  // if (ast->is_forward_declared) {
-  //   ast = symbol->function.declaration;
-  // }
 
   bind(ast, thir);
 
