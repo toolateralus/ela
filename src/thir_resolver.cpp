@@ -160,7 +160,13 @@ void Resolver::visit_variable(const THIRVariable *thir) {
 void Resolver::visit_function(const THIRFunction *thir) {
   static std::set<InternedString> emitted {};
 
-  if (thir->block) {
+  // TODO: This entire system for preventing double emission is atrocious,
+  // we're using like 90 maps instead of rectifying our THIR
+  if (thir->is_extern && emitted.contains(thir->name)) {
+    return;
+  }
+
+  if (thir->block || thir->is_extern) {
     emitted.insert(thir->name);
   }
 
@@ -168,7 +174,7 @@ void Resolver::visit_function(const THIRFunction *thir) {
     return;
   }
 
-  if (thir->block) {
+  if (thir->block || thir->is_extern) {
     emitted_functions.insert(thir);
   }
 
@@ -184,8 +190,10 @@ void Resolver::visit_function(const THIRFunction *thir) {
     }
   }
 
-  // Emit a forward declaration for mutually recursive functions
-  emitter.emit_function(thir, true);
+  if (!thir->is_extern) {
+    // Emit a forward declaration for mutually recursive functions
+    emitter.emit_function(thir, true);
+  }
 
   if (thir->block) {
     visit_node(thir->block);
