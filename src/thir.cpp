@@ -2025,7 +2025,7 @@ THIR *THIRGen::visit_unpack_element(ASTUnpackElement *ast) {
   }
 }
 
-void THIRGen::make_global_initializer_assignment_and_get_stub_value(const Type *type, THIRVariable *thir,
+void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir,
                                                                     Nullable<ASTExpr> value_n) {
   THIR *value;
   if (value_n.is_not_null()) {

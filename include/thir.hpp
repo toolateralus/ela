@@ -41,8 +41,9 @@ enum struct THIRNodeType : unsigned char {
   For,
   If,
   While,
-};
 
+  Noop, // Some things just return nothing, but need to return something
+};
 
 struct THIR {
   // This is purely used to handle putting semicolons after expression statements, without needing an 'expression
@@ -76,6 +77,14 @@ struct THIR {
   }
 };
 
+struct THIRNoop: THIR {
+  THIRNodeType get_node_type() const override { return THIRNodeType::Noop; }
+  static THIRNoop *shared() {
+    static THIRNoop noop;
+    return &noop;
+  }
+};
+
 struct THIRProgram : THIR {
   std::vector<THIR *> statements;
   THIRNodeType get_node_type() const override { return THIRNodeType::Program; }
@@ -86,7 +95,7 @@ struct THIRVariable : THIR {
   THIR *value;
   bool is_static : 1 = false;
   bool is_global : 1 = false;
-  bool is_constexpr: 1 = false;
+  bool is_constexpr : 1 = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -182,7 +191,6 @@ struct THIRIndex : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Index; }
 };
 
-
 struct THIROffsetOf : THIR {
   Type *target_type;
   InternedString target_field;
@@ -270,13 +278,12 @@ struct THIRGen {
     auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
     auto method_ty = ctx.scope->find_type_id("Method", {});
     auto field_ty = ctx.scope->find_type_id("Field", {});
-    
-    auto list_decl = (ASTDeclaration*)ctx.scope->lookup("List")->type.declaration.get();
+
+    auto list_decl = (ASTDeclaration *)ctx.scope->lookup("List")->type.declaration.get();
 
     type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
     method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
     field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
-
 
     THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
     global_initializer_function = global_ini;
@@ -290,17 +297,15 @@ struct THIRGen {
     global_ini->block = thir_alloc<THIRBlock>();
     global_ini->block->is_statement = true;
 
-
     THIR_ALLOC_NO_SRC_RANGE(THIRCall, global_ini_call);
     global_initializer_call = global_ini_call;
     global_ini_call->callee = global_ini;
     global_ini_call->is_statement = true;
     global_ini_call->arguments = {};
   }
+
   Context &ctx;
-
   std::vector<THIRFunction *> test_functions;
-
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;
 
@@ -328,13 +333,9 @@ struct THIRGen {
     symbol_map[sym] = thir;
   }
 
-  inline THIR *get_thir(ASTNode *ast) {
-    return ast_map[ast];
-  }
+  inline THIR *get_thir(ASTNode *ast) { return ast_map[ast]; }
 
-  inline THIR *get_thir(Symbol *sym) {
-    return symbol_map[sym];
-  }
+  inline THIR *get_thir(Symbol *sym) { return symbol_map[sym]; }
 
   THIR *entry_point;
   THIRProgram *program;
@@ -393,7 +394,7 @@ struct THIRGen {
   void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
                                           std::vector<THIR *> &statements, Type *variant_type,
                                           const InternedString &variant_name);
-                                          
+
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
@@ -473,5 +474,5 @@ struct THIRGen {
   void visit_where_branch(const WhereBranch *branch);
   THIRFunction *emit_runtime_entry_point();
 
-  void make_global_initializer_assignment_and_get_stub_value(const Type *, THIRVariable *thir, Nullable<ASTExpr > value);
+  void make_global_initializer(const Type *, THIRVariable *thir, Nullable<ASTExpr> value);
 };

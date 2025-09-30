@@ -281,6 +281,8 @@ void Resolver::visit_node(const THIR *thir) {
     case THIRNodeType::Offset_Of:
       visit_offset_of((const THIROffsetOf *)thir);
       break;
+    case THIRNodeType::Noop:
+      break;
   }
 }
 void Resolver::visit_expr_block(const THIRExprBlock *thir) {

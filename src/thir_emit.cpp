@@ -626,6 +626,10 @@ void Emitter::emit_break(const THIRBreak *) { indented_terminated("break"); }
 void Emitter::emit_continue(const THIRContinue *) { indented_terminated("continue;\n"); }
 
 void Emitter::emit_node(const THIR *thir) {
+  if (!thir) {
+    // Defers and other nodes are expectedly null. We should probably just use a THIRNoOp, this allows bugs to creep in
+    return;
+  }
   emit_line_directive(thir);
   switch (thir->get_node_type()) {
     case THIRNodeType::Offset_Of:
@@ -674,6 +678,8 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_if((const THIRIf *)thir);
     case THIRNodeType::While:
       return emit_while((const THIRWhile *)thir);
+    case THIRNodeType::Noop:
+      break;
   }
 }
 
