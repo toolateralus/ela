@@ -21,8 +21,6 @@
   TODO: we should not have a preprocessor at all,
   and all the conditional compilation stuff should get it's own node
   so that we can do type checking on the constants that #if might use.
-
-
 */
 enum PreprocKind {
   PREPROC_IF,
@@ -1418,7 +1416,8 @@ ASTType *Parser::parse_type() {
 }
 
 // TODO: we should handle the 'then' statement more gracefully.
-// Also, => is super fricken janky, and is really poorly implemented.
+// Also, => is super fricken janky, and is really poorly implemented. 
+// !CLEANUP remove the => operator from everything but switch cases. it's terrible and awful
 ASTIf *Parser::parse_if() {
   NODE_ALLOC(ASTIf, node, range, _, this)
   node->is_expression = true;

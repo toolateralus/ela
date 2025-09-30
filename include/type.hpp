@@ -382,13 +382,6 @@ struct Type {
   bool tuple_is_emitted = false;
   bool dyn_emitted = false;
 
-  // TODO: refactor the way type extensions work.
-  // most of this should just be on the type itself,
-  // especially the querying methods, it's a pain to get the extensions everywhere.
-
-  // the pointer and array size extensions, describing the type further.
-  // this stores things like * and [], [20] etc.
-  // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
   TypeExtensions extensions{};
 
   inline TypeExtEnum back_ext_type() const {
