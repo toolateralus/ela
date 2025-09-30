@@ -95,7 +95,6 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   return thir;
 }
 
-
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                  std::vector<THIR *> &out_args, Nullable<THIR> self) {
   out_args.clear();
@@ -107,7 +106,7 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
     if (self.is_not_null()) {
       out_args.push_back(self.get());
     }
-  size_t param_index = out_args.size(); // start at current args (handles implicit self)
+    size_t param_index = out_args.size();  // start at current args (handles implicit self)
     size_t ast_index = 0;
 
     for (; param_index < params.size() && ast_index < ast_args.size(); ++param_index, ++ast_index) {
@@ -766,7 +765,8 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
     entry_point = thir;
     thir->is_entry = true;
     thir->name = USER_MAIN_FUNCTION_NAME;
-  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle) {
+  } else if (thir->is_exported || thir->is_extern || thir->is_no_mangle ||
+             ast->is_forward_declared /* !TODO: REMOVE THIS LAST CASE __ IT IS WRONG */) {
     thir->name = ast->name;
   } else {
     std::string name;
@@ -810,9 +810,9 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     throw_error("Unable to find symbol for function", ast->source_range);
   }
 
-  if (ast->is_forward_declared) {
-    ast = symbol->function.declaration;
-  }
+  // if (ast->is_forward_declared) {
+  //   ast = symbol->function.declaration;
+  // }
 
   bind(ast, thir);
 
