@@ -168,6 +168,11 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
     code << " temp = ";
     emit_expr(thir->operand);
     code << "; &temp; })";
+  } else if (thir->op == TType::Increment || thir->op == TType::Decrement) { // ++ and -- are ALWAYS posfix in this language.
+    code << '(';
+    emit_expr(thir->operand);
+    code << ttype_get_operator_string(thir->op, thir->source_range);
+    code << ")";
   } else {
     code << '(';
     code << ttype_get_operator_string(thir->op, thir->source_range);
