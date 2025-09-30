@@ -1750,12 +1750,10 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   thir->key_values.push_back({"traits", get_traits_list(type)});
 
-#if 0  // TODO: start doing this. it's super buggy and im just trying to get _something_ working.
   thir->key_values.push_back({
-      "methods",
-      get_methods_list(type),
+    "methods",
+    get_methods_list(type),
   });
-#endif
 
   return info;
 }
