@@ -1708,8 +1708,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   thir->key_values.push_back({"id", make_literal(std::to_string(type->uid), {}, u64_type())});
 
   thir->key_values.push_back({
-      "name",
-      make_str(type->basename, {}),
+    "name",
+    make_str(get_unmangled_name(type), {}),
   });
 
   thir->key_values.push_back({
