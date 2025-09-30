@@ -19,8 +19,10 @@ impl Destroy for Destroyable {
 
 #test fn test_using() {
   mut value: u8 = 0;
+  
   using destroyable := Destroyable::new(&mut value) {
     assert_eq(*destroyable.memory, 0, "memory should be 0 inside using");
-  }
+  };
+
   assert_eq(value, 255, "destroy did not write 255 to memory");
 }

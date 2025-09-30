@@ -42,7 +42,7 @@ enum struct THIRNodeType : unsigned char {
   If,
   While,
 
-  Noop, // Some things just return nothing, but need to return something
+  Noop,  // Some things just return nothing, but need to return something
 };
 
 struct THIR {
@@ -77,7 +77,7 @@ struct THIR {
   }
 };
 
-struct THIRNoop: THIR {
+struct THIRNoop : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Noop; }
   static THIRNoop *shared() {
     static THIRNoop noop;
@@ -276,6 +276,7 @@ struct ReflectionInfo {
 enum struct DeferBoundary {
   FUNCTION,
   LOOP,
+  BLOCK,
 };
 
 struct DeferFrame {
@@ -332,11 +333,11 @@ struct THIRGen {
   std::map<ASTNode *, THIR *> ast_map;
 
   inline void bind(ASTNode *ast, THIR *thir) {
-    if (!thir) {
-      throw_error("Bound a null thir to an AST", {});
-    }
     if (!ast) {
-      throw_error("Bound a null AST to a thir", {});
+      throw_error("Bound a null AST to a thir", thir->source_range);
+    }
+    if (!thir) {
+      throw_error("Bound a null thir to an AST", ast->source_range);
     }
     ast_map[ast] = thir;
   }
@@ -346,7 +347,7 @@ struct THIRGen {
       throw_error("Bound a null thir to a symbol", {});
     }
     if (!sym) {
-      throw_error("Bound a null symbol to a thir", {});
+      throw_error("Bound a null symbol to a thir", thir->source_range);
     }
 
     symbol_map[sym] = thir;

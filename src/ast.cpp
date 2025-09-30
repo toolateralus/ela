@@ -1598,9 +1598,19 @@ ASTStatement *Parser::parse_using_stmt() {
   if (peek().type == TType::LCurly) {
     parsed_block = true;
     block = parse_block();
+    expect(TType::Semi);
+
+    { // we have to patch these up since this is synthetic
+      variable->declaring_block = block;
+      variable->declaring_scope = block->scope;
+      defer_ast->declaring_block = block;
+      defer_ast->declaring_scope = block->scope;
+    }
+
     block->statements.insert(block->statements.begin(), variable);
     block->statements.insert(block->statements.begin() + 1, defer_ast);
-  } else {  // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
+  } else { 
+    // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
     block->statements.push_back(variable);
     block->statements.push_back(defer_ast);
   }

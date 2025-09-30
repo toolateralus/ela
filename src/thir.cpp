@@ -712,16 +712,22 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
 THIR *THIRGen::visit_block(ASTBlock *ast) {
   ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRBlock, thir, ast);
-  ENTER_STMT_VEC(thir->statements);
 
-  std::vector<ASTDefer *> deferred_statements;
-  for (const auto &ast_statement : ast->statements) {
-    if (ast_statement->get_node_type() == AST_NODE_DEFER) {
-      deferred_statements.push_back((ASTDefer *)ast_statement);
+  enter_defer_boundary(DeferBoundary::BLOCK);
+
+  {
+    ENTER_STMT_VEC(thir->statements);
+    for (const auto &ast_statement : ast->statements) {
+      if (auto thir_statement = visit_node(ast_statement)) {
+        thir->statements.push_back(thir_statement);
+      }
     }
-    if (auto thir_statement = visit_node(ast_statement)) {
-      thir->statements.push_back(thir_statement);
-    }
+  }
+
+  auto block_defers = collect_defers_up_to(DeferBoundary::BLOCK);
+
+  for (auto d : block_defers) {
+    thir->statements.push_back(d);
   }
 
   return thir;
@@ -809,6 +815,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
     thir->name = name;
   }
 }
+
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   const static bool is_testing = compile_command.has_flag("test");
 
@@ -848,12 +855,18 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   mangle_function_name_for_thir(ast, thir);
 
   if (ast->block) {
+    // auto saved_defer_stack = std::move(defer_stack);
+    // defer_stack.clear();
+    
     enter_defer_boundary(DeferBoundary::FUNCTION);
+
     thir->block = (THIRBlock *)visit_block(ast->block.get());
     auto func_defers = collect_defers_up_to(DeferBoundary::FUNCTION);
     for (auto d : func_defers) {
       thir->block->statements.push_back(d);
     }
+
+    // defer_stack = std::move(saved_defer_stack);
   }
 
   if (is_testing && ast->is_test) {
@@ -1295,7 +1308,7 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
 
 THIR *THIRGen::visit_defer(ASTDefer *ast) {
   std::vector<THIR *> tmp_stmts;
-  
+
   {
     ENTER_STMT_VEC(tmp_stmts);
     if (auto s = visit_node(ast->statement)) {
@@ -1979,7 +1992,8 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
 
     const bool is_testing = compile_command.has_flag("test");
 
-    if (!is_testing && !compile_command.has_flag("freestanding") && this->entry_point->get_node_type() == THIRNodeType::Function) {
+    if (!is_testing && !compile_command.has_flag("freestanding") &&
+        this->entry_point->get_node_type() == THIRNodeType::Function) {
       // Call __ela_main_();
       // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
       THIRFunction *entry_point = (THIRFunction *)this->entry_point;
@@ -2073,8 +2087,7 @@ THIR *THIRGen::visit_unpack_element(ASTUnpackElement *ast) {
   }
 }
 
-void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir,
-                                                                    Nullable<ASTExpr> value_n) {
+void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Nullable<ASTExpr> value_n) {
   THIR *value;
   if (value_n.is_not_null()) {
     value = visit_node(value_n.get());
@@ -2102,11 +2115,11 @@ std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
   while (!defer_stack.empty()) {
     DeferFrame frame = std::move(defer_stack.back());
     defer_stack.pop_back();
- 
+
     for (auto it = frame.defers.rbegin(); it != frame.defers.rend(); ++it) {
       out.push_back(*it);
     }
-    
+
     if (frame.boundary == boundary) {
       break;
     }
