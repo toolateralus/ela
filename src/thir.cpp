@@ -1010,79 +1010,93 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
     return visit_node(ast->default_branch.get());
   }
 
-  static int idx = 0;
+  // Build the switch as a THIRIf chain. Encapsulate construction so we can reuse for
+  // both statement and expression forms (expression needs return override handling).
+  const auto build_if_chain = [&]() -> THIRIf * {
+    static int idx = 0;
 
-  auto cached_expr = make_variable(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
-                                   visit_node(ast->expression), ast->expression);
+    auto cached_expr = make_variable(std::format(THIR_SWITCH_CACHED_EXPRESSION_KEY_FORMAT, idx++),
+                                     visit_node(ast->expression), ast->expression);
 
-  current_statement_list->push_back(cached_expr);
+    current_statement_list->push_back(cached_expr);
 
-  // when applicable:
-  // gets cleared for every branch, and populated for every branch
-  std::vector<THIR *> extra_statements_generated_by_pattern_match;
+    // when applicable:
+    // gets cleared for every branch, and populated for every branch
+    std::vector<THIR *> extra_statements_generated_by_pattern_match;
 
-  const auto get_condition_comparator = [&](size_t index) -> THIR * {
-    auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
-    auto left = cached_expr;
+    const auto get_condition_comparator = [&](size_t index) -> THIR * {
+      auto operator_overload_ty = find_operator_overload(CONST, cached_expr->type, TType::EQ, OPERATION_BINARY);
+      auto left = cached_expr;
 
-    auto &branch = ast->branches[index];
-    if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
-      THIR *condition;
+      auto &branch = ast->branches[index];
+      if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
+        THIR *condition;
 
-      if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
-        // clear -> populate extra statements.
-        extra_statements_generated_by_pattern_match.clear();
-        condition = visit_pattern_match((ASTPatternMatch *)branch.expression, branch.block->scope,
-                                        extra_statements_generated_by_pattern_match);
-      } else {
-        THIR_ALLOC(THIRBinExpr, binexpr, ast);
-        binexpr->left = left;
-        binexpr->right = visit_node(ast->branches[index].expression);
-        binexpr->op = TType::EQ;
-        binexpr->type = bool_type();
-        condition = binexpr;
+        if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
+          // clear -> populate extra statements.
+          extra_statements_generated_by_pattern_match.clear();
+          condition = visit_pattern_match((ASTPatternMatch *)branch.expression, branch.block->scope,
+                                          extra_statements_generated_by_pattern_match);
+        } else {
+          THIR_ALLOC(THIRBinExpr, binexpr, ast);
+          binexpr->left = left;
+          binexpr->right = visit_node(ast->branches[index].expression);
+          binexpr->op = TType::EQ;
+          binexpr->type = bool_type();
+          condition = binexpr;
+        }
+
+        return condition;
+      } else {  // call an operator overload
+        THIR_ALLOC(THIRCall, overload_call, ast);
+        auto scope = left->type->info->scope;
+        auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
+        overload_call->callee = visit_node(symbol->function.declaration);
+        overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
+            branch.expression, left, symbol->function.declaration->requires_self_ptr()));
+        overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
+        return overload_call;
       }
+    };
 
-      return condition;
-    } else {  // call an operator overload
-      THIR_ALLOC(THIRCall, overload_call, ast);
-      auto scope = left->type->info->scope;
-      auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
-      overload_call->callee = visit_node(symbol->function.declaration);
-      overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-          branch.expression, left, symbol->function.declaration->requires_self_ptr()));
-      overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
-      return overload_call;
+    THIR_ALLOC(THIRIf, first_case, ast)
+    first_case->condition = get_condition_comparator(0);
+    first_case->block = (THIRBlock *)visit_node(ast->branches[0].block);
+    for (auto &stmt : extra_statements_generated_by_pattern_match) {
+      first_case->block->statements.insert(first_case->block->statements.begin(), stmt);
     }
+    first_case->is_statement = true;
+
+    THIRIf *the_if = first_case;
+    for (size_t i = 1; i < ast->branches.size(); ++i) {
+      const auto &ast_branch = ast->branches[i];
+      THIR_ALLOC(THIRIf, thir_branch, ast)
+      thir_branch->condition = get_condition_comparator(i);
+      thir_branch->block = (THIRBlock *)visit_node(ast_branch.block);
+      for (auto &stmt : extra_statements_generated_by_pattern_match) {
+        thir_branch->block->statements.insert(thir_branch->block->statements.begin(), stmt);
+      }
+      thir_branch->is_statement = true;
+      the_if->_else = thir_branch;
+      the_if = thir_branch;
+    }
+
+    if (ast->default_branch) {
+      the_if->_else = (THIRBlock *)visit_node(ast->default_branch.get());
+    }
+
+    return first_case;
   };
 
-  THIR_ALLOC(THIRIf, first_case, ast)
-  first_case->condition = get_condition_comparator(0);
-  first_case->block = (THIRBlock *)visit_node(ast->branches[0].block);
-  for (auto &stmt : extra_statements_generated_by_pattern_match) {
-    first_case->block->statements.insert(first_case->block->statements.begin(), stmt);
-  }
-  first_case->is_statement = true;
-
-  THIRIf *the_if = first_case;
-  for (size_t i = 1; i < ast->branches.size(); ++i) {
-    const auto &ast_branch = ast->branches[i];
-    THIR_ALLOC(THIRIf, thir_branch, ast)
-    thir_branch->condition = get_condition_comparator(i);
-    thir_branch->block = (THIRBlock *)visit_node(ast_branch.block);
-    for (auto &stmt : extra_statements_generated_by_pattern_match) {
-      thir_branch->block->statements.insert(thir_branch->block->statements.begin(), stmt);
-    }
-    thir_branch->is_statement = true;
-    the_if->_else = thir_branch;
-    the_if = thir_branch;
+  if (!ast->is_statement) {
+    THIR_ALLOC(THIRExprBlock, block, ast);
+    ENTER_RETURN_OVERRIDE(ast, block->statements);
+    block->return_register = return_override_register.get();
+    block->statements.push_back(build_if_chain());
+    return block;
   }
 
-  if (ast->default_branch) {
-    the_if->_else = (THIRBlock *)visit_node(ast->default_branch.get());
-  }
-
-  return first_case;
+  return build_if_chain();
 }
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {
