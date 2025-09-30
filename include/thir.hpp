@@ -1,6 +1,7 @@
 #pragma once
 
 #include "arena.hpp"
+#include "core.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -289,15 +290,18 @@ struct DeferFrame {
 
 struct THIRGen {
   THIRGen(Context &ctx) : ctx(ctx) {
-    auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
-    auto method_ty = ctx.scope->find_type_id("Method", {});
-    auto field_ty = ctx.scope->find_type_id("Field", {});
 
-    auto list_decl = (ASTDeclaration *)ctx.scope->lookup("List")->type.declaration.get();
-
-    type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
-    method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
-    field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
+    if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) {
+      auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
+      auto method_ty = ctx.scope->find_type_id("Method", {});
+      auto field_ty = ctx.scope->find_type_id("Field", {});
+  
+      auto list_decl = (ASTDeclaration *)ctx.scope->lookup("List")->type.declaration.get();
+  
+      type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
+      method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
+      field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
+    }
 
     THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
     global_initializer_function = global_ini;
@@ -326,6 +330,8 @@ struct THIRGen {
   std::vector<DeferFrame> defer_stack;
 
   void enter_defer_boundary(DeferBoundary boundary);
+  void exit_defer_boundary();
+  
   // remove frames up to `boundary` and return defers in execution order
   std::vector<THIR *> collect_defers_up_to(DeferBoundary boundary);
 

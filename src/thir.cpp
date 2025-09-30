@@ -725,6 +725,7 @@ THIR *THIRGen::visit_block(ASTBlock *ast) {
   }
 
   auto block_defers = collect_defers_up_to(DeferBoundary::BLOCK);
+  exit_defer_boundary();
 
   for (auto d : block_defers) {
     thir->statements.push_back(d);
@@ -855,18 +856,20 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   mangle_function_name_for_thir(ast, thir);
 
   if (ast->block) {
-    // auto saved_defer_stack = std::move(defer_stack);
-    // defer_stack.clear();
+    auto saved_defer_stack = std::move(defer_stack);
+    defer_stack.clear();
     
     enter_defer_boundary(DeferBoundary::FUNCTION);
 
     thir->block = (THIRBlock *)visit_block(ast->block.get());
+
     auto func_defers = collect_defers_up_to(DeferBoundary::FUNCTION);
     for (auto d : func_defers) {
       thir->block->statements.push_back(d);
     }
 
-    // defer_stack = std::move(saved_defer_stack);
+    exit_defer_boundary();
+    defer_stack = std::move(saved_defer_stack);
   }
 
   if (is_testing && ast->is_test) {
@@ -969,15 +972,6 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   return thir;
 }
 
-// TODO:
-/*
-  Right now, we're just going to lower this into a bunch of if-else branches.
-  This maintains the previous meaning of all the programs that exist in the language
-
-  However, with a future LLVM backend and an improvement of the behaviour of switch statements in general,
-  We're going to need a THIRSwitch, because it won't just act as an if-else (fall throughs, jump table optimizations,
-  etc)
-*/
 THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   // TODO: maybe we want to throw an error for this, instead of just optimizing it out.
   if (ast->branches.empty() && !ast->default_branch) {
@@ -1225,8 +1219,16 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
       statements.push_back(variable);
     }
 
+    enter_defer_boundary(DeferBoundary::LOOP);
     thir->block = visit_node(ast->block);
     THIRBlock *block = (THIRBlock *)thir->block;
+
+    auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+    exit_defer_boundary();
+    for (auto d : loop_defers) {
+      block->statements.push_back(d);
+    }
+
     block->statements.insert(block->statements.begin(), statements.begin(), statements.end());
   } else {
     const auto identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
@@ -1235,15 +1237,13 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     bind(identifier_symbol, identifier_var);
 
     enter_defer_boundary(DeferBoundary::LOOP);
-
     THIRBlock *block = (THIRBlock *)visit_node(ast->block);
     thir->block = block;
-
     auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+    exit_defer_boundary();
     for (auto d : loop_defers) {
       block->statements.push_back(d);
     }
-
     block->statements.insert(block->statements.begin(), identifier_var);
   }
 
@@ -1299,6 +1299,7 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
   enter_defer_boundary(DeferBoundary::LOOP);
   thir->block = (THIRBlock *)visit_node(ast->block);
   auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+  exit_defer_boundary();
   for (auto d : loop_defers) {
     thir->block->statements.push_back(d);
   }
@@ -1314,10 +1315,6 @@ THIR *THIRGen::visit_defer(ASTDefer *ast) {
     if (auto s = visit_node(ast->statement)) {
       tmp_stmts.push_back(s);
     }
-  }
-
-  for (auto &s : tmp_stmts) {
-    if (s) s->is_statement = true;
   }
 
   if (defer_stack.empty()) {
@@ -1959,7 +1956,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
 
     block->statements.push_back(global_initializer_call);
 
-    {  // Call Env::initialize(argc, argv);
+    if (!compile_command.has_flag("nostdlib") && !compile_command.has_flag("freestanding")) {  // Call Env::initialize(argc, argv);
       // Find the damn call
       ASTFunctionDeclaration *env_initialize = nullptr;
       ASTPath env_initialize_path;
@@ -2109,17 +2106,19 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
 void THIRGen::enter_defer_boundary(DeferBoundary boundary) { defer_stack.push_back({boundary, {}}); }
 
+void THIRGen::exit_defer_boundary() {
+  defer_stack.pop_back();
+}
+
 // inclusive
 std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
   std::vector<THIR *> out;
-  while (!defer_stack.empty()) {
-    DeferFrame frame = std::move(defer_stack.back());
-    defer_stack.pop_back();
-
+  // Walk the defer_stack from the top (back) to the bottom without mutating it.
+  for (auto frame_it = defer_stack.rbegin(); frame_it != defer_stack.rend(); ++frame_it) {
+    const DeferFrame &frame = *frame_it;
     for (auto it = frame.defers.rbegin(); it != frame.defers.rend(); ++it) {
       out.push_back(*it);
     }
-
     if (frame.boundary == boundary) {
       break;
     }
