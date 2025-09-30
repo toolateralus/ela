@@ -875,7 +875,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
     // global variables don't get directly assigned, we will always use a static global initializer.
     // TODO: make some kind of analyzer that will actually figure this out for us, simple assignments dont
     // need to work like this for compile time constant friendly values.
-    make_global_initializer_assignment_and_get_stub_value(ast->type->resolved_type, thir, ast->value);
+    make_global_initializer(ast->type->resolved_type, thir, ast->value);
   } else {
     if (ast->value) {
       thir->value = visit_node(ast->value.get());
@@ -1930,11 +1930,10 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
 
     const bool is_testing = compile_command.has_flag("test");
 
-    if (!is_testing && !compile_command.has_flag("freestanding")) {
+    if (!is_testing && !compile_command.has_flag("freestanding") && this->entry_point->get_node_type() == THIRNodeType::Function) {
       // Call __ela_main_();
       // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
       THIRFunction *entry_point = (THIRFunction *)this->entry_point;
-
       THIR_ALLOC_NO_SRC_RANGE(THIRCall, entry_call)
       entry_call->callee = entry_point;
       entry_call->arguments = {};
