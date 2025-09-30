@@ -579,15 +579,22 @@ void Emitter::emit_expr(const THIR *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
-  if (thir->is_static) {
+  if (thir->is_constexpr) {
+    indented("const " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+  } else if (thir->is_static) {
     indented("static " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   } else {
     indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   }
 
-  code << " = ";
-  emit_expr(thir->value);
-  code << ";\n";
+  if (!thir->value) {
+    code << ";\n";
+  } else {
+    code << " = ";
+    emit_expr(thir->value);
+    code << ";\n";
+  }
+
 }
 
 void Emitter::emit_return(const THIRReturn *thir) {

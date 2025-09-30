@@ -86,6 +86,7 @@ struct THIRVariable : THIR {
   THIR *value;
   bool is_static : 1 = false;
   bool is_global : 1 = false;
+  bool is_constexpr: 1 = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -275,10 +276,33 @@ struct THIRGen {
     type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
     method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
     field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
+
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
+    global_initializer_function = global_ini;
+    FunctionTypeInfo info;
+    info.params_len = 0;
+    info.return_type = void_type();
+    global_ini->type = global_find_function_type_id(info, {});
+    global_ini->is_statement = true;
+    global_ini->name = "ela_run_global_initializers";
+    global_ini->parameters = {};
+    global_ini->block = thir_alloc<THIRBlock>();
+    global_ini->block->is_statement = true;
+
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRCall, global_ini_call);
+    global_initializer_call = global_ini_call;
+    global_ini_call->callee = global_ini;
+    global_ini_call->is_statement = true;
+    global_ini_call->arguments = {};
   }
   Context &ctx;
 
   std::vector<THIRFunction *> test_functions;
+
+  THIRCall *global_initializer_call;
+  THIRFunction *global_initializer_function;
 
   std::map<Symbol *, THIR *> symbol_map;
   std::map<ASTNode *, THIR *> ast_map;
@@ -448,4 +472,6 @@ struct THIRGen {
 
   void visit_where_branch(const WhereBranch *branch);
   THIRFunction *emit_runtime_entry_point();
+
+  void make_global_initializer_assignment_and_get_stub_value(const Type *, THIRVariable *thir, Nullable<ASTExpr > value);
 };

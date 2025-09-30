@@ -1,6 +1,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "strings.hpp"
+#include "thir.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
@@ -50,11 +51,20 @@ int CompileCommand::compile() {
 
     output << emitter.code.str();
 
-    emitter.code.clear();
+    { // emit global initializer function that's called in main
+      emitter.code.clear();
+      THIRFunction *global_ini = thir_gen.global_initializer_function;
+      resolver.visit_node(global_ini);
+      output << emitter.code.str();
+      emitter.code.clear();
+    }
+
     // Emit our main last always
-    THIRFunction *ep = thir_gen.emit_runtime_entry_point();
-    emitter.emit_function(ep);
-    output << emitter.code.str();
+    {
+      THIRFunction *ep = thir_gen.emit_runtime_entry_point();
+      emitter.emit_function(ep);
+      output << emitter.code.str();
+    }
   });
 
   if (has_flag("no-compile")) {

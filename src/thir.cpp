@@ -858,8 +858,10 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 
   thir->is_global = !ast->is_local;
   thir->is_static = ast->is_static;
+  thir->is_constexpr = ast->is_constexpr;
 
   auto symbol = ast->declaring_scope->local_lookup(ast->name);
+
   bind(ast, thir);
   bind(symbol, thir);
 
@@ -869,10 +871,17 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
     thir->name = ast->name;
   }
 
-  if (ast->value) {
-    thir->value = visit_node(ast->value.get());
+  if (thir->is_global && !ast->is_constexpr) {
+    // global variables don't get directly assigned, we will always use a static global initializer.
+    // TODO: make some kind of analyzer that will actually figure this out for us, simple assignments dont
+    // need to work like this for compile time constant friendly values.
+    make_global_initializer_assignment_and_get_stub_value(ast->type->resolved_type, thir, ast->value);
   } else {
-    thir->value = initialize(thir->source_range, ast->type->resolved_type, {});
+    if (ast->value) {
+      thir->value = visit_node(ast->value.get());
+    } else {
+      thir->value = initialize(thir->source_range, ast->type->resolved_type, {});
+    }
   }
 
   thir->type = ast->type->resolved_type;
@@ -1885,7 +1894,10 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
     main->parameters.push_back(argv);
   }
   THIR_ALLOC_NO_SRC_RANGE(THIRBlock, block) {  // Create block for main.
-    {                                          // Call Env::initialize(argc, argv);
+
+    block->statements.push_back(global_initializer_call);
+
+    {  // Call Env::initialize(argc, argv);
       // Find the damn call
       ASTFunctionDeclaration *env_initialize = nullptr;
       ASTPath env_initialize_path;
@@ -2011,4 +2023,25 @@ THIR *THIRGen::visit_unpack_element(ASTUnpackElement *ast) {
       return visit_node(ast->range_literal_value);
     } break;
   }
+}
+
+void THIRGen::make_global_initializer_assignment_and_get_stub_value(const Type *type, THIRVariable *thir,
+                                                                    Nullable<ASTExpr> value_n) {
+  THIR *value;
+  if (value_n.is_not_null()) {
+    value = visit_node(value_n.get());
+  } else {
+    value = initialize(thir->source_range, (Type *)type, {});
+  }
+
+  thir->value = nullptr;  // global variables never get a value before the initializer.
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, expr)
+  expr->left = thir;
+  expr->right = value;
+  expr->is_statement = true;
+  expr->op = TType::Assign;
+  expr->type = value->type;
+
+  global_initializer_function->block->statements.push_back(expr);
 }

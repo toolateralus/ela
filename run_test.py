@@ -136,14 +136,14 @@ def main():
             print(f"\n\033[1;31m{test}:\033[0m")
             print(out.strip() or "<no output>")
 
+        # cleanup: remove non-.ela files (unconditional)
         for fname in os.listdir("."):
-        if not fname.endswith(".ela") and not fname.endswith(".gitignore"):
-            try:
-                os.remove(fname)
-            except Exception as e:
-                print(f"\033[1;31mFailed to remove {fname}: {e}\033[0m")
+            if not fname.endswith(".ela") and not fname.endswith(".gitignore"):
+                try:
+                    os.remove(fname)
+                except Exception as e:
+                    print(f"\033[1;31mFailed to remove {fname}: {e}\033[0m")
 
 # ---------------- Entry ---------------- #
-
 if __name__ == "__main__":
     main()
