@@ -114,8 +114,25 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   }
 }
 
+// used in libffi
+extern std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH;
+
 // clang-format off
 std::vector<DirectiveRoutine> Parser:: directive_routines = {
+  // #load_dynamic_lib
+  // used to make a dynamic library (by path, relative to LD_LIBRARY_PATH or absolute)
+  // available at compile time.
+    {.identifier = "load_dynamic_lib",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        parser->expect(TType::LParen);
+        auto string = parser->expect(TType::String);
+        parser->expect(TType::RParen);
+        DYNAMIC_LIBRARY_LOAD_PATH.push_back(string.value.get_str());
+        printf("adding dynamic library to compile time function dispatch tool: %s\n", string.value.get_str().c_str());
+        return nullptr;
+      }
+    },
     // #include
     // Just like C's include, just paste a text file right above where the
     // include is used.

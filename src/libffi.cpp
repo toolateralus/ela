@@ -30,6 +30,22 @@ T ffi_coerce_numeric(Value* v) {
 }
 
 ffi_type* to_ffi_type(Type* t) {
+  if (t->is_kind(TYPE_STRUCT)) {
+    auto info = t->info->as<StructTypeInfo>();
+    size_t n = info->members.size();
+    ffi_type** elements = new ffi_type*[n + 1];
+    for (size_t i = 0; i < n; ++i) {
+      elements[i] = to_ffi_type(info->members[i].type);
+    }
+    elements[n] = nullptr;
+    ffi_type* struct_type = new ffi_type;
+    struct_type->size = 0;
+    struct_type->alignment = 0;
+    struct_type->type = FFI_TYPE_STRUCT;
+    struct_type->elements = elements;
+    return struct_type;
+  }
+
   if (!t) {
     return &ffi_type_pointer;
   }
@@ -62,7 +78,7 @@ ffi_type* to_ffi_type(Type* t) {
         return &ffi_type_uint64;
       case TYPE_BOOL:
         return &ffi_type_uint8;
-      case TYPE_CHAR: // We use 32 bit unsigned chars, UTF8+ support.
+      case TYPE_CHAR:  // We use 32 bit unsigned chars, UTF8+ support.
         return &ffi_type_sint32;
       case TYPE_VOID:
         return &ffi_type_void;
@@ -76,11 +92,53 @@ ffi_type* to_ffi_type(Type* t) {
   }
 }
 
-void* try_load_libc_or_libm_symbol(const std::string& name) {
+extern std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH;
+
+std::unordered_map<std::string, void*> loaded_dl_libraries;
+
+void* try_load_symbol(const std::string& name) {
+  if (loaded_ffi_extern_functions.contains(name)) {
+    printf("returning cached function\n");
+    return loaded_ffi_extern_functions[name];
+  }
+
   void* sym = dlsym(RTLD_DEFAULT, name.c_str());
   if (sym) {
+    printf("loaded function from RTLD_DEFAULT\n");
     loaded_ffi_extern_functions[name] = sym;
   }
+
+  for (const auto& lib : DYNAMIC_LIBRARY_LOAD_PATH) {
+    if (loaded_dl_libraries.contains(lib)) {
+      void* sym = dlsym(loaded_dl_libraries[lib], name.c_str());
+      if (sym) {
+        loaded_ffi_extern_functions[name] = sym;
+        return sym;
+      }
+    }
+
+    void* the_lib = dlopen(lib.c_str(), RTLD_NOW);
+
+    if (!the_lib) {
+      throw_warning(WARNING_GENERAL,
+                    std::format("failed to load dynamic library at compile time. lib='{}', is your path correct?", lib),
+                    {});
+      continue;
+    }
+
+    void* sym = dlsym(the_lib, name.c_str());
+
+    if (!sym) {
+      throw_warning(WARNING_GENERAL, std::format("failed to get sym '{}' from lib '{}' at compile time.", name, lib),
+                    {});
+      dlclose(the_lib);
+    } else {
+      printf("loaded '%s' from '%s' at compile time.\n", name.c_str(), lib.c_str());
+      loaded_dl_libraries[lib] = the_lib;
+      loaded_ffi_extern_functions[name] = sym;
+    }
+  }
+
   return sym;
 }
 
@@ -251,6 +309,35 @@ struct FFIContext {
   // If the Value is pointer/array, we allocate nested buffers and put a pointer into out_storage.
   void marshal_value_into_storage(Value* v, std::vector<uint8_t>& out_storage, ffi_type*& out_type,
                                   size_t arg_index = 0) {
+    // Support for objects: map<InternedString, Value*>
+    if (v->get_value_type() == ValueType::OBJECT) {
+      // Assume ObjectValue has: std::unordered_map<InternedString, Value*> fields;
+      ObjectValue* obj = v->as<ObjectValue>();
+      // Marshal as a struct: flatten fields in order of type's struct members
+      if (obj->type->is_kind(TYPE_STRUCT)) {
+        StructTypeInfo* stinfo = obj->type->info->as<StructTypeInfo>();
+        size_t n = stinfo->members.size();
+        std::vector<uint8_t> struct_buf;
+        struct_buf.resize(obj->type->size_in_bytes(), 0);
+        size_t offset = 0;
+        for (size_t i = 0; i < n; ++i) {
+          const auto& member = stinfo->members[i];
+          auto it = obj->values.find(member.name);
+          if (it != obj->values.end()) {
+            std::vector<uint8_t> field_buf;
+            ffi_type* dummy = nullptr;
+            marshal_value_into_storage(it->second, field_buf, dummy, arg_index);
+            memcpy(struct_buf.data() + offset, field_buf.data(),
+                   std::min(field_buf.size(), member.type->size_in_bytes()));
+          }
+          offset += member.type->size_in_bytes();
+        }
+        out_type = to_ffi_type(obj->type);
+        out_storage = std::move(struct_buf);
+        return;
+      }
+    }
+
     switch (v->get_value_type()) {
       case ValueType::FLOATING: {
         double tmp = ffi_coerce_numeric<double>(v);
@@ -489,13 +576,13 @@ struct FFIContext {
   }
 };
 
-Value *unmarshal_pointer_value(Type *rtype, const std::vector<uint8_t>& ret_storage) {
+Value* unmarshal_pointer_value(Type* rtype, const std::vector<uint8_t>& ret_storage) {
   char* ptr = nullptr;
   memcpy(&ptr, ret_storage.data(), sizeof(char*));
   return new_raw_pointer(rtype, ptr);
 }
 
-Value* unmarshal_scalar_return(Type *rtype, ScalarTypeInfo* info, const std::vector<uint8_t>& ret_storage) {
+Value* unmarshal_scalar_return(Type* rtype, ScalarTypeInfo* info, const std::vector<uint8_t>& ret_storage) {
   if (ret_storage.empty()) {
     return null_value();
   }
@@ -561,11 +648,7 @@ Value* unmarshal_scalar_return(Type *rtype, ScalarTypeInfo* info, const std::vec
 */
 
 Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, const std::vector<Value*>& args) {
-  void* fn_ptr = loaded_ffi_extern_functions[name.get_str()];
-
-  if (!fn_ptr) {
-    fn_ptr = try_load_libc_or_libm_symbol(name.get_str());
-  }
+  void* fn_ptr = try_load_symbol(name.get_str());
 
   if (!fn_ptr) {
     return nullptr;
