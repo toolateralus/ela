@@ -1388,8 +1388,7 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
   auto members_iter = type->info->members.begin();
 
   THIR *base = visit_node(ast->right);
-  static size_t id = 0;
-  const auto cached_base = make_variable("$destructure$" + std::to_string(id), take_address_of(base, ast), ast->right);
+  const auto cached_base = make_variable(get_temporary_variable(), take_address_of(base, ast), ast->right);
   current_statement_list->push_back(cached_base);
 
   for (const DestructureElement &element : ast->elements) {

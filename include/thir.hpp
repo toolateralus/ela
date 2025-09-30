@@ -5,9 +5,9 @@
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
-#include "strings.hpp"
 #include "type.hpp"
 #include "ast.hpp"
+#include "visitor.hpp"
 #include <map>
 #include <unordered_map>
 #include <vector>
@@ -393,7 +393,7 @@ struct THIRGen {
 
   inline THIRVariable *init_override_register(ASTNode *node) {
     THIR_ALLOC(THIRVariable, override_register, node)
-    override_register->name = std::format(THIR_RETURN_OVERRIDE_REGISTER_KEY_FORMAT, return_override_register_index++);
+    override_register->name = get_temporary_variable();
     THIR_ALLOC(THIREmptyInitializer, empty_init, node)
     override_register->value = empty_init;
     override_register->type = node->resolved_type;

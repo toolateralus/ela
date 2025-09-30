@@ -321,7 +321,7 @@ void Emitter::emit_type(const THIRType *thir) {
 
 void Emitter::emit_tuple(Type *type) {
   const auto type_name = c_type_string(type);
-  code << "typedef struct";
+  code << "typedef struct " << type_name;
   emit_struct_body(type);
   code << ' ' << type_name << ";\n";
 }
@@ -444,7 +444,7 @@ void Emitter::forward_declare_type(const Type *type) {
     } break;
     case TYPE_TUPLE: {
       auto name = c_type_string(type);
-      code << "typedef struct " << name << ";\n";
+      code << "typedef struct " << name << ' ' << name << ";\n";
     } break;
     case TYPE_DYN:
     case TYPE_CHOICE: {
