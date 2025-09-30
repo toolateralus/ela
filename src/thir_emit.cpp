@@ -184,12 +184,14 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
     return;
   }
 
-  const bool is_string = thir->type == u8_ptr_type();
+  const bool is_string = thir->type == u8_ptr_type() || thir->is_c_string;
 
   if (is_string) {
     code << '\"';
   }
+
   code << thir->value.get_str();
+
   if (is_string) {
     code << '\"';
   }

@@ -154,6 +154,7 @@ struct THIRUnaryExpr : THIR {
 
 struct THIRLiteral : THIR {
   InternedString value;
+  bool is_c_string = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Literal; }
 };
 
@@ -444,5 +445,6 @@ struct THIRGen {
   THIR *to_reflection_type_struct(Type *type);
   void emit_destructure_for_pattern_match(ASTPatternMatch *pattern_match, std::vector<THIR *> &statements);
 
+  void visit_where_branch(const WhereBranch *branch);
   THIRFunction *emit_runtime_entry_point();
 };

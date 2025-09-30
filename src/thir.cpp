@@ -405,6 +405,9 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
   }
 
   THIR_ALLOC(THIRLiteral, literal, ast);
+  if (ast->is_c_string) {
+    literal->is_c_string = true;
+  }
   literal->value = ast->value;
   return literal;
 }
@@ -1305,6 +1308,20 @@ void THIRGen::visit_module(ASTModule *ast) {
   }
 }
 
+void THIRGen::visit_where_branch(const WhereBranch *branch) {
+  if (branch->where_stmt.is_not_null()) {
+    visit_node(branch->where_stmt.get());
+  } else {
+    auto block = branch->block.get();
+    ENTER_SCOPE(block->scope);
+    for (const auto &ast_stmt : block->statements) {
+      if (auto thir_stmt = visit_node(ast_stmt)) {
+        current_statement_list->push_back(thir_stmt);
+      }
+    }
+  }
+}
+
 void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
   if (ast->should_compile) {
     ENTER_SCOPE(ast->block->scope);
@@ -1313,6 +1330,9 @@ void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
         current_statement_list->push_back(thir_stmt);
       }
     }
+  } else if (ast->branch) {
+    // the 'else' cases
+    visit_where_branch(ast->branch.get());
   }
 }
 
