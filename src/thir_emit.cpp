@@ -460,7 +460,7 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
   code << "} " << name << ";\n";
 }
 
-void Emitter::emit_function(const THIRFunction *thir) {
+void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
   if (thir->is_extern || thir->is_exported) {
@@ -492,7 +492,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
 
     std::string ident = std::string("*") + thir->name.get_str() + "(" + outer_params_decl + ")";
     code << get_function_pointer_type_string(info->return_type, &ident, false);
-    if (thir->block) {
+    if (thir->block && !forward_declaration) {
       emit_block(thir->block);
     } else {
       code << ";\n";
@@ -520,7 +520,7 @@ void Emitter::emit_function(const THIRFunction *thir) {
 
   code << ") ";
 
-  if (thir->block) {
+  if (thir->block && !forward_declaration) {
     emit_block(thir->block);
   } else {
     code << ";\n";

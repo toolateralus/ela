@@ -184,6 +184,9 @@ void Resolver::visit_function(const THIRFunction *thir) {
     }
   }
 
+  // Emit a forward declaration for mutually recursive functions
+  emitter.emit_function(thir, true);
+
   if (thir->block) {
     visit_node(thir->block);
   }

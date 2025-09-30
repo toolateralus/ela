@@ -38,13 +38,13 @@ struct Emitter {
   void emit_expr(const THIR *thir);
 
   inline void emit_line_directive(const THIR *thir) {
-    const static bool is_debugging = compile_command.has_flag("debug");
+    // const static bool is_debugging = compile_command.has_flag("debug");
     const static bool no_line = compile_command.has_flag("nl");
 
-    if (!is_debugging || no_line) {
+    if (no_line) {
       return;
     }
-    
+
     code << "\n#line " << std::to_string(thir->source_range.line) << " \""
          << thir->source_range.files()[thir->source_range.file] << "\";\n";
   }
@@ -81,10 +81,9 @@ struct Emitter {
   void forward_declare_type(const Type *type);
   void emit_dyn_dispatch_object_struct(Type *type);
 
-  void emit_function(const THIRFunction *thir);
+  void emit_function(const THIRFunction *thir, const bool forward_declaration = false);
   void emit_block(const THIRBlock *thir);
   void emit_expression_block(const THIRExprBlock *thir);
-
 
   std::string reflection_prelude(const std::unordered_map<const Type *, ReflectionInfo>&);
 };
