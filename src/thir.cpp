@@ -26,6 +26,12 @@
   Defer $ovr_reg_defer([&] { return_override_register = {nullptr}; });
 
 static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath *ast) {
+  if (!ast->resolved_type) {
+    // This should never happen, debugging something
+    // TODO: remove this
+    return false;
+  }
+  
   if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->has_extensions()) {
     return false;
   }

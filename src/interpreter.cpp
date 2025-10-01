@@ -99,10 +99,9 @@ LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
   if (object->values.contains(node->member)) {
     return new_lvalue(&object->values[node->member]);
   } else {
-    throw_warning(
-        WARNING_GENERAL,
-        std::format("Accessing a member access expression during compile time, but the object didn't have a property "
-                    "{}, so it got ignored",
+    throw_error(
+        std::format("A member access expression during compile time read a property that doesnt exist."
+                    " member: '{}'",
                     node->member),
         node->source_range);
     return null_lvalue();

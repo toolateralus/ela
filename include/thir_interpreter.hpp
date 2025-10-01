@@ -53,10 +53,7 @@ struct Interpreter {
   Value *visit_collection_initializer(THIRCollectionInitializer *);
 
   Value *visit_empty_initializer(THIREmptyInitializer *node) {
-    if (node->type->is_fixed_sized_array()) {
-      return new_array(node->type);
-    }
-    return new_object(node->type);
+    return default_value_of_t(node->type, this);
   }
 
   Value *visit_offset_of(THIROffsetOf *node) {
