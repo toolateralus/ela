@@ -499,6 +499,8 @@ struct Type {
 
   size_t size_in_bytes() const;
   size_t alignment_in_bytes() const;
+
+  bool has_dependencies() const;
 };
 
 static inline constexpr bool type_is_valid(Type *type) {

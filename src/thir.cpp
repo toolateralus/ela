@@ -424,7 +424,6 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
         ast->operand, visit_node(ast->operand), symbol->function.declaration->requires_self_ptr()));
 
-
     if (symbol->name == "deref") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
       deref->op = TType::Mul;
@@ -432,7 +431,7 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
       deref->type = ast->resolved_type;
       deref->is_statement = overload_call->is_statement;
       return deref;
-    } 
+    }
 
     return overload_call;
   }
@@ -748,7 +747,20 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
     thir->parameters.push_back(thir_param);
   }
 
-  thir->block = (THIRBlock *)visit_node(ast->block);
+  auto saved_defer_stack = std::move(defer_stack);
+  defer_stack.clear();
+
+  enter_defer_boundary(DeferBoundary::FUNCTION);
+
+  thir->block = (THIRBlock *)visit_block(ast->block);
+
+  auto func_defers = collect_defers_up_to(DeferBoundary::FUNCTION);
+  for (auto d : func_defers) {
+    thir->block->statements.push_back(d);
+  }
+
+  exit_defer_boundary();
+  defer_stack = std::move(saved_defer_stack);
 
   return thir;
 }
@@ -1030,8 +1042,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
   // Build the switch as a THIRIf chain. Encapsulate construction so we can reuse for
   // both statement and expression forms (expression needs return override handling).
   const auto build_if_chain = [&]() -> THIRIf * {
-    auto cached_expr = make_variable(get_temporary_variable(),
-                                     visit_node(ast->expression), ast->expression);
+    auto cached_expr = make_variable(get_temporary_variable(), visit_node(ast->expression), ast->expression);
 
     current_statement_list->push_back(cached_expr);
 
@@ -1252,8 +1263,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     }
 
     // we take the address of when caching the result because 'for &x, &y in ...' needs to mutate the original.
-    THIRVariable *cached_base =
-        make_variable(get_temporary_variable(), ptr_to_some, ast);
+    THIRVariable *cached_base = make_variable(get_temporary_variable(), ptr_to_some, ast);
     statements.push_back(cached_base);
     const auto type = value_type;
     auto members_iter = type->info->members.begin();
@@ -1581,7 +1591,13 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
       make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
   });
 
-  if (parent_type->has_no_extensions()) {
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    const auto info = parent_type->info->as<EnumTypeInfo>();
+    const auto member = info->find_member(name);
+    if (member && member->thir_value) {
+      thir->key_values.push_back({"enum_value", member->thir_value.get()});
+    }
+  } else if (parent_type->has_no_extensions()) {
     THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
     offset_of->target_type = parent_type;
     offset_of->target_field = name;
@@ -1589,14 +1605,6 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
         "offset",
         offset_of,
     });
-  }
-
-  if (parent_type->is_kind(TYPE_ENUM)) {
-    const auto info = parent_type->info->as<EnumTypeInfo>();
-    const auto member = info->find_member(name);
-    if (member && member->thir_value) {
-      thir->key_values.push_back({"enum_value", member->thir_value.get()});
-    }
   }
 
   return thir;
@@ -1608,6 +1616,7 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->is_variable_length_array = true;
   collection->type = field_type->make_array_of(length);
+
   for (const auto &member : type->info->members) {
     collection->values.push_back(get_field_struct(member.name.get_str(), member.type, type));
   }
@@ -1736,8 +1745,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   ReflectionInfo &info = reflected_upon_types[type];
   info.created = true;
-  info.definition =
-      make_variable(get_temporary_variable(), initialize({}, type_type, {}), nullptr);
+  info.definition = make_variable(get_temporary_variable(), initialize({}, type_type, {}), nullptr);
 
   info.definition->is_global = true;
   info.definition->is_statement = true;

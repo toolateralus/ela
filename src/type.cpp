@@ -607,7 +607,6 @@ Token get_unique_identifier() {
   return tok;
 }
 
-
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
   auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
@@ -1085,7 +1084,6 @@ void assess_and_try_add_blittable_trait(Type *type) {
   type->traits.push_back(blittable_trait());
 }
 
-
 // TODO: make sizing more platform dependent, and maybe we should make cross compilation a bit more
 // simple by using static definitions for these.
 size_t Type::size_in_bytes() const {
@@ -1184,7 +1182,7 @@ size_t StructTypeInfo::size_in_bytes() const {
 
   size_t offset = 0;
   size_t max_align = 1;
-  for (auto &member: members) {
+  for (auto &member : members) {
     size_t member_size = member.type->size_in_bytes();
     size_t align = member.type->alignment_in_bytes();
     max_align = std::max(max_align, align);
@@ -1211,4 +1209,61 @@ size_t TupleTypeInfo::size_in_bytes() const {
   return offset;
 }
 
-
+// If this type has members or generics that depend on other types being defined first, this returns true.
+bool Type::has_dependencies() const {
+  switch (kind) {
+    case TYPE_ENUM:
+      return false;
+    case TYPE_SCALAR:
+      return false;
+    case TYPE_FUNCTION: {
+      auto info = this->info->as<FunctionTypeInfo>();
+      if (info->return_type->has_dependencies()) {
+        return true;
+      }
+      for (size_t i = 0; i < info->params_len; ++i) {
+        Type *param = info->parameter_types[i];
+        if (param->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_STRUCT: {
+      auto info = this->info->as<StructTypeInfo>();
+      for (const auto &member : info->members) {
+        if (member.type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_TUPLE: {
+      auto info = this->info->as<TupleTypeInfo>();
+      for (const auto &type : info->types) {
+        if (type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_CHOICE: {
+      auto info = this->info->as<ChoiceTypeInfo>();
+      for (const auto &member : info->members) {
+        if (member.type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_TRAIT: {
+      // these are never declared, so it doesn't depend on the declaration of another.
+      return false;
+    }
+    case TYPE_DYN: {
+      // this doesn't depend on any other type, rather function declarations, but that's not relevant.
+      return false;
+    }
+    break;
+  }
+}

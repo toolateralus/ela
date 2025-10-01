@@ -74,6 +74,7 @@ void Resolver::emit_type_definition(Type *type) {
       break;
   }
 }
+
 void Resolver::visit_program(const THIRProgram *thir) {
   for (const auto &stmt : thir->statements) {
     if (stmt) {
