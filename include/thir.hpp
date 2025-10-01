@@ -92,10 +92,15 @@ struct THIRProgram : THIR {
 };
 
 struct Value;
+struct THIRBinExpr;
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
+  // Global variables will always have ".value" stored in here as .right, and this is what will get 
+  // read from and mutated during compile time.
+  THIRBinExpr *global_initializer_assignment;
   Value *compile_time_value;
+  
   bool use_compile_time_value_at_emit_time: 1 = false;
   bool is_static : 1 = false;
   bool is_global : 1 = false;

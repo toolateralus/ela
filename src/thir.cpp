@@ -2184,6 +2184,8 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
   expr->op = TType::Assign;
   expr->type = value->type;
 
+  thir->global_initializer_assignment = expr;
+
   global_initializer_function->block->statements.push_back(expr);
 }
 

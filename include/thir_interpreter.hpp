@@ -18,6 +18,8 @@ struct Interpreter {
   Scope *scope;
   Context &ctx;
 
+  void on_lvalue_written_to(THIR *left, Value *right);
+
   Interpreter(Context &context) : ctx(context) {
     root_scope = create_child(ctx.scope);
     scope = root_scope;
@@ -44,7 +46,7 @@ struct Interpreter {
   Value *visit_for(THIRFor *);
   Value *visit_if(THIRIf *);
   Value *visit_while(THIRWhile *);
-  
+
   Value *visit_expression_block(THIRExprBlock *);
   Value *visit_member_access(THIRMemberAccess *);
   Value *visit_aggregate_initializer(THIRAggregateInitializer *);
@@ -64,13 +66,9 @@ struct Interpreter {
   }
 
   // don't need to declare types.
-  Value *visit_type_node(THIRType *) {
-    return null_value();
-  }
+  Value *visit_type_node(THIRType *) { return null_value(); }
 
-  Value *visit_noop(THIRNoop *) {
-    return null_value();
-  };
+  Value *visit_noop(THIRNoop *) { return null_value(); };
 
   Value *visit_node(THIR *node) {
     switch (node->get_node_type()) {
@@ -125,5 +123,4 @@ struct Interpreter {
         return visit_noop(static_cast<THIRNoop *>(node));
     }
   }
-
 };

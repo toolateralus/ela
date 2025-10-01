@@ -46,8 +46,15 @@ LValue *Interpreter::get_lvalue(THIR *node) {
 
 LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
   if (!node->value && !node->compile_time_value) {
-    node->compile_time_value = null_value();
-    node->use_compile_time_value_at_emit_time = false;
+
+    if (node->global_initializer_assignment) {
+      node->compile_time_value = visit_node(node->global_initializer_assignment->right);
+      node->use_compile_time_value_at_emit_time = false;
+    } else {
+      node->compile_time_value = null_value();
+      node->use_compile_time_value_at_emit_time = false;
+    }
+
     // our first assignment has to have something to write into, so 
     // we just give null.
     return new_lvalue(&node->compile_time_value);
@@ -399,10 +406,9 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
 
       // make it permanent
       auto lvalue = get_lvalue(node->left);
+      on_lvalue_written_to(node->left, res);
       switch (lvalue->kind) {
         case LValue::MANAGED:
-          printf("assigning %s to what was previously %s\n", right->to_string().c_str(),
-                 (*lvalue->managed)->to_string().c_str());
           *lvalue->managed = res;
           break;
         case LValue::RAW:
@@ -413,6 +419,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
     }
     case TType::Assign: {
       auto lvalue = get_lvalue(node->left);
+      on_lvalue_written_to(node->left, right);
       switch (lvalue->kind) {
         case LValue::MANAGED:
           *lvalue->managed = right;
@@ -647,4 +654,13 @@ Value *Interpreter::visit_collection_initializer(THIRCollectionInitializer *node
     array->values.push_back(visit_node(value));
   }
   return array;
+}
+void Interpreter::on_lvalue_written_to(THIR *left, Value *right) {
+  if (left->get_node_type() == THIRNodeType::Variable) {
+    auto var = (THIRVariable *)left;
+    if (var->global_initializer_assignment) {  // we have to update this, unfortunately.
+      var->global_initializer_assignment->right = right->to_thir();
+    }
+    var->compile_time_value = right;
+  }
 }
