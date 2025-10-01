@@ -2965,7 +2965,7 @@ void Typer::visit(ASTImport *node) {
         printf("local module: %s\n", name.get_str().c_str());
       }
     }
-    for (const auto &[name, sym]: ctx.root_scope->symbols) {
+    for (const auto &[name, sym] : ctx.root_scope->symbols) {
       if (sym.is_module) {
         printf("global/imported module: %s\n", name.get_str().c_str());
       }
@@ -3002,10 +3002,10 @@ void Typer::visit(ASTImport *node) {
 }
 
 void Typer::visit(ASTModule *node) {
-  // TODO: we need to remove all the symbol table insertions from the parser to make this work.
-  // otherwise we just get constant fake redefinitions.
-  // For now, redefinitions from module "appends" are untracked.
-  #if 0 
+// TODO: we need to remove all the symbol table insertions from the parser to make this work.
+// otherwise we just get constant fake redefinitions.
+// For now, redefinitions from module "appends" are untracked.
+#if 0 
   {
     if (auto mod = ctx.scope->lookup(node->module_name)) {
       for (const auto &stmt : node->statements) {
@@ -3293,9 +3293,13 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
-        if (!symbol) return nullptr;
+        if (!symbol) {
+          return nullptr;
+        } 
 
-        if (index == path->length() - 1) return symbol;
+        if (index == path->length() - 1) {
+          return symbol;
+        }
 
         if (!part.generic_arguments.empty()) {
           if (symbol->is_type) {
@@ -3310,8 +3314,9 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
                                       part.get_resolved_generics());
             auto type = instantiation->resolved_type;
             scope = type->info->scope;
-          } else
+          } else {
             return nullptr;
+          }
         } else {
           if (symbol->is_module) {
             scope = symbol->module.declaration->scope;
@@ -3944,6 +3949,4 @@ void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }
 
-void Typer::visit(ASTRun *node) {
-  node->node_to_run->accept(this);
-}
+void Typer::visit(ASTRun *node) { node->node_to_run->accept(this); }

@@ -11,6 +11,12 @@ void Resolver::declare_or_define_type(Type *type) {
     return;
   }
 
+  if (type->generic_args.size()) {
+    for (const auto &generic: type->generic_args) {
+      declare_or_define_type(generic);
+    }
+  }
+
   // this is for function pointers.
   if (type->is_kind(TYPE_FUNCTION)) {
     emit_type_definition(type);
