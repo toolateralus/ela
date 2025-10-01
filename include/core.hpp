@@ -5,7 +5,6 @@
 #include <functional>
 #include <iostream>
 #include <unordered_map>
-
 #include "lex.hpp"
 
 #define MB(n) (n * 1024 * 1024)
@@ -70,6 +69,7 @@ struct CompilationMetric {
   }
 };
 
+struct SourceRange;
 struct CompileCommand {
   CompilationMetric parse;
   CompilationMetric lower;
@@ -95,6 +95,8 @@ struct CompileCommand {
     std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
     std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
   }
+
+  void request_compile_time_code_execution(const SourceRange &range);
 };
 
 extern CompileCommand compile_command;

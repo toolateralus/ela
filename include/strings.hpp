@@ -67,6 +67,7 @@ Available flags:
   --metrics          Write performance metrics to stdout.
   --x                Print the command used to compile the outputted C code.
   --test             Only emit functions marked `#test` and bootstrap the default test runner. You still have to run the binary to run the tests.
+  --ctfe-validate    Get prompted any time a '#run' directive is, get the source location, and get a prompt to allow or deny the compilation. You shouldn't be compiling untrusted code, but if you must, use this to vet any CTFE.
 
 Warning Exclusions:
   "--Wignore-all"                   Ignore all warnings.

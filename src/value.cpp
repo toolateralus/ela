@@ -113,6 +113,7 @@ THIR* StringValue::to_thir() const {
   auto literal = thir_alloc<THIRLiteral>();
   literal->value = value;
   literal->tag = ASTLiteral::String;
+  literal->type = u8_ptr_type(); // TODO: support str and String better
   return literal;
 }
 

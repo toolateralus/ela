@@ -1835,6 +1835,9 @@ THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
 }
 
 THIR *THIRGen::visit_run(ASTRun *ast) {
+
+  compile_command.request_compile_time_code_execution(ast->source_range);
+
   auto thir = visit_node(ast->node_to_run);
   auto result = interpret(thir, ctx);
   thir = result->to_thir();

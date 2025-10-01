@@ -46,7 +46,6 @@ LValue *Interpreter::get_lvalue(THIR *node) {
 
 LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
   if (!node->value && !node->compile_time_value) {
-
     if (node->global_initializer_assignment) {
       node->compile_time_value = visit_node(node->global_initializer_assignment->right);
       node->use_compile_time_value_at_emit_time = false;
@@ -55,14 +54,20 @@ LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
       node->use_compile_time_value_at_emit_time = false;
     }
 
+    // printf("didnt have value nor ctval: %s, defaulting to %s\n", node->name.get_str().c_str(), node->compile_time_value->to_string().c_str());
     // our first assignment has to have something to write into, so 
     // we just give null.
     return new_lvalue(&node->compile_time_value);
   }
+
   if (!node->compile_time_value) {
     node->compile_time_value = visit_node(node->value);
   }
+
   node->use_compile_time_value_at_emit_time = true;
+
+  // printf("reading: %s, from %s\n", node->compile_time_value->to_string().c_str(), node->name.get_str().c_str());
+
   return new_lvalue(&node->compile_time_value);
 }
 
@@ -580,9 +585,6 @@ Value *Interpreter::visit_cast(THIRCast *node) {
 }
 
 Value *Interpreter::visit_variable(THIRVariable *node) {
-  if (!node->value) {
-    return null_value();
-  }
   LValue *value = get_variable_lvalue(node);
   return *value->managed;
 }
@@ -655,6 +657,7 @@ Value *Interpreter::visit_collection_initializer(THIRCollectionInitializer *node
   }
   return array;
 }
+
 void Interpreter::on_lvalue_written_to(THIR *left, Value *right) {
   if (left->get_node_type() == THIRNodeType::Variable) {
     auto var = (THIRVariable *)left;
@@ -662,5 +665,6 @@ void Interpreter::on_lvalue_written_to(THIR *left, Value *right) {
       var->global_initializer_assignment->right = right->to_thir();
     }
     var->compile_time_value = right;
+    // printf("writing %s to %s\n", right->to_string().c_str(), var->name.get_str().c_str());
   }
 }

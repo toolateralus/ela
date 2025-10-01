@@ -225,3 +225,14 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     }
   }
 }
+void CompileCommand::request_compile_time_code_execution(const SourceRange &range) {
+  if (has_flag("ctfe-validate")) {
+    std::cout << "\033[1;33mRequesting compile-time function execution at: " << range.ToString()
+          << "\033[0m\nProceed? [y/n]: ";
+    char response;
+    std::cin >> response;
+    if (response != 'y' && response != 'Y') {
+      std::exit(1);
+    }
+  }
+}
