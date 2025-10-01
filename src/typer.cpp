@@ -776,7 +776,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
           }
         }
       } else if (!method->is_forward_declared) {
-        
         if (!method->generic_parameters.empty()) {
           type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC, method);
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
@@ -1267,7 +1266,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
 // #undef USE_GENERIC_PANIC_HANDLER
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range) {
-
 #ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
   set_panic_handler(generic_instantiation_panic_handler);
@@ -2955,6 +2953,11 @@ void Typer::visit(ASTImport *node) {
   const Nullable<Symbol> the_module_nullable = ctx.get_symbol(node->root_group.path);
 
   if (!the_module_nullable) {
+    for (const auto &[name, sym] : ctx.scope->symbols) {
+      if (sym.is_module) {
+        printf("module: %s\n", name.get_str().c_str());
+      }
+    }
     throw_error("unable to find module", node->source_range);
   }
 
@@ -2990,6 +2993,78 @@ void Typer::visit(ASTModule *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   node->scope->name = node->module_name;
+
+  // TODO: we need to remove all the symbol table insertions from the parser to make this work.
+  // otherwise we just get constant fake redefinitions.
+  // For now, redefinitions from module "appends" are untracked.
+  #if 0 
+  {
+    if (auto mod = ctx.scope->lookup(node->module_name)) {
+      for (const auto &stmt : node->statements) {
+        InternedString offender = {};
+  
+        if (auto struct_decl = dynamic_cast<ASTStructDeclaration *>(stmt)) {
+          if (mod->scope->symbols.contains(struct_decl->name)) {
+            offender = struct_decl->name;
+            goto err;
+          }
+        }
+        if (auto choice_decl = dynamic_cast<ASTChoiceDeclaration *>(stmt)) {
+          if (mod->scope->symbols.contains(choice_decl->name)) {
+            offender = choice_decl->name;
+            goto err;
+          }
+        }
+        if (auto enum_decl = dynamic_cast<ASTEnumDeclaration *>(stmt)) {
+          if (mod->scope->symbols.contains(enum_decl->name)) {
+            offender = enum_decl->name;
+            goto err;
+          }
+        }
+        if (auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
+          auto sym = mod->scope->local_lookup(func_decl->name);
+  
+          if (!sym) {
+            continue;
+          }
+          
+          const ASTFunctionDeclaration *decl = sym->function.declaration;
+  
+          const bool new_declaration_is_fwd_or_extern = func_decl->is_forward_declared || func_decl->is_extern;
+          const bool existing_declaration_is_fwd_or_extern = decl->is_extern || decl->is_forward_declared;
+  
+          if (!new_declaration_is_fwd_or_extern && existing_declaration_is_fwd_or_extern) {
+            offender = func_decl->name;
+            goto err;
+          }
+        }
+        if (auto trait_decl = dynamic_cast<ASTTraitDeclaration *>(stmt)) {
+          if (mod->scope->symbols.contains(trait_decl->name)) {
+            offender = trait_decl->name;
+            goto err;
+          }
+        }
+        if (auto alias_decl = dynamic_cast<ASTAlias *>(stmt)) {
+          if (mod->scope->symbols.contains(alias_decl->name)) {
+            offender = alias_decl->name;
+            goto err;
+          }
+        }
+        if (auto variable_decl = dynamic_cast<ASTVariable *>(stmt)) {
+          if (mod->scope->symbols.contains(variable_decl->name)) {
+            offender = variable_decl->name;
+            goto err;
+          }
+        }
+  
+        continue;
+      err:
+        throw_error(std::format("redefinition of '{}'", offender), stmt->source_range);
+      }
+    }
+  }
+  #endif  
+
   for (auto statement : node->statements) {
     statement->accept(this);
   }
@@ -2999,17 +3074,14 @@ void Typer::visit(ASTModule *node) {
     if (!mod->is_module) {
       throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
     }
+    // TODO: we need to check if we're redefining symbols but the mod scope & the node scope
+    // are the same when we visit this node, so we'd have to do that before the node's symbols are
+    // visited? or would the typer just handle that anyway?
     for (auto &[name, sym] : node->scope->symbols) {
-      if (mod->scope->local_lookup(name)) {
-        throw_error(
-            "redefinition of symbol in appending module declaration (a module already existed, and we were adding "
-            "symbols to it.)",
-            node->source_range);
-      }
       mod->scope->symbols[name] = sym;
     }
   } else {
-    ctx.scope->create_module(node->module_name, node);
+    node->declaring_scope->create_module(node->module_name, node);
   }
 }
 

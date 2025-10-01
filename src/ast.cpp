@@ -1475,18 +1475,23 @@ ASTModule *Parser::parse_module() {
 ASTImport *Parser::parse_import() {
   expect(TType::Import);
   NODE_ALLOC(ASTImport, import, range, _, this);
+
   // Parse the root group (could be a single path, a group, or a wildcard, or a recursive set of groups.)
   import->root_group = parse_import_group(nullptr);
 
   ASTPath *path = import->root_group.path;
   ASTPath::Segment root_segment = path->segments[0];
 
-  // Import stuff from files
-  Scope *scope = create_child(ctx.scope);
+  // we always treat modules as if theyre at a root scope when theyre imported so you dont get 
+  // 'my_module::some_stdlib::module::etc'
+  // when you import shit -- it messes up linking and name resolution  
+  Scope *scope = create_child(ctx.root_scope);
   ENTER_SCOPE(scope)
 
   if (this->import(root_segment.identifier, &scope)) {
     NODE_ALLOC(ASTModule, the_module, range, _, this)
+    // again, make certain that we are attached to the root scope for imported modules.
+    the_module->declaring_scope = ctx.root_scope;
     the_module->module_name = root_segment.identifier;
     the_module->scope = scope;
     while (!peek().is_eof()) {
@@ -2295,6 +2300,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     }
   }
 
+  // TODO: why are we inserting the functions at parse time?
+  // Really, we never ended up removing symbol table interactions from the parser,
+  // and this is biting us in the ass later on (now)
   ctx.scope->insert_function(name, Type::INVALID_TYPE, node);
 
   if (peek().type != TType::Arrow) {
@@ -3005,6 +3013,7 @@ bool Parser::import(InternedString name, Scope **scope) {
     }
     path;
   });
+  // TODO: we'll use weave with a local .cache, this is not a great system currently.
 
   std::string module_name = name.get_str();
   std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();
