@@ -3074,7 +3074,7 @@ void Typer::visit(ASTModule *node) {
     }
   }
 
-  if (auto mod = ctx.scope->lookup(node->module_name)) {
+  if (Symbol *mod = ctx.scope->lookup(node->module_name)) {
     if (!mod->is_module) {
       throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
     }
@@ -3265,7 +3265,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
   auto sym = Symbol::create_type(ty, trait_name, nullptr);
   // TODO: we have to fit this in modules or some stuff.
-  sym.scope = this;
+  sym.parent_scope = this;
   symbols.insert_or_assign(trait_name, sym);
   return ty;
 }
@@ -3350,7 +3350,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
         auto symbol = scope->lookup(ident);
         if (!symbol) return nullptr;
 
-        if (index == path->length() - 1) return symbol->scope;
+        if (index == path->length() - 1) return symbol->parent_scope;
 
         if (!part.generic_arguments.empty()) {
           if (symbol->is_type) {
