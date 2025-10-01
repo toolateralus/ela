@@ -227,11 +227,20 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
 }
 void CompileCommand::request_compile_time_code_execution(const SourceRange &range) {
   if (has_flag("ctfe-validate")) {
-    std::cout << "\033[1;33mRequesting compile-time function execution at: " << range.ToString()
-          << "\033[0m\nProceed? [y/n]: ";
+
+    std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString()
+          << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
+
     char response;
     std::cin >> response;
+
+    if (response == 'S' || response == 's') {
+      std::cout << format_source_location(range, ERROR_INFO);
+      return request_compile_time_code_execution(range);
+    }
+
     if (response != 'y' && response != 'Y') {
+      throw_error("compile time function execution denied.", range);
       std::exit(1);
     }
   }
