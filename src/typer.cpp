@@ -2955,7 +2955,12 @@ void Typer::visit(ASTImport *node) {
   if (!the_module_nullable) {
     for (const auto &[name, sym] : ctx.scope->symbols) {
       if (sym.is_module) {
-        printf("module: %s\n", name.get_str().c_str());
+        printf("local module: %s\n", name.get_str().c_str());
+      }
+    }
+    for (const auto &[name, sym]: ctx.root_scope->symbols) {
+      if (sym.is_module) {
+        printf("global/imported module: %s\n", name.get_str().c_str());
       }
     }
     throw_error("unable to find module", node->source_range);

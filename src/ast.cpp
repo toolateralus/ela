@@ -1494,8 +1494,11 @@ ASTImport *Parser::parse_import() {
     the_module->declaring_scope = ctx.root_scope;
     the_module->module_name = root_segment.identifier;
     the_module->scope = scope;
-    while (!peek().is_eof()) {
-      the_module->statements.push_back(parse_statement());
+    {
+      ENTER_AST_STATEMENT_LIST(the_module->statements);
+      while (!peek().is_eof()) {
+        the_module->statements.push_back(parse_statement());
+      }
     }
     current_statement_list->push_back(the_module);
     expect(TType::Eof);
