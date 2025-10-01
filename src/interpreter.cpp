@@ -1,8 +1,10 @@
 #include "ast.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "libffi.hpp"
 #include "thir_interpreter.hpp"
 #include "thir.hpp"
+#include "type.hpp"
 #include "value.hpp"
 
 Value *interpret_from_ast(ASTNode *node, Context &ctx) {
@@ -38,6 +40,12 @@ LValue *Interpreter::get_lvalue(THIR *node) {
       return get_index_lvalue((THIRIndex *)node);
     case THIRNodeType::Variable:
       return get_variable_lvalue((THIRVariable *)node);
+    case THIRNodeType::Function: {
+      // TODO: fix this
+      static Value *function;
+      function = visit_node(node);
+      return new_lvalue(&function);
+    }
     default:
       break;
   }
@@ -54,9 +62,9 @@ LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
       node->use_compile_time_value_at_emit_time = false;
     }
 
-    // printf("didnt have value nor ctval: %s, defaulting to %s\n", node->name.get_str().c_str(), node->compile_time_value->to_string().c_str());
-    // our first assignment has to have something to write into, so 
-    // we just give null.
+    // printf("didnt have value nor ctval: %s, defaulting to %s\n", node->name.get_str().c_str(),
+    // node->compile_time_value->to_string().c_str()); our first assignment has to have something to write into, so we
+    // just give null.
     return new_lvalue(&node->compile_time_value);
   }
 
@@ -555,7 +563,12 @@ Value *Interpreter::visit_call(THIRCall *node) {
   evaluated_args.reserve(node->arguments.size());
 
   for (const auto &arg : node->arguments) {
-    evaluated_args.push_back(visit_node(arg));
+    const auto evaluated = visit_node(arg);
+    evaluated_args.push_back(evaluated);
+  }
+
+  if (node->is_dyn_call) {
+    return FunctionValue::dyn_dispatch(node->dyn_method_name, this, evaluated_args);
   }
 
   if (function->get_value_type() == ValueType::EXTERN_FUNCTION) {
@@ -603,7 +616,6 @@ Value *Interpreter::visit_for(THIRFor *node) {
     if (!condition->is_truthy()) {
       break;
     }
-
 
     auto body_result = visit_node(node->block);
     if (body_result->get_value_type() == ValueType::BREAK) {
@@ -653,9 +665,21 @@ Value *Interpreter::visit_expression_block(THIRExprBlock *) { return nullptr; }
 
 Value *Interpreter::visit_aggregate_initializer(THIRAggregateInitializer *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->type, this);
+
+  const bool is_dyn = node->type->is_kind(TYPE_DYN);
+
   for (const auto &[key, value] : node->key_values) {
+    if (is_dyn && key == "instance") {
+      continue;
+    }
     object->values[key] = visit_node(value);
   }
+
+  if (is_dyn) {
+    // We have to patch this back out
+    object->values["instance"] = object;
+  }
+
   return object;
 }
 

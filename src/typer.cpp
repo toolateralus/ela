@@ -3438,6 +3438,7 @@ void Typer::visit(ASTMethodCall *node) {
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
       node->inserted_dyn_arg = true;
+      node->dyn_method_name = node->callee->member.identifier;
     }
 
     type = node->callee->resolved_type;

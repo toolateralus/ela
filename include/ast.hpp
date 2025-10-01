@@ -666,7 +666,12 @@ struct ASTDotExpr : ASTExpr {
 struct ASTMethodCall : ASTExpr {
   ASTDotExpr *callee;
   ASTArguments *arguments;
-  bool inserted_dyn_arg = false;
+
+  struct {
+    InternedString dyn_method_name;
+    bool inserted_dyn_arg = false;
+  };
+
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
 };

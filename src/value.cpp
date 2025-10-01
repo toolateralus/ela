@@ -10,7 +10,6 @@ ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
 
 ValueType FunctionValue::get_value_type() const { return ValueType::FUNCTION; }
 
-
 ValueType ObjectValue::get_value_type() const { return ValueType::OBJECT; }
 ValueType Value::get_value_type() const { return value_type; }
 ValueType IntValue::get_value_type() const { return ValueType::INTEGER; }
@@ -44,8 +43,8 @@ ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
 NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
 LValue* null_lvalue() {
-  static Value *null_val = null_value();
-  static LValue *null_lval = new_lvalue(&null_val);
+  static Value* null_val = null_value();
+  static LValue* null_lval = new_lvalue(&null_val);
   return null_lval;
 }
 ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
@@ -81,7 +80,7 @@ Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> argumen
     interpreter->write_to_lvalue(param.associated_variable, *it);
     ++it;
   }
-  
+
   auto value = interpreter->visit_block(block);
 
   if (value->is(ValueType::RETURN)) {
@@ -121,7 +120,7 @@ THIR* StringValue::to_thir() const {
   auto literal = thir_alloc<THIRLiteral>();
   literal->value = value;
   literal->tag = ASTLiteral::String;
-  literal->type = u8_ptr_type(); // TODO: support str and String better
+  literal->type = u8_ptr_type();  // TODO: support str and String better
   return literal;
 }
 
@@ -486,3 +485,23 @@ void RawPointerValue::assign_from(Value* v) {
 }
 
 FunctionValue::FunctionValue() : Value(ValueType::FUNCTION) {}
+
+Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interpreter* interpreter,
+                                   std::vector<Value*> arguments) {
+  Value *arg0 = arguments[0];
+
+  if (arg0->is(ValueType::POINTER)) {
+    arg0 = *arg0->as<PointerValue>()->ptr;
+  }
+
+  ObjectValue *self = arg0->as<ObjectValue>();
+  PointerValue *function_pointer = self->values[method_name]->as<PointerValue>();
+
+  if (function_pointer->pointee_value_type != ValueType::FUNCTION) {
+    throw_error("cannot call a non-pointer function with dyn dispatch at compile time. this is likely a bug", {});
+  }
+
+  FunctionValue *function = (*function_pointer->ptr)->as<FunctionValue>();
+
+  return function->call(interpreter, arguments);
+}

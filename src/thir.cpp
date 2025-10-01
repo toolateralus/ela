@@ -204,10 +204,14 @@ THIR *THIRGen::try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *tar
   }
   return target;
 }
+
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   const auto base = ast->callee->base;
   const auto symbol = ctx.get_symbol(ast->callee).get();
+
+  thir->is_dyn_call = ast->inserted_dyn_arg;
+  thir->dyn_method_name = ast->dyn_method_name;
 
   THIR *self = nullptr;
   if (symbol->is_variable) {

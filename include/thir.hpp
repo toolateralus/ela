@@ -182,6 +182,10 @@ struct THIRLiteral : THIR {
 };
 
 struct THIRCall : THIR {
+  struct {
+    bool is_dyn_call = false;
+    InternedString dyn_method_name = "";
+  };
   THIR *callee;
   std::vector<THIR *> arguments;
   THIRNodeType get_node_type() const override { return THIRNodeType::Call; }

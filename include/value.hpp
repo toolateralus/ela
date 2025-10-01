@@ -212,6 +212,7 @@ struct FunctionValue : Value {
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   Value* call(Interpreter* interpreter, std::vector<Value*> arguments);
+  static Value* dyn_dispatch(const InternedString& method_name, Interpreter* interpeter, std::vector<Value*> arguments);
 };
 
 struct ExternFunctionValue : Value {
