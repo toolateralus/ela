@@ -13,7 +13,7 @@
 
 #include "ast.hpp"
 #include "copier.hpp"
-#include "interpreter.hpp"
+#include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"

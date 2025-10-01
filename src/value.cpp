@@ -66,7 +66,7 @@ LValue* new_lvalue(RawPointerValue* raw) {
   return lvalue;
 }
 
-#include "interpreter.hpp"
+#include "thir_interpreter.hpp"
 
 Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> arguments) {
   if (!block) {

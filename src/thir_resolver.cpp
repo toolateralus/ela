@@ -1,7 +1,7 @@
 #include <unordered_set>
 #include "interned_string.hpp"
-#include "resolver.hpp"
-#include "emit.hpp"
+#include "thir_resolver.hpp"
+#include "thir_emit.hpp"
 #include "thir.hpp"
 #include "type.hpp"
 

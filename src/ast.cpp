@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include "value.hpp"
 #include "visitor.hpp"
-#include "interpreter.hpp"
+#include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"

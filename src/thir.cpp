@@ -2,7 +2,7 @@
 #include <deque>
 #include <string>
 #include "ast.hpp"
-#include "interpreter.hpp"
+#include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"

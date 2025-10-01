@@ -1,5 +1,5 @@
 #include "builder.hpp"
-#include "emit.hpp"
+#include "thir_emit.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"

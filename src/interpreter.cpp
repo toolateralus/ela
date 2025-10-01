@@ -1,7 +1,7 @@
 #include "ast.hpp"
 #include "error.hpp"
 #include "libffi.hpp"
-#include "interpreter.hpp"
+#include "thir_interpreter.hpp"
 #include "thir.hpp"
 #include "value.hpp"
 
