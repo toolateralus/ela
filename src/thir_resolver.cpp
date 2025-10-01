@@ -93,7 +93,15 @@ void Resolver::visit_call(const THIRCall *thir) {
     visit_node(arg);
   }
 }
-void Resolver::visit_member_access(const THIRMemberAccess *thir) { visit_node(thir->base); }
+void Resolver::visit_member_access(const THIRMemberAccess *thir) { 
+  visit_node(thir->base); 
+
+  // If we're doing a member access on a pointer type, the type still has to be fully defined by this point,
+  // but the declare_or_define_type will just see the pointer and decide to forward declare it.
+  if (thir->base->type->is_pointer()) {
+    declare_or_define_type(thir->base->type->base_type);
+  }
+}
 void Resolver::visit_cast(const THIRCast *thir) { visit_node(thir->operand); }
 void Resolver::visit_index(const THIRIndex *thir) {
   visit_node(thir->base);
