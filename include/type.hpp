@@ -394,6 +394,15 @@ struct Type {
 
   inline bool is_fixed_sized_array() const { return back_ext_type() == TYPE_EXT_ARRAY; }
 
+  inline bool has_fixed_array_ext_anywhere() const {
+    for (const auto &ext : extensions) {
+      if (ext.type == TYPE_EXT_ARRAY && ext.array_size != (size_t)-1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   inline bool is_pointer() const {
     return back_ext_type() == TYPE_EXT_POINTER_CONST || back_ext_type() == TYPE_EXT_POINTER_MUT;
   }

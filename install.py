@@ -5,6 +5,7 @@ import subprocess
 import sys
 import platform
 import shutil
+import shlex
 
 def run_command(command, use_shell=True):
   print(f"\033[1;33mrunning command: {command}\033[0m")
@@ -52,33 +53,41 @@ def build_project(build_dir, build_type, do_clean):
   os.chdir("..")
   save_build_type(build_dir, build_type)
 
+REPO_ROOT = os.path.abspath(os.getcwd())
+
+
+def is_permanent():
+  return any(arg.lower() == "permanent" for arg in sys.argv[1:])
+
 def install_files():
   if platform.system() == "Windows":
     ela_lib_dir = os.path.join(os.environ["ProgramFiles"], "ela")
     ela_bin_dir = os.path.join(ela_lib_dir, "bin")
     os.makedirs(ela_lib_dir, exist_ok=True)
     os.makedirs(ela_bin_dir, exist_ok=True)
-    # Copy lib directory
-    if os.path.exists("lib"):
+    # Copy lib directory from absolute repo path
+    src_lib = os.path.join(REPO_ROOT, "lib")
+    if os.path.exists(src_lib):
         dest_lib = os.path.join(ela_lib_dir, "lib")
         if os.path.exists(dest_lib):
             shutil.rmtree(dest_lib)
-        shutil.copytree("lib", dest_lib)
-    # Copy binary
-    ela_bin_path = os.path.join(os.getcwd(), "bin", "ela.exe")
+        shutil.copytree(src_lib, dest_lib)
+    ela_bin_path = os.path.join(REPO_ROOT, "bin", "ela.exe")
     if os.path.exists(ela_bin_path):
         shutil.copy2(ela_bin_path, ela_bin_dir)
-    # Optionally, create a symlink in PATH (requires admin)
-    # print("Add", ela_bin_dir, "to your PATH if you want to run ela globally.")
   else:
     ela_lib_dir = "/usr/local/lib/ela"
-    # Remove old lib dir
     if os.path.isdir(ela_lib_dir):
-        run_command(f"sudo rm -rf {ela_lib_dir}")
-    run_command(f"sudo mkdir -p {ela_lib_dir}")
-    run_command(f"sudo cp -r ./lib/* {ela_lib_dir}")
-    ela_bin_path = os.path.join(os.getcwd(), "bin/ela")
-    run_command(f"sudo ln -sf {ela_bin_path} /usr/local/bin/ela")
+        run_command(f"sudo rm -rf {shlex.quote(ela_lib_dir)}")
+    run_command(f"sudo mkdir -p {shlex.quote(ela_lib_dir)}")
+    src_prefix = shlex.quote(os.path.join(REPO_ROOT, "lib"))
+    run_command(f"sudo cp -r {src_prefix}/* {shlex.quote(ela_lib_dir)}")
+    ela_bin_path = os.path.join(REPO_ROOT, "bin", "ela")
+
+    if is_permanent():
+      run_command(f"sudo cp -f {shlex.quote(ela_bin_path)} /usr/local/bin/ela")
+    else: 
+      run_command(f"sudo ln -sf {shlex.quote(ela_bin_path)} /usr/local/bin/ela")
 
 def main():
   build_dir = "build"

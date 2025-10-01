@@ -6,10 +6,10 @@
 #include "thir.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
-bool ArrayValue::is_truthy() const { return !values.empty(); }
-bool FunctionValue::is_truthy() const { return true; }
+
 ValueType FunctionValue::get_value_type() const { return ValueType::FUNCTION; }
-bool ObjectValue::is_truthy() const { return true; }
+
+
 ValueType ObjectValue::get_value_type() const { return ValueType::OBJECT; }
 ValueType Value::get_value_type() const { return value_type; }
 ValueType IntValue::get_value_type() const { return ValueType::INTEGER; }
@@ -19,6 +19,9 @@ ValueType StringValue::get_value_type() const { return ValueType::STRING; }
 ValueType CharValue::get_value_type() const { return ValueType::CHARACTER; }
 ValueType NullValue::get_value_type() const { return ValueType::NULLPTR; }
 
+bool FunctionValue::is_truthy() const { return true; }
+bool ArrayValue::is_truthy() const { return true; }
+bool ObjectValue::is_truthy() const { return true; }
 bool NullValue::is_truthy() const { return false; }
 bool CharValue::is_truthy() const { return value != '\0'; }
 bool IntValue::is_truthy() const { return value != 0; }
@@ -27,28 +30,20 @@ bool BoolValue::is_truthy() const { return value; }
 bool StringValue::is_truthy() const { return !value.empty(); }
 
 PointerValue* new_pointer(Value** value) { return value_arena_alloc<PointerValue>((*value)->value_type, value); }
-
 CharValue* new_char(char val) { return value_arena_alloc<CharValue>(val); }
 IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
 IntValue* new_int(size_t val) { return value_arena_alloc<IntValue>(val); }
-
 FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
 FloatValue* new_float(double val) { return value_arena_alloc<FloatValue>(val); }
-
 BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
 BoolValue* new_bool(bool val) { return value_arena_alloc<BoolValue>(val); }
-
 StringValue* new_string(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
 StringValue* new_string(const std::string& str) { return value_arena_alloc<StringValue>(str); }
-
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
-
 NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
-
 ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
 FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
-
 ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }
 ReturnValue* return_value() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
 
@@ -450,6 +445,9 @@ void RawPointerValue::assign_from(Value* v) {
     case ValueType::NULLPTR:
       ptr = nullptr;
       break;
+    case ValueType::INTEGER:
+      memcpy(ptr, &v->as<IntValue>()->value, sizeof(size_t));
+      break;
     case ValueType::FLOATING:
       memcpy(ptr, &v->as<FloatValue>()->value, sizeof(double));
       break;
@@ -461,9 +459,6 @@ void RawPointerValue::assign_from(Value* v) {
       break;
     case ValueType::CHARACTER:
       *ptr = v->as<CharValue>()->value;
-      break;
-    case ValueType::INTEGER:
-      memcpy(ptr, &v->as<IntValue>()->value, sizeof(size_t));
       break;
 
     // Not sure how we're going to handle these cases.

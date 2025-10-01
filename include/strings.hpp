@@ -36,6 +36,9 @@ constexpr const char *DISCRIMINANT_KEY = "$discriminant";
 constexpr const char *OPTION_NONE_DISCRIMINANT_VALUE = "1";
 constexpr const char *OPTION_SOME_DISCRIMINANT_VALUE = "2";
 
+// if you publish a tag, this MUST match the tag identifier.
+constexpr const char *COMPILER_VERSION = "v0.0.0";
+
 // We should probably not rely on this since RangeBase is defined in the stdlib.
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";
 constexpr const char *RANGE_TYPE_END_KEY = "end";

@@ -29,6 +29,8 @@ jstl::Arena thir_arena(MB(10));
 jstl::Arena value_arena(MB(10));
 jstl::Arena binding_arena(MB(10));
 
+std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
+
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};

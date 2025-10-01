@@ -1,22 +1,17 @@
-/* 
-  This has to be run with '--nostdlib' on the thir-temp
-*/
 
+struct Hello {}
 
-extern fn printf(fmt: *u8, ...);
-
-fn func(v: *u8) {
-  printf(v);
+impl Hello {
+  fn exec!<TString, UserArg>(*mut self,
+    sql: TString,
+    callback: fn(*mut UserArg, *s32) -> s32 = null, // This was crashing the compiler during generic arg inference
+    user_arg: *mut UserArg = null) -> c_str {
+    return null;
+  }
 }
 
-/* 
-  Uncomment this and observe the bugs.
-  func := fn(v: *u8) {
-    printf(v);
-  }
-*/
 
-fn main() -> s32 {
-  func("Hello, World!\n"c);
-  return 0;
+fn main() {
+  mut h: Hello;
+  h.exec("haha", null, null);
 }

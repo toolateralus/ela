@@ -1190,7 +1190,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
             for (const auto &generic : generics) {
               // ! This condition is terrible
-              if (generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
+              // ! Update: this condition is truly awful. FIXME. had to patch this because it crashes the compiler.
+              if (param->normal.type->kind == ASTType::NORMAL &&
+                  generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
                 is_generic = true;
                 break;
               }
@@ -1208,6 +1210,11 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
       for (size_t i = 0; i < args.size(); ++i) {
         auto arg_ty_id = args[i];
+
+        if (i + start_index >= arg_to_generic_map.size()) {
+          break;
+        }
+
         auto [is_generic, generic_index] = arg_to_generic_map[i + start_index];
 
         if (is_generic) {

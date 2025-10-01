@@ -17,6 +17,20 @@
         "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
+     {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug current file compilation (nostdlib)",
+      "program": "${workspaceFolder}/bin/ela",
+      "cwd": "${fileDirname}",
+      "args": [
+        "${file}",
+        "--nostdlib"
+      ],
+      "env": {
+        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
+      }
+    },
     {
       "type": "lldb",
       "request": "launch",
