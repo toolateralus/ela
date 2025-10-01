@@ -820,32 +820,31 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
 
 void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   for (const auto &param : ast->params->params) {
-    THIR_ALLOC(THIRVariable, thir_param, param);
+    THIR_ALLOC(THIRVariable, var, param);
     if (param->tag == ASTParamDecl::Normal) {
-      thir_param->name = param->normal.name;
-      thir_param->type = param->normal.type->resolved_type;
+      var->name = param->normal.name;
+      var->type = param->normal.type->resolved_type;
       if (param->normal.default_value) {
-        thir_param->value = visit_node(param->normal.default_value.get());
+        var->value = visit_node(param->normal.default_value.get());
       } else {
-        // TODO: this may be problematic. Not certain yet we can assume this is never null. Maybe we make this nullable
-        // in def
-        thir_param->value = nullptr;
+        var->value = nullptr;
       }
     } else {
-      thir_param->name = "self";
-      thir_param->type = param->resolved_type;
+      var->name = "self";
+      var->type = param->resolved_type;
     }
 
     if (!ast->is_forward_declared) {
-      auto param_sym = ctx.scope->local_lookup(thir_param->name);
+      auto param_sym = ctx.scope->local_lookup(var->name);
 
-      bind(param_sym, thir_param);
-      bind(param, thir_param);
+      bind(param_sym, var);
+      bind(param, var);
     }
 
     thir->parameters.push_back(THIRParameter{
-        .name = thir_param->name,
-        .default_value = thir_param->value,
+        .name = var->name,
+        .default_value = var->value,
+        .associated_variable = var,
     });
   }
 }
@@ -948,6 +947,8 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   thir->is_extern = ast->is_extern;
 
   auto symbol = ast->declaring_scope->local_lookup(ast->name);
+
+  thir->symbol = symbol;
 
   bind(ast, thir);
   bind(symbol, thir);
@@ -1835,7 +1836,6 @@ THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
 }
 
 THIR *THIRGen::visit_run(ASTRun *ast) {
-
   compile_command.request_compile_time_code_execution(ast->source_range);
 
   auto thir = visit_node(ast->node_to_run);

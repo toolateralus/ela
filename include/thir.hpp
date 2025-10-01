@@ -100,6 +100,7 @@ struct THIRVariable : THIR {
   // read from and mutated during compile time.
   THIRBinExpr *global_initializer_assignment;
   Value *compile_time_value;
+  Symbol *symbol;
   
   bool use_compile_time_value_at_emit_time: 1 = false;
   bool is_static : 1 = false;
@@ -139,6 +140,7 @@ struct THIRBlock : THIR {
 struct THIRParameter {
   InternedString name;
   THIR *default_value;
+  THIR *associated_variable;
 };
 
 struct THIRFunction : THIR {

@@ -2158,7 +2158,7 @@ void Typer::visit(ASTBinExpr *node) {
       if (path->length() == 1 && path->segments[0].generic_arguments.empty()) {
         if (auto symbol = ctx.get_symbol(path)) {
           if (symbol && symbol.get()->mutability == CONST) {
-            throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
+            throw_error("cannot assign to an immutable variable. consider adding 'mut' to the parameter or variable.",
                         node->source_range);
           }
         } else {

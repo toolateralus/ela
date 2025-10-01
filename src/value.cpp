@@ -2,6 +2,7 @@
 #include <cstring>
 #include "ast.hpp"
 #include "scope.hpp"
+#include "strings.hpp"
 #include "type.hpp"
 #include "thir.hpp"
 
@@ -74,15 +75,22 @@ Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> argumen
   }
 
   auto it = arguments.begin();
+
   // TODO: attach types to parameters in THIR.
   for (const auto& param : parameters) {
-    interpreter->scope->insert_local_variable(param.name, nullptr, nullptr, MUT);
-    Symbol* symbol = interpreter->scope->local_lookup(param.name);
-    symbol->value = *it;
+    interpreter->write_to_lvalue(param.associated_variable, *it);
     ++it;
   }
+  
   auto value = interpreter->visit_block(block);
-  return value;
+
+  if (value->is(ValueType::RETURN)) {
+    auto return_value = value->as<ReturnValue>();
+    if (return_value->value) {
+      return return_value->value.get();
+    }
+  }
+  return null_value();
 }
 
 THIR* IntValue::to_thir() const {
@@ -292,7 +300,7 @@ Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
   // 0 is always the invalid out of bounds discriminant for choice types.
   // for interpreted choice types, we will just ignore initializing variants, only one can exist,
   // so only one shall exist ever.
-  object->values["index"] = 0;
+  object->values[DISCRIMINANT_KEY] = 0;
   return object;
 }
 

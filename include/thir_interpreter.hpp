@@ -18,7 +18,7 @@ struct Interpreter {
   Scope *scope;
   Context &ctx;
 
-  void on_lvalue_written_to(THIR *left, Value *right);
+  void write_to_lvalue(THIR *left, Value *right);
 
   Interpreter(Context &context) : ctx(context) {
     root_scope = create_child(ctx.scope);

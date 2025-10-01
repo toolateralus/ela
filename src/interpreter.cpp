@@ -159,7 +159,8 @@ Value *Interpreter::visit_block(THIRBlock *node) {
     if (result->value_type == ValueType::RETURN) {
       auto value = result->as<ReturnValue>()->value;
       if (value) {
-        return value.get();
+        // Propagate returns to function
+        return result;
       }
       return null_value();
     }
@@ -305,6 +306,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
         long long b = to_int(right);
         return new_bool(a <= b);
       }
+
       return null_value();
     }
     case TType::GE: {
@@ -411,7 +413,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
 
       // make it permanent
       auto lvalue = get_lvalue(node->left);
-      on_lvalue_written_to(node->left, res);
+      write_to_lvalue(node->left, res);
       switch (lvalue->kind) {
         case LValue::MANAGED:
           *lvalue->managed = res;
@@ -424,7 +426,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
     }
     case TType::Assign: {
       auto lvalue = get_lvalue(node->left);
-      on_lvalue_written_to(node->left, right);
+      write_to_lvalue(node->left, right);
       switch (lvalue->kind) {
         case LValue::MANAGED:
           *lvalue->managed = right;
@@ -595,7 +597,14 @@ Value *Interpreter::visit_for(THIRFor *node) {
     visit_node(node->initialization);
   }
 
-  while (visit_node(node->condition)->is_truthy()) {
+  while (true) {
+    auto condition = visit_node(node->condition);
+
+    if (!condition->is_truthy()) {
+      break;
+    }
+
+
     auto body_result = visit_node(node->block);
     if (body_result->get_value_type() == ValueType::BREAK) {
       break;
@@ -658,7 +667,7 @@ Value *Interpreter::visit_collection_initializer(THIRCollectionInitializer *node
   return array;
 }
 
-void Interpreter::on_lvalue_written_to(THIR *left, Value *right) {
+void Interpreter::write_to_lvalue(THIR *left, Value *right) {
   if (left->get_node_type() == THIRNodeType::Variable) {
     auto var = (THIRVariable *)left;
     if (var->global_initializer_assignment) {  // we have to update this, unfortunately.
