@@ -69,9 +69,13 @@ LValue* new_lvalue(RawPointerValue* raw) {
 #include "interpreter.hpp"
 
 Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> arguments) {
+  if (!block) {
+    return null_value();
+  }
+
   auto it = arguments.begin();
   // TODO: attach types to parameters in THIR.
-  for (const auto &param: parameters) {
+  for (const auto& param : parameters) {
     interpreter->scope->insert_local_variable(param.name, nullptr, nullptr, MUT);
     Symbol* symbol = interpreter->scope->local_lookup(param.name);
     symbol->value = *it;
@@ -81,43 +85,50 @@ Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> argumen
   return value;
 }
 
-ASTNode* IntValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* IntValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Integer;
-  return literal;
-}
-ASTNode* FloatValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
-  literal->value = std::to_string(value);
-  literal->tag = ASTLiteral::Float;
-  return literal;
-}
-ASTNode* BoolValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
-  literal->value = value ? "true" : "false";
-  literal->tag = ASTLiteral::Bool;
+  literal->type = s64_type();
   return literal;
 }
 
-ASTNode* StringValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* FloatValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
+  literal->value = std::to_string(value);
+  literal->tag = ASTLiteral::Float;
+  literal->type = f64_type();
+  return literal;
+}
+
+THIR* BoolValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
+  literal->value = value ? "true" : "false";
+  literal->tag = ASTLiteral::Bool;
+  literal->type = bool_type();
+  return literal;
+}
+
+THIR* StringValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = value;
   literal->tag = ASTLiteral::String;
   return literal;
 }
 
-ASTNode* CharValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* CharValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Char;
+  literal->type = char_type();
   return literal;
 }
 
-ASTNode* NullValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* NullValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = "null";
   literal->tag = ASTLiteral::Null;
+  literal->type = void_type()->take_pointer_to(true);
   return literal;
 }
 
@@ -323,28 +334,20 @@ Value* default_value_of_t(Type* t, Interpreter* interpreter) {
   }
 }
 
-ASTNode* ObjectValue::to_ast() const {
-  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
-  init->resolved_type = type;
-  // TODO: figure out if we need this type allocated.
-  init->target_type = ast_alloc<ASTType>();
-  init->target_type.get()->resolved_type = type;
-  init->tag = ASTInitializerList::INIT_LIST_NAMED;
+THIR* ObjectValue::to_thir() const {
+  THIRAggregateInitializer* init = thir_alloc<THIRAggregateInitializer>();
+  init->type = type;
   for (const auto& [key, value] : this->values) {
-    init->key_values.push_back({key, (ASTExpr*)value->to_ast()});
+    init->key_values.push_back({key, value->to_thir()});
   }
   return init;
 }
 
-ASTNode* ArrayValue::to_ast() const {
-  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
-  init->resolved_type = type;
-  // TODO: figure out if we need this type allocated.
-  init->target_type = ast_alloc<ASTType>();
-  init->target_type.get()->resolved_type = type->base_type;  // pass the base type to array initializers
-  init->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+THIR* ArrayValue::to_thir() const {
+  THIRCollectionInitializer* init = thir_alloc<THIRCollectionInitializer>();
+  init->type = type;
   for (const auto& value : this->values) {
-    init->values.push_back((ASTExpr*)value->to_ast());
+    init->values.push_back(value->to_thir());
   }
   return init;
 }
@@ -353,22 +356,41 @@ bool RawPointerValue::is_truthy() const { return ptr != nullptr; }
 
 ValueType RawPointerValue::get_value_type() const { return value_type; }
 
-ASTNode* RawPointerValue::to_ast() const {
-  // Obviously strings can be built at compile time.
+THIR* RawPointerValue::to_thir() const {
   if (type->is_kind(TYPE_SCALAR)) {
     auto info = type->info->as<ScalarTypeInfo>();
     if (info->scalar_type == TYPE_CHAR) {
-      auto literal = ast_alloc<ASTLiteral>();
-      literal->tag = ASTLiteral::String;
-      literal->is_c_string = true;
-      literal->value = std::string(ptr);
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Char;
+      literal->value = std::string(1, *(char*)ptr);
+      literal->type = char_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_BOOL) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Bool;
+      literal->value = (*(bool*)ptr) ? "true" : "false";
+      literal->type = bool_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_S64 || info->scalar_type == TYPE_U64) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Integer;
+      literal->value = std::to_string(*(size_t*)ptr);
+      literal->type = s64_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_FLOAT || info->scalar_type == TYPE_DOUBLE) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Float;
+      literal->value = std::to_string(*(double*)ptr);
+      literal->type = f64_type();
       return literal;
     }
   }
-  // TODO: maybe convert pointers to static arrays at compile time? idk.
   throw_error(
-      "You cannot pass pointers out of the compile time code into runtime code-- pointers cant exist in a binary. "
-      "Just strings can.",
+      "You cannot pass pointers out of the compile time code into runtime code-- pointers can't exist in a binary. "
+      "Just strings, chars, and scalars can.",
       {});
   return nullptr;
 }

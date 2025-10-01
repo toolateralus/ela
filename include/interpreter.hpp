@@ -23,7 +23,7 @@ struct Interpreter {
     scope = root_scope;
   }
 
-  Value *try_link_extern_function(Symbol *name);
+  Value *try_link_extern_function(THIRFunction *function);
   void set_value(InternedString &name, Value *value);
   LValue *get_lvalue(THIR *);
   LValue *get_member_access_lvalue(THIRMemberAccess *);

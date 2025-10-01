@@ -58,7 +58,8 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   I put some of these super trivial nodes up top here so they stay out of the way
 */
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
-  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->source_range, u64_type(), ASTLiteral::Integer);
+  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->source_range, u64_type(),
+                      ASTLiteral::Integer);
 }
 
 THIR *THIRGen::visit_continue(ASTContinue *ast) {
@@ -673,7 +674,8 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
         thir->type = type;
         thir->key_values.push_back({"data", collection});
-        thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type(), ASTLiteral::Integer)});
+        thir->key_values.push_back(
+            {"length", make_literal(std::to_string(length), ast->source_range, u64_type(), ASTLiteral::Integer)});
         return thir;
       }
 
@@ -1234,7 +1236,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   member_access->member = DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
-  THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);
+  THIR *discriminant_literal =
+      make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);
 
   condition->left = member_access;
   condition->op = TType::EQ;
@@ -1502,7 +1505,8 @@ THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_rang
   return thir;
 }
 
-THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag) {
+THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type,
+                            ASTLiteral::Tag tag) {
   THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, thir);
   thir->tag = tag;
   thir->source_range = src_range;
@@ -1773,7 +1777,8 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
       make_literal(std::to_string(type->size_in_bytes()), {}, u64_type(), ASTLiteral::Integer),
   });
 
-  thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type(), ASTLiteral::Integer)});
+  thir->key_values.push_back(
+      {"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type(), ASTLiteral::Integer)});
 
   thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
 
@@ -1827,6 +1832,20 @@ THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
   deref->source_range = expr->source_range;
 
   return deref;
+}
+
+THIR *THIRGen::visit_run(ASTRun *ast) {
+  auto thir = visit_node(ast->node_to_run);
+  auto result = interpret(thir, ctx);
+  thir = result->to_thir();
+  // Fix this.
+  thir->is_statement = true;
+
+  if (ast->replace_prev_parent) {
+    return thir;
+  } else {
+    return THIRNoop::shared();
+  }
 }
 
 THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
@@ -1975,10 +1994,9 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
     case AST_NODE_UNPACK_ELEMENT: {
       return visit_unpack_element((ASTUnpackElement *)ast);
     } break;
+
     case AST_NODE_RUN:
-      throw_error("AST node type not yet supported by the THIRGen", ast->source_range);
-      return nullptr;
-      break;
+      return visit_run((ASTRun *)ast);
 
     default:
       throw_error("AST node not supported by THIR generator. needs to be implemented", ast->source_range);

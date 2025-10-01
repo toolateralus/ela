@@ -23,9 +23,8 @@ Value *interpret(THIR *node, Context &ctx) {
   return interpeter.visit_node(node);
 }
 
-Value *Interpreter::try_link_extern_function(Symbol *symbol) {
-  auto function = symbol->function.declaration;
-  auto fti = function->resolved_type->info->as<FunctionTypeInfo>();
+Value *Interpreter::try_link_extern_function(THIRFunction *function) {
+  auto fti = function->type->info->as<FunctionTypeInfo>();
   return value_arena_alloc<ExternFunctionValue>(function->name, fti);
 }
 
@@ -531,6 +530,9 @@ Value *Interpreter::visit_member_access(THIRMemberAccess *node) {
 }
 
 Value *Interpreter::visit_function(THIRFunction *node) {
+  if (node->is_extern) {
+    return try_link_extern_function(node);
+  }
   auto function = value_arena_alloc<FunctionValue>();
   function->parameters = node->parameters;
   function->block = node->block;

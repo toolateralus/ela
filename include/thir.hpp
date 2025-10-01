@@ -488,6 +488,8 @@ struct THIRGen {
   void visit_destructure(ASTDestructure *node);
   void visit_where_statement(ASTWhereStatement *node);
 
+  THIR *visit_run(ASTRun *);
+
   // instantiate conversions bool is needed because we recurse on these to set the
   // operand of a cast when capturing otherwise implicit casts as explicit casts.
   THIR *visit_node(ASTNode *node, bool instantiate_conversions = true);

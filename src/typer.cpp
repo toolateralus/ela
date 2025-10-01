@@ -3936,6 +3936,6 @@ void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }
 
-void Typer::visit(ASTRun *) {
-  // This does nothing until THIR time.
+void Typer::visit(ASTRun *node) {
+  node->node_to_run->accept(this);
 }

@@ -37,7 +37,6 @@ inline T* value_arena_alloc(Args&&... args) {
   return new (mem) T(std::forward<Args>(args)...);
 }
 
-struct ASTNode;
 struct Value {
   const ValueType value_type = ValueType::NULLPTR;
   Type* type;
@@ -52,7 +51,7 @@ struct Value {
 
   virtual bool is_truthy() const = 0;
   virtual ValueType get_value_type() const;
-  virtual ASTNode* to_ast() const { return nullptr; }
+  virtual THIR* to_thir() const { return nullptr; }
   virtual std::string to_string() const;
 
   inline bool is(ValueType type) const { return type == this->value_type; }
@@ -63,7 +62,7 @@ struct IntValue : Value {
   IntValue(size_t val = 0) : Value(ValueType::INTEGER), value(val) { type = s64_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct FloatValue : Value {
@@ -71,7 +70,7 @@ struct FloatValue : Value {
   FloatValue(double val = 0.0) : Value(ValueType::FLOATING), value(val) { type = f64_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct BoolValue : Value {
@@ -79,7 +78,7 @@ struct BoolValue : Value {
   BoolValue(bool val = false) : Value(ValueType::BOOLEAN), value(val) { type = bool_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct StringValue : Value {
@@ -92,7 +91,7 @@ struct StringValue : Value {
 
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct CharValue : Value {
@@ -100,14 +99,14 @@ struct CharValue : Value {
   CharValue(char c = '\0') : Value(ValueType::CHARACTER), value(c) { type = u8_type(); }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct NullValue : Value {
   NullValue() : Value(ValueType::NULLPTR) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 // a void or non-void return value.
@@ -143,7 +142,7 @@ struct ObjectValue : Value {
 
   ValueType get_value_type() const override;
 
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct ArrayValue : Value {
@@ -152,7 +151,7 @@ struct ArrayValue : Value {
   ArrayValue(Type* type) : Value(ValueType::ARRAY), values({}) { this->type = type; }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
 };
 
 struct PointerValue : Value {
@@ -170,7 +169,7 @@ struct PointerValue : Value {
 
   ValueType get_value_type() const override { return value_type; }
 
-  ASTNode* to_ast() const override { return nullptr; }
+  THIR* to_thir() const override { return nullptr; }
 };
 
 struct RawPointerValue : Value {
@@ -178,7 +177,7 @@ struct RawPointerValue : Value {
   RawPointerValue(Type* type, char* p) : Value(ValueType::RAW_POINTER), ptr(p) { this->type = type; }
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  ASTNode* to_ast() const override;
+  THIR* to_thir() const override;
   Value* dereference() const;
 
   void assign_from(Value*);
@@ -196,7 +195,7 @@ struct LValue : Value {
 
   ValueType get_value_type() const override { return ValueType::LVALUE; }
 
-  ASTNode* to_ast() const override { return nullptr; }
+  THIR* to_thir() const override { return nullptr; }
 };
 
 struct ASTBlock;
