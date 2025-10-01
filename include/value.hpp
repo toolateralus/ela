@@ -202,14 +202,14 @@ struct LValue : Value {
 struct ASTBlock;
 struct ASTParamsDecl;
 
-struct CTInterpreter;
+struct Interpreter;
 struct FunctionValue : Value {
   ASTBlock* block;
   ASTParamsDecl* parameters;
   FunctionValue() : Value(ValueType::FUNCTION) {}
   bool is_truthy() const override;
   ValueType get_value_type() const override;
-  Value* call(CTInterpreter* interpreter, std::vector<Value*> arguments);
+  Value* call(Interpreter* interpreter, std::vector<Value*> arguments);
 };
 
 struct ExternFunctionValue : Value {
@@ -253,5 +253,5 @@ RawPointerValue* new_raw_pointer(Type* type, T* ptr) {
 
 PointerValue* new_pointer(Value** value);
 
-struct CTInterpreter;
-Value* default_value_of_t(Type* t, CTInterpreter*);
+struct Interpreter;
+Value* default_value_of_t(Type* t, Interpreter*);

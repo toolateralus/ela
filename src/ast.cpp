@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include "value.hpp"
 #include "visitor.hpp"
-#include "constexpr.hpp"
+#include "interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"

@@ -11,13 +11,13 @@ struct ASTExpr;
 
 Value *evaluate_constexpr(ASTExpr *node, Context &ctx);
 
-struct CTInterpreter {
+struct Interpreter {
   std::unordered_map<InternedString, ExternFunctionValue> extern_functions{};
   Scope *root_scope;
   Scope *current_scope;
   Context &ctx;
 
-  CTInterpreter(Context &context) : ctx(context) {
+  Interpreter(Context &context) : ctx(context) {
     root_scope = create_child(ctx.scope);
     current_scope = root_scope;
   }

@@ -1,4 +1,4 @@
-#include "constexpr.hpp"
+#include "interpreter.hpp"
 #include <print>
 #include "ast.hpp"
 #include "core.hpp"
@@ -10,11 +10,11 @@
 #include "libffi.hpp"
 
 Value *evaluate_constexpr(ASTExpr *node, Context &ctx) {
-  CTInterpreter interpeter(ctx);
+  Interpreter interpeter(ctx);
   return interpeter.visit(node);
 }
 
-Value *CTInterpreter::visit_path(ASTPath *node) {
+Value *Interpreter::visit_path(ASTPath *node) {
   auto lvalue = get_lvalue(node);
   if (lvalue->kind == LValue::RAW) {
     auto raw = lvalue->raw;
@@ -24,7 +24,7 @@ Value *CTInterpreter::visit_path(ASTPath *node) {
   }
 }
 
-Value *CTInterpreter::visit_block(ASTBlock *node) {
+Value *Interpreter::visit_block(ASTBlock *node) {
   ENTER_SCOPE(node->scope);
   for (const auto &stmt : node->statements) {
     auto result = visit(stmt);
@@ -39,9 +39,9 @@ Value *CTInterpreter::visit_block(ASTBlock *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_expr_statement(ASTExprStatement *stmt) { return visit(stmt->expression); }
+Value *Interpreter::visit_expr_statement(ASTExprStatement *stmt) { return visit(stmt->expression); }
 
-Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
+Value *Interpreter::visit_bin_expr(ASTBinExpr *node) {
   auto left = visit(node->left);
   auto right = visit(node->right);
 
@@ -315,7 +315,7 @@ Value *CTInterpreter::visit_bin_expr(ASTBinExpr *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
+Value *Interpreter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit(node->operand);
   switch (node->op) {
     case TType::Sub: {
@@ -373,7 +373,7 @@ Value *CTInterpreter::visit_unary_expr(ASTUnaryExpr *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_literal(ASTLiteral *node) {
+Value *Interpreter::visit_literal(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer:
       return new_int(node->value);
@@ -392,7 +392,7 @@ Value *CTInterpreter::visit_literal(ASTLiteral *node) {
 }
 
 // TODO: handle iterators.
-Value *CTInterpreter::visit_for(ASTFor *node) {
+Value *Interpreter::visit_for(ASTFor *node) {
   InternedString loop_var_name;
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
@@ -448,18 +448,18 @@ Value *CTInterpreter::visit_for(ASTFor *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_continue(ASTContinue *) { return continue_value(); }
+Value *Interpreter::visit_continue(ASTContinue *) { return continue_value(); }
 
-Value *CTInterpreter::visit_break(ASTBreak *) { return break_value(); }
+Value *Interpreter::visit_break(ASTBreak *) { return break_value(); }
 
-Value *CTInterpreter::visit_return(ASTReturn *node) {
+Value *Interpreter::visit_return(ASTReturn *node) {
   if (node->expression) {
     return return_value(visit(node->expression.get()));
   }
   return return_value();
 }
 
-Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
+Value *Interpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
   if (node->is_forward_declared) {
     return null_value();
   }
@@ -471,7 +471,7 @@ Value *CTInterpreter::visit_function_declaration(ASTFunctionDeclaration *node) {
   return function;
 }
 
-Value *CTInterpreter::visit_call(ASTCall *call) {
+Value *Interpreter::visit_call(ASTCall *call) {
   auto function = visit(call->callee);
   std::vector<Value *> evaluated_args;
   evaluated_args.reserve(call->arguments->arguments.size());
@@ -511,7 +511,7 @@ Value *CTInterpreter::visit_call(ASTCall *call) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
+Value *Interpreter::visit_dot_expr(ASTDotExpr *dot) {
   LValue *lvalue = get_dot_expr_lvalue(dot);
   if (lvalue->kind == LValue::MANAGED) {
     return *lvalue->managed;
@@ -521,7 +521,7 @@ Value *CTInterpreter::visit_dot_expr(ASTDotExpr *dot) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_index(ASTIndex *node) {
+Value *Interpreter::visit_index(ASTIndex *node) {
   LValue *lvalue = get_index_lvalue(node);
   if (lvalue->kind == LValue::MANAGED) {
     return *lvalue->managed;
@@ -531,7 +531,7 @@ Value *CTInterpreter::visit_index(ASTIndex *node) {
   return null_value();
 }
 
-LValue *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
+LValue *Interpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
   Value *base = visit(dot->base);
   static Value *the_null_value = null_value();
 
@@ -561,7 +561,7 @@ LValue *CTInterpreter::get_dot_expr_lvalue(ASTDotExpr *dot) {
 }
 
 // This is just for assigning via a *x = 0 kinda dereference.
-LValue *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
+LValue *Interpreter::get_unary_lvalue(ASTUnaryExpr *node) {
   auto operand = visit(node->operand);
 
   if (node->op == TType::Mul) {
@@ -588,7 +588,7 @@ LValue *CTInterpreter::get_unary_lvalue(ASTUnaryExpr *node) {
   return new_lvalue(&the_null_value);
 }
 
-LValue *CTInterpreter::get_index_lvalue(ASTIndex *node) {
+LValue *Interpreter::get_index_lvalue(ASTIndex *node) {
   Value *base = visit(node->base);
   IntValue *index_v = (IntValue *)visit(node->index);
   size_t index = index_v->value;
@@ -620,7 +620,7 @@ LValue *CTInterpreter::get_index_lvalue(ASTIndex *node) {
   return new_lvalue(&array->values[index]);
 }
 
-LValue *CTInterpreter::get_lvalue(ASTNode *node) {
+LValue *Interpreter::get_lvalue(ASTNode *node) {
   if (node->get_node_type() == AST_NODE_UNARY_EXPR) {
     return get_unary_lvalue((ASTUnaryExpr *)node);
   }
@@ -668,14 +668,14 @@ LValue *CTInterpreter::get_lvalue(ASTNode *node) {
   return new_lvalue(&symbol->value);
 }
 
-Value *CTInterpreter::visit_range(ASTRange *node) {
+Value *Interpreter::visit_range(ASTRange *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
   object->values["begin"] = visit(node->left);
   object->values["end"] = visit(node->right);
   return object;
 }
 
-Value *CTInterpreter::visit_tuple(ASTTuple *node) {
+Value *Interpreter::visit_tuple(ASTTuple *node) {
   ObjectValue *object = (ObjectValue *)default_value_of_t(node->resolved_type, this);
   for (size_t i = 0; i < node->values.size(); ++i) {
     const auto &value = node->values[i];
@@ -684,7 +684,7 @@ Value *CTInterpreter::visit_tuple(ASTTuple *node) {
   return object;
 }
 
-Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
+Value *Interpreter::visit_method_call(ASTMethodCall *node) {
   auto func_symbol = ctx.get_symbol(node->callee).get();
   auto func_decl = func_symbol->function.declaration;
   auto function = visit(func_decl);
@@ -713,7 +713,7 @@ Value *CTInterpreter::visit_method_call(ASTMethodCall *node) {
   return result;
 }
 
-Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
+Value *Interpreter::visit_initializer_list(ASTInitializerList *ini) {
   if (ini->tag == ASTInitializerList::INIT_LIST_NAMED) {
     ObjectValue *object = (ObjectValue *)default_value_of_t(ini->resolved_type, this);
     for (const auto &[key, value] : ini->key_values) {
@@ -729,7 +729,7 @@ Value *CTInterpreter::visit_initializer_list(ASTInitializerList *ini) {
   }
 }
 
-Value *CTInterpreter::visit_lambda(ASTLambda *node) {
+Value *Interpreter::visit_lambda(ASTLambda *node) {
   // Might have to do more here.
   auto function = value_arena_alloc<FunctionValue>();
   function->block = node->block;
@@ -737,22 +737,22 @@ Value *CTInterpreter::visit_lambda(ASTLambda *node) {
   return function;
 }
 
-Value *CTInterpreter::visit_cast(ASTCast *node) {
+Value *Interpreter::visit_cast(ASTCast *node) {
   // TODO: do we even have to do any casting here? probably float<->int and other scalars just to make sense?
   return visit(node->expression);
 }
 
-Value *CTInterpreter::visit_size_of(ASTSize_Of *node) {
+Value *Interpreter::visit_size_of(ASTSize_Of *node) {
   return new_int(node->target_type->resolved_type->size_in_bytes());
 }
 
-Value *CTInterpreter::visit_type_of(ASTType_Of *) {
+Value *Interpreter::visit_type_of(ASTType_Of *) {
   ObjectValue *object =
       (ObjectValue *)default_value_of_t(ctx.root_scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}}), this);
   return object;
 }
 
-Value *CTInterpreter::visit_variable(ASTVariable *variable) {
+Value *Interpreter::visit_variable(ASTVariable *variable) {
   current_scope->insert_local_variable(variable->name, variable->type->resolved_type, nullptr, variable->mutability);
 
   auto symbol = current_scope->local_lookup(variable->name);
@@ -771,7 +771,7 @@ Value *CTInterpreter::visit_variable(ASTVariable *variable) {
   return null_value();
 }
 
-void CTInterpreter::set_value(InternedString &name, Value *value) {
+void Interpreter::set_value(InternedString &name, Value *value) {
   auto symbol = ctx.scope->lookup(name);
   if (symbol) {
     symbol->value = value;
@@ -782,18 +782,18 @@ void CTInterpreter::set_value(InternedString &name, Value *value) {
   }
 }
 
-Value *CTInterpreter::try_link_extern_function(Symbol *symbol) {
+Value *Interpreter::try_link_extern_function(Symbol *symbol) {
   auto function = symbol->function.declaration;
   auto fti = function->resolved_type->info->as<FunctionTypeInfo>();
   return value_arena_alloc<ExternFunctionValue>(function->name, fti);
 }
 
-Value *CTInterpreter::visit_impl(ASTImpl *node) {
+Value *Interpreter::visit_impl(ASTImpl *node) {
   throw_error("creating \"impl\"'s in a #run or #eval directive is not allowed", node->source_range);
   return null_value();
 }
 
-Value *CTInterpreter::visit_if(ASTIf *node) {
+Value *Interpreter::visit_if(ASTIf *node) {
   bool cond;
 
   if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
@@ -819,7 +819,7 @@ Value *CTInterpreter::visit_if(ASTIf *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_while(ASTWhile *node) {
+Value *Interpreter::visit_while(ASTWhile *node) {
   const auto should_continue = [&]() {
     if (node->condition.is_not_null()) {
       return visit(node->condition.get())->is_truthy();
@@ -839,7 +839,7 @@ Value *CTInterpreter::visit_while(ASTWhile *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_else(ASTElse *node) {
+Value *Interpreter::visit_else(ASTElse *node) {
   if (node->_if) {
     return visit(node->_if.get());
   }
@@ -849,7 +849,7 @@ Value *CTInterpreter::visit_else(ASTElse *node) {
   return null_value();
 }
 
-Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *node) {
+Value *Interpreter::visit_pattern_match(ASTPatternMatch *node) {
   Value *object = visit(node->object);
   Type *target_type = node->target_type_path->resolved_type;
 
@@ -861,9 +861,9 @@ Value *CTInterpreter::visit_pattern_match(ASTPatternMatch *node) {
   return new_bool(true);
 }
 
-Value *CTInterpreter::visit_unpack_element(ASTUnpackElement *) { return null_value(); }
-Value *CTInterpreter::visit_unpack(ASTUnpack *) { return null_value(); }
-Value *CTInterpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
-Value *CTInterpreter::visit_defer(ASTDefer *) { return null_value(); }
-Value *CTInterpreter::visit_switch(ASTSwitch *) { return null_value(); }
-Value *CTInterpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }
+Value *Interpreter::visit_unpack_element(ASTUnpackElement *) { return null_value(); }
+Value *Interpreter::visit_unpack(ASTUnpack *) { return null_value(); }
+Value *Interpreter::visit_tuple_deconstruction(ASTDestructure *) { return null_value(); }
+Value *Interpreter::visit_defer(ASTDefer *) { return null_value(); }
+Value *Interpreter::visit_switch(ASTSwitch *) { return null_value(); }
+Value *Interpreter::visit_dyn_of(ASTDyn_Of *) { return null_value(); }

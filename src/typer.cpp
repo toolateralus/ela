@@ -13,7 +13,7 @@
 
 #include "ast.hpp"
 #include "copier.hpp"
-#include "constexpr.hpp"
+#include "interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -3938,7 +3938,7 @@ void Typer::visit(ASTUnpackElement *) {
 
 void Typer::visit(ASTRun *node) {
   node->node_to_run->accept(this);
-  CTInterpreter interpreter(ctx);
+  Interpreter interpreter(ctx);
 
   auto result = interpreter.visit(node->node_to_run);
 

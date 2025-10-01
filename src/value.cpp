@@ -64,9 +64,9 @@ LValue* new_lvalue(RawPointerValue* raw) {
   return lvalue;
 }
 
-#include "constexpr.hpp"
+#include "interpreter.hpp"
 
-Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> arguments) {
+Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> arguments) {
   auto it = arguments.begin();
   auto temp_scope = create_child(block->scope->parent);
 
@@ -255,7 +255,7 @@ Value* default_value_of_scalar_t(ScalarType type) {
   return null_value();
 }
 
-Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpreter* interpreter) {
+Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, Interpreter* interpreter) {
   auto array = new_array({});
   for (size_t i = 0; i < size; ++i) {
     array->values.push_back(default_value_of_t(base_type, interpreter));
@@ -263,7 +263,7 @@ Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpr
   return array;
 }
 
-Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, CTInterpreter* interpreter) {
+Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, Interpreter* interpreter) {
   auto object = new_object(type);
   for (const auto& member : info->members) {
     if (member.default_value.is_not_null()) {
@@ -275,7 +275,7 @@ Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, CTInterpreter
   return object;
 }
 
-Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, CTInterpreter* interpreter) {
+Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, Interpreter* interpreter) {
   auto object = new_object(type);
   for (size_t i = 0; i < info->types.size(); ++i) {
     Type* type = info->types[i];
@@ -302,7 +302,7 @@ Value* default_value_of_dyn_t(Type* type, DynTypeInfo* info) {
   return object;
 }
 
-Value* default_value_of_t(Type* t, CTInterpreter* interpreter) {
+Value* default_value_of_t(Type* t, Interpreter* interpreter) {
   if (t->is_pointer()) {
     return null_value();
   }
