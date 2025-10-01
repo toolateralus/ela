@@ -346,6 +346,9 @@ THIR* ObjectValue::to_thir() const {
   THIRAggregateInitializer* init = thir_alloc<THIRAggregateInitializer>();
   init->type = type;
   for (const auto& [key, value] : this->values) {
+    if (type->is_kind(TYPE_DYN) && key == "instance") {
+      continue;
+    }
     init->key_values.push_back({key, value->to_thir()});
   }
   return init;
@@ -494,6 +497,10 @@ Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interprete
     arg0 = *arg0->as<PointerValue>()->ptr;
   }
 
+  if (!arg0->is(ValueType::OBJECT)) {
+    throw_error(std::format("'dyn' object was ({}), so a dynamic dispatch failed at compile time for method: {}", arg0->to_string(), method_name), {});
+  }
+
   ObjectValue *self = arg0->as<ObjectValue>();
   PointerValue *function_pointer = self->values[method_name]->as<PointerValue>();
 
@@ -504,4 +511,16 @@ Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interprete
   FunctionValue *function = (*function_pointer->ptr)->as<FunctionValue>();
 
   return function->call(interpreter, arguments);
+}
+
+THIR* PointerValue::to_thir() const {
+  if (pointee_value_type == ValueType::FUNCTION) {
+    auto function = (*ptr)->as<FunctionValue>();
+    auto variable = thir_alloc<THIRVariable>();
+    variable->name = function->name;
+    variable->type = function->type;
+    variable->use_compile_time_value_at_emit_time = false;
+    return variable;
+  }
+  return null_value()->to_thir();
 }

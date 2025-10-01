@@ -169,7 +169,7 @@ struct PointerValue : Value {
 
   ValueType get_value_type() const override { return value_type; }
 
-  THIR* to_thir() const override { return nullptr; }
+  THIR* to_thir() const override;
 };
 
 struct RawPointerValue : Value {
@@ -206,6 +206,7 @@ struct Interpreter;
 struct THIRBlock;
 struct THIRParameter;
 struct FunctionValue : Value {
+  InternedString name;
   THIRBlock* block;
   std::vector<THIRParameter> parameters;
   FunctionValue();

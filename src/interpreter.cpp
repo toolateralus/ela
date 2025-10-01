@@ -99,11 +99,10 @@ LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
   if (object->values.contains(node->member)) {
     return new_lvalue(&object->values[node->member]);
   } else {
-    throw_error(
-        std::format("A member access expression during compile time read a property that doesnt exist."
-                    " member: '{}'",
-                    node->member),
-        node->source_range);
+    throw_error(std::format("A member access expression during compile time read a property that doesnt exist."
+                            " member: '{}'",
+                            node->member),
+                node->source_range);
     return null_lvalue();
   }
 }
@@ -185,196 +184,209 @@ Value *Interpreter::visit_block(THIRBlock *node) {
 }
 
 Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
-  auto left = visit_node(node->left);
-  auto right = visit_node(node->right);
+  Value *left = visit_node(node->left);
+  Value *right = visit_node(node->right);
 
-  auto is_int = [](Value *v) { return v->get_value_type() == ValueType::INTEGER; };
-  auto is_float = [](Value *v) { return v->get_value_type() == ValueType::FLOATING; };
-  auto is_bool = [](Value *v) { return v->get_value_type() == ValueType::BOOLEAN; };
+  const auto vt = [](Value *v) { return v->get_value_type(); };
+  const auto is_int = [&](Value *v) { return vt(v) == ValueType::INTEGER; };
+  const auto is_float = [&](Value *v) { return vt(v) == ValueType::FLOATING; };
+  const auto is_bool = [&](Value *v) { return vt(v) == ValueType::BOOLEAN; };
+  const auto is_null = [&](Value *v) { return vt(v) == ValueType::NULLPTR; };
+  const auto is_ptr = [&](Value *v) { return vt(v) == ValueType::POINTER || vt(v) == ValueType::RAW_POINTER; };
+  const auto is_number = [&](Value *v) { return is_int(v) || is_float(v); };
 
-  constexpr auto to_int = [](Value *v) -> long long {
-    if (v->get_value_type() == ValueType::INTEGER) return ((IntValue *)v)->value;
-    if (v->get_value_type() == ValueType::FLOATING) return (long long)((FloatValue *)v)->value;
+  const auto to_int = [&](Value *v) -> long long {
+    if (is_int(v)) return (long long)v->as<IntValue>()->value;
+    if (is_float(v)) return (long long)v->as<FloatValue>()->value;
     return 0;
   };
 
-  constexpr auto to_double = [](Value *v) -> double {
-    if (v->get_value_type() == ValueType::FLOATING) return ((FloatValue *)v)->value;
-    if (v->get_value_type() == ValueType::INTEGER) return (double)((IntValue *)v)->value;
+  const auto to_double = [&](Value *v) -> double {
+    if (is_float(v)) return v->as<FloatValue>()->value;
+    if (is_int(v)) return (double)v->as<IntValue>()->value;
     return 0.0;
+  };
+
+  // Produce a numeric result following C usual arithmetic conversions:
+  // - If either is float -> do double math, result is float
+  // - Else integer math (wrap in host sized integer – same as current model)
+  auto numeric_bin = [&](auto op_int, auto op_float) -> Value * {
+    if (!is_number(left) || !is_number(right)) {
+      return null_value();
+    }
+
+    if (is_float(left) || is_float(right)) {
+      double a = to_double(left);
+      double b = to_double(right);
+      return new_float(op_float(a, b));
+    }
+    long long a = to_int(left);
+    long long b = to_int(right);
+    long long r = op_int(a, b);
+    return new_int((size_t)r);
+  };
+
+  auto numeric_rel = [&](auto cmp_int, auto cmp_float) -> Value * {
+    if (!is_number(left) || !is_number(right)) return null_value();
+    if (is_float(left) || is_float(right)) {
+      double a = to_double(left);
+      double b = to_double(right);
+      return new_bool(cmp_float(a, b));
+    }
+    long long a = to_int(left);
+    long long b = to_int(right);
+    return new_bool(cmp_int(a, b));
+  };
+
+  auto numeric_eq = [&]() -> Value * {
+    if (!is_number(left) || !is_number(right)) return nullptr;
+    if (is_float(left) || is_float(right)) {
+      return new_bool(to_double(left) == to_double(right));
+    }
+    return new_bool(to_int(left) == to_int(right));
+  };
+
+  auto numeric_neq = [&]() -> Value * {
+    if (!is_number(left) || !is_number(right)) return nullptr;
+    if (is_float(left) || is_float(right)) {
+      return new_bool(to_double(left) != to_double(right));
+    }
+    return new_bool(to_int(left) != to_int(right));
   };
 
   switch (node->op) {
     case TType::Add: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_float(a + b);
-      }
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((size_t)(a + b));
+      return numeric_bin([](long long a, long long b) { return (a + b); }, [](double a, double b) { return a + b; });
     }
+
     case TType::Sub: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_float(a - b);
-      }
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a - b));
+      return numeric_bin([](long long a, long long b) { return (a - b); }, [](double a, double b) { return a - b; });
     }
+
     case TType::Mul: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_float(a * b);
-      }
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a * b));
+      return numeric_bin([](long long a, long long b) { return (a * b); }, [](double a, double b) { return a * b; });
     }
+
     case TType::Div: {
-      if (is_float(left) || is_float(right)) {
-        double b = to_double(right);
-        double a = to_double(left);
-        return new_float(a / b);
+      if (!is_number(left) || !is_number(right)) return null_value();
+      if ((is_int(right) && to_int(right) == 0) || (is_float(right) && to_double(right) == 0.0)) {
+        throw_error("division by zero in compile-time evaluation", node->source_range);
       }
-      long long b = to_int(right);
-      long long a = to_int(left);
-      return new_int((a / b));
+      return numeric_bin([](long long a, long long b) { return (b == 0 ? 0 : a / b); },
+                         [](double a, double b) { return a / b; });
     }
+
     case TType::Modulo: {
+      if (!is_int(left) || !is_int(right)) return null_value();
       long long b = to_int(right);
-      long long a = to_int(left);
-      return new_int((a % b));
-    }
-    case TType::Or: {
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a | b));
-    }
-    case TType::And: {
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a & b));
-    }
-    case TType::Xor: {
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a ^ b));
-    }
-    case TType::SHL: {
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a << b));
-    }
-    case TType::SHR: {
-      long long a = to_int(left);
-      long long b = to_int(right);
-      return new_int((a >> b));
-    }
-    case TType::LogicalOr: {
-      bool a = ((BoolValue *)left)->value;
-      bool b = ((BoolValue *)right)->value;
-      return new_bool(a || b);
-    }
-    case TType::LogicalAnd: {
-      bool a = ((BoolValue *)left)->value;
-      bool b = ((BoolValue *)right)->value;
-      return new_bool(a && b);
-    }
-    case TType::LT: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a < b);
+      if (b == 0) {
+        throw_error("modulo by zero in compile-time evaluation", node->source_range);
       }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a < b);
-      }
-      return null_value();
+      long long a = to_int(left);
+      return new_int((size_t)(a % b));
     }
-    case TType::GT: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a > b);
-      }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a > b);
-      }
-      return null_value();
-    }
-    case TType::LE: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a <= b);
-      }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a <= b);
-      }
 
+    case TType::Or:
+      if (is_int(left) && is_int(right))
+        return new_int((size_t)(to_int(left) | to_int(right)));
+      else
+        return null_value();
+    case TType::And:
+      if (is_int(left) && is_int(right))
+        return new_int((size_t)(to_int(left) & to_int(right)));
+      else
+        return null_value();
+    case TType::Xor:
+      if (is_int(left) && is_int(right))
+        return new_int((size_t)(to_int(left) ^ to_int(right)));
+      else
+        return null_value();
+    case TType::SHL:
+      if (is_int(left) && is_int(right))
+        return new_int((size_t)(to_int(left) << to_int(right)));
+      else
+        return null_value();
+    case TType::SHR:
+      if (is_int(left) && is_int(right))
+        return new_int((size_t)(to_int(left) >> to_int(right)));
+      else
+        return null_value();
+
+    case TType::LogicalOr:
+      if (is_bool(left) && is_bool(right))
+        return new_bool(left->as<BoolValue>()->value || right->as<BoolValue>()->value);
       return null_value();
-    }
-    case TType::GE: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a >= b);
-      }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a >= b);
-      }
+
+    case TType::LogicalAnd:
+      if (is_bool(left) && is_bool(right))
+        return new_bool(left->as<BoolValue>()->value && right->as<BoolValue>()->value);
       return null_value();
-    }
+
+    case TType::LT:
+      return numeric_rel([](long long a, long long b) { return a < b; }, [](double a, double b) { return a < b; });
+
+    case TType::GT:
+      return numeric_rel([](long long a, long long b) { return a > b; }, [](double a, double b) { return a > b; });
+
+    case TType::LE:
+      return numeric_rel([](long long a, long long b) { return a <= b; }, [](double a, double b) { return a <= b; });
+
+    case TType::GE:
+      return numeric_rel([](long long a, long long b) { return a >= b; }, [](double a, double b) { return a >= b; });
+
     case TType::EQ: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a == b);
-      }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a == b);
-      }
+      if (auto r = numeric_eq()) return r;
+
       if (is_bool(left) && is_bool(right)) {
-        bool a = ((BoolValue *)left)->value;
-        bool b = ((BoolValue *)right)->value;
-        return new_bool(a == b);
+        return new_bool(left->as<BoolValue>()->value == right->as<BoolValue>()->value);
       }
-      return null_value();
-    }
-    case TType::NEQ: {
-      if (is_float(left) || is_float(right)) {
-        double a = to_double(left);
-        double b = to_double(right);
-        return new_bool(a != b);
+
+      if ((is_null(left) && is_null(right))) {
+        return new_bool(true);
       }
-      if (is_int(left) && is_int(right)) {
-        long long a = to_int(left);
-        long long b = to_int(right);
-        return new_bool(a != b);
+
+      if ((is_null(left) && is_ptr(right)) || (is_ptr(left) && is_null(right))) {
+        return new_bool(false);
       }
-      if (is_bool(left) && is_bool(right)) {
-        bool a = ((BoolValue *)left)->value;
-        bool b = ((BoolValue *)right)->value;
-        return new_bool(a != b);
+
+      if (is_ptr(left) && is_ptr(right)) {
+        if (vt(left) == ValueType::POINTER && vt(right) == ValueType::POINTER) {
+          auto lp = left->as<PointerValue>()->ptr;
+          auto rp = right->as<PointerValue>()->ptr;
+          return new_bool(lp == rp);
+        } else if (vt(left) == ValueType::RAW_POINTER && vt(right) == ValueType::RAW_POINTER) {
+          return new_bool(left->as<RawPointerValue>()->ptr == right->as<RawPointerValue>()->ptr);
+        }
+        return new_bool(false);
       }
+
       return null_value();
     }
 
+    case TType::NEQ: {
+      if (auto r = numeric_neq()) return r;
+
+      if (is_bool(left) && is_bool(right))
+        return new_bool(left->as<BoolValue>()->value != right->as<BoolValue>()->value);
+
+      if ((is_null(left) && is_null(right))) return new_bool(false);
+      if ((is_null(left) && is_ptr(right)) || (is_ptr(left) && is_null(right))) return new_bool(true);
+
+      if (is_ptr(left) && is_ptr(right)) {
+        if (vt(left) == ValueType::POINTER && vt(right) == ValueType::POINTER) {
+          auto lp = left->as<PointerValue>()->ptr;
+          auto rp = right->as<PointerValue>()->ptr;
+          return new_bool(lp != rp);
+        } else if (vt(left) == ValueType::RAW_POINTER && vt(right) == ValueType::RAW_POINTER) {
+          return new_bool(left->as<RawPointerValue>()->ptr != right->as<RawPointerValue>()->ptr);
+        }
+        return new_bool(true);
+      }
+
+      return null_value();
+    }
+
+    /* Compound assignments */
     case TType::CompAdd:
     case TType::CompSub:
     case TType::CompMul:
@@ -385,49 +397,48 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
     case TType::CompXor:
     case TType::CompSHL:
     case TType::CompSHR: {
-      auto old_op = node->op;
-      TType base_op = TType::Add;
-      switch (old_op) {
+      // Map compound to base
+      TType base;
+      switch (node->op) {
         case TType::CompAdd:
-          base_op = TType::Add;
+          base = TType::Add;
           break;
         case TType::CompSub:
-          base_op = TType::Sub;
+          base = TType::Sub;
           break;
         case TType::CompMul:
-          base_op = TType::Mul;
+          base = TType::Mul;
           break;
         case TType::CompDiv:
-          base_op = TType::Div;
+          base = TType::Div;
           break;
         case TType::CompMod:
-          base_op = TType::Modulo;
+          base = TType::Modulo;
           break;
         case TType::CompAnd:
-          base_op = TType::And;
+          base = TType::And;
           break;
         case TType::CompOr:
-          base_op = TType::Or;
+          base = TType::Or;
           break;
         case TType::CompXor:
-          base_op = TType::Xor;
+          base = TType::Xor;
           break;
         case TType::CompSHL:
-          base_op = TType::SHL;
+          base = TType::SHL;
           break;
         case TType::CompSHR:
-          base_op = TType::SHR;
+          base = TType::SHR;
           break;
         default:
-          base_op = old_op;
+          base = node->op;
           break;
       }
-
-      node->op = base_op;
+      auto saved = node->op;
+      node->op = base;
       Value *res = visit_bin_expr(node);
-      node->op = old_op;
+      node->op = saved;
 
-      // make it permanent
       auto lvalue = get_lvalue(node->left);
       write_to_lvalue(node->left, res);
       switch (lvalue->kind) {
@@ -440,6 +451,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
       }
       return res;
     }
+
     case TType::Assign: {
       auto lvalue = get_lvalue(node->left);
       write_to_lvalue(node->left, right);
@@ -453,11 +465,10 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
       }
       return lvalue;
     }
-    default:
-      break;
-  }
 
-  return null_value();
+    default:
+      return null_value();
+  }
 }
 
 Value *Interpreter::visit_unary_expr(THIRUnaryExpr *node) {
@@ -560,6 +571,7 @@ Value *Interpreter::visit_function(THIRFunction *node) {
     return try_link_extern_function(node);
   }
   auto function = value_arena_alloc<FunctionValue>();
+  function->name = node->name;
   function->parameters = node->parameters;
   function->block = node->block;
   return function;
