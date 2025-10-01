@@ -2995,10 +2995,6 @@ void Typer::visit(ASTImport *node) {
 }
 
 void Typer::visit(ASTModule *node) {
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  node->scope->name = node->module_name;
-
   // TODO: we need to remove all the symbol table insertions from the parser to make this work.
   // otherwise we just get constant fake redefinitions.
   // For now, redefinitions from module "appends" are untracked.
@@ -3070,20 +3066,22 @@ void Typer::visit(ASTModule *node) {
   }
   #endif  
 
-  for (auto statement : node->statements) {
-    statement->accept(this);
+  {
+    ENTER_SCOPE(node->scope)
+    node->scope->name = node->module_name;
+    for (auto statement : node->statements) {
+      statement->accept(this);
+    }
   }
-  ctx.set_scope(old_scope);
 
   if (auto mod = ctx.scope->lookup(node->module_name)) {
     if (!mod->is_module) {
       throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
     }
-    // TODO: we need to check if we're redefining symbols but the mod scope & the node scope
-    // are the same when we visit this node, so we'd have to do that before the node's symbols are
-    // visited? or would the typer just handle that anyway?
+    auto scope = mod->module.declaration->scope;
+    // See above: we need to check for redefinitions.
     for (auto &[name, sym] : node->scope->symbols) {
-      mod->scope->symbols[name] = sym;
+      scope->symbols[name] = sym;
     }
   } else {
     node->declaring_scope->create_module(node->module_name, node);

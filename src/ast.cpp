@@ -526,7 +526,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto old_scope = parser->ctx.scope;
         parser->ctx.scope = parser->ctx.root_scope;
         auto module_definition = parser->parse_module();
-        parser->ctx.scope =old_scope;
+        parser->ctx.scope = old_scope;
         return module_definition;
       }
     },
@@ -1494,6 +1494,7 @@ ASTImport *Parser::parse_import() {
     the_module->declaring_scope = ctx.root_scope;
     the_module->module_name = root_segment.identifier;
     the_module->scope = scope;
+    scope->name = root_segment.identifier;
     {
       ENTER_AST_STATEMENT_LIST(the_module->statements);
       while (!peek().is_eof()) {
