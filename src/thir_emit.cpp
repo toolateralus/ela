@@ -168,7 +168,8 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
     code << " temp = ";
     emit_expr(thir->operand);
     code << "; &temp; })";
-  } else if (thir->op == TType::Increment || thir->op == TType::Decrement) { // ++ and -- are ALWAYS posfix in this language.
+  } else if (thir->op == TType::Increment ||
+             thir->op == TType::Decrement) {  // ++ and -- are ALWAYS posfix in this language.
     code << '(';
     emit_expr(thir->operand);
     code << ttype_get_operator_string(thir->op, thir->source_range);
@@ -241,7 +242,6 @@ void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
 }
 
 void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir) {
-
   if (thir->is_variable_length_array) {
     code << "(" << c_type_string(thir->type) << "){";
   } else {
@@ -255,7 +255,11 @@ void Emitter::emit_collection_initializer(const THIRCollectionInitializer *thir)
 }
 
 void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
-  if (thir->type->is_fixed_sized_array()) {
+  if (thir->type->is_kind(TYPE_ENUM)) {
+    code << "0";
+  } else if (thir->type->is_kind(TYPE_CHOICE) && thir->type->has_no_extensions()) {
+    code << "{ . " + std::string{DISCRIMINANT_KEY} + " = 0 }";
+  } else if (thir->type->is_fixed_sized_array()) {
     code << "{}";
   } else {
     code << "(" << c_type_string(thir->type) << "){0}";
@@ -607,7 +611,6 @@ void Emitter::emit_variable(const THIRVariable *thir) {
     }
     code << ";\n";
   }
-
 }
 
 void Emitter::emit_return(const THIRReturn *thir) {
@@ -699,7 +702,7 @@ void Emitter::emit_node(const THIR *thir) {
 std::string Emitter::reflection_prelude(const std::unordered_map<const Type *, ReflectionInfo> &info) {
   StringBuilder code;
   code << "typedef struct Type Type;\n";
-  for (const auto &[_, info]: info) {
+  for (const auto &[_, info] : info) {
     code << "extern Type " << info.definition->name.get_str() << ";\n";
   }
   return code.str();

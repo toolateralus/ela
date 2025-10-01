@@ -31,7 +31,7 @@ static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath 
     // TODO: remove this
     return false;
   }
-  
+
   if (!ast->resolved_type->is_kind(TYPE_CHOICE) || ast->resolved_type->has_extensions()) {
     return false;
   }
@@ -551,6 +551,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
 
+
   if (type->is_pointer() && key_values.empty()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
     literal->tag = ASTLiteral::Null;
@@ -561,7 +562,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
   }
 
   // TODO: might need more ignored things here
-  if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->is_fixed_sized_array()) {
+  if (info->members.empty() || type->is_kind(TYPE_CHOICE) || type->is_fixed_sized_array() || type->is_kind(TYPE_ENUM)) {
     THIR_ALLOC_NO_SRC_RANGE(THIREmptyInitializer, thir);
     thir->source_range = source_range;
     thir->type = type;
@@ -1032,9 +1033,9 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
     var->source_range = ast->source_range;
-    var->is_global = true;
+    var->is_global = false;
     var->is_statement = true;
-    var->name = member.name;
+    var->name = ast->resolved_type->basename.get_str() + '$' + member.name.get_str();
     var->value = member.thir_value.get();
     var->type = member.type;
     auto symbol = ast->resolved_type->info->scope->local_lookup(member.name);
