@@ -24,12 +24,14 @@ enum Mutability : char {
 };
 
 struct Scope;
-
+struct THIR;
 struct Symbol {
   InternedString name;
   Type *resolved_type = Type::INVALID_TYPE;
   Mutability mutability = CONST;
   Scope *parent_scope;
+
+  THIR *thir;
 
   bool is_variable : 1 = false;
   bool is_function : 1 = false;

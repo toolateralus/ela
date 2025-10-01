@@ -91,9 +91,12 @@ struct THIRProgram : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::Program; }
 };
 
+struct Value;
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
+  Value *compile_time_value;
+  bool use_compile_time_value_at_emit_time: 1 = false;
   bool is_static : 1 = false;
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;

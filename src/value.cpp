@@ -42,6 +42,11 @@ StringValue* new_string(const std::string& str) { return value_arena_alloc<Strin
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
 NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
+LValue* null_lvalue() {
+  static Value *null_val = null_value();
+  static LValue *null_lval = new_lvalue(&null_val);
+  return null_lval;
+}
 ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
 FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
 ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }

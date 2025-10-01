@@ -235,6 +235,7 @@ StringValue* new_string(const InternedString& str);
 StringValue* new_string(const std::string& str);
 CharValue* new_char(char val);
 NullValue* null_value();
+LValue* null_lvalue();
 ObjectValue* new_object(Type* type);
 FunctionValue* new_function();
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);

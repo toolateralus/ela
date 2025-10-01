@@ -24,7 +24,6 @@ struct Interpreter {
   }
 
   Value *try_link_extern_function(THIRFunction *function);
-  void set_value(InternedString &name, Value *value);
   LValue *get_lvalue(THIR *);
   LValue *get_member_access_lvalue(THIRMemberAccess *);
   LValue *get_index_lvalue(THIRIndex *);

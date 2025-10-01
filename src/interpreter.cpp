@@ -28,17 +28,6 @@ Value *Interpreter::try_link_extern_function(THIRFunction *function) {
   return value_arena_alloc<ExternFunctionValue>(function->name, fti);
 }
 
-void Interpreter::set_value(InternedString &name, Value *value) {
-  auto symbol = ctx.scope->lookup(name);
-  if (symbol) {
-    symbol->value = value;
-  }
-  symbol = scope->lookup(name);
-  if (symbol) {
-    symbol->value = value;
-  }
-}
-
 LValue *Interpreter::get_lvalue(THIR *node) {
   switch (node->get_node_type()) {
     case THIRNodeType::UnaryExpr:
@@ -52,35 +41,26 @@ LValue *Interpreter::get_lvalue(THIR *node) {
     default:
       break;
   }
-  static Value *the_null = null_value();
-  static LValue *the_null_lvalue = new_lvalue(&the_null);
-  return the_null_lvalue;
+  return null_lvalue();
 }
 
 LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
-  auto get_or_create_lvalue = [&](Symbol *symbol) -> LValue * {
-    if (symbol) {
-      return new_lvalue(&symbol->value);
-    } else {
-      Value *value = visit_node(node->value);
-      scope->insert_local_variable(node->name, node->type, nullptr, MUT);
-      symbol->value = value;
-      return new_lvalue(&symbol->value);
-    }
-  };
-
-  auto symbol = ctx.scope->lookup(node->name);
-
-  if (!symbol) {
-    symbol = scope->local_lookup(node->name);
+  if (!node->value && !node->compile_time_value) {
+    node->compile_time_value = null_value();
+    node->use_compile_time_value_at_emit_time = false;
+    // our first assignment has to have something to write into, so 
+    // we just give null.
+    return new_lvalue(&node->compile_time_value);
   }
-
-  return get_or_create_lvalue(symbol);
+  if (!node->compile_time_value) {
+    node->compile_time_value = visit_node(node->value);
+  }
+  node->use_compile_time_value_at_emit_time = true;
+  return new_lvalue(&node->compile_time_value);
 }
 
 LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
   Value *base = visit_node(node->base);
-  static Value *the_null_value = null_value();
 
   // Auto dereference
   if (base->get_value_type() == ValueType::POINTER) {
@@ -105,7 +85,7 @@ LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
                     "{}, so it got ignored",
                     node->member),
         node->source_range);
-    return new_lvalue(&the_null_value);
+    return null_lvalue();
   }
 }
 
@@ -158,8 +138,7 @@ LValue *Interpreter::get_unary_lvalue(THIRUnaryExpr *node) {
     }
   }
 
-  static Value *the_null_value = null_value();
-  return new_lvalue(&the_null_value);
+  return null_lvalue();
 }
 
 Value *Interpreter::visit_block(THIRBlock *node) {
@@ -594,22 +573,11 @@ Value *Interpreter::visit_cast(THIRCast *node) {
 }
 
 Value *Interpreter::visit_variable(THIRVariable *node) {
-  scope->insert_local_variable(node->name, node->type, nullptr, MUT);
-
-  auto symbol = scope->local_lookup(node->name);
-
-  Value *value = null_value();
-  if (node->value) {
-    value = symbol->value = visit_node(node->value);
-  } else {
-    value = symbol->value = default_value_of_t(node->type, this);
+  if (!node->value) {
+    return null_value();
   }
-
-  if (symbol->value) {
-    symbol->value->type = node->type;
-  }
-
-  return value;
+  LValue *value = get_variable_lvalue(node);
+  return *value->managed;
 }
 
 Value *Interpreter::visit_for(THIRFor *node) {

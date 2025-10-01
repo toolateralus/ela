@@ -584,7 +584,6 @@ void Emitter::emit_expr(const THIR *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
-
   if (thir->is_extern) {
     indented("extern " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type) + ";\n");
     return;
@@ -600,7 +599,12 @@ void Emitter::emit_variable(const THIRVariable *thir) {
     code << ";\n";
   } else {
     code << " = ";
-    emit_expr(thir->value);
+    // use the value mutated by interpreter
+    if (thir->compile_time_value && thir->use_compile_time_value_at_emit_time) {
+      emit_expr(thir->compile_time_value->to_thir());
+    } else {
+      emit_expr(thir->value);
+    }
     code << ";\n";
   }
 
