@@ -126,7 +126,16 @@ LValue *Interpreter::get_index_lvalue(THIRIndex *node) {
     return new_lvalue(new_raw_pointer(raw->type->base_type, p));
   }
 
-  if (base->get_value_type() != ValueType::ARRAY) {
+  if (base->get_value_type() == ValueType::RAW_POINTER) {
+    RawPointerValue *raw = base->as<RawPointerValue>();
+    const size_t sz = raw->type->base_type->size_in_bytes();
+    char *p = raw->ptr + (sz * index);
+    return new_lvalue(new_raw_pointer(raw->type->base_type, p));
+  } else if (base->get_value_type() == ValueType::POINTER) {
+    PointerValue *pv = base->as<PointerValue>();
+    Value **p = &pv->ptr[index];
+    return new_lvalue(p);
+  } else if (base->get_value_type() != ValueType::ARRAY) {
     throw_error("cannot index-- operator overloading not implemented at compile time", node->source_range);
   }
 
