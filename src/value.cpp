@@ -1,7 +1,9 @@
 #include "value.hpp"
 #include <cstring>
 #include "ast.hpp"
+#include "scope.hpp"
 #include "type.hpp"
+#include "thir.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
 bool ArrayValue::is_truthy() const { return !values.empty(); }
@@ -68,28 +70,17 @@ LValue* new_lvalue(RawPointerValue* raw) {
 
 Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> arguments) {
   auto it = arguments.begin();
-  auto temp_scope = create_child(block->scope->parent);
-
-  for (const auto param : this->parameters->params) {
-    if (param->tag == ASTParamDecl::Normal) {
-      temp_scope->insert_local_variable(param->normal.name, param->resolved_type, nullptr, MUT);
-      auto symbol = temp_scope->local_lookup(param->normal.name);
-      symbol->value = *it;
-      ++it;
-    } else {
-      temp_scope->insert_local_variable("self", param->resolved_type, nullptr, param->mutability);
-      auto symbol = temp_scope->local_lookup("self");
-      symbol->value = *it;
-    }
+  // TODO: attach types to parameters in THIR.
+  for (const auto &param: parameters) {
+    interpreter->scope->insert_local_variable(param.name, nullptr, nullptr, MUT);
+    Symbol* symbol = interpreter->scope->local_lookup(param.name);
+    symbol->value = *it;
+    ++it;
   }
-
-  auto old_scope = block->scope;
-  block->scope = temp_scope;
   auto value = interpreter->visit_block(block);
-  block->scope = old_scope;
-
   return value;
 }
+
 ASTNode* IntValue::to_ast() const {
   auto literal = ast_alloc<ASTLiteral>();
   literal->value = std::to_string(value);
@@ -266,8 +257,8 @@ Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, Interpret
 Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, Interpreter* interpreter) {
   auto object = new_object(type);
   for (const auto& member : info->members) {
-    if (member.default_value.is_not_null()) {
-      object->values[member.name] = interpreter->visit(member.default_value.get());
+    if (member.thir_value.is_not_null()) {
+      object->values[member.name] = interpreter->visit_node(member.thir_value.get());
     } else {
       object->values[member.name] = default_value_of_t(member.type, interpreter);
     }
@@ -462,3 +453,5 @@ void RawPointerValue::assign_from(Value* v) {
       break;
   }
 }
+
+FunctionValue::FunctionValue() : Value(ValueType::FUNCTION) {}

@@ -501,6 +501,7 @@ struct Type {
   size_t alignment_in_bytes() const;
 
   bool has_dependencies() const;
+  size_t offset_in_bytes(const InternedString &field) const;
 };
 
 static inline constexpr bool type_is_valid(Type *type) {

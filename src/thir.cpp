@@ -49,7 +49,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   const auto variant_name = path->segments.back().identifier;
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto discriminant = info->get_variant_discriminant(variant_name);
-  auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type());
+  auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer);
   thir->key_values.push_back({DISCRIMINANT_KEY, literal});
   return thir;
 }
@@ -58,7 +58,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   I put some of these super trivial nodes up top here so they stay out of the way
 */
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
-  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->source_range, u64_type());
+  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->source_range, u64_type(), ASTLiteral::Integer);
 }
 
 THIR *THIRGen::visit_continue(ASTContinue *ast) {
@@ -363,7 +363,7 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
   THIR_ALLOC(THIRBinExpr, thir, ast);
   thir->left = discriminant_access;
   thir->op = TType::EQ;
-  thir->right = make_literal(std::to_string(discriminant), ast->source_range, u64_type());
+  thir->right = make_literal(std::to_string(discriminant), ast->source_range, u64_type(), ASTLiteral::Integer);
   return thir;
 }
 
@@ -474,6 +474,7 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
   }
 
   THIR_ALLOC(THIRLiteral, literal, ast);
+  literal->tag = ast->tag;
   if (ast->is_c_string) {
     literal->is_c_string = true;
   }
@@ -541,6 +542,7 @@ THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
 
   if (type->is_pointer() && key_values.empty()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
+    literal->tag = ASTLiteral::Null;
     literal->value = "nullptr";
     literal->source_range = source_range;
     literal->is_statement = false;
@@ -671,7 +673,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
         thir->type = type;
         thir->key_values.push_back({"data", collection});
-        thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type())});
+        thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->source_range, u64_type(), ASTLiteral::Integer)});
         return thir;
       }
 
@@ -1232,7 +1234,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   member_access->member = DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
-  THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type());
+  THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);
 
   condition->left = member_access;
   condition->op = TType::EQ;
@@ -1494,14 +1496,15 @@ THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_rang
   static Type *str_type = ctx.scope->find_type_id("str", {});
   thir->source_range = src_range;
   thir->type = str_type;
-  thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type())});
+  thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type(), ASTLiteral::String)});
   thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())),
-                                                     src_range, u64_type())});
+                                                     src_range, u64_type(), ASTLiteral::Integer)});
   return thir;
 }
 
-THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type) {
+THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag) {
   THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, thir);
+  thir->tag = tag;
   thir->source_range = src_range;
   thir->value = value;
   thir->type = type;
@@ -1562,13 +1565,13 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
     } else {
       thir->key_values.push_back({
           "pointer",
-          make_literal("nullptr", {}, void_type()->take_pointer_to(false)),
+          make_literal("nullptr", {}, void_type()->take_pointer_to(false), ASTLiteral::Null),
       });
     }
   } else {
     thir->key_values.push_back({
         "pointer",
-        make_literal("nullptr", {}, void_type()->take_pointer_to(false)),
+        make_literal("nullptr", {}, void_type()->take_pointer_to(false), ASTLiteral::Null),
     });
   }
 
@@ -1589,7 +1592,7 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
 
   thir->key_values.push_back({
       "size",
-      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
+      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type(), ASTLiteral::Integer),
   });
 
   if (parent_type->is_kind(TYPE_ENUM)) {
@@ -1626,7 +1629,7 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
   thir->type = field_list;
   thir->key_values.push_back({"data", collection});
 
-  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
 
   thir->key_values.push_back({
       "length",
@@ -1645,7 +1648,7 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
 
 THIR *THIRGen::get_methods_list(Type *type) {
   const auto length = type->info->scope->methods_count();
-  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
   static Type *method_type = ctx.scope->find_type_id("Method", {});
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
@@ -1675,7 +1678,7 @@ THIR *THIRGen::get_methods_list(Type *type) {
 
 THIR *THIRGen::get_traits_list(Type *type) {
   const auto length = type->traits.size();
-  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
 
   static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
 
@@ -1705,7 +1708,7 @@ THIR *THIRGen::get_traits_list(Type *type) {
 
 THIR *THIRGen::get_generic_args_list(Type *type) {
   const auto length = type->generic_args.size();
-  const auto length_literal = make_literal(std::to_string(length), {}, u64_type());
+  const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
 
   static Type *type_type = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
 
@@ -1758,7 +1761,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   thir->type = type_type;
   info.definition->value = thir;
 
-  thir->key_values.push_back({"id", make_literal(std::to_string(type->uid), {}, u64_type())});
+  thir->key_values.push_back({"id", make_literal(std::to_string(type->uid), {}, u64_type(), ASTLiteral::Integer)});
 
   thir->key_values.push_back({
       "name",
@@ -1767,10 +1770,10 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   thir->key_values.push_back({
       "size",
-      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type()),
+      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type(), ASTLiteral::Integer),
   });
 
-  thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type())});
+  thir->key_values.push_back({"flags", make_literal(std::to_string(get_reflection_type_flags(type)), {}, u64_type(), ASTLiteral::Integer)});
 
   thir->key_values.push_back({"generic_args", get_generic_args_list(type)});
 

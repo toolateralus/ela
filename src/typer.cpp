@@ -1341,7 +1341,7 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   std::vector<TypeExtension> extensions;
   for (auto &ext : ast_extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
-      auto val = evaluate_constexpr(ext.expression, ctx);
+      auto val = interpret_from_ast(ext.expression, ctx);
       if (val->get_value_type() != ValueType::INTEGER) {
         throw_error("Fixed array must have integer size.", ext.expression->source_range);
       }
@@ -1451,7 +1451,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
     // C will infer this, but we need to be explicit and not rely on any target language stuff.
     // we upcast to unsigned to get the largest maximum value for huge values
 
-    Value *evaluated = evaluate_constexpr(value, ctx);
+    Value *evaluated = interpret_from_ast(value, ctx);
     size_t evaluated_integer = evaluated->as<IntValue>()->value;
 
     constexpr uint64_t u32_max = 0xFFFFFFFFull;
@@ -3892,8 +3892,8 @@ void Typer::visit(ASTUnpack *node) {
   } else if (expr->get_node_type() == AST_NODE_RANGE) {
     ASTRange *range = (ASTRange *)expr;
 
-    auto left = evaluate_constexpr(range->left, ctx);
-    auto right = evaluate_constexpr(range->right, ctx);
+    auto left = interpret_from_ast(range->left, ctx);
+    auto right = interpret_from_ast(range->right, ctx);
 
     if (left->value_type != ValueType::INTEGER || right->value_type != ValueType::INTEGER) {
       throw_error("currently, you can only use integer literals in range unpack expressions", node->source_range);
@@ -3936,30 +3936,6 @@ void Typer::visit(ASTUnpackElement *) {
   // Do nothing. this is essentially a placeholder, until emit time.
 }
 
-void Typer::visit(ASTRun *node) {
-  node->node_to_run->accept(this);
-  Interpreter interpreter(ctx);
-
-  auto result = interpreter.visit(node->node_to_run);
-
-  if (result->get_value_type() == ValueType::RETURN) {
-    auto return_v = result->as<ReturnValue>();
-    if (return_v->value.is_null()) {
-      return;
-    } else {
-      result = return_v->value.get();
-    }
-  }
-
-  auto ast = result->to_ast();
-
-  if (ast) {
-    ast->accept(this);
-    if (parent_prev && node->replace_prev_parent) {
-      parent_prev->accept_typed_replacement(ast);
-    }
-  } else {
-    throw_warning(WARNING_GENERAL, "INTERNAL COMPILER ERROR: #run or #eval yielded no value. this is not expected",
-                  node->source_range);
-  }
+void Typer::visit(ASTRun *) {
+  // This does nothing until THIR time.
 }

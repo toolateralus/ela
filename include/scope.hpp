@@ -28,7 +28,6 @@ struct Scope;
 struct Symbol {
   InternedString name;
   Type *resolved_type = Type::INVALID_TYPE;
-
   Mutability mutability = CONST;
   Scope *parent_scope;
 

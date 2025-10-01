@@ -203,10 +203,13 @@ struct ASTBlock;
 struct ASTParamsDecl;
 
 struct Interpreter;
+
+struct THIRBlock;
+struct THIRParameter;
 struct FunctionValue : Value {
-  ASTBlock* block;
-  ASTParamsDecl* parameters;
-  FunctionValue() : Value(ValueType::FUNCTION) {}
+  THIRBlock* block;
+  std::vector<THIRParameter> parameters;
+  FunctionValue();
   bool is_truthy() const override;
   ValueType get_value_type() const override;
   Value* call(Interpreter* interpreter, std::vector<Value*> arguments);

@@ -165,6 +165,7 @@ struct THIRUnaryExpr : THIR {
 };
 
 struct THIRLiteral : THIR {
+  ASTLiteral::Tag tag;
   InternedString value;
   bool is_c_string = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Literal; }
@@ -290,7 +291,11 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  THIRGen(Context &ctx) : ctx(ctx) {
+  THIRGen(Context &ctx, bool for_emitter = true) : ctx(ctx) {
+
+    if (!for_emitter) {
+      return;
+    }
 
     if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) {
       auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
@@ -473,7 +478,7 @@ struct THIRGen {
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
   THIR *make_cast(THIR *operand, Type *type);
   THIR *make_str(const InternedString &value, const SourceRange &src_range);
-  THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type);
+  THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag);
 
   THIR *make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
 
