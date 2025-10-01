@@ -58,8 +58,24 @@ LValue *Interpreter::get_lvalue(THIR *node) {
 }
 
 LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
-  Value *value = visit_node(node->value);
-  return new_lvalue(&value);
+  auto get_or_create_lvalue = [&](Symbol *symbol) -> LValue * {
+    if (symbol) {
+      return new_lvalue(&symbol->value);
+    } else {
+      Value *value = visit_node(node->value);
+      scope->insert_local_variable(node->name, node->type, nullptr, MUT);
+      symbol->value = value;
+      return new_lvalue(&symbol->value);
+    }
+  };
+
+  auto symbol = ctx.scope->lookup(node->name);
+
+  if (!symbol) {
+    symbol = scope->local_lookup(node->name);
+  }
+
+  return get_or_create_lvalue(symbol);
 }
 
 LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
@@ -398,7 +414,6 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
           break;
       }
 
-      // temporarily replace op and evaluate as a normal binary expr
       node->op = base_op;
       Value *res = visit_bin_expr(node);
       node->op = old_op;
@@ -407,10 +422,12 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
       auto lvalue = get_lvalue(node->left);
       switch (lvalue->kind) {
         case LValue::MANAGED:
-          *lvalue->managed = right;
+          printf("assigning %s to what was previously %s\n", right->to_string().c_str(),
+                 (*lvalue->managed)->to_string().c_str());
+          *lvalue->managed = res;
           break;
         case LValue::RAW:
-          lvalue->raw->assign_from(right);
+          lvalue->raw->assign_from(res);
           break;
       }
       return res;
@@ -580,7 +597,7 @@ Value *Interpreter::visit_variable(THIRVariable *node) {
   scope->insert_local_variable(node->name, node->type, nullptr, MUT);
 
   auto symbol = scope->local_lookup(node->name);
-  
+
   Value *value = null_value();
   if (node->value) {
     value = symbol->value = visit_node(node->value);
