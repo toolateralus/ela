@@ -584,7 +584,11 @@ void Emitter::emit_expr(const THIR *thir) {
 }
 
 void Emitter::emit_variable(const THIRVariable *thir) {
-  if (thir->is_constexpr) {
+
+  if (thir->is_extern) {
+    indented("extern " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type) + ";\n");
+    return;
+  } else if (thir->is_constexpr) {
     indented("const " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
   } else if (thir->is_static) {
     indented("static " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));

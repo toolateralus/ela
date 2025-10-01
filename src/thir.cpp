@@ -941,19 +941,20 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   thir->is_global = !ast->is_local;
   thir->is_static = ast->is_static;
   thir->is_constexpr = ast->is_constexpr;
+  thir->is_extern = ast->is_extern;
 
   auto symbol = ast->declaring_scope->local_lookup(ast->name);
 
   bind(ast, thir);
   bind(symbol, thir);
 
-  if (!ast->is_local) {
+  if (!ast->is_local && !ast->is_extern) {
     thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
   } else {
     thir->name = ast->name;
   }
 
-  if (thir->is_global && !ast->is_constexpr) {
+  if (thir->is_global && !ast->is_constexpr && !ast->is_extern) {
     // global variables don't get directly assigned, we will always use a static global initializer.
     // TODO: make some kind of analyzer that will actually figure this out for us, simple assignments dont
     // need to work like this for compile time constant friendly values.

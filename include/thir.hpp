@@ -97,6 +97,7 @@ struct THIRVariable : THIR {
   bool is_static : 1 = false;
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;
+  bool is_extern: 1 = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
