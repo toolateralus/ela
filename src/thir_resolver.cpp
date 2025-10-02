@@ -11,6 +11,17 @@ void Resolver::declare_or_define_type(Type *type) {
     return;
   }
 
+  // We already defined or declared a base type, don't need to emit anything.
+  if (type_is_valid(type->base_type)) {
+    Type *base = type->base_type;
+    while (type_is_valid(base)) {
+      base = type->base_type;
+    }
+    if (forward_declared_types.contains(base) || emitted_types.contains(base)) {
+      return;
+    }
+  }
+
   if (type->generic_args.size()) {
     for (const auto &generic: type->generic_args) {
       declare_or_define_type(generic);
@@ -125,8 +136,6 @@ void Resolver::visit_collection_initializer(const THIRCollectionInitializer *thi
     visit_node(value);
   }
 }
-
-void Resolver::visit_offset_of(const THIROffsetOf *thir) { declare_or_define_type(thir->target_type); }
 
 void Resolver::visit_return(const THIRReturn *thir) {
   if (thir->expression) {
@@ -292,9 +301,6 @@ void Resolver::visit_node(const THIR *thir) {
       break;
     case THIRNodeType::While:
       visit_while((const THIRWhile *)thir);
-      break;
-    case THIRNodeType::Offset_Of:
-      visit_offset_of((const THIROffsetOf *)thir);
       break;
     case THIRNodeType::Noop:
       break;

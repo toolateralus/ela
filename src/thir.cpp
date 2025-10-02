@@ -945,8 +945,9 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   if (thir->name == "main" || thir->is_entry) {
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
+
       throw_error(
-          "multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found",
+          std::format("multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found. previous definition: {}", entry_point->source_range.ToString()),
           ast->source_range);
     }
     entry_point = thir;
@@ -1699,12 +1700,9 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
       thir->key_values.push_back({"enum_value", member->thir_value.get()});
     }
   } else if (parent_type->has_no_extensions()) {
-    THIR_ALLOC_NO_SRC_RANGE(THIROffsetOf, offset_of)
-    offset_of->target_type = parent_type;
-    offset_of->target_field = name;
     thir->key_values.push_back({
-        "offset",
-        offset_of,
+      "offset",
+      make_literal(std::to_string(parent_type->offset_in_bytes(name)), {}, u64_type(), ASTLiteral::Integer),
     });
   }
 

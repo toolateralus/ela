@@ -220,10 +220,6 @@ void Emitter::emit_cast(const THIRCast *thir) {
   code << ')';
 }
 
-void Emitter::emit_offset_of(const THIROffsetOf *thir) {
-  code << "offsetof(" << c_type_string(thir->target_type) << ", " << thir->target_field.get_str() << ')';
-}
-
 void Emitter::emit_index(const THIRIndex *thir) {
   emit_expr(thir->base);
   code << "[";
@@ -648,8 +644,6 @@ void Emitter::emit_node(const THIR *thir) {
   }
   emit_line_directive(thir);
   switch (thir->get_node_type()) {
-    case THIRNodeType::Offset_Of:
-      return emit_offset_of((const THIROffsetOf *)thir);
     case THIRNodeType::ExpressionBlock:
       return emit_expression_block((const THIRExprBlock *)thir);
     case THIRNodeType::Program:

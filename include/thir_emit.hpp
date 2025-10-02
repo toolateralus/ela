@@ -62,7 +62,6 @@ struct Emitter {
   void emit_aggregate_initializer(const THIRAggregateInitializer *thir);
   void emit_collection_initializer(const THIRCollectionInitializer *thir);
   void emit_empty_initializer(const THIREmptyInitializer *thir);
-  void emit_offset_of(const THIROffsetOf *thir);
   void emit_return(const THIRReturn *thir);
   void emit_break(const THIRBreak *thir);
   void emit_continue(const THIRContinue *thir);

@@ -56,12 +56,6 @@ struct Interpreter {
     return default_value_of_t(node->type, this);
   }
 
-  Value *visit_offset_of(THIROffsetOf *node) {
-    auto type = node->target_type;
-    auto field = node->target_field;
-    return new_int(type->offset_in_bytes(field));
-  }
-
   // don't need to declare types.
   Value *visit_type_node(THIRType *) { return null_value(); }
 
@@ -102,8 +96,6 @@ struct Interpreter {
         return visit_collection_initializer(static_cast<THIRCollectionInitializer *>(node));
       case THIRNodeType::EmptyInitializer:
         return visit_empty_initializer(static_cast<THIREmptyInitializer *>(node));
-      case THIRNodeType::Offset_Of:
-        return visit_offset_of(static_cast<THIROffsetOf *>(node));
       case THIRNodeType::Return:
         return visit_return(static_cast<THIRReturn *>(node));
       case THIRNodeType::Break:

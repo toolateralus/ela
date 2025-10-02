@@ -34,7 +34,6 @@ enum struct THIRNodeType : unsigned char {
   CollectionInitializer,
   EmptyInitializer,
 
-  Offset_Of,
   // Control Flow
   Return,
   Break,
@@ -206,12 +205,6 @@ struct THIRIndex : THIR {
   THIR *base;
   THIR *index;
   THIRNodeType get_node_type() const override { return THIRNodeType::Index; }
-};
-
-struct THIROffsetOf : THIR {
-  Type *target_type;
-  InternedString target_field;
-  THIRNodeType get_node_type() const override { return THIRNodeType::Offset_Of; }
 };
 
 struct THIRReturn : THIR {

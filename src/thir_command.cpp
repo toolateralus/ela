@@ -20,7 +20,7 @@ int CompileCommand::compile() {
   Context context{};
   original_path = std::filesystem::current_path();
 
-  auto root = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  auto program = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
@@ -28,12 +28,12 @@ int CompileCommand::compile() {
 
   lower.run<void>("typing & lowering to C", [&] {
     Typer typer{context};
-    typer.visit(root);
+    typer.visit(program);
     THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);
 
-    resolver.visit_node(thir_gen.visit_program(root));
+    resolver.visit_node(thir_gen.visit_program(program));
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
