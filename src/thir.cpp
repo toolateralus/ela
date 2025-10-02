@@ -303,9 +303,10 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
             // we get null variables in paths.
 
             // There's probably a much better solution than this, but this works.
-            if (resolved_type->is_kind(TYPE_ENUM) || resolved_type->is_kind(TYPE_CHOICE)) {
-              auto thir = visit_enum_declaration((ASTEnumDeclaration*)resolved_type->declaring_node.get());
-              program->statements.push_back(thir);
+
+            if (resolved_type->declaring_node) {
+              auto thir = visit_node(resolved_type->declaring_node.get());
+              if (thir) program->statements.push_back(thir);
             }
 
           } else {
