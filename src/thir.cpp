@@ -2268,6 +2268,7 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
     value = initialize(thir->source_range, (Type *)type, {});
   }
 
+
   thir->value = nullptr;  // global variables never get a value before the initializer.
 
   THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, expr)
@@ -2278,6 +2279,46 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
   expr->type = value->type;
 
   thir->global_initializer_assignment = expr;
+
+
+  // This just doesn't need to happen. can't assign a thing
+  if (type->is_fixed_sized_array()) {
+    if (value->get_node_type() == THIRNodeType::EmptyInitializer) {
+      return;
+    }
+    if (value->get_node_type() == THIRNodeType::CollectionInitializer) {
+      THIR_ALLOC_NO_SRC_RANGE(THIRCall, memcpy_call)
+      ASTPath p;
+      p.push_segment("std");
+      p.push_segment("c");
+      p.push_segment("memcpy");
+      auto symbol = get_symbol(&p);
+      auto memcpy_fn = visit_node(symbol->function.declaration);
+      memcpy_call->callee = memcpy_fn;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRVariable, temp);
+      temp->value = value;
+      temp->is_global = false;
+      temp->type = value->type;
+      temp->name = get_temporary_variable();
+      temp->is_statement =true;
+
+      auto init = (THIRCollectionInitializer *)value;
+
+      memcpy_call->arguments = {
+        thir,
+        temp,
+        make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {}, u64_type(), ASTLiteral::Integer)
+      };
+      memcpy_call->is_statement = true;
+
+      // This just wont work with compile time, which is annoying
+      global_initializer_function->block->statements.push_back(temp);
+      global_initializer_function->block->statements.push_back(memcpy_call);
+
+      return;
+    }
+  }
 
   global_initializer_function->block->statements.push_back(expr);
 }

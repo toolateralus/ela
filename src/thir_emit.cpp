@@ -254,7 +254,7 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
   if (thir->type->is_kind(TYPE_ENUM)) {
     code << "0";
   } else if (thir->type->is_kind(TYPE_CHOICE) && thir->type->has_no_extensions()) {
-    code << "{ . " + std::string{DISCRIMINANT_KEY} + " = 0 }";
+    code << "(" << c_type_string(thir->type) << "){ . " << std::string{DISCRIMINANT_KEY} << " = 0 }";
   } else if (thir->type->is_fixed_sized_array()) {
     code << "{}";
   } else {
