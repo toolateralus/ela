@@ -295,27 +295,27 @@ void Emitter::emit_while(const THIRWhile *thir) {
   emit_block(thir->block);
 }
 
-void Emitter::emit_type(const THIRType *thir) {
+void Emitter::emit_type(Type *type) {
   // TODO: stop doing this hack;
-  if (thir->type->basename == "va_list") {
+  if (type->basename == "va_list") {
     return;
   }
 
-  switch (thir->type->kind) {
+  switch (type->kind) {
     case TYPE_SCALAR:
     case TYPE_FUNCTION:
     case TYPE_TRAIT:
       return;
     case TYPE_DYN:
-      return emit_dyn_dispatch_object_struct(thir->type);
+      return emit_dyn_dispatch_object_struct(type);
     case TYPE_TUPLE:
-      return emit_tuple(thir->type);
+      return emit_tuple(type);
     case TYPE_STRUCT:
-      return emit_struct(thir->type);
+      return emit_struct(type);
     case TYPE_ENUM:
-      return emit_enum(thir->type);
+      return emit_enum(type);
     case TYPE_CHOICE:
-      return emit_choice(thir->type);
+      return emit_choice(type);
   }
 }
 
@@ -654,8 +654,6 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_variable((const THIRVariable *)thir);
     case THIRNodeType::Function:
       return emit_function((const THIRFunction *)thir);
-    case THIRNodeType::Type:
-      return emit_type((const THIRType *)thir);
     case THIRNodeType::BinExpr:
       return emit_bin_expr((const THIRBinExpr *)thir);
     case THIRNodeType::UnaryExpr:
@@ -690,6 +688,8 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_while((const THIRWhile *)thir);
     case THIRNodeType::Noop:
       break;
+    case THIRNodeType::Type: // We ignore types here.
+      return;
   }
 }
 

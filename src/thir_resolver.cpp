@@ -14,10 +14,11 @@ void Resolver::declare_or_define_type(Type *type) {
   // We already defined or declared a base type, don't need to emit anything.
   if (type_is_valid(type->base_type)) {
     Type *base = type->base_type;
-    while (type_is_valid(base)) {
-      base = type->base_type;
+
+    while (type_is_valid(base->base_type)) {
+      base = base->base_type;
     }
-    if (forward_declared_types.contains(base) || emitted_types.contains(base)) {
+    if (emitted_types.contains(base)) {
       return;
     }
   }
@@ -47,43 +48,43 @@ void Resolver::declare_or_define_type(Type *type) {
 
 // formerly `define_type`
 void Resolver::emit_type_definition(Type *type) {
+  Type *base =  type;
   if (type->base_type != Type::INVALID_TYPE) {
-    type = type->base_type;
+    base = type->base_type;
   }
-  if (!type || emitted_types.contains(type)) {
+
+  if (!base || emitted_types.contains(base)) {
     return;
   }
-  emitted_types.insert(type);
+  emitted_types.insert(base);
 
-  THIRType thir_type;
-  thir_type.type = type;
-
-  for (const auto &member : type->info->members) {
+  for (const auto &member : base->info->members) {
     declare_or_define_type(member.type);
   }
 
-  switch (type->kind) {
+  switch (base->kind) {
     case TYPE_FUNCTION: {
-      const auto *info = type->info->as<FunctionTypeInfo>();
+      const auto *info = base->info->as<FunctionTypeInfo>();
       declare_or_define_type(info->return_type);
       for (size_t i = 0; i < info->params_len; ++i) {
         declare_or_define_type(info->parameter_types[i]);
       }
     } break;
     case TYPE_STRUCT: {
-      if (type->is_child_of_choice_type()) {
+      // Hmm.
+      if (base->is_child_of_choice_type()) {
         return;
       }
     }
     case TYPE_TUPLE:
     case TYPE_CHOICE:
     case TYPE_ENUM: {
-      emitter.emit_type(&thir_type);
+      emitter.emit_type(base);
     } break;
     case TYPE_DYN: {
-      const auto *info = type->info->as<DynTypeInfo>();
+      const auto *info = base->info->as<DynTypeInfo>();
       declare_or_define_type(info->trait_type);
-      emitter.emit_dyn_dispatch_object_struct(type);
+      emitter.emit_dyn_dispatch_object_struct(base);
     } break;
       // No emission needed for these types
     case TYPE_TRAIT:
@@ -142,11 +143,13 @@ void Resolver::visit_return(const THIRReturn *thir) {
     visit_node(thir->expression);
   }
 }
+
 void Resolver::visit_empty_initializer(const THIREmptyInitializer *) {}
 void Resolver::visit_break(const THIRBreak *) {}
 void Resolver::visit_literal(const THIRLiteral *) {}
 void Resolver::visit_type(const THIRType *) {}
 void Resolver::visit_continue(const THIRContinue *) {}
+
 void Resolver::visit_for(const THIRFor *thir) {
   visit_node(thir->initialization);
   visit_node(thir->increment);
