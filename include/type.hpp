@@ -86,6 +86,7 @@ struct TypeExtension {
     return true;
   }
 };
+
 using TypeExtensions = std::vector<TypeExtension>;
 
 std::string inline extensions_to_string(const TypeExtensions &extensions) {

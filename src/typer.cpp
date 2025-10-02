@@ -339,6 +339,10 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     you can't even refer to them directly anyway.
   */
 
+  if (node->is_forward_declared) {
+    return;
+  }
+
   using alias_tuple = std::tuple<InternedString, Type *, TypeKind, ASTNode *>;
   using struct_tuple = std::tuple<InternedString, Scope *>;
 
@@ -3074,7 +3078,7 @@ void Typer::visit(ASTModule *node) {
       }
     }
   }
-  #endif  
+#endif
 
   {
     ENTER_SCOPE(node->scope)
@@ -3298,7 +3302,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         auto symbol = scope->lookup(ident);
         if (!symbol) {
           return nullptr;
-        } 
+        }
 
         if (index == path->length() - 1) {
           return symbol;

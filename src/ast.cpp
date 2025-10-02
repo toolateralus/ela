@@ -2753,11 +2753,19 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
+
+
   auto scope = create_child(ctx.scope);
   auto type = ctx.scope->create_tagged_union(node->name, scope, node);
   ctx.set_scope(scope);
   node->scope = scope;
   node->resolved_type = type;
+
+  if (peek().type == TType::Semi) {
+    node->is_forward_declared = true;
+    ctx.exit_scope();
+    return node; 
+  }
 
   expect(TType::LCurly);
 

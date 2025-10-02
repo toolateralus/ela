@@ -343,10 +343,6 @@ struct ASTTypeExtension {
 struct ASTPath : ASTExpr {
   struct Segment {
     InternedString identifier{};
-    /*
-      we use optional here to avoid unneccesary initialization for basic stuff
-      like identifiers.
-    */
     std::vector<ASTExpr *> generic_arguments;
 
     Type *resolved_type = Type::INVALID_TYPE;
@@ -862,6 +858,7 @@ struct ASTChoiceDeclaration : ASTDeclaration {
   InternedString name;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
+  bool is_forward_declared = false;
   bool destroy_glue_compiler_implementation_needed = false;
   std::vector<ASTChoiceVariant> variants;
   void accept(VisitorBase *visitor) override;

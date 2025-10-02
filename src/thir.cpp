@@ -945,10 +945,10 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
 void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
   if (thir->name == "main" || thir->is_entry) {
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
-
-      throw_error(
-          std::format("multiple functions with the @[entry] attribute were found, or multiple 'main()' functions were found. previous definition: {}", entry_point->source_range.ToString()),
-          ast->source_range);
+      throw_error(std::format("multiple functions with the @[entry] attribute were found, or multiple 'main()' "
+                              "functions were found. previous definition: {}",
+                              entry_point->source_range.ToString()),
+                  ast->source_range);
     }
     entry_point = thir;
     thir->is_entry = true;
@@ -1104,6 +1104,12 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
+  
+  // We just ignore these i think?
+  if (ast->is_forward_declared) {
+    return nullptr;
+  }
+
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
   return thir;
@@ -1701,8 +1707,8 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
     }
   } else if (parent_type->has_no_extensions()) {
     thir->key_values.push_back({
-      "offset",
-      make_literal(std::to_string(parent_type->offset_in_bytes(name)), {}, u64_type(), ASTLiteral::Integer),
+        "offset",
+        make_literal(std::to_string(parent_type->offset_in_bytes(name)), {}, u64_type(), ASTLiteral::Integer),
     });
   }
 
@@ -2268,7 +2274,6 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
     value = initialize(thir->source_range, (Type *)type, {});
   }
 
-
   thir->value = nullptr;  // global variables never get a value before the initializer.
 
   THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, expr)
@@ -2280,7 +2285,8 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
   thir->global_initializer_assignment = expr;
 
-  //  Have to call memcpy for array assignment to global variables. Really, what we should do is not this, and just not make
+  //  Have to call memcpy for array assignment to global variables. Really, what we should do is not this, and just not
+  //  make
   // a global initializer for it, but we wanna support non-constants in arrays.
   if (type->is_fixed_sized_array()) {
     if (value->get_node_type() == THIRNodeType::EmptyInitializer) {
@@ -2301,15 +2307,14 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
       temp->is_global = false;
       temp->type = value->type;
       temp->name = get_temporary_variable();
-      temp->is_statement =true;
+      temp->is_statement = true;
 
       auto init = (THIRCollectionInitializer *)value;
 
       memcpy_call->arguments = {
-        thir,
-        temp,
-        make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {}, u64_type(), ASTLiteral::Integer)
-      };
+          thir, temp,
+          make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {},
+                       u64_type(), ASTLiteral::Integer)};
       memcpy_call->is_statement = true;
 
       // This just wont work with compile time, which is annoying
