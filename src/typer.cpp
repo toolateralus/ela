@@ -187,8 +187,11 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_create_struct_type(node->name, node->scope, generic_args);
     type_just_created = true;
   } else {
-    type = ctx.scope->find_type_id(node->name, {});
-    if (type != Type::INVALID_TYPE && type != Type::UNRESOLVED_GENERIC) {
+    auto symbol = ctx.scope->local_lookup(node->name);
+    if (symbol && type_is_valid(symbol->resolved_type)) {
+      type = symbol->resolved_type;
+    }
+    if (type_is_valid(type)) {
       if (type->is_kind(TYPE_STRUCT)) {
         auto info = (type->info->as<StructTypeInfo>());
         if (!info->is_forward_declared) {
