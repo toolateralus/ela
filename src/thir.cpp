@@ -1110,11 +1110,6 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
 THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
-
-  if (ast->name == "OpenFlag") {
-    printf("visiting OpenFlag\n");
-  }
-
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
     var->source_range = ast->source_range;
