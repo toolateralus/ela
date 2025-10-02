@@ -2280,8 +2280,8 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
   thir->global_initializer_assignment = expr;
 
-
-  // This just doesn't need to happen. can't assign a thing
+  //  Have to call memcpy for array assignment to global variables. Really, what we should do is not this, and just not make
+  // a global initializer for it, but we wanna support non-constants in arrays.
   if (type->is_fixed_sized_array()) {
     if (value->get_node_type() == THIRNodeType::EmptyInitializer) {
       return;
