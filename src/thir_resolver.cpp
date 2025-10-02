@@ -42,7 +42,9 @@ void Resolver::declare_or_define_type(Type *type) {
       return;
     }
   }
-  
+
+  // Have to do this for self referential types
+  emitter.forward_declare_type(type);
   emit_type_definition(type);
 }
 
@@ -84,6 +86,11 @@ void Resolver::emit_type_definition(Type *type) {
     case TYPE_DYN: {
       const auto *info = base->info->as<DynTypeInfo>();
       declare_or_define_type(info->trait_type);
+
+      for (const auto &[name, method_type]: info->methods) {
+        declare_or_define_type(method_type);
+      }
+
       emitter.emit_dyn_dispatch_object_struct(base);
     } break;
       // No emission needed for these types

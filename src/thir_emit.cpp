@@ -422,6 +422,12 @@ void Emitter::emit_enum(Type *type) {
 }
 
 void Emitter::forward_declare_type(const Type *type) {
+
+  // TODO: remove this
+  if (type->basename == "va_list") {
+    return;
+  }
+
   if (type_is_valid(type->base_type)) {
     type = type->base_type;
   }
