@@ -6,7 +6,7 @@
 #include "type.hpp"
 
 // formerly `declare_type`
-void Resolver::declare_or_define_type(Type *type) {
+void Resolver::declare_or_define_type(Type *type, bool do_define) {
   if (!type || forward_declared_types.contains(type) || emitted_types.contains(type)) {
     return;
   }
@@ -25,7 +25,7 @@ void Resolver::declare_or_define_type(Type *type) {
 
   if (type->generic_args.size()) {
     for (const auto &generic: type->generic_args) {
-      declare_or_define_type(generic);
+      declare_or_define_type(generic, false);
     }
   }
 
@@ -53,8 +53,11 @@ void Resolver::declare_or_define_type(Type *type) {
   }
 
   // Have to do this for self referential types
+
   emitter.forward_declare_type(type);
-  emit_type_definition(type);
+  if (do_define) {
+    emit_type_definition(type);
+  }
 }
 
 void Resolver::emit_type_definition(Type *type) {

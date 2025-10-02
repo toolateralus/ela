@@ -12,7 +12,7 @@ struct Resolver {
   Resolver(Emitter &emitter): emitter(emitter) {}
   Emitter &emitter;
 
-  void declare_or_define_type(Type *type);
+  void declare_or_define_type(Type *type, bool do_define = true);
   void emit_type_definition(Type *type);
 
   void visit_node(const THIR *thir);
