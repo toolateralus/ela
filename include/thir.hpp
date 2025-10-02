@@ -351,6 +351,8 @@ struct THIRGen {
 
   void enter_defer_boundary(DeferBoundary boundary);
   void exit_defer_boundary();
+
+  Symbol *get_symbol(ASTNode *);
   
   // remove frames up to `boundary` and return defers in execution order
   std::vector<THIR *> collect_defers_up_to(DeferBoundary boundary);

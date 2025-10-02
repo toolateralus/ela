@@ -214,7 +214,7 @@ THIR *THIRGen::try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *tar
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   const auto base = ast->callee->base;
-  const auto symbol = ctx.get_symbol(ast->callee).get();
+  const auto symbol = get_symbol(ast->callee);
 
   thir->is_dyn_call = ast->inserted_dyn_arg;
   thir->dyn_method_name = ast->dyn_method_name;
@@ -231,8 +231,8 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     // auto dereference / address of logic.
     self = try_deref_or_take_ptr_to_if_needed(base, self, requires_self_ptr);
 
-    auto fn_sym = ctx.get_symbol(ast->callee);
-    auto fn = fn_sym.get()->function.declaration;
+    auto fn_sym = get_symbol(ast->callee);
+    auto fn = fn_sym->function.declaration;
 
     if (fn->generic_parameters.size()) {
       auto generics = ast->callee->member.get_resolved_generics();
@@ -251,12 +251,94 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   return thir;
 }
 
+Symbol *THIRGen::get_symbol(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_TYPE: {
+      auto type_node = static_cast<ASTType *>(node);
+      if (type_node->kind != ASTType::NORMAL) {
+        return nullptr;
+      }
+      return get_symbol(type_node->normal.path);
+    }
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath *>(node);
+      Scope *scope = ctx.scope;
+      size_t index = 0;
+      for (auto &part : path->segments) {
+        auto &ident = part.identifier;
+        auto symbol = scope->lookup(ident);
+        if (!symbol) {
+          return nullptr;
+        }
+
+        if (index == path->length() - 1) {
+          return symbol;
+        }
+
+        if (!part.generic_arguments.empty()) {
+          if (symbol->is_type) {
+            auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
+
+            if (!decl) {
+              throw_error("Cannot apply generic arguments to that type", node->source_range);
+            }
+
+            auto instantiation =
+                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                      part.get_resolved_generics());
+            auto type = instantiation->resolved_type;
+            scope = type->info->scope;
+          } else {
+            return nullptr;
+          }
+        } else {
+          if (symbol->is_module) {
+            scope = symbol->module.declaration->scope;
+          } else if (symbol->is_type) {
+            auto resolved_type = symbol->resolved_type;
+            scope = resolved_type->info->scope;
+
+            // We do this here because it's not neccesarily true that these would have been visited already,
+            // duplicates don't matter all that much, and we _need_ the child symbols to be bound otherwise
+            // we get null variables in paths.
+
+            // There's probably a much better solution than this, but this works.
+            if (resolved_type->is_kind(TYPE_ENUM) || resolved_type->is_kind(TYPE_CHOICE)) {
+              auto thir = visit_enum_declaration((ASTEnumDeclaration*)resolved_type->declaring_node.get());
+              program->statements.push_back(thir);
+            }
+
+          } else {
+            return nullptr;
+          }
+        }
+        index++;
+      }
+    } break;
+    case AST_NODE_DOT_EXPR: {
+      auto dotnode = static_cast<ASTDotExpr *>(node);
+      auto type = dotnode->base->resolved_type;
+      auto symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+      // Implicit dereference, we look at the base scope.
+      if (!symbol && type->is_pointer()) {
+        type = type->get_element_type();
+        symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+      }
+      return symbol;
+    }
+    default:
+      return nullptr;  // TODO: verify this isn't strange.
+  }
+  return nullptr;
+}
+
 THIR *THIRGen::visit_path(ASTPath *ast) {
   if (should_emit_choice_type_marker_variant_instantiation(ast)) {
     return get_choice_type_instantiation_boilerplate(ast, this);
   }
 
-  auto symbol = ctx.get_symbol(ast).get();
+  auto symbol = get_symbol(ast);
+
   if (symbol_map.contains(symbol)) {
     return symbol_map[symbol];
   }
@@ -550,7 +632,6 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
 THIR *THIRGen::initialize(const SourceRange &source_range, Type *type,
                           std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
-
 
   if (type->is_pointer() && key_values.empty()) {
     THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, literal);
@@ -1029,6 +1110,10 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
 THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   THIR_ALLOC(THIRType, thir, ast);
   extract_thir_values_for_type_members(thir->type);
+
+  if (ast->name == "OpenFlag") {
+    printf("visiting OpenFlag\n");
+  }
 
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
@@ -2059,7 +2144,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
       ASTPath env_initialize_path;
       env_initialize_path.push_segment("Env");
       env_initialize_path.push_segment("initialize");
-      auto symbol = ctx.get_symbol(&env_initialize_path).get();
+      auto symbol = get_symbol(&env_initialize_path);
       env_initialize = symbol->function.declaration;
 
       THIR_ALLOC_NO_SRC_RANGE(THIRCall, initialize);
@@ -2114,14 +2199,14 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         test_path.push_segment("testing");
         test_path.push_segment("Test");
 
-        auto test_struct_sym = ctx.get_symbol(&test_path);
-        test_struct_type = test_struct_sym.get()->resolved_type;
+        auto test_struct_sym = get_symbol(&test_path);
+        test_struct_type = test_struct_sym->resolved_type;
 
         ASTPath all_tests_list_path;
         all_tests_list_path.push_segment("testing");
         all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
 
-        auto all_tests_list = ctx.get_symbol(&all_tests_list_path).get();
+        auto all_tests_list = get_symbol(&all_tests_list_path);
         all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
 
         push_function =
@@ -2150,9 +2235,9 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         run_all_tests.push_segment("testing");
         run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
 
-        auto _run_all_tests_function = ctx.get_symbol(&run_all_tests);
+        auto _run_all_tests_function = get_symbol(&run_all_tests);
 
-        ASTFunctionDeclaration *ast_func = _run_all_tests_function.get()->function.declaration;
+        ASTFunctionDeclaration *ast_func = _run_all_tests_function->function.declaration;
 
         _run_all_tests_call->callee = visit_node(ast_func);
         _run_all_tests_call->arguments = {};
