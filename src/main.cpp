@@ -27,6 +27,7 @@ jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};
 jstl::Arena thir_arena(MB(10));
 jstl::Arena value_arena(MB(10));
+jstl::Arena binding_arena(MB(10));
 
 std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
 
@@ -57,6 +58,7 @@ std::unordered_set<InternedString> include_set;
 */
 
 int ignored_warnings = 0;
+
 
 bool run_on_finished = false;
 

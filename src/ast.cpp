@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include "value.hpp"
 #include "visitor.hpp"
-#include "constexpr.hpp"
+#include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -21,8 +21,6 @@
   TODO: we should not have a preprocessor at all,
   and all the conditional compilation stuff should get it's own node
   so that we can do type checking on the constants that #if might use.
-
-
 */
 enum PreprocKind {
   PREPROC_IF,
@@ -68,7 +66,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
     executed = !parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
-    auto value = evaluate_constexpr(condition, parser->ctx);
+    auto value = interpret_from_ast(condition, parser->ctx);
     executed = value->is_truthy();
   } else {
     throw_error(
@@ -150,6 +148,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         include_set.insert(filename);
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+        parser->fill_buffer_if_needed(parser->states.back());
         parser->fill_buffer_if_needed(parser->states.back());
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         while (parser->peek().type != TType::Eof) {
@@ -544,7 +543,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto old_scope = parser->ctx.scope;
         parser->ctx.scope = parser->ctx.root_scope;
         auto module_definition = parser->parse_module();
-        parser->ctx.scope =old_scope;
+        parser->ctx.scope = old_scope;
         return module_definition;
       }
     },
@@ -704,12 +703,12 @@ void Parser::parse_pattern_match_value_semantic(auto &part) {
     expect(TType::And);
     if (peek().type == TType::Mut) {
       expect(TType::Mut);
-      part.semantic = PTRN_MTCH_PTR_MUT;
+      part.semantic = PATTERN_MATCH_PTR_MUT;
     } else {
       if (peek().type == TType::Const) {
         expect(TType::Const);
       }
-      part.semantic = PTR_MTCH_PTR_CONST;
+      part.semantic = PATTERN_MATCH_PTR_CONST;
     }
   }
 }
@@ -1131,10 +1130,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTRN_MTCH_PTR_MUT;
+                  part.semantic = PATTERN_MATCH_PTR_MUT;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_MTCH_PTR_CONST;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 }
               }
 
@@ -1163,10 +1162,10 @@ ASTExpr *Parser::parse_primary() {
                 eat();
                 if (peek().type == TType::Mut) {
                   eat();
-                  part.semantic = PTRN_MTCH_PTR_MUT;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 } else {
                   expect(TType::Const);
-                  part.semantic = PTR_MTCH_PTR_CONST;
+                  part.semantic = PATTERN_MATCH_PTR_CONST;
                 }
               }
 
@@ -1440,7 +1439,8 @@ ASTType *Parser::parse_type() {
 }
 
 // TODO: we should handle the 'then' statement more gracefully.
-// Also, => is super fricken janky, and is really poorly implemented.
+// Also, => is super fricken janky, and is really poorly implemented. 
+// !CLEANUP remove the => operator from everything but switch cases. it's terrible and awful
 ASTIf *Parser::parse_if() {
   NODE_ALLOC(ASTIf, node, range, _, this)
   node->is_expression = true;
@@ -1498,22 +1498,31 @@ ASTModule *Parser::parse_module() {
 ASTImport *Parser::parse_import() {
   expect(TType::Import);
   NODE_ALLOC(ASTImport, import, range, _, this);
+
   // Parse the root group (could be a single path, a group, or a wildcard, or a recursive set of groups.)
   import->root_group = parse_import_group(nullptr);
 
   ASTPath *path = import->root_group.path;
   ASTPath::Segment root_segment = path->segments[0];
 
-  // Import stuff from files
-  Scope *scope = create_child(ctx.scope);
+  // we always treat modules as if theyre at a root scope when theyre imported so you dont get 
+  // 'my_module::some_stdlib::module::etc'
+  // when you import shit -- it messes up linking and name resolution  
+  Scope *scope = create_child(ctx.root_scope);
   ENTER_SCOPE(scope)
 
   if (this->import(root_segment.identifier, &scope)) {
     NODE_ALLOC(ASTModule, the_module, range, _, this)
+    // again, make certain that we are attached to the root scope for imported modules.
+    the_module->declaring_scope = ctx.root_scope;
     the_module->module_name = root_segment.identifier;
     the_module->scope = scope;
-    while (!peek().is_eof()) {
-      the_module->statements.push_back(parse_statement());
+    scope->name = root_segment.identifier;
+    {
+      ENTER_AST_STATEMENT_LIST(the_module->statements);
+      while (!peek().is_eof()) {
+        the_module->statements.push_back(parse_statement());
+      }
     }
     current_statement_list->push_back(the_module);
     expect(TType::Eof);
@@ -1620,9 +1629,19 @@ ASTStatement *Parser::parse_using_stmt() {
   if (peek().type == TType::LCurly) {
     parsed_block = true;
     block = parse_block();
+    expect(TType::Semi);
+
+    { // we have to patch these up since this is synthetic
+      variable->declaring_block = block;
+      variable->declaring_scope = block->scope;
+      defer_ast->declaring_block = block;
+      defer_ast->declaring_scope = block->scope;
+    }
+
     block->statements.insert(block->statements.begin(), variable);
     block->statements.insert(block->statements.begin() + 1, defer_ast);
-  } else {  // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
+  } else { 
+    // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
     block->statements.push_back(variable);
     block->statements.push_back(defer_ast);
   }
@@ -1664,6 +1683,7 @@ ASTStatement *Parser::parse_using_stmt() {
     return noop;
   }
 }
+
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
@@ -2307,6 +2327,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     }
   }
 
+  // TODO: why are we inserting the functions at parse time?
+  // Really, we never ended up removing symbol table interactions from the parser,
+  // and this is biting us in the ass later on (now)
   ctx.scope->insert_function(name, Type::INVALID_TYPE, node);
 
   if (peek().type != TType::Arrow) {
@@ -2379,7 +2402,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
-      auto evaluated_value = evaluate_constexpr(value, this->ctx);
+      auto evaluated_value = interpret_from_ast(value, this->ctx);
       if (evaluated_value->value_type != ValueType::INTEGER) {
         throw_error("Enums can only have integers", value->source_range);
       }
@@ -3018,6 +3041,7 @@ bool Parser::import(InternedString name, Scope **scope) {
     }
     path;
   });
+  // TODO: we'll use weave with a local .cache, this is not a great system currently.
 
   std::string module_name = name.get_str();
   std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();

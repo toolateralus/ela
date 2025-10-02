@@ -9,8 +9,8 @@
 // formatters quto included.
 import gl;
 import llvm;
-import rayui;
-import arena;
+// import rayui; // ! bug with constants, can't find symbol at thirgen time for const WHITE: Color = .{}... in rayui.ela/Style/default_values/Option!<Color>/unwrap()/default: T/someshit
+import arena; 
 import compiler;
 import dlfcn;
 import elexify;

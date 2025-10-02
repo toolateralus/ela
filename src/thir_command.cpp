@@ -1,11 +1,14 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "strings.hpp"
+#include "thir.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
 #include <cstdlib>
 #include <filesystem>
+#include "thir_emit.hpp"
+#include "thir_resolver.hpp"
 
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
@@ -17,46 +20,20 @@ int CompileCommand::compile() {
   Context context{};
   original_path = std::filesystem::current_path();
 
-  auto root = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  auto program = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
   });
 
   lower.run<void>("typing & lowering to C", [&] {
-    Typer type_visitor{context};
-    type_visitor.visit(root);
+    Typer typer{context};
+    typer.visit(program);
+    THIRGen thir_gen(context);
+    Emitter emitter;
+    Resolver resolver(emitter);
 
-    Emitter emit(context, type_visitor);
-    Resolver dep_resolver(context, &emit);
-    emit.dep_emitter = &dep_resolver;
-
-    static const auto testing = compile_command.has_flag("test");
-    const bool is_freestanding =
-        compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
-
-    if (!is_freestanding) {
-      emit.code << "#define USE_STD_LIB 1\n";
-    } else {
-      if (compile_command.has_flag("test")) {
-        throw_error(
-            "You cannot use unit tests in a freestanding or nostlib "
-            "environment due to lack of exception handling",
-            {});
-      }
-    }
-
-    if (compile_command.has_flag("test-verbose")) {
-      emit.code << "#define TEST_VERBOSE;\n";
-      std ::cout << "adding TEST_VERBOSE\n";
-    }
-
-    if (testing) {
-      emit.code << "#define TESTING\n";
-    }
-
-    root->accept(&dep_resolver);
-    root->accept(&emit);
+    resolver.visit_node(thir_gen.visit_program(program));
 
     std::filesystem::current_path(compile_command.original_path);
     std::ofstream output(compile_command.output_path);
@@ -68,21 +45,26 @@ int CompileCommand::compile() {
 
     output << BOILERPLATE_C_CODE << '\n';
 
-    const bool uses_reflection = emit.reflected_upon_types.size();
-
-    if (uses_reflection) {
-      output << "typedef struct Type Type;\n";
-      output << emit.reflection_externs.str();
+    if (thir_gen.reflected_upon_types.size()) {
+      output << emitter.reflection_prelude(thir_gen.reflected_upon_types);
     }
 
-    output << emit.code.str();
+    output << emitter.code.str();
 
-    if (uses_reflection) {
-      output << emit.reflection_initialization.str();
+    { // emit global initializer function that's called in main
+      emitter.code.clear();
+      THIRFunction *global_ini = thir_gen.global_initializer_function;
+      resolver.visit_node(global_ini);
+      output << emitter.code.str();
+      emitter.code.clear();
     }
 
-    output.flush();
-    output.close();
+    // Emit our main last always
+    {
+      THIRFunction *ep = thir_gen.emit_runtime_entry_point();
+      emitter.emit_function(ep);
+      output << emitter.code.str();
+    }
   });
 
   if (has_flag("no-compile")) {
@@ -162,7 +144,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       if (i + 1 < args.size() && args[i + 1] == "raylib") {
         init_string = RAYLIB_INIT_CODE;
       } else {
-        init_string = MAIN_INIT_CODE;
+        init_string = HELLO_WORLD_INIT_CODE;
       }
     } else if (arg == "lldb") {
       run_on_finished = false;
@@ -240,6 +222,26 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     }
     if (has_flag(WARNING_FLAG_STRINGS[i])) {
       ignored_warnings |= i;
+    }
+  }
+}
+void CompileCommand::request_compile_time_code_execution(const SourceRange &range) {
+  if (has_flag("ctfe-validate")) {
+
+    std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString()
+          << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
+
+    char response;
+    std::cin >> response;
+
+    if (response == 'S' || response == 's') {
+      std::cout << format_source_location(range, ERROR_INFO);
+      return request_compile_time_code_execution(range);
+    }
+
+    if (response != 'y' && response != 'Y') {
+      throw_error("compile time function execution denied.", range);
+      std::exit(1);
     }
   }
 }

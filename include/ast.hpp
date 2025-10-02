@@ -113,7 +113,9 @@ struct ASTNode {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
-  Nullable<ASTBlock> declaring_block;
+  
+  Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
+  Scope *declaring_scope;
   SourceRange source_range{};
   Type *resolved_type = Type::INVALID_TYPE;
   bool is_emitted = false;
@@ -151,7 +153,7 @@ struct Attribute {
 
 struct ASTStatement : ASTNode {
   std::vector<Attribute> attributes = {};
-  virtual ASTNodeType get_node_type() const override  = 0;
+  virtual ASTNodeType get_node_type() const override = 0;
   virtual void accept_typed_replacement(ASTNode *) override {
     printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
   }
@@ -468,10 +470,8 @@ struct ASTVariable : ASTStatement {
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
-  
-  void accept_typed_replacement(ASTNode *node) override {
-    value = (ASTExpr*)node;
-  }
+
+  void accept_typed_replacement(ASTNode *node) override { value = (ASTExpr *)node; }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -606,6 +606,10 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
 
+  bool requires_self_ptr() const {
+    return params->has_self && params->params[0]->self.is_pointer;
+  }
+
   bool has_defer = false;
   bool is_declared = false;
   Type *declaring_type = Type::INVALID_TYPE;
@@ -660,13 +664,14 @@ struct ASTDotExpr : ASTExpr {
 };
 
 struct ASTMethodCall : ASTExpr {
-  /*
-    сперма хранится в яйцах.
-    (aka the generic arguments are stored in the base)
-  */
   ASTDotExpr *callee;
   ASTArguments *arguments;
-  bool inserted_dyn_arg = false;
+
+  struct {
+    InternedString dyn_method_name;
+    bool inserted_dyn_arg = false;
+  };
+
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
 };
@@ -992,6 +997,13 @@ struct ASTUnpackElement : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+struct ASTUnpackExpr : ASTExpr {
+  // the source of the unpack, such as a variable, function result, literal, etc.
+  ASTExpr *expression;
+  ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
+  void accept(VisitorBase *visitor) override;
+};
+
 // The first value is the target type.
 // The second value is the condition/constraint being applied.
 using Constraint = std::pair<ASTExpr *, ASTExpr *>;
@@ -1017,13 +1029,13 @@ struct ASTTraitDeclaration : ASTDeclaration {
   void accept(VisitorBase *visitor) override;
 };
 
-enum PatternMatchPointerSemantic { PTRN_MTCH_PTR_NONE, PTRN_MTCH_PTR_MUT, PTR_MTCH_PTR_CONST };
+enum PatternMatchPointerSemantic { PATTERN_MATCH_PTR_NONE, PATTERN_MATCH_PTR_MUT, PATTERN_MATCH_PTR_CONST };
 
 struct TuplePattern {
   struct Part {
     Mutability mutability = CONST;
     InternedString var_name;
-    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
+    PatternMatchPointerSemantic semantic = PATTERN_MATCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;
@@ -1034,7 +1046,7 @@ struct StructPattern {
     InternedString field_name;
     InternedString var_name;
     Mutability mutability = CONST;
-    PatternMatchPointerSemantic semantic = PTRN_MTCH_PTR_NONE;
+    PatternMatchPointerSemantic semantic = PATTERN_MATCH_PTR_NONE;
     Type *resolved_type;
   };
   std::vector<Part> parts;
@@ -1075,7 +1087,7 @@ struct ASTPatternMatch : ASTExpr {
         break;
     }
   }
-  
+
   /*
     the left hand side of the 'is', e.g { if x is ... }
                                              ^<- object.
@@ -1301,11 +1313,13 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
 
 #define NODE_ALLOC(type, node, range, defer, parser) \
   type *node = ast_alloc<type>();                    \
+  node->declaring_scope = parser->ctx.scope;         \
   auto range = parser->begin_node();                 \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred) \
   type *node = ast_alloc<type>();                                          \
+  node->declaring_scope = parser->ctx.scope;                               \
   auto range = parser->begin_node();                                       \
   Defer defer([&] {                                                        \
     parser->end_node(node, range);                                         \

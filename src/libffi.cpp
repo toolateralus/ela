@@ -634,13 +634,6 @@ Value* unmarshal_scalar_return(Type* rtype, ScalarTypeInfo* info, const std::vec
   }
 }
 
-/*
-  TODO:
-    - handle more complex nested pointer depths (pointer-to-pointer) if needed
-    - support struct marshalling when/if you add it
-    - adapt integer width semantics to your language ABI if you want something narrower than 64-bit
-*/
-
 Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, const std::vector<Value*>& args) {
   void* fn_ptr = try_load_symbol(name.get_str());
 

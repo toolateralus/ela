@@ -148,6 +148,8 @@ struct TypeInfo {
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 
+  virtual size_t size_in_bytes() const = 0;
+
   inline TypeMember const *find_member(const InternedString &name) const {
     for (auto member = members.begin(); member != members.end(); ++member) {
       if (member->name == name) {
@@ -161,11 +163,16 @@ struct TypeInfo {
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
   bool is_forward_declared = false;
+  
+  // Zero size type.
+  size_t size_in_bytes() const override { return 0; }
 };
 
 struct ChoiceTypeInfo : TypeInfo {
   int get_variant_discriminant(const InternedString &variant_name) const;
   Type *get_variant_type(const InternedString &variant_name) const;
+
+  size_t size_in_bytes() const override;
 };
 
 struct ASTFunctionDeclaration;
@@ -178,6 +185,9 @@ struct FunctionTypeInfo : TypeInfo {
   bool is_varargs = false;
   virtual std::string to_string() const override;
   std::string to_string(const TypeExtensions &ext) const;
+  size_t size_in_bytes() const override {
+    return sizeof(void *);  // This is only ever sized as a function pointer.
+  }
 };
 
 struct ScalarTypeInfo : TypeInfo {
@@ -186,12 +196,48 @@ struct ScalarTypeInfo : TypeInfo {
   size_t size = 0;
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
+
+  size_t size_in_bytes() const override {
+    // TODO: why do we even use 'size' when we switch over this anyway?
+    // I'm just afraid that size is wrong xD
+    switch (scalar_type) {
+      case TYPE_S8:
+        return 1;
+      case TYPE_U8:
+        return 1;
+      case TYPE_S16:
+        return 2;
+      case TYPE_U16:
+        return 2;
+      case TYPE_S32:
+        return 4;
+      case TYPE_U32:
+        return 4;
+      case TYPE_S64:
+        return 8;
+      case TYPE_U64:
+        return 8;
+      case TYPE_FLOAT:
+        return 4;
+      case TYPE_DOUBLE:
+        return 8;
+      case TYPE_CHAR:
+        return 1;
+      case TYPE_BOOL:
+        return 1;
+      case TYPE_VOID:
+        return 0;
+      default:
+        return sizeof(void *);
+    }
+  }
 };
 
 struct EnumTypeInfo : TypeInfo {
   Type *underlying_type = nullptr;
   bool is_flags = false;
   EnumTypeInfo() {};
+  size_t size_in_bytes() const override;
 };
 
 struct StructTypeInfo : TypeInfo {
@@ -201,7 +247,7 @@ struct StructTypeInfo : TypeInfo {
   bool is_union : 1 = false;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
-
+  size_t size_in_bytes() const override;
   inline bool structural_match(std::vector<Type *> types) const {
     if (types.size() != members.size()) return false;
     for (size_t i = 0; i < types.size(); ++i) {
@@ -215,11 +261,18 @@ struct StructTypeInfo : TypeInfo {
 
 struct TupleTypeInfo : TypeInfo {
   std::vector<Type *> types;
+  size_t size_in_bytes() const override;
 };
 
 struct DynTypeInfo : TypeInfo {
   Type *trait_type;
   std::vector<std::pair<InternedString, Type *>> methods;
+
+  size_t size_in_bytes() const override {
+    size_t method_ptrs_size = methods.size() * sizeof(void *);
+    size_t instance_size = sizeof(void *);
+    return method_ptrs_size + instance_size;
+  }
 };
 
 // helpers to get scalar types for fast comparison
@@ -237,6 +290,9 @@ Type *u32_type();
 Type *u64_type();
 Type *f64_type();
 Type *f32_type();
+
+Type *char_ptr_type();
+Type *char_type();
 
 Type *is_fn_trait();
 
@@ -326,13 +382,6 @@ struct Type {
   bool tuple_is_emitted = false;
   bool dyn_emitted = false;
 
-  // TODO: refactor the way type extensions work.
-  // most of this should just be on the type itself,
-  // especially the querying methods, it's a pain to get the extensions everywhere.
-
-  // the pointer and array size extensions, describing the type further.
-  // this stores things like * and [], [20] etc.
-  // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
   TypeExtensions extensions{};
 
   inline TypeExtEnum back_ext_type() const {
@@ -460,6 +509,8 @@ struct Type {
   size_t size_in_bytes() const;
   size_t alignment_in_bytes() const;
 
+  bool has_dependencies() const;
+  size_t offset_in_bytes(const InternedString &field) const;
 };
 
 static inline constexpr bool type_is_valid(Type *type) {
@@ -577,5 +628,3 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 
   return kind_flags;
 }
-
-

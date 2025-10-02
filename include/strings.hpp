@@ -43,17 +43,6 @@ constexpr const char *COMPILER_VERSION = "v0.0.0";
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";
 constexpr const char *RANGE_TYPE_END_KEY = "end";
 
-constexpr auto MAIN_FMT = R"_(
-int main (int argc, char** argv) {{
-  /* initialize command line args. */
-  {}(argc, argv);
-  /* run the global initializers */
-  ela_run_global_initializers();
-  /* call user main, or dispatch tests, depending on the build type. */
-  ___MAIN___;
-}}
-)_";
-
 constexpr auto HELP_STRING = R"_(
 compile a file: `ela <filename.ela>` | 'ela' (compiles main.ela in current directory by default)
 compile & run a 'main.ela' in current directory: `ela run` | 'ela r'
@@ -78,6 +67,7 @@ Available flags:
   --metrics          Write performance metrics to stdout.
   --x                Print the command used to compile the outputted C code.
   --test             Only emit functions marked `#test` and bootstrap the default test runner. You still have to run the binary to run the tests.
+  --ctfe-validate    Get prompted any time a '#run' directive is, get the source location, and get a prompt to allow or deny the compilation. You shouldn't be compiling untrusted code, but if you must, use this to vet any CTFE.
 
 Warning Exclusions:
   "--Wignore-all"                   Ignore all warnings.
@@ -120,11 +110,11 @@ fn main () {
 }
 )__";
 
-constexpr auto MAIN_INIT_CODE = R"__(
+constexpr auto HELLO_WORLD_INIT_CODE = R"__(
 import fmt::*;
 
 fn main() {
-  hellos := List!<str>::init(.[
+  using hellos := List!<str>::init(.[
     "Hello, World!",
     "Привет, Мир!",
     "Hola, Mundo!",
@@ -139,7 +129,9 @@ fn main() {
     "Salve, Mundi!"
   ]);
 
-  defer hellos.destroy();
+  // using statement automatically cleans up our list.
+  // equivalent to:
+  // defer hellos.destroy();
 
   for hello in hellos {
     println(hello);
@@ -147,16 +139,9 @@ fn main() {
 }
 )__";
 
-/* Macro to decide what to run at main. We could just do this in the compiler, idk why we have this. */
-static constexpr auto TESTING_BOILERPLATE = R"__(
-#ifdef TESTING
-  #define ___MAIN___\
-    for (int i = 0; i < sizeof(tests) / sizeof($ela_test); i++) { $ela_test_run(&tests[i]); }
-#else 
-  #define ___MAIN___\
-    __ela_main_();
-#endif
-  )__";
+static constexpr auto USER_MAIN_FUNCTION_NAME = "__ela_main_";
+static constexpr auto ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME = "_all_tests";
+static constexpr auto RUN_ALL_TESTS_GLOBAL_FUNCTION = "_run_all_tests";
 
 // This is stuff we just can't really get rid of while using a transpiled backend.
 static constexpr auto BOILERPLATE_C_CODE = R"__(
@@ -169,7 +154,7 @@ typedef unsigned int u32;
 typedef double f64;
 typedef float f32;
 
-typedef short int s16;
+typedef signed short int s16;
 typedef unsigned short int u16;
 
 /* 
@@ -177,6 +162,7 @@ typedef unsigned short int u16;
   * We did this because we can't use main() in 
   * freestanding with a signed char, because of 
   * command line args, and C restrictions.
+  * I think most platforms default char to signed char. but it's not great to not explicitly state it
 */
 typedef char s8;
 typedef unsigned char u8;
@@ -184,24 +170,7 @@ typedef unsigned char u8;
 /* static initializers. */
 void ela_run_global_initializers();
 
-#include <stddef.h>
-#include <stdarg.h>
+#include <stdarg.h> // for 'va_list'
+#include <stddef.h> // for 'offsetof'
 
-#ifdef TESTING
-  #if TEST_VERBOSE
-    int printf(u8 *, ...);
-  #endif
-
-  typedef struct {
-    const char *name;
-    void (*function)();
-  } $ela_test;
-
-  static void $ela_test_run($ela_test *test) {
-    #if TEST_VERBOSE
-      printf("running %s\n", test->name);
-    #endif
-    test->function();
-  }
-#endif
 )__";

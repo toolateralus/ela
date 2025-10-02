@@ -110,7 +110,7 @@ fn array() {
   my_array[1] = temp;
 
   // arrays, much like in C, can implicitly be cast to a pointer, either of it's underlying type (in this case s32)
-  // or a *void / *u8 (raw byte representation)
+  // or another pointer type which will reinterpret the data.
   underlying_type_ptr: *s32 = my_array;
   void_ptr: *void = my_array;
   byte_ptr: *u8 = my_array;

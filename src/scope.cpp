@@ -48,25 +48,6 @@ Context::Context() {
     Scope::add_def("TESTING");
   }
 
-  // Initialize opaque traits.
-  {
-    is_fn_ptr_trait();
-    is_fn_trait();
-    is_tuple_trait();
-    is_struct_trait();
-    is_enum_trait();
-    is_choice_trait();
-    is_dyn_trait();
-    is_union_trait();
-    is_array_trait();
-    is_pointer_trait();
-    is_mut_pointer_trait();
-    is_const_pointer_trait();
-    is_slice_trait();
-    is_slice_mut_trait();
-    blittable_trait();
-  }
-
   for (size_t i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->info->scope) {
       type_table[i]->info->scope->parent = scope;

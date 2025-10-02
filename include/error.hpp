@@ -47,6 +47,7 @@ static bool supports_color() {
   }
   const char *term = getenv("TERM");
   if (term == NULL) return false;
+  if (term == NULL) return false;
 
   return strstr(term, "dumb") == nullptr || (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL ||
                                              strstr(term, "screen") != NULL || strstr(term, "tmux") != NULL);

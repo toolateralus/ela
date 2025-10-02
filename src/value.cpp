@@ -1,13 +1,14 @@
 #include "value.hpp"
 #include <cstring>
 #include "ast.hpp"
-#include "interned_string.hpp"
+#include "scope.hpp"
+#include "strings.hpp"
 #include "type.hpp"
+#include "thir.hpp"
 
 ValueType ArrayValue::get_value_type() const { return ValueType::ARRAY; }
 
 ValueType FunctionValue::get_value_type() const { return ValueType::FUNCTION; }
-
 
 ValueType ObjectValue::get_value_type() const { return ValueType::OBJECT; }
 ValueType Value::get_value_type() const { return value_type; }
@@ -41,6 +42,11 @@ StringValue* new_string(const std::string& str) { return value_arena_alloc<Strin
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }
 NullValue* null_value() { return (NullValue*)SHARED_NULL_VALUE; }
+LValue* null_lvalue() {
+  static Value* null_val = null_value();
+  static LValue* null_lval = new_lvalue(&null_val);
+  return null_lval;
+}
 ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
 FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
 ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }
@@ -60,65 +66,77 @@ LValue* new_lvalue(RawPointerValue* raw) {
   return lvalue;
 }
 
-#include "constexpr.hpp"
+#include "thir_interpreter.hpp"
 
-Value* FunctionValue::call(CTInterpreter* interpreter, std::vector<Value*> arguments) {
-  auto it = arguments.begin();
-  auto temp_scope = create_child(block->scope->parent);
-
-  for (const auto param : this->parameters->params) {
-    if (param->tag == ASTParamDecl::Normal) {
-      interpreter->set_value(param->normal.name, *it);
-    } else {
-      const static InternedString name = InternedString{"self"};
-      interpreter->set_value(name, *it);
-    }
+Value* FunctionValue::call(Interpreter* interpreter, std::vector<Value*> arguments) {
+  if (!block) {
+    return null_value();
   }
 
-  auto old_scope = block->scope;
-  block->scope = temp_scope;
-  auto value = interpreter->visit_block(block);
-  block->scope = old_scope;
+  auto it = arguments.begin();
 
-  return value;
+  // TODO: attach types to parameters in THIR.
+  for (const auto& param : parameters) {
+    interpreter->write_to_lvalue(param.associated_variable, *it);
+    ++it;
+  }
+
+  auto value = interpreter->visit_block(block);
+
+  if (value->is(ValueType::RETURN)) {
+    auto return_value = value->as<ReturnValue>();
+    if (return_value->value) {
+      return return_value->value.get();
+    }
+  }
+  return null_value();
 }
-ASTNode* IntValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+
+THIR* IntValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Integer;
+  literal->type = s64_type();
   return literal;
 }
-ASTNode* FloatValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+
+THIR* FloatValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Float;
+  literal->type = f64_type();
   return literal;
 }
-ASTNode* BoolValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+
+THIR* BoolValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = value ? "true" : "false";
   literal->tag = ASTLiteral::Bool;
+  literal->type = bool_type();
   return literal;
 }
 
-ASTNode* StringValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* StringValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = value;
   literal->tag = ASTLiteral::String;
+  literal->type = u8_ptr_type();  // TODO: support str and String better
   return literal;
 }
 
-ASTNode* CharValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* CharValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Char;
+  literal->type = char_type();
   return literal;
 }
 
-ASTNode* NullValue::to_ast() const {
-  auto literal = ast_alloc<ASTLiteral>();
+THIR* NullValue::to_thir() const {
+  auto literal = thir_alloc<THIRLiteral>();
   literal->value = "null";
   literal->tag = ASTLiteral::Null;
+  literal->type = void_type()->take_pointer_to(true);
   return literal;
 }
 
@@ -247,7 +265,7 @@ Value* default_value_of_scalar_t(ScalarType type) {
   return null_value();
 }
 
-Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpreter* interpreter) {
+Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, Interpreter* interpreter) {
   auto array = new_array({});
   for (size_t i = 0; i < size; ++i) {
     array->values.push_back(default_value_of_t(base_type, interpreter));
@@ -255,11 +273,11 @@ Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, CTInterpr
   return array;
 }
 
-Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, CTInterpreter* interpreter) {
+Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, Interpreter* interpreter) {
   auto object = new_object(type);
   for (const auto& member : info->members) {
-    if (member.default_value.is_not_null()) {
-      object->values[member.name] = interpreter->visit(member.default_value.get());
+    if (member.thir_value.is_not_null()) {
+      object->values[member.name] = interpreter->visit_node(member.thir_value.get());
     } else {
       object->values[member.name] = default_value_of_t(member.type, interpreter);
     }
@@ -267,7 +285,7 @@ Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, CTInterpreter
   return object;
 }
 
-Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, CTInterpreter* interpreter) {
+Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, Interpreter* interpreter) {
   auto object = new_object(type);
   for (size_t i = 0; i < info->types.size(); ++i) {
     Type* type = info->types[i];
@@ -281,7 +299,7 @@ Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
   // 0 is always the invalid out of bounds discriminant for choice types.
   // for interpreted choice types, we will just ignore initializing variants, only one can exist,
   // so only one shall exist ever.
-  object->values["index"] = 0;
+  object->values[DISCRIMINANT_KEY] = 0;
   return object;
 }
 
@@ -294,7 +312,7 @@ Value* default_value_of_dyn_t(Type* type, DynTypeInfo* info) {
   return object;
 }
 
-Value* default_value_of_t(Type* t, CTInterpreter* interpreter) {
+Value* default_value_of_t(Type* t, Interpreter* interpreter) {
   if (t->is_pointer()) {
     return null_value();
   }
@@ -324,28 +342,23 @@ Value* default_value_of_t(Type* t, CTInterpreter* interpreter) {
   }
 }
 
-ASTNode* ObjectValue::to_ast() const {
-  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
-  init->resolved_type = type;
-  // TODO: figure out if we need this type allocated.
-  init->target_type = ast_alloc<ASTType>();
-  init->target_type.get()->resolved_type = type;
-  init->tag = ASTInitializerList::INIT_LIST_NAMED;
+THIR* ObjectValue::to_thir() const {
+  THIRAggregateInitializer* init = thir_alloc<THIRAggregateInitializer>();
+  init->type = type;
   for (const auto& [key, value] : this->values) {
-    init->key_values.push_back({key, (ASTExpr*)value->to_ast()});
+    if (type->is_kind(TYPE_DYN) && key == "instance") {
+      continue;
+    }
+    init->key_values.push_back({key, value->to_thir()});
   }
   return init;
 }
 
-ASTNode* ArrayValue::to_ast() const {
-  ASTInitializerList* init = ast_alloc<ASTInitializerList>();
-  init->resolved_type = type;
-  // TODO: figure out if we need this type allocated.
-  init->target_type = ast_alloc<ASTType>();
-  init->target_type.get()->resolved_type = type->base_type;  // pass the base type to array initializers
-  init->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+THIR* ArrayValue::to_thir() const {
+  THIRCollectionInitializer* init = thir_alloc<THIRCollectionInitializer>();
+  init->type = type;
   for (const auto& value : this->values) {
-    init->values.push_back((ASTExpr*)value->to_ast());
+    init->values.push_back(value->to_thir());
   }
   return init;
 }
@@ -354,22 +367,41 @@ bool RawPointerValue::is_truthy() const { return ptr != nullptr; }
 
 ValueType RawPointerValue::get_value_type() const { return value_type; }
 
-ASTNode* RawPointerValue::to_ast() const {
-  // Obviously strings can be built at compile time.
+THIR* RawPointerValue::to_thir() const {
   if (type->is_kind(TYPE_SCALAR)) {
     auto info = type->info->as<ScalarTypeInfo>();
     if (info->scalar_type == TYPE_CHAR) {
-      auto literal = ast_alloc<ASTLiteral>();
-      literal->tag = ASTLiteral::String;
-      literal->is_c_string = true;
-      literal->value = std::string(ptr);
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Char;
+      literal->value = std::string(1, *(char*)ptr);
+      literal->type = char_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_BOOL) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Bool;
+      literal->value = (*(bool*)ptr) ? "true" : "false";
+      literal->type = bool_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_S64 || info->scalar_type == TYPE_U64) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Integer;
+      literal->value = std::to_string(*(size_t*)ptr);
+      literal->type = s64_type();
+      return literal;
+    }
+    if (info->scalar_type == TYPE_FLOAT || info->scalar_type == TYPE_DOUBLE) {
+      auto literal = thir_alloc<THIRLiteral>();
+      literal->tag = ASTLiteral::Float;
+      literal->value = std::to_string(*(double*)ptr);
+      literal->type = f64_type();
       return literal;
     }
   }
-  // TODO: maybe convert pointers to static arrays at compile time? idk.
   throw_error(
-      "You cannot pass pointers out of the compile time code into runtime code-- pointers cant exist in a binary. "
-      "Just strings can.",
+      "You cannot pass pointers out of the compile time code into runtime code-- pointers can't exist in a binary. "
+      "Just strings, chars, and scalars can.",
       {});
   return nullptr;
 }
@@ -453,4 +485,42 @@ void RawPointerValue::assign_from(Value* v) {
     default:
       break;
   }
+}
+
+FunctionValue::FunctionValue() : Value(ValueType::FUNCTION) {}
+
+Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interpreter* interpreter,
+                                   std::vector<Value*> arguments) {
+  Value *arg0 = arguments[0];
+
+  if (arg0->is(ValueType::POINTER)) {
+    arg0 = *arg0->as<PointerValue>()->ptr;
+  }
+
+  if (!arg0->is(ValueType::OBJECT)) {
+    throw_error(std::format("'dyn' object was ({}), so a dynamic dispatch failed at compile time for method: {}", arg0->to_string(), method_name), {});
+  }
+
+  ObjectValue *self = arg0->as<ObjectValue>();
+  PointerValue *function_pointer = self->values[method_name]->as<PointerValue>();
+
+  if (function_pointer->pointee_value_type != ValueType::FUNCTION) {
+    throw_error("cannot call a non-pointer function with dyn dispatch at compile time. this is likely a bug", {});
+  }
+
+  FunctionValue *function = (*function_pointer->ptr)->as<FunctionValue>();
+
+  return function->call(interpreter, arguments);
+}
+
+THIR* PointerValue::to_thir() const {
+  if (pointee_value_type == ValueType::FUNCTION) {
+    auto function = (*ptr)->as<FunctionValue>();
+    auto variable = thir_alloc<THIRVariable>();
+    variable->name = function->name;
+    variable->type = function->type;
+    variable->use_compile_time_value_at_emit_time = false;
+    return variable;
+  }
+  return null_value()->to_thir();
 }

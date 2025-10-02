@@ -117,6 +117,7 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
   }
 
   // expensive loop
+  // expensive loop
   for (const auto &type : type_table) {
     if (type->base_type == base_t && extensions_copy == type->extensions) {
       return type;
@@ -483,7 +484,12 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   type->set_base(base);
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
+
+  // ! THIS SHOULD NOT INHERIT THE NODES SCOPE,
+  // ! IT SHOULD HAVE IT'S OWN SCOPE THAT'S DETACHED FROM THE ROOT SCOPE
+  // ! ALL TYPES SUFFER THIS ISSUE, IT NEEDS TO BE FIXED.
   info->scope = scope;
+
   info->scope->name = base;
   type->set_info(info);
 
@@ -652,10 +658,21 @@ Type *u8_ptr_type() {
   return type;
 }
 
+Type *char_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
+  return type;
+}
+
+Type *char_ptr_type() {
+  static Type *type = global_find_type_id(char_type(), {{TYPE_EXT_POINTER_CONST}});
+  return type;
+}
+
 Type *u8_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
 }
+
 Type *s64_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
   return type;
@@ -713,14 +730,27 @@ void init_type_system() {
   {
     bool_type();
     void_type();
+    char_type();
+    char_ptr_type();
   }
 
-  is_const_pointer_trait();
-  is_mut_pointer_trait();
-  is_pointer_trait();
-
-  is_tuple_trait();
-  is_array_trait();
+  {  // initialize trait types.
+    is_fn_ptr_trait();
+    is_fn_trait();
+    is_tuple_trait();
+    is_struct_trait();
+    is_enum_trait();
+    is_choice_trait();
+    is_dyn_trait();
+    is_union_trait();
+    is_array_trait();
+    is_pointer_trait();
+    is_mut_pointer_trait();
+    is_const_pointer_trait();
+    is_slice_trait();
+    is_slice_mut_trait();
+    blittable_trait();
+  }
 }
 
 bool type_is_numerical(const Type *t) {
@@ -1054,9 +1084,11 @@ void assess_and_try_add_blittable_trait(Type *type) {
   type->traits.push_back(blittable_trait());
 }
 
+// TODO: make sizing more platform dependent, and maybe we should make cross compilation a bit more
+// simple by using static definitions for these.
 size_t Type::size_in_bytes() const {
   if (!info) {
-    return sizeof(void *);
+    throw_error("INTERNAL COMPILER ERROR: called 'size_in_bytes' on a type with no info", {});
   }
 
   if (is_pointer()) {
@@ -1069,73 +1101,27 @@ size_t Type::size_in_bytes() const {
     return elem_size * len;
   }
 
-  if (kind == TYPE_STRUCT && info->as<StructTypeInfo>()->is_union) {
-    auto struct_info = info->as<StructTypeInfo>();
-    size_t max_size = 0;
-    size_t max_align = 1;
-    for (auto &member : struct_info->members) {
-      max_size = std::max(max_size, member.type->size_in_bytes());
-      max_align = std::max(max_align, member.type->alignment_in_bytes());
-    }
-    // round up to max alignment
-    max_size = (max_size + max_align - 1) & ~(max_align - 1);
-    return max_size;
+  return info->size_in_bytes();
+}
+
+size_t ChoiceTypeInfo::size_in_bytes() const {
+  if (members.empty()) {
+    return sizeof(int32_t);
   }
 
-  if (kind == TYPE_STRUCT) {
-    auto struct_info = info->as<StructTypeInfo>();
-    size_t offset = 0;
-    size_t max_align = 1;
+  size_t max_size = 0;
+  size_t max_align = alignof(int32_t);
 
-    for (auto &member : struct_info->members) {
-      size_t member_size = member.type->size_in_bytes();
-      size_t align = member.type->alignment_in_bytes();
-      max_align = std::max(max_align, align);
-
-      // align the offset
-      offset = (offset + align - 1) & ~(align - 1);
-      offset += member_size;
-    }
-
-    // Round up to max alignment
-    offset = (offset + max_align - 1) & ~(max_align - 1);
-    return offset;
+  for (const auto &member : members) {
+    max_size = std::max(max_size, member.type->size_in_bytes());
+    max_align = std::max(max_align, member.type->alignment_in_bytes());
   }
 
-  if (kind == TYPE_SCALAR) {
-    switch (info->as<ScalarTypeInfo>()->scalar_type) {
-      case TYPE_S8:
-        return 1;
-      case TYPE_U8:
-        return 1;
-      case TYPE_S16:
-        return 2;
-      case TYPE_U16:
-        return 2;
-      case TYPE_S32:
-        return 4;
-      case TYPE_U32:
-        return 4;
-      case TYPE_S64:
-        return 8;
-      case TYPE_U64:
-        return 8;
-      case TYPE_FLOAT:
-        return 4;
-      case TYPE_DOUBLE:
-        return 8;
-      case TYPE_CHAR:
-        return 1;
-      case TYPE_BOOL:
-        return 1;
-      case TYPE_VOID:
-        return 0;
-      default:
-        return sizeof(void *);
-    }
-  }
+  max_size = (max_size + max_align - 1) & ~(max_align - 1);
+  size_t total_size = sizeof(int32_t) + max_size;
+  total_size = (total_size + max_align - 1) & ~(max_align - 1);
 
-  return sizeof(void *);
+  return total_size;
 }
 
 size_t Type::alignment_in_bytes() const {
@@ -1177,4 +1163,222 @@ size_t Type::alignment_in_bytes() const {
   }
 
   return alignof(void *);
+}
+
+size_t StructTypeInfo::size_in_bytes() const {
+  if (is_union) {
+    size_t max_size = 0;
+    size_t max_align = 1;
+
+    for (auto &member : members) {
+      max_size = std::max(max_size, member.type->size_in_bytes());
+      max_align = std::max(max_align, member.type->alignment_in_bytes());
+    }
+
+    // round up to max alignment
+    max_size = (max_size + max_align - 1) & ~(max_align - 1);
+    return max_size;
+  }
+
+  size_t offset = 0;
+  size_t max_align = 1;
+  for (auto &member : members) {
+    size_t member_size = member.type->size_in_bytes();
+    size_t align = member.type->alignment_in_bytes();
+    max_align = std::max(max_align, align);
+    offset = (offset + align - 1) & ~(align - 1);
+    offset += member_size;
+  }
+  offset = (offset + max_align - 1) & ~(max_align - 1);
+  return offset;
+}
+
+size_t EnumTypeInfo::size_in_bytes() const { return underlying_type->size_in_bytes(); }
+
+size_t TupleTypeInfo::size_in_bytes() const {
+  size_t offset = 0;
+  size_t max_align = 1;
+  for (auto &member : members) {
+    size_t member_size = member.type->size_in_bytes();
+    size_t align = member.type->alignment_in_bytes();
+    max_align = std::max(max_align, align);
+    offset = (offset + align - 1) & ~(align - 1);
+    offset += member_size;
+  }
+  offset = (offset + max_align - 1) & ~(max_align - 1);
+  return offset;
+}
+
+size_t Type::offset_in_bytes(const InternedString &field) const {
+  // If this is a pointer/array type, delegate to the element/base type.
+  if (is_pointer() || is_fixed_sized_array()) {
+    if (!base_type || base_type == Type::INVALID_TYPE) {
+      throw_error("internal compiler error: asked for field offset on pointer/array with invalid base", {});
+    }
+    return base_type->offset_in_bytes(field);
+  }
+
+  switch (kind) {
+    case TYPE_STRUCT: {
+      auto info = this->info->as<StructTypeInfo>();
+      if (info->is_union) {
+        // In a union, all members start at offset 0.
+        for (const auto &member : info->members) {
+          if (member.name == field) return 0;
+        }
+        throw_error("type has no field \"" + field.get_str() + "\"", {});
+      }
+
+      size_t offset = 0;
+      size_t max_align = 1;
+      for (const auto &member : info->members) {
+        size_t member_size = member.type->size_in_bytes();
+        size_t align = member.type->alignment_in_bytes();
+        max_align = std::max(max_align, align);
+        offset = (offset + align - 1) & ~(align - 1);
+        if (member.name == field) {
+          return offset;
+        }
+        offset += member_size;
+      }
+      throw_error("type has no field \"" + field.get_str() + "\"", {});
+    }
+
+    case TYPE_TUPLE: {
+      auto info = this->info->as<TupleTypeInfo>();
+      // Accept either "$N" or "N" as the field identifier.
+      std::string fname = field.get_str();
+      size_t idx = std::string::npos;
+      try {
+        if (!fname.empty() && fname[0] == '$') {
+          idx = std::stoul(fname.substr(1));
+        } else {
+          idx = std::stoul(fname);
+        }
+      } catch (...) {
+        // If it's not a numeric index, try to match by member.name (which are "$0", "$1", ...)
+        size_t offset = 0;
+        size_t max_align = 1;
+        for (const auto &member : info->members) {
+          size_t member_size = member.type->size_in_bytes();
+          size_t align = member.type->alignment_in_bytes();
+          max_align = std::max(max_align, align);
+          offset = (offset + align - 1) & ~(align - 1);
+          if (member.name == field) return offset;
+          offset += member_size;
+        }
+        throw_error("tuple type has no field \"" + field.get_str() + "\"", {});
+      }
+
+      if (idx >= info->members.size()) {
+        throw_error("tuple index out of range for field \"" + field.get_str() + "\"", {});
+      }
+
+      size_t offset = 0;
+      size_t max_align = 1;
+      for (size_t i = 0; i < idx; ++i) {
+        auto &member = info->members[i];
+        size_t member_size = member.type->size_in_bytes();
+        size_t align = member.type->alignment_in_bytes();
+        max_align = std::max(max_align, align);
+        offset = (offset + align - 1) & ~(align - 1);
+        offset += member_size;
+      }
+      // Align for the requested member (not strictly necessary for returning offset,
+      // but keep consistent with layout rules).
+      {
+        auto &target = info->members[idx];
+        size_t align = target.type->alignment_in_bytes();
+        offset = (offset + align - 1) & ~(align - 1);
+      }
+      return offset;
+    }
+
+    case TYPE_CHOICE: {
+      auto info = this->info->as<ChoiceTypeInfo>();
+      for (const auto &member : info->members) {
+        if (member.name == field) {
+          // discriminant is stored first (int32_t), then payload aligned accordingly.
+          size_t offset = sizeof(int32_t);
+          size_t align = member.type->alignment_in_bytes();
+          offset = (offset + align - 1) & ~(align - 1);
+          return offset;
+        }
+      }
+      throw_error("choice type has no variant \"" + field.get_str() + "\"", {});
+    }
+
+    case TYPE_ENUM: {
+      // Enums do not have per-field offsets in this representation.
+      throw_error("enum type has no field \"" + field.get_str() + "\"", {});
+    }
+
+    case TYPE_FUNCTION:
+    case TYPE_SCALAR:
+    case TYPE_TRAIT:
+    case TYPE_DYN:
+    default:
+      throw_error("type has no field \"" + field.get_str() + "\"", {});
+  }
+
+  return 0;
+}
+
+// If this type has members or generics that depend on other types being defined first, this returns true.
+bool Type::has_dependencies() const {
+  switch (kind) {
+    case TYPE_ENUM:
+      return false;
+    case TYPE_SCALAR:
+      return false;
+    case TYPE_FUNCTION: {
+      auto info = this->info->as<FunctionTypeInfo>();
+      if (info->return_type->has_dependencies()) {
+        return true;
+      }
+      for (size_t i = 0; i < info->params_len; ++i) {
+        Type *param = info->parameter_types[i];
+        if (param->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_STRUCT: {
+      auto info = this->info->as<StructTypeInfo>();
+      for (const auto &member : info->members) {
+        if (member.type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_TUPLE: {
+      auto info = this->info->as<TupleTypeInfo>();
+      for (const auto &type : info->types) {
+        if (type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_CHOICE: {
+      auto info = this->info->as<ChoiceTypeInfo>();
+      for (const auto &member : info->members) {
+        if (member.type->has_dependencies()) {
+          return true;
+        }
+      }
+      return false;
+    }
+    case TYPE_TRAIT: {
+      // these are never declared, so it doesn't depend on the declaration of another.
+      return false;
+    }
+    case TYPE_DYN: {
+      // this doesn't depend on any other type, rather function declarations, but that's not relevant.
+      return false;
+    }
+    break;
+  }
 }

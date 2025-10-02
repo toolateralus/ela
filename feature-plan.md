@@ -224,13 +224,64 @@ recursive pattern stuff like this should work, to any degree:
 
 ```
 
-#### Instead of variadics, we could..
-  (...tuple) allow for tuple unpacking.
+### Example: Advanced Attribute System
 
-  ```rust
+Attributes would always be executed at compile time, invoked at the end of typing whatever it's applied to.
+This would be most possible once the THIR mutation API is all stable in the compiler, right now, we still 
+have to finish making the THIR branch stable at runtime, then convert the compile time interpreter to use that
+instead of the AST, as it does now.
 
-  fn printf!<T>(fmt: str, tuple: T) where T: IsTuple {
-    std::c::printf(fmt, ...tuple);
+#### Defining custom attributes
+
+```rust
+attribute(function: compiler::Declaration::Function) Obsolete(reason: str, alternative: str) {
+  warning: compiler::diagnostics::Warning = .{
+    message: reason,
+    solution: Some(alternative),
+  };
+  compiler::diagnostics::raise(warning);
+};
+
+@[Obsolete("Old function is obsolete!", "use new_function instead!")]
+fn old_function() {}
+```
+
+### Registering JSON serializer 
+```
+attribute(T: type) Json() {
+  json::generate_and_register_serializer!<T>();
+}
+```
+
+#### Attribute for variable clamping
+
+```rust
+attribute(variable: *mut compiler::Declaration::Variable) Clamp!<T>(min: T, max: T) {
+  *variable.initializer = compiler::make_literal(math::clamp(*variable.initializer, min, max));
+}
+```
+
+#### Attribute for auto-deriving traits
+
+```rust
+attribute(Target: type) Derive!<generics: [Trait]>() #expand {
+  for T in generics {
+    #insert {
+      impl T for Target {}
+    }
   }
+}
 
-  ```
+@[Derive!<.[Clone, Copy, Blittable]()]
+struct Vec2 {}
+```
+
+#### Attribute usage in main
+
+```rust
+fn main() {
+  @[Clamp(0, 100)]
+  value: s32 = 100;
+}
+```
+

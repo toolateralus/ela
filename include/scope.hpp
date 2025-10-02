@@ -24,13 +24,12 @@ enum Mutability : char {
 };
 
 struct Scope;
-
+struct THIR;
 struct Symbol {
   InternedString name;
   Type *resolved_type = Type::INVALID_TYPE;
-
   Mutability mutability = CONST;
-  Scope *scope;
+  Scope *parent_scope;
 
   bool is_variable : 1 = false;
   bool is_function : 1 = false;
@@ -139,29 +138,29 @@ struct Scope {
                              ASTNode *decl = nullptr) {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
     sym.is_local = true;
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   void insert_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
                        ASTNode *decl = nullptr) {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   void forward_declare_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
     auto sym = Symbol::create_function(name, type_id, declaration);
     sym.is_forward_declared = true;
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration) {
     auto sym = Symbol::create_function(name, type_id, declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   void insert_type(Type *type_id, const InternedString &name, ASTNode *declaration) {
     auto sym = Symbol::create_type(type_id, name, declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   Symbol *lookup(const InternedString &name);
@@ -171,7 +170,7 @@ struct Scope {
     auto type = global_create_choice_type(name, scope, {});
     auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
   }
@@ -180,7 +179,7 @@ struct Scope {
     auto type = global_create_trait_type(name, scope, generic_args);
     auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
   }
@@ -188,7 +187,7 @@ struct Scope {
     auto type = global_create_struct_type(name, scope);
     auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
 
     return type;
@@ -200,7 +199,7 @@ struct Scope {
     symbol.is_type = true;
     symbol.type.declaration = declaring_node;
     symbols.erase(name);
-    symbol.scope = this;
+    symbol.parent_scope = this;
     symbols.insert_or_assign(name, symbol);
   }
   void forward_declare_type(const InternedString &name, Type *default_id) {
@@ -208,19 +207,19 @@ struct Scope {
     symbol.name = name;
     symbol.resolved_type = default_id;
     symbol.is_type = true;
-    symbol.scope = this;
+    symbol.parent_scope = this;
     symbols.insert_or_assign(name, symbol);
   }
   Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto type = global_create_enum_type(name, scope, flags);
     auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
   }
   void create_module(const InternedString &name, ASTModule *declaration) {
     auto sym = Symbol::create_module(name, declaration);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
   }
   Type *create_tuple_type(const std::vector<Type *> &types) {
@@ -228,7 +227,7 @@ struct Scope {
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
     auto sym = Symbol::create_type(type, name, nullptr);
-    sym.scope = this;
+    sym.parent_scope = this;
     symbols.insert_or_assign(name, sym);
     return type;
   }
