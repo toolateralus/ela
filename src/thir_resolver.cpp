@@ -29,6 +29,15 @@ void Resolver::declare_or_define_type(Type *type) {
     }
   }
 
+  if (type->is_kind(TYPE_ENUM)) {
+    while (type_is_valid(type->base_type)) {
+      type = type->base_type;
+    }
+    emitter.emit_type(type);
+    emitted_types.insert(type);
+    return;
+  }
+
   // this is for function pointers.
   if (type->is_kind(TYPE_FUNCTION)) {
     emit_type_definition(type);
@@ -48,7 +57,6 @@ void Resolver::declare_or_define_type(Type *type) {
   emit_type_definition(type);
 }
 
-// formerly `define_type`
 void Resolver::emit_type_definition(Type *type) {
   Type *base =  type;
   if (type->base_type != Type::INVALID_TYPE) {
