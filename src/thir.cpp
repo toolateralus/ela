@@ -1024,6 +1024,13 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   mangle_function_name_for_thir(ast, thir);
 
+  // Temporary override this so we don't leak it into callers from call sites.
+  auto old_return_register = return_override_register;
+  return_override_register = nullptr;
+  Defer _([&] {
+    return_override_register = old_return_register;
+  });
+
   if (ast->block) {
     // SUPER naive macro expansion, this will explode with C errors if you misuse it
     // I'm really only adding expand blocks to aide in the development of the self hosted compiler.

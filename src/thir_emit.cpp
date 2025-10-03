@@ -1,3 +1,4 @@
+#include "ast.hpp"
 #include "builder.hpp"
 #include "thir_emit.hpp"
 #include "core.hpp"
@@ -185,7 +186,7 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
 }
 
 void Emitter::emit_literal(const THIRLiteral *thir) {
-  if (thir->value == "null") {
+  if (thir->tag == ASTLiteral::Null) {
     code << "nullptr";
     return;
   }
