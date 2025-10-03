@@ -152,6 +152,7 @@ struct THIRFunction : THIR {
   bool is_entry : 1 = false;
   bool is_no_return : 1 = false;
   bool is_no_mangle : 1 = false;
+  bool is_macro: 1 = false;
 
   InternedString name;
   std::vector<THIRParameter> parameters;
@@ -335,6 +336,7 @@ struct THIRGen {
     global_ini_call->arguments = {};
   }
 
+  bool is_making_call = false;
   Context &ctx;
   std::vector<THIRFunction *> test_functions;
   THIRCall *global_initializer_call;

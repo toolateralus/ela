@@ -186,10 +186,18 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     return thir;
   }
 
+  auto old = is_making_call;
+  is_making_call = true;
   thir->callee = visit_node(ast->callee);
+  is_making_call = old;
 
   if (!thir->callee) {
     throw_error("INTERNAL COMPILER ERROR: unable to locate callee for function", ast->source_range);
+  }
+
+  // macro expansion, we dont emit anything.
+  if (thir->callee == THIRNoop::shared()) {
+    return THIRNoop::shared();
   }
 
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
@@ -234,6 +242,8 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     auto fn_sym = get_symbol(ast->callee);
     auto fn = fn_sym->function.declaration;
 
+    auto old = is_making_call;
+    is_making_call = true;
     if (fn->generic_parameters.size()) {
       auto generics = ast->callee->member.get_resolved_generics();
       auto function = find_generic_instance(fn->generic_instantiations, generics);
@@ -241,6 +251,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
     } else {
       thir->callee = visit_function_declaration(fn);
     }
+    is_making_call = old;
   }
 
   if (!thir->callee) {
@@ -894,6 +905,7 @@ static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDec
   reciever->is_entry = function->is_entry;
   reciever->is_exported = function->is_exported;
   reciever->is_test = function->is_test;
+  reciever->is_macro = function->is_macro;
 }
 
 static inline void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
@@ -973,6 +985,10 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   const static bool is_testing = compile_command.has_flag("test");
 
+  if (ast->is_macro && !is_making_call) {
+    return nullptr;
+  }
+
   if (ast->is_test && !is_testing) {
     // TODO: is this acceptable?
     return nullptr;
@@ -1009,6 +1025,15 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   mangle_function_name_for_thir(ast, thir);
 
   if (ast->block) {
+    // SUPER naive macro expansion, this will explode with C errors if you misuse it
+    // I'm really only adding expand blocks to aide in the development of the self hosted compiler.
+    if (ast->is_macro) {
+      for (const auto &stmt : ast->block.get()->statements) {
+        visit_node(stmt);
+      }
+      return THIRNoop::shared();
+    }
+
     auto saved_defer_stack = std::move(defer_stack);
     defer_stack.clear();
 
@@ -1104,7 +1129,7 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
-  
+
   // We just ignore these i think?
   if (ast->is_forward_declared) {
     return nullptr;
@@ -2044,8 +2069,11 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
     // Statement nodes
     case AST_NODE_BLOCK:
       return visit_block((ASTBlock *)ast);
-    case AST_NODE_FUNCTION_DECLARATION:
-      return visit_function_declaration((ASTFunctionDeclaration *)ast);
+    case AST_NODE_FUNCTION_DECLARATION: {
+      auto result = visit_function_declaration((ASTFunctionDeclaration *)ast);
+      return result;
+    }
+
     case AST_NODE_RETURN:
       return visit_return((ASTReturn *)ast);
     case AST_NODE_CONTINUE:

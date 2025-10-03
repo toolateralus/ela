@@ -422,7 +422,6 @@ void Emitter::emit_enum(Type *type) {
 }
 
 void Emitter::forward_declare_type(const Type *type) {
-
   // TODO: remove this
   if (type->basename == "va_list") {
     return;
@@ -627,7 +626,6 @@ void Emitter::emit_return(const THIRReturn *thir) {
 void Emitter::emit_call(const THIRCall *thir) {
   EXPR_BEGIN(thir);
   emit_expr(thir->callee);
-
   code << '(';
   for (const auto &arg : thir->arguments) {
     emit_expr(arg);
@@ -694,7 +692,7 @@ void Emitter::emit_node(const THIR *thir) {
       return emit_while((const THIRWhile *)thir);
     case THIRNodeType::Noop:
       break;
-    case THIRNodeType::Type: // We ignore types here.
+    case THIRNodeType::Type:  // We ignore types here.
       return;
   }
 }

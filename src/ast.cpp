@@ -444,6 +444,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       }
     },
 
+    // doesn't do anything
     {
       .identifier = "push_context",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -500,6 +501,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       }
     },
 
+    // doesn't do anything
     {
       .identifier = "pop_context",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -533,7 +535,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       }
     },
 
-    { 
+    // Don't use this.
+    {
       // ! this is a hacky directive to make it so you can forward declare types from other modules without making a submodule within your current file.
       // ! This is just a symptom of having implicit file scoped modules, we should have to declare 'module fmt;' at the top of the file (ish) so anything above
       // !that would be in global namespace.
@@ -547,6 +550,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return module_definition;
       }
     },
+
+    // #eval, for evaluating expressions :O
     {
       .identifier = "eval",
       .kind = DIRECTIVE_KIND_EXPRESSION,
@@ -560,6 +565,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return run;
       }
     },
+
+    // #run, for running code :O
     {
       .identifier = "run",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -581,6 +588,33 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       }
     },
 
+
+    // #run, for running code :O
+    {
+      .identifier = "expand",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+
+        if (!parser->current_func_decl.get()) {
+          throw_error("expand blocks may only be used in functions", {});
+        }
+
+        auto func = parser->current_func_decl.get();
+
+        if (parser->peek().type == TType::LParen) {
+          parser->expect(TType::LParen);
+          auto argument = parser->expect(TType::Identifier);
+          parser->expect(TType::RParen);
+          if (argument.value == "hygenic") {
+            func->is_hygenic_macro = true;
+          }
+        }
+
+        auto block = parser->parse_block();
+        func->is_macro = true;
+        return block;
+      }
+    },
 };
 // clang-format on
 
@@ -1428,9 +1462,8 @@ ASTType *Parser::parse_type() {
     node->normal.path->source_range = range;
   }
 
-
   end_node(node, range);
-  
+
   if (node->kind == ASTType::NORMAL && node->normal.path && node->normal.path->segments.empty()) {
     throw_error("INTERNAL PARSER ERROR: parsed an empty path for a type", range);
   }
@@ -1439,7 +1472,7 @@ ASTType *Parser::parse_type() {
 }
 
 // TODO: we should handle the 'then' statement more gracefully.
-// Also, => is super fricken janky, and is really poorly implemented. 
+// Also, => is super fricken janky, and is really poorly implemented.
 // !CLEANUP remove the => operator from everything but switch cases. it's terrible and awful
 ASTIf *Parser::parse_if() {
   NODE_ALLOC(ASTIf, node, range, _, this)
@@ -1505,9 +1538,9 @@ ASTImport *Parser::parse_import() {
   ASTPath *path = import->root_group.path;
   ASTPath::Segment root_segment = path->segments[0];
 
-  // we always treat modules as if theyre at a root scope when theyre imported so you dont get 
+  // we always treat modules as if theyre at a root scope when theyre imported so you dont get
   // 'my_module::some_stdlib::module::etc'
-  // when you import shit -- it messes up linking and name resolution  
+  // when you import shit -- it messes up linking and name resolution
   Scope *scope = create_child(ctx.root_scope);
   ENTER_SCOPE(scope)
 
@@ -1631,7 +1664,7 @@ ASTStatement *Parser::parse_using_stmt() {
     block = parse_block();
     expect(TType::Semi);
 
-    { // we have to patch these up since this is synthetic
+    {  // we have to patch these up since this is synthetic
       variable->declaring_block = block;
       variable->declaring_scope = block->scope;
       defer_ast->declaring_block = block;
@@ -1640,7 +1673,7 @@ ASTStatement *Parser::parse_using_stmt() {
 
     block->statements.insert(block->statements.begin(), variable);
     block->statements.insert(block->statements.begin() + 1, defer_ast);
-  } else { 
+  } else {
     // If we're doing the "inline using" we just push them back otherwise we'd mess with a ton of crap.
     block->statements.push_back(variable);
     block->statements.push_back(defer_ast);
@@ -2142,6 +2175,18 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   ENTER_AST_STATEMENT_LIST(block->statements);
 
   ctx.set_scope(scope);
+
+  if (peek().type == TType::Directive) {
+    eat();
+    auto ident = expect(TType::Identifier);
+    auto result = process_directive(DIRECTIVE_KIND_STATEMENT, ident.value);
+    if (result.is_null() || result.get()->get_node_type() != AST_NODE_BLOCK) {
+      end_node(block, range);
+      throw_error(std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't", ident.value),
+                  range);
+    }
+    return (ASTBlock*)result.get();
+  }
 
   if (peek().type == TType::ExpressionBody) {
     NODE_ALLOC(ASTReturn, $return, range, _, this);
@@ -2754,7 +2799,6 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     node->where_clause = parse_where_clause();
   }
 
-
   auto scope = create_child(ctx.scope);
   auto type = ctx.scope->create_tagged_union(node->name, scope, node);
   ctx.set_scope(scope);
@@ -2764,7 +2808,7 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
     ctx.exit_scope();
-    return node; 
+    return node;
   }
 
   expect(TType::LCurly);

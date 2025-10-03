@@ -601,6 +601,8 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_extern : 1 = false;
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
+  bool is_macro: 1 = false;
+  bool is_hygenic_macro: 1 = false;
 
   bool requires_self_ptr() const {
     return params->has_self && params->params[0]->self.is_pointer;

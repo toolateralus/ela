@@ -396,7 +396,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
   implement_destroy_glue_for_choice_type(node, generic_instantiation, generic_args);
 }
 
-void Typer::visit_function_body(ASTFunctionDeclaration *node) {
+void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansion) {
   //// TODO: handle more attributes
   for (auto attr : node->attributes) {
     switch (attr.tag) {
@@ -413,6 +413,11 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
 
   if (node->name == "main") {
     node->is_entry = true;
+  }
+
+  if (node->is_macro && !macro_expansion) {
+    // These get thier bodies type checked on call, not here.
+    return;  
   }
 
   ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
@@ -753,7 +758,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       continue;
     }
 
-    visit_function_body(method);
+    visit_function_body(method, false);
   }
 
   if (trait_ty) {
@@ -808,7 +813,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             continue;
           }
         }
-        visit_function_body(method);
+        visit_function_body(method, false);
       } else {
         throw_error(std::format("required method \"{}\" (from trait {}) not implemented in impl", method->name,
                                 trait_ty->to_string()),
@@ -1319,7 +1324,7 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Typ
           visit_function_header((ASTFunctionDeclaration *)instantiation, true, true, args);
           auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
           func->generic_arguments = args;
-          visit_function_body(func);
+          visit_function_body(func, false);
         } break;
         case AST_NODE_TRAIT_DECLARATION:
           visit_trait_declaration((ASTTraitDeclaration *)instantiation, true, args);
@@ -1529,7 +1534,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
     return;
   }
 
-  visit_function_body(node);
+  visit_function_body(node, false);
 }
 
 void Typer::visit(ASTVariable *node) {
@@ -1906,6 +1911,12 @@ void Typer::visit(ASTWhile *node) {
   node->control_flow = control_flow;
 }
 
+void Typer::expand_macro(ASTFunctionDeclaration *macro, ASTCall *call) {
+  // TODO: do something, this is super bad. just adding it as a hack feature.
+  ENTER_SCOPE(call->declaring_scope);
+  macro->block.get()->accept(this);
+}
+
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
@@ -1932,15 +1943,18 @@ void Typer::visit(ASTCall *node) {
       type = symbol->resolved_type;
     }
     auto declaring_node = symbol->function.declaration;
+
+    if (declaring_node->is_macro) {
+      expand_macro(declaring_node, node);
+    }
+
     if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
-
       if (!func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
-
         auto old_type = type_context;
         Defer _([&] { type_context = old_type; });
 

@@ -168,7 +168,9 @@ struct Typer : VisitorBase {
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args = {});
   void visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                std::vector<Type *> generic_args = {});
-  void visit_function_body(ASTFunctionDeclaration *node);
+  void visit_function_body(ASTFunctionDeclaration *node, bool macro_expansion);
+  
+  void expand_macro(ASTFunctionDeclaration *macro, ASTCall *originator);
 
   Type *get_self_type();
 
