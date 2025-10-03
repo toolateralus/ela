@@ -1027,9 +1027,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   // Temporary override this so we don't leak it into callers from call sites.
   auto old_return_register = return_override_register;
   return_override_register = nullptr;
-  Defer _([&] {
-    return_override_register = old_return_register;
-  });
+  Defer _([&] { return_override_register = old_return_register; });
 
   if (ast->block) {
     // SUPER naive macro expansion, this will explode with C errors if you misuse it
@@ -1737,6 +1735,10 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
     if (member && member->thir_value) {
       thir->key_values.push_back({"enum_value", member->thir_value.get()});
     }
+  } else if (parent_type->is_kind(TYPE_CHOICE)) {
+    const auto info = parent_type->info->as<ChoiceTypeInfo>();
+    const auto discriminant = info->get_variant_discriminant(name);
+    thir->key_values.push_back({"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
   } else if (parent_type->has_no_extensions()) {
     thir->key_values.push_back({
         "offset",
