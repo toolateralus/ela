@@ -1914,6 +1914,7 @@ void Typer::visit(ASTWhile *node) {
 void Typer::expand_macro(ASTFunctionDeclaration *macro, ASTCall *call) {
   // TODO: do something, this is super bad. just adding it as a hack feature.
   ENTER_SCOPE(call->declaring_scope);
+  macro->scope->parent = call->declaring_scope;
   macro->block.get()->accept(this);
 }
 

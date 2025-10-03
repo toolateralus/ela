@@ -1033,8 +1033,9 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     // SUPER naive macro expansion, this will explode with C errors if you misuse it
     // I'm really only adding expand blocks to aide in the development of the self hosted compiler.
     if (ast->is_macro) {
+      ENTER_SCOPE(ast->block.get()->scope);
       for (const auto &stmt : ast->block.get()->statements) {
-        visit_node(stmt);
+        current_statement_list->push_back(visit_node(stmt));
       }
       return THIRNoop::shared();
     }
