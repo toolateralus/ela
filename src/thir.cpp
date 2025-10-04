@@ -40,7 +40,7 @@ static inline bool should_emit_choice_type_marker_variant_instantiation(ASTPath 
   const auto last_segment = ast->segments.back();
 
   for (const auto &member : info->members) {
-    if (last_segment.identifier == member.name) {
+    if (last_segment.get_identifier() == member.name) {
       return true;
     }
   }
@@ -52,7 +52,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
   const auto type = ast->resolved_type;
   const auto path = ast;
-  const auto variant_name = path->segments.back().identifier;
+  const auto variant_name = path->segments.back().get_identifier();
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto discriminant = info->get_variant_discriminant(variant_name);
   auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer);
@@ -137,9 +137,7 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                  std::vector<THIR *> &out_args, Nullable<THIR> self) {
   auto old_list = current_expression_list;
-  Defer _([&] {
-    current_expression_list = old_list;
-  });
+  Defer _([&] { current_expression_list = old_list; });
   current_expression_list = &out_args;
   out_args.clear();
   if (callee->get_node_type() == THIRNodeType::Function) {
@@ -186,7 +184,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
   // Tuple style constructor for choice type.
   if (ast->callee->resolved_type->is_kind(TYPE_CHOICE) && ast->callee->get_node_type() == AST_NODE_PATH) {
     const auto path = (ASTPath *)ast->callee;
-    const auto variant_name = path->segments.back().identifier;
+    const auto variant_name = path->segments.back().get_identifier();
     const auto type = ast->callee->resolved_type;
     const auto info = type->info->as<ChoiceTypeInfo>();
     const auto thir = get_choice_type_instantiation_boilerplate(path, this);
@@ -286,10 +284,16 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = ctx.scope;
       size_t index = 0;
-      for (auto &part : path->segments) {
-        auto &ident = part.identifier;
-        auto symbol = scope->lookup(ident);
-        if (!symbol) {
+      for (auto &segment : path->segments) {
+        Symbol *symbol;
+        if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+          auto ident = segment.get_identifier();
+          symbol = scope->lookup(ident);
+        } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
+          symbol = ctx.get_symbol(segment.get_expression()).get();
+        } else {
+          throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier",
+                      node->source_range);
           return nullptr;
         }
 
@@ -297,7 +301,7 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
           return symbol;
         }
 
-        if (!part.generic_arguments.empty()) {
+        if (!segment.generic_arguments.empty()) {
           if (symbol->is_type) {
             auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
 
@@ -307,7 +311,7 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
 
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      part.get_resolved_generics());
+                                      segment.get_resolved_generics());
             auto type = instantiation->resolved_type;
             scope = type->info->scope;
           } else {
@@ -341,16 +345,16 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       auto type = dotnode->base->resolved_type;
-      auto symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+      auto symbol = type->info->scope->local_lookup(dotnode->member.get_identifier());
       // Implicit dereference, we look at the base scope.
       if (!symbol && type->is_pointer()) {
         type = type->get_element_type();
-        symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+        symbol = type->info->scope->local_lookup(dotnode->member.get_identifier());
       }
       return symbol;
     }
     default:
-      return nullptr;  // TODO: verify this isn't strange.
+      return nullptr;
   }
   return nullptr;
 }
@@ -405,10 +409,10 @@ THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
 
-  thir->member = ast->member.identifier;
+  thir->member = ast->member.get_identifier();
 
   // Tuple.0;
-  if (ast->member.identifier == "0" || atoi(ast->member.identifier.get_str().c_str()) != 0) {
+  if (thir->member == "0" || atoi(thir->member.get_str().c_str()) != 0) {
     thir->member = "$" + thir->member.get_str();
   }
 
@@ -498,9 +502,11 @@ THIR *THIRGen::visit_pattern_match(ASTPatternMatch *ast, Scope *scope, std::vect
   const ChoiceTypeInfo *info = choice_type->info->as<ChoiceTypeInfo>();
   const ASTPath::Segment &segment = ast->target_type_path->segments.back();
 
-  const size_t discriminant = info->get_variant_discriminant(segment.identifier);
-  Type *variant_type = info->get_variant_type(segment.identifier);
-  const InternedString variant_name = segment.identifier;
+  const auto identifier = segment.get_identifier();
+
+  const size_t discriminant = info->get_variant_discriminant(identifier);
+  Type *variant_type = info->get_variant_type(identifier);
+  const InternedString variant_name = identifier;
 
   auto condition = visit_pattern_match_condition(ast, cached_object, discriminant);
   make_destructure_for_pattern_match(ast, cached_object, scope, statements, variant_type, variant_name);
@@ -756,7 +762,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         const auto path = ast->target_type.get()->normal.path;
         const auto info = ast->resolved_type->info->as<ChoiceTypeInfo>();
         const auto thir = get_choice_type_instantiation_boilerplate(path, this);
-        const auto variant_name = path->segments.back().identifier;
+        const auto variant_name = path->segments.back().get_identifier();
         const auto variant_type = info->get_variant_type(variant_name);
 
         // Mock up a temporary initializer list to just take advantage of existing THIR generation
@@ -941,7 +947,7 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
       var->name = param->normal.name;
       var->type = param->normal.type->resolved_type;
       if (param->normal.default_value) {
-        auto vec = std::vector<THIR*>();
+        auto vec = std::vector<THIR *>();
         auto previous = current_expression_list;
         current_expression_list = &vec;
         auto result = visit_node(param->normal.default_value.get());

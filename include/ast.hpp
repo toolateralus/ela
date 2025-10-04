@@ -343,16 +343,18 @@ struct ASTTypeExtension {
 
 struct ASTPath : ASTExpr {
   struct Segment {
+   private:
+    union {
+      InternedString identifier;
+      ASTExpr *expression;
+    };
+
+   public:
     enum Tag {
       INVALID,
       EXPRESSION,
       IDENTIFIER,
     } tag;
-
-    union {
-      InternedString identifier{};
-      ASTExpr *expression;
-    };
 
     std::vector<ASTExpr *> generic_arguments;
     Type *resolved_type = Type::INVALID_TYPE;
@@ -363,6 +365,31 @@ struct ASTPath : ASTExpr {
         generics.push_back(arg->resolved_type);
       }
       return generics;
+    }
+
+    void set_identifier(InternedString identifier) {
+      this->tag = IDENTIFIER;
+      this->identifier = identifier;
+    }
+    void set_expression(ASTExpr *expr) {
+      this->tag = EXPRESSION;
+      this->expression = expr;
+    }
+
+    InternedString get_identifier() const {
+      if (tag == IDENTIFIER) {
+        return identifier;
+      }
+      throw_error("tried to get an identifier for a non-identifier path segment.", {});
+      std::exit(1);
+    }
+
+    ASTExpr *get_expression() const {
+      if (tag == EXPRESSION) {
+        return expression;
+      }
+      throw_error("tried to get an expression for a non-expression path segment.", {});
+      std::exit(1);
     }
 
     static Segment Identifier(InternedString ident, std::vector<ASTExpr *> generics = {}) {
@@ -378,6 +405,12 @@ struct ASTPath : ASTExpr {
       seg.tag = EXPRESSION;
       seg.expression = expr;
       seg.generic_arguments = generics;
+      return seg;
+    }
+
+    static Segment Invalid() {
+      Segment seg;
+      seg.tag = INVALID;
       return seg;
     }
   };
@@ -402,11 +435,11 @@ struct ASTPath : ASTExpr {
   inline size_t length() const { return segments.size(); }
 
   inline void push_segment(ASTExpr *expression, std::vector<ASTExpr *> generic_arguments = {}) {
-    segments.push_back({.tag = Segment::EXPRESSION, .expression = expression, .generic_arguments = generic_arguments});
+    segments.push_back(Segment::Expression(expression, generic_arguments));
   }
 
   inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments = {}) {
-    segments.push_back({.tag = Segment::IDENTIFIER, .identifier = identifier, .generic_arguments = generic_arguments});
+    segments.push_back(Segment::Identifier(identifier, generic_arguments));
   }
 };
 

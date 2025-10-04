@@ -897,16 +897,14 @@ ASTExpr *Parser::parse_unary() {
 }
 
 ASTPath::Segment Parser::parse_path_segment() {
-  ASTPath::Segment segment = {
-      .tag = ASTPath::Segment::INVALID,
-  };
+  ASTPath::Segment segment = ASTPath::Segment::Invalid();
 
   if (peek().type == TType::Identifier) {
     segment.tag = ASTPath::Segment::IDENTIFIER;
-    segment.identifier = expect(TType::Identifier).value;
+    segment.set_identifier(expect(TType::Identifier).value);
   } else {
     segment.tag = ASTPath::Segment::EXPRESSION;
-    segment.expression = parse_expr();
+    segment.set_expression(parse_expr());
   }
 
   if (peek().type == TType::GenericBrace) {
@@ -1100,9 +1098,6 @@ ASTExpr *Parser::parse_primary() {
       node->expression = parse_expr();
       return node;
     };
-    case TType::Self: {
-      return parse_type();
-    }
     case TType::If: {
       return parse_if();
     }
@@ -1364,8 +1359,11 @@ ASTExpr *Parser::parse_primary() {
 
       return expr;
     }
+    case TType::Self: {
+      return parse_path();
+    }
     case TType::LBrace: {
-      return parse_type();
+      return parse_path();
     }
     default: {
       auto error_range = begin_node();
@@ -1569,13 +1567,14 @@ ASTImport *Parser::parse_import() {
   Scope *scope = create_child(ctx.root_scope);
   ENTER_SCOPE(scope)
 
-  if (this->import(root_segment.identifier, &scope)) {
+  auto identifier = root_segment.get_identifier();
+  if (this->import(identifier, &scope)) {
     NODE_ALLOC(ASTModule, the_module, range, _, this)
     // again, make certain that we are attached to the root scope for imported modules.
     the_module->declaring_scope = ctx.root_scope;
-    the_module->module_name = root_segment.identifier;
+    the_module->module_name = identifier;
     the_module->scope = scope;
-    scope->name = root_segment.identifier;
+    scope->name = identifier;
     {
       ENTER_AST_STATEMENT_LIST(the_module->statements);
       while (!peek().is_eof()) {
@@ -1716,10 +1715,11 @@ ASTStatement *Parser::parse_using_stmt() {
     // variable.
     NODE_ALLOC(ASTPath, path, range1, defer1, this);
     path->push_segment(variable->name);
+
     // .destroy()
     NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
     dot->base = path;
-    dot->member = ASTPath::Segment{.identifier = "destroy"};
+    dot->member = ASTPath::Segment::Identifier("destroy");
     method_call->callee = dot;
   }
 

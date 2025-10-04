@@ -418,7 +418,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
 
   if (node->is_macro && !macro_expansion) {
     // These get thier bodies type checked on call, not here.
-    return;  
+    return;
   }
 
   ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
@@ -1072,8 +1072,9 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
     if (first->is_mut_pointer()) {
       if (!self_type->is_pointer() && self_symbol && self_symbol.get()->is_const()) {
-        throw_error("cannot call a '*mut self' method with an immutable variable, consider adding 'mut' to the declaration.",
-                    node->source_range);
+        throw_error(
+            "cannot call a '*mut self' method with an immutable variable, consider adding 'mut' to the declaration.",
+            node->source_range);
       }
       if (is_const_pointer(self)) {
         throw_error(
@@ -1153,11 +1154,15 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
         /*
           TODO: we need to do a better job of checking whether the return type name
 
+          TODO: this is not a todo it's a massive BUG
+          ! BUG
+          This is freaking horrible. get rid of this STAT.
+
           * matches the generic parameter it's trying to infer.
           * we shouldn't restrict the path length nor should we be using a simple string comparison here.
         */
-        if (return_ty_path->length() == 1 &&
-            (func->generic_parameters[0].identifier == return_ty_path->segments[0].identifier)) {
+        if (return_ty_path->length() == 1 && return_ty_path->segments[0].tag == ASTPath::Segment::IDENTIFIER &&
+            (func->generic_parameters[0].identifier == return_ty_path->segments[0].get_identifier())) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = source_range;
@@ -1205,7 +1210,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
               // ! This condition is terrible
               // ! Update: this condition is truly awful. FIXME. had to patch this because it crashes the compiler.
               if (param->normal.type->kind == ASTType::NORMAL &&
-                  generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
+                  param->normal.type->normal.path->segments[0].tag == ASTPath::Segment::IDENTIFIER &&
+                  generic.identifier == param->normal.type->normal.path->segments[0].get_identifier()) {
                 is_generic = true;
                 break;
               }
@@ -1580,9 +1586,11 @@ void Typer::visit(ASTVariable *node) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
   }
 
-
   if (node->type->resolved_type->is_kind(TYPE_TRAIT)) {
-    throw_error("You cannot have a variable of a 'trait' type -- it is sizeless and only used at compile time to enforce rules.", node->source_range);
+    throw_error(
+        "You cannot have a variable of a 'trait' type -- it is sizeless and only used at compile time to enforce "
+        "rules.",
+        node->source_range);
   }
 
   if (node->value.is_not_null()) {
@@ -2456,7 +2464,14 @@ void Typer::visit(ASTDotExpr *node) {
     throw_error("internal compiler error: dot expression used on a type that had a null scope", node->source_range);
   }
 
-  if (auto member = base_scope->local_lookup(node->member.identifier)) {
+  if (node->member.tag != ASTPath::Segment::IDENTIFIER) {
+    throw_error("cannot use a non-identifier as the right hand side of a dot expression. what were you doing??",
+                node->source_range);
+  }
+
+  auto identifier = node->member.get_identifier();
+
+  if (auto member = base_scope->local_lookup(identifier)) {
     /*
       TODO Resolve generic arguments for dot expression?
     */
@@ -2465,7 +2480,7 @@ void Typer::visit(ASTDotExpr *node) {
     for (const auto &[name, _] : base_scope->symbols) {
       std::cout << "symbol: " << name.get_str() << '\n';
     }
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member.identifier, base_ty->to_string()),
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", identifier, base_ty->to_string()),
                 node->source_range);
   }
 }
@@ -2578,8 +2593,15 @@ void Typer::visit(ASTInitializerList *node) {
         if (node->target_type.get() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH) {
           const auto path = (ASTPath *)node->target_type.get()->normal.path;
           const auto last_segment = path->segments.back();
+
+          if (last_segment.tag != ASTPath::Segment::IDENTIFIER) {
+            throw_error(
+                "INTERNAL COMPILER ERROR: got a non-identifier as the last segment of a choice type instantiation path",
+                node->source_range);
+          }
+
           const auto info = target_type->info->as<ChoiceTypeInfo>();
-          const auto variant_type = info->get_variant_type(last_segment.identifier);
+          const auto variant_type = info->get_variant_type(last_segment.get_identifier());
 
           target_type = variant_type;
           scope = variant_type->info->scope;
@@ -2972,7 +2994,15 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
 
     } else {  // Single symbol import
       Nullable<Symbol> sym = ctx.get_symbol(symbol.path);
-      InternedString name = symbol.path->segments.back().identifier;
+
+      if (symbol.path->segments.back().tag != ASTPath::Segment::IDENTIFIER) {
+        throw_error(
+            "got a non-identifier path in an import, this is not valid. You don't need to apply generics or anything "
+            "to imports",
+            {});
+      }
+
+      InternedString name = symbol.path->segments.back().get_identifier();
       if (!sym) {
         throw_error(std::format("symbol: {} not found in module", name), range);
       }
@@ -3319,8 +3349,17 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       Scope *scope = this->scope;
       size_t index = 0;
       for (auto &part : path->segments) {
-        auto &ident = part.identifier;
-        auto symbol = scope->lookup(ident);
+        Symbol *symbol;
+        if (part.tag == ASTPath::Segment::IDENTIFIER) {
+          symbol = scope->lookup(part.get_identifier());
+        } else if (part.tag == ASTPath::Segment::EXPRESSION) {
+          symbol = get_symbol(part.get_expression()).get();
+        } else {
+          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
+                      node->source_range);
+          return nullptr;
+        }
+
         if (!symbol) {
           return nullptr;
         }
@@ -3361,11 +3400,18 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       auto type = dotnode->base->resolved_type;
-      auto symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+
+      if (dotnode->member.tag != ASTPath::Segment::IDENTIFIER) {
+        throw_error("cannot use a non-identifier path as the right hand side of a dot expression", node->source_range);
+      }
+
+      auto identifier = dotnode->member.get_identifier();
+      auto symbol = type->info->scope->local_lookup(identifier);
+
       // Implicit dereference, we look at the base scope.
       if (!symbol && type->is_pointer()) {
         type = type->get_element_type();
-        symbol = type->info->scope->local_lookup(dotnode->member.identifier);
+        symbol = type->info->scope->local_lookup(identifier);
       }
       return symbol;
     }
@@ -3386,9 +3432,16 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       Scope *scope = this->scope;
       size_t index = 0;
       for (auto &part : path->segments) {
-        auto &ident = part.identifier;
-        auto symbol = scope->lookup(ident);
-        if (!symbol) return nullptr;
+        Symbol *symbol;
+        if (part.tag == ASTPath::Segment::IDENTIFIER) {
+          symbol = scope->lookup(part.get_identifier());
+        } else if (part.tag == ASTPath::Segment::EXPRESSION) {
+          symbol = get_symbol(part.get_expression()).get();
+        } else {
+          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
+                      node->source_range);
+          return nullptr;
+        }
 
         if (index == path->length() - 1) return symbol->parent_scope;
 
@@ -3471,7 +3524,7 @@ void Typer::visit(ASTMethodCall *node) {
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
       node->inserted_dyn_arg = true;
-      node->dyn_method_name = node->callee->member.identifier;
+      node->dyn_method_name = node->callee->member.get_identifier();
     }
 
     type = node->callee->resolved_type;
@@ -3518,7 +3571,7 @@ void Typer::visit(ASTPatternMatch *node) {
   auto info = target_type->info->as<ChoiceTypeInfo>();
 
   const auto segment = node->target_type_path->segments.back();
-  auto variant_type = info->get_variant_type(segment.identifier);
+  auto variant_type = info->get_variant_type(segment.get_identifier());
 
   switch (node->pattern_tag) {
     case ASTPatternMatch::NONE:
@@ -3589,19 +3642,26 @@ void Typer::visit(ASTPath *node) {
   Symbol *symbol = nullptr;
 
   for (auto &segment : node->segments) {
-    auto &ident = segment.identifier;
-    symbol = scope->lookup(ident);
-    if (!symbol) {
-      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+    if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+      auto ident = segment.get_identifier();
+      symbol = scope->lookup(ident);
+      if (!symbol) {
+        throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
+      }
+      scope = nullptr;
+    } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
+      symbol = ctx.get_symbol(segment.get_expression()).get();
+    } else {
+      throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
     }
-    scope = nullptr;
 
-    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
+    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1 &&
+        segment.tag == ASTPath::Segment::IDENTIFIER) {
       /* we need to return the parent type here? but we need to maintain the variant. hmm. */
       node->resolved_type = previous_type;
-      auto symbol = previous_type->info->scope->lookup(segment.identifier);
+      auto symbol = previous_type->info->scope->lookup(segment.get_identifier());
       if (!symbol) {
-        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
+        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.get_identifier(),
                                 previous_type->to_string()),
                     node->source_range);
       }
@@ -3645,8 +3705,12 @@ void Typer::visit(ASTPath *node) {
       segment.resolved_type = symbol->resolved_type;
     }
     if (!scope && index < node->segments.size() - 1) {
-      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
-                  node->source_range);
+      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+        throw_error(std::format("symbol \"{}\"'s scope could not be resolved in path", segment.get_identifier()),
+                    node->source_range);
+      } else {
+        throw_error("symbol (expression) scope could not be resolved in path", node->source_range);
+      }
     }
     index++;
   }
@@ -3664,19 +3728,33 @@ void Typer::visit_path_for_call(ASTPath *node) {
   size_t index = 0;
   Type *previous_type = nullptr;
   for (auto &segment : node->segments) {
-    auto &ident = segment.identifier;
-    auto symbol = scope->lookup(ident);
+    Symbol *symbol;
+    if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+      auto ident = segment.get_identifier();
+      symbol = scope->lookup(ident);
+    } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
+      symbol = ctx.get_symbol(segment.get_expression()).get();
+    } else {
+      throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
+      return;
+    }
+
     if (!symbol) {
-      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+        throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
+      } else {
+        throw_error("use of undeclared identifier", node->source_range);
+      }
     }
     scope = nullptr;
 
-    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
+    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1 &&
+        segment.tag == ASTPath::Segment::IDENTIFIER) {
       /* we need to return the parent type here? but we need to maintain the variant. hmm. */
       node->resolved_type = previous_type;
-      auto symbol = previous_type->info->scope->lookup(segment.identifier);
+      auto symbol = previous_type->info->scope->lookup(segment.get_identifier());
       if (!symbol) {
-        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
+        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.get_identifier(),
                                 previous_type->to_string()),
                     node->source_range);
       }
@@ -3722,8 +3800,12 @@ void Typer::visit_path_for_call(ASTPath *node) {
       segment.resolved_type = symbol->resolved_type;
     }
     if (!scope && index < node->segments.size() - 1) {
-      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
-                  node->source_range);
+      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+        throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.get_identifier()),
+                    node->source_range);
+      } else {
+        throw_error("symbol {}'s scope could not be resolved in path", node->source_range);
+      }
     }
     index++;
   }
