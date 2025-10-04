@@ -903,7 +903,6 @@ ASTPath::Segment Parser::parse_path_segment() {
     segment.tag = ASTPath::Segment::IDENTIFIER;
     segment.set_identifier(expect(TType::Identifier).value);
   } else {
-    std::printf("%s\n", peek().location.ToString().c_str());
     segment.tag = ASTPath::Segment::TYPE;
     segment.set_type(parse_type());
   }
