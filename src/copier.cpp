@@ -692,7 +692,11 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
       }
       new_node->push_segment(part.identifier, args);
     } else {
-      new_node->push_segment(part.identifier, {});
+      if (part.is_self_type) {
+        new_node->push_self_segment();
+      } else {
+        new_node->push_segment(part.identifier, {});
+      }
     }
   }
   return new_node;

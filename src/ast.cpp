@@ -897,27 +897,24 @@ ASTExpr *Parser::parse_unary() {
 }
 
 ASTPath::Segment Parser::parse_path_segment() {
-  auto token = eat();
-  ASTPath::Segment segment;
-  if (token.type == TType::LBrace) {
-    segment.identifier = "Slice";
-    segment.generic_arguments.push_back(parse_type());
-    expect(TType::RBrace);
-  } else if (token.type == TType::Identifier) {
+  ASTPath::Segment segment{
+      .tag = ASTPath::Segment::INVALID,
+  };
+
+  Token token = eat();
+
+  if (token.type == TType::Identifier) {
+    segment.tag = ASTPath::Segment::IDENTIFIER;
     segment.identifier = token.value;
-    if (peek().type == TType::GenericBrace) {
-      segment.generic_arguments = parse_generic_arguments();
-    }
-  } else if (token.type == TType::Self) {
-    if (peek().type == TType::GenericBrace) {
-      throw_error("Cannot apply generic arguments to a Self type", token.location);
-    }
-    segment.is_self_type = true;
   } else {
-    throw_error(
-        std::format("Expected Identifier, Self, or LBrace, got {} : {}", TTypeToString(token.type), token.value),
-        token.location);
+    segment.tag = ASTPath::Segment::EXPRESSION;
+    segment.expression = parse_expr();
   }
+
+  if (peek().type == TType::GenericBrace) {
+    segment.generic_arguments = parse_generic_arguments();
+  }
+
   return segment;
 }
 
@@ -954,7 +951,7 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       dot->base = left;
       if (peek().type == TType::Integer) {
-        dot->member = ASTPath::Segment{eat().value};
+        dot->member = ASTPath::Segment{.tag = ASTPath::Segment::IDENTIFIER, .identifier = eat().value};
       } else if (peek().type == TType::Identifier) {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {

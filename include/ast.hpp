@@ -114,7 +114,7 @@ struct ASTNode {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
-  
+
   Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
   Scope *declaring_scope;
   SourceRange source_range{};
@@ -343,11 +343,19 @@ struct ASTTypeExtension {
 
 struct ASTPath : ASTExpr {
   struct Segment {
-    InternedString identifier{};
-    std::vector<ASTExpr *> generic_arguments;
+    enum Tag {
+      INVALID,
+      IDENTIFIER,
+      EXPRESSION,
+    } tag;
 
+    union {
+      InternedString identifier;
+      ASTExpr *expression;
+    };
+
+    std::vector<ASTExpr *> generic_arguments;
     Type *resolved_type = Type::INVALID_TYPE;
-    bool is_self_type = false;
 
     inline std::vector<Type *> get_resolved_generics() {
       std::vector<Type *> generics;
@@ -377,11 +385,14 @@ struct ASTPath : ASTExpr {
   void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
-  inline void push_segment(InternedString identifier) { segments.emplace_back(identifier); }
-  inline void push_self_segment() { segments.push_back({.is_self_type = true}); }
+  inline void push_segment(ASTExpr *expr, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back(
+        Segment{.tag = Segment::EXPRESSION, .expression = expr, .generic_arguments = generic_arguments});
+  }
 
-  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
-    segments.emplace_back(identifier, generic_arguments);
+  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back(
+        Segment{.tag = Segment::IDENTIFIER, .identifier = identifier, .generic_arguments = generic_arguments});
   }
 };
 
@@ -602,12 +613,10 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_extern : 1 = false;
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
-  bool is_macro: 1 = false;
-  bool is_hygenic_macro: 1 = false;
+  bool is_macro : 1 = false;
+  bool is_hygenic_macro : 1 = false;
 
-  bool requires_self_ptr() const {
-    return params->has_self && params->params[0]->self.is_pointer;
-  }
+  bool requires_self_ptr() const { return params->has_self && params->params[0]->self.is_pointer; }
 
   bool has_defer = false;
   bool is_declared = false;

@@ -2097,6 +2097,7 @@ void Typer::visit(ASTType *node) {
     case ASTType::NORMAL: {
       auto &normal_ty = node->normal;
       normal_ty.path->accept(this);
+
       auto symbol = ctx.get_symbol(normal_ty.path).get();
 
       if (!symbol) {
@@ -3312,6 +3313,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       size_t index = 0;
+      
       for (auto &part : path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
