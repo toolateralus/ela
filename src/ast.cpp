@@ -237,7 +237,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #location, for getting source location.
     {
       .identifier = "location",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) {
         auto location = parser->peek().location;
         auto formatted = std::format("{}:{}:{}", SourceRange::files()[location.file], location.line, location.column);
@@ -589,7 +589,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     },
 
 
-    // #run, for running code :O
+    // #expand, for making a function expand at call site, like a C macro.
     {
       .identifier = "expand",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -613,6 +613,21 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto block = parser->parse_block();
         func->is_macro = true;
         return block;
+      }
+    },
+
+    // #insert, for use in expand blocks to say this statement should be expanded into the call site.
+    {
+      .identifier = "insert",
+      .kind = DIRECTIVE_KIND_DONT_CARE,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto block = parser->parse_block();
+        for (auto node: block->statements) {
+          node->is_insert_node = true;
+          node->declaring_scope = parser->ctx.scope;
+          parser->current_statement_list->push_back(node);
+        }
+        return nullptr;
       }
     },
 };

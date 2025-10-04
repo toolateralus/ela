@@ -96,6 +96,7 @@ struct ControlFlow {
 struct ASTBlock;
 
 struct ASTNode {
+  bool is_insert_node = false;
   bool is_temporary_value() const {
     switch (get_node_type()) {
       case AST_NODE_INITIALIZER_LIST:

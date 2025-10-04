@@ -136,6 +136,11 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
 
 void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
                                                  std::vector<THIR *> &out_args, Nullable<THIR> self) {
+  auto old_list = current_expression_list;
+  Defer _([&] {
+    current_expression_list = old_list;
+  });
+  current_expression_list = &out_args;
   out_args.clear();
   if (callee->get_node_type() == THIRNodeType::Function) {
     const auto function = (const THIRFunction *)callee;
@@ -149,11 +154,17 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
     size_t ast_index = 0;
 
     for (; param_index < params.size() && ast_index < ast_args.size(); ++param_index, ++ast_index) {
-      out_args.push_back(visit_node(ast_args[ast_index]));
+      auto result = visit_node(ast_args[ast_index]);
+      if (result != THIRNoop::shared()) {
+        out_args.push_back(result);
+      }
     }
 
     for (; ast_index < ast_args.size(); ++ast_index) {
-      out_args.push_back(visit_node(ast_args[ast_index]));
+      auto result = visit_node(ast_args[ast_index]);
+      if (result != THIRNoop::shared()) {
+        out_args.push_back(result);
+      }
     }
 
     for (; param_index < params.size(); ++param_index) {
@@ -930,7 +941,16 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
       var->name = param->normal.name;
       var->type = param->normal.type->resolved_type;
       if (param->normal.default_value) {
-        var->value = visit_node(param->normal.default_value.get());
+        auto vec = std::vector<THIR*>();
+        auto previous = current_expression_list;
+        current_expression_list = &vec;
+        auto result = visit_node(param->normal.default_value.get());
+        if (vec.size() || result == THIRNoop::shared()) {
+          var->value = vec[0];
+        } else {
+          var->value = result;
+        }
+        current_expression_list = previous;
       } else {
         var->value = nullptr;
       }
@@ -1035,7 +1055,16 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     if (ast->is_macro) {
       ENTER_SCOPE(ast->block.get()->scope);
       for (const auto &stmt : ast->block.get()->statements) {
-        current_statement_list->push_back(visit_node(stmt));
+        if (stmt->get_node_type() == AST_NODE_DEFER && !stmt->is_insert_node) {
+          continue;
+        }
+        auto result = visit_node(stmt);
+
+        if (stmt->is_insert_node && stmt->get_node_type() == AST_NODE_EXPR_STATEMENT && current_expression_list) {
+          current_expression_list->push_back(result);
+        } else if (stmt->is_insert_node) {
+          current_statement_list->push_back(result);
+        }
       }
       return THIRNoop::shared();
     }
@@ -1739,7 +1768,8 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
   } else if (parent_type->is_kind(TYPE_CHOICE)) {
     const auto info = parent_type->info->as<ChoiceTypeInfo>();
     const auto discriminant = info->get_variant_discriminant(name);
-    thir->key_values.push_back({"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
+    thir->key_values.push_back(
+        {"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
   } else if (parent_type->has_no_extensions()) {
     thir->key_values.push_back({
         "offset",

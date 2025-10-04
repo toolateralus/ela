@@ -1,0 +1,15 @@
+
+
+fn main() { 
+  slice:= [u8]::from(null, 10);
+}
+
+trait Associated {
+  fn get() -> s32;
+}
+
+trait Something: Associated {
+  fn take(self) -> s32 {
+    return Self::get();
+  }
+}

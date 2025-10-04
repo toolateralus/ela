@@ -1071,12 +1071,12 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
     if (first->is_mut_pointer()) {
       if (!self_type->is_pointer() && self_symbol && self_symbol.get()->is_const()) {
-        throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.",
+        throw_error("cannot call a '*mut self' method with an immutable variable, consider adding 'mut' to the declaration.",
                     node->source_range);
       }
       if (is_const_pointer(self)) {
         throw_error(
-            "cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however "
+            "cannot call a '*mut self' method with an immutable pointer, consider taking it as '&mut' (or however "
             "you obtained this pointer)",
             node->source_range);
       }
@@ -1577,6 +1577,11 @@ void Typer::visit(ASTVariable *node) {
 
   if (node->type->resolved_type == Type::INVALID_TYPE) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
+  }
+
+
+  if (node->type->resolved_type->is_kind(TYPE_TRAIT)) {
+    throw_error("You cannot have a variable of a 'trait' type -- it is sizeless and only used at compile time to enforce rules.", node->source_range);
   }
 
   if (node->value.is_not_null()) {
@@ -2206,13 +2211,13 @@ void Typer::visit(ASTBinExpr *node) {
       auto unary = (ASTUnaryExpr *)node->left;
       auto unary_operand_ty = unary->operand->resolved_type;
       if (unary->op == TType::Mul && unary_operand_ty->is_const_pointer()) {
-        throw_error("cannot dereference into a const pointer!", node->source_range);
+        throw_error("cannot dereference into an immutable pointer!", node->source_range);
       }
 
       auto left_ty = unary->operand->resolved_type;
       auto symbol = ctx.get_symbol(unary->operand);
       if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
-        throw_error("cannot assign into a const variable!", node->source_range);
+        throw_error("cannot assign into an immutable variable!", node->source_range);
       }
 
     } else if (node->left->get_node_type() == AST_NODE_INDEX) {
@@ -2220,12 +2225,12 @@ void Typer::visit(ASTBinExpr *node) {
 
       auto subscript_left_ty = index->base->resolved_type;
       if (subscript_left_ty->is_const_pointer()) {
-        throw_error("cannot index-assign into a const pointer!", node->source_range);
+        throw_error("cannot index-assign into an immutable pointer!", node->source_range);
       }
 
       auto symbol = ctx.get_symbol(index->base);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->is_mut_pointer()) {
-        throw_error("cannot index-assign into a const variable!", node->source_range);
+        throw_error("cannot index-assign into an immutable variable!", node->source_range);
       }
 
     } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
@@ -2235,11 +2240,11 @@ void Typer::visit(ASTBinExpr *node) {
       auto left_ty = dot->base->resolved_type;
 
       if (left_ty->is_const_pointer()) {
-        throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
+        throw_error("cannot dot-assign into an immutable pointer!", dot->base->source_range);
       }
 
       if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
-        throw_error("cannot dot-assign into a const variable!", node->source_range);
+        throw_error("cannot dot-assign into an immutable variable!", node->source_range);
       }
 
       /*
@@ -2249,11 +2254,11 @@ void Typer::visit(ASTBinExpr *node) {
         dot = (ASTDotExpr *)dot->base;
         auto left_ty = dot->base->resolved_type;
         if (left_ty->is_const_pointer()) {
-          throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
+          throw_error("cannot dot-assign into an immutable pointer!", dot->base->source_range);
         }
         auto symbol = ctx.get_symbol(dot->base);
         if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->is_mut_pointer()) {
-          throw_error("cannot dot-assign into a const variable!", dot->base->source_range);
+          throw_error("cannot dot-assign into an immutable variable!", dot->base->source_range);
         }
       }
     }
@@ -2323,7 +2328,7 @@ void Typer::visit(ASTUnaryExpr *node) {
     if (symbol) {
       auto sym = symbol.get();
       if (sym->is_const() && node->mutability == MUT && !op_ty->is_mut_pointer() && !op_ty->is_kind(TYPE_FUNCTION)) {
-        throw_error("cannot take a mutable pointer to a non-mutable variable", node->source_range);
+        throw_error("cannot take a mutable pointer to an immutable variable", node->source_range);
       }
     }
 

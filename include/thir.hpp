@@ -336,6 +336,8 @@ struct THIRGen {
     global_ini_call->arguments = {};
   }
 
+
+  std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
   Context &ctx;
   std::vector<THIRFunction *> test_functions;
