@@ -347,7 +347,7 @@ struct ASTPath : ASTExpr {
    private:
     union {
       InternedString identifier;
-      ASTType *expression;
+      ASTType *type;
     };
 
    public:
@@ -374,7 +374,7 @@ struct ASTPath : ASTExpr {
     }
     void set_type(ASTType *expr) {
       this->tag = TYPE;
-      this->expression = expr;
+      this->type = expr;
     }
 
     InternedString get_identifier() const {
@@ -387,7 +387,7 @@ struct ASTPath : ASTExpr {
 
     ASTType *get_type() const {
       if (tag == TYPE) {
-        return expression;
+        return type;
       }
       throw_error("tried to get an expression for a non-expression path segment.", {});
       std::exit(1);
@@ -404,7 +404,7 @@ struct ASTPath : ASTExpr {
     static Segment Expression(ASTType *expr, std::vector<ASTExpr *> generics = {}) {
       Segment seg;
       seg.tag = TYPE;
-      seg.expression = expr;
+      seg.type = expr;
       seg.generic_arguments = generics;
       return seg;
     }

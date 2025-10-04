@@ -132,7 +132,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh/source/ela/ela-stdlib"
       }
     },
   ]

@@ -1947,7 +1947,7 @@ void Typer::visit(ASTCall *node) {
   Defer _defer([&] { current_expression_list = old_expression_list; });
 
   if (node->callee->get_node_type() == AST_NODE_PATH) {
-    visit_path_for_call((ASTPath *)node->callee);
+    visit_path((ASTPath *)node->callee, true);
   } else {
     node->callee->accept(this);
   }
@@ -3635,33 +3635,26 @@ void Typer::visit(ASTPatternMatch *node) {
   }
 }
 
-void Typer::visit(ASTPath *node) {
+void Typer::visit_path(ASTPath *node, bool from_call) {
   Scope *scope = ctx.scope;
   size_t index = 0;
   Type *previous_type = nullptr;
-  Symbol *symbol = nullptr;
-
   for (auto &segment : node->segments) {
+    Symbol *symbol = nullptr;
+    Type *type = nullptr;
     if (segment.tag == ASTPath::Segment::IDENTIFIER) {
       auto ident = segment.get_identifier();
       symbol = scope->lookup(ident);
       if (!symbol) {
         throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
       }
-      scope = nullptr;
     } else if (segment.tag == ASTPath::Segment::TYPE) {
-      symbol = ctx.get_symbol(segment.get_type()).get();
+      auto type_ast = segment.get_type(); 
+      visit(type_ast);
+      type = type_ast->resolved_type;
     } else {
-      throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
+      throw_error("INTERNAL COMPILER ERROR: path segment was neither type nor identifier", node->source_range);
     }
-
-    if (!symbol) {
-      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
-        throw_error(std::format("use of undeclared identifier {}", segment.get_identifier()), node->source_range);  
-      }
-      throw_error("use of undeclared path", node->source_range);
-    }
-
     if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1 &&
         segment.tag == ASTPath::Segment::IDENTIFIER) {
       /* we need to return the parent type here? but we need to maintain the variant. hmm. */
@@ -3675,100 +3668,13 @@ void Typer::visit(ASTPath *node) {
       return;
     }
 
-    if (!segment.generic_arguments.empty()) {
-      std::vector<Type *> generic_args;
-      for (auto &arg : segment.generic_arguments) {
-        arg->accept(this);
-        generic_args.push_back(arg->resolved_type);
-      }
-      ASTDeclaration *instantiation = nullptr;
-      if (symbol->is_type) {
-        auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
-
-        if (!decl) {
-          throw_error("cannot apply generic arguments to that type", node->source_range);
-        }
-
-        instantiation = visit_generic(decl, generic_args, node->source_range);
-        auto type = instantiation->resolved_type;
-        scope = type->info->scope;
-        previous_type = type;
-      } else if (symbol->is_function) {
-        instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
-      }
-      segment.resolved_type = instantiation->resolved_type;
-
-    } else {
-      if (symbol->is_module) {
-        scope = symbol->module.declaration->scope;
-      } else if (symbol->is_type) {
-        if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
-                      node->source_range);
-        }
-        previous_type = symbol->resolved_type;
-        scope = previous_type->info->scope;
-      }
-      segment.resolved_type = symbol->resolved_type;
-    }
-    if (!scope && index < node->segments.size() - 1) {
-      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
-        throw_error(std::format("symbol \"{}\"'s scope could not be resolved in path", segment.get_identifier()),
-                    node->source_range);
-      } else {
-        throw_error("symbol (expression) scope could not be resolved in path", node->source_range);
-      }
-    }
-    index++;
-  }
-
-  if (symbol && symbol->is_module) {
-    throw_error("A path cannot refer only to a module, it must refer to a type or function or variable.",
-                node->source_range);
-  }
-
-  node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
-}
-
-void Typer::visit_path_for_call(ASTPath *node) {
-  Scope *scope = ctx.scope;
-  size_t index = 0;
-  Type *previous_type = nullptr;
-  for (auto &segment : node->segments) {
-    Symbol *symbol;
-    if (segment.tag == ASTPath::Segment::IDENTIFIER) {
-      auto ident = segment.get_identifier();
-      symbol = scope->lookup(ident);
-    } else if (segment.tag == ASTPath::Segment::TYPE) {
-      symbol = ctx.get_symbol(segment.get_type()).get();
-    } else {
-      throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
-      return;
-    }
-
-    if (!symbol) {
-      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
-        throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
-      } else {
-        throw_error("use of undeclared identifier", node->source_range);
-      }
-    }
     scope = nullptr;
-
-    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1 &&
-        segment.tag == ASTPath::Segment::IDENTIFIER) {
-      /* we need to return the parent type here? but we need to maintain the variant. hmm. */
-      node->resolved_type = previous_type;
-      auto symbol = previous_type->info->scope->lookup(segment.get_identifier());
-      if (!symbol) {
-        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.get_identifier(),
-                                previous_type->to_string()),
-                    node->source_range);
-      }
-      return;
-    }
-
-    if (!segment.generic_arguments.empty()) {
+    
+    if (type) {
+      previous_type = type;
+      scope = previous_type->info->scope;
+      segment.resolved_type = type;
+    } else if (!segment.generic_arguments.empty()) {
       std::vector<Type *> generic_args;
       for (auto &arg : segment.generic_arguments) {
         arg->accept(this);
@@ -3782,7 +3688,7 @@ void Typer::visit_path_for_call(ASTPath *node) {
       } else {
         throw_error("use of generic arguments only for types and functions currently.", node->source_range);
       }
-      if (index == node->segments.size() - 1 && generic_args.size() != decl->generic_parameters.size()) {
+      if (from_call && index == node->segments.size() - 1 && generic_args.size() != decl->generic_parameters.size()) {
         // dont try to instantiate unresolved generic function for calls so that call can handle it
         return;
       }
@@ -3791,6 +3697,8 @@ void Typer::visit_path_for_call(ASTPath *node) {
         auto type = instantiation->resolved_type;
         scope = type->info->scope;
         previous_type = type;
+      } else if (symbol->is_function) {
+        instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
       }
       segment.resolved_type = instantiation->resolved_type;
     } else {
@@ -3818,6 +3726,10 @@ void Typer::visit_path_for_call(ASTPath *node) {
   }
 
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
+}
+
+void Typer::visit(ASTPath *node) {
+  visit_path(node);
 }
 
 bool Typer::visit_where_predicate_throws(Type *target_type, ASTExpr *predicate) {
