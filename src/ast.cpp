@@ -1453,7 +1453,7 @@ ASTType *Parser::parse_type() {
       auto slice = ast_alloc<ASTType>();
       slice->kind = ASTType::NORMAL;
       slice->normal.path = ast_alloc<ASTPath>();
-      slice->normal.path->push_segment("Slice", {type});
+      slice->normal.path->push_segment("Slice", std::vector<ASTExpr*>{type});
       return slice;
     }
     return node;
