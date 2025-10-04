@@ -3655,6 +3655,13 @@ void Typer::visit(ASTPath *node) {
       throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
     }
 
+    if (!symbol) {
+      if (segment.tag == ASTPath::Segment::IDENTIFIER) {
+        throw_error(std::format("use of undeclared identifier {}", segment.get_identifier()), node->source_range);  
+      }
+      throw_error("use of undeclared path", node->source_range);
+    }
+
     if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1 &&
         segment.tag == ASTPath::Segment::IDENTIFIER) {
       /* we need to return the parent type here? but we need to maintain the variant. hmm. */

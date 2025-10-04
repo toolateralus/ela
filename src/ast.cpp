@@ -903,8 +903,9 @@ ASTPath::Segment Parser::parse_path_segment() {
     segment.tag = ASTPath::Segment::IDENTIFIER;
     segment.set_identifier(expect(TType::Identifier).value);
   } else {
+    std::printf("%s\n", peek().location.ToString().c_str());
     segment.tag = ASTPath::Segment::EXPRESSION;
-    segment.set_expression(parse_expr());
+    segment.set_expression(parse_type());
   }
 
   if (peek().type == TType::GenericBrace) {
@@ -947,7 +948,7 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       dot->base = left;
       if (peek().type == TType::Integer) {
-        dot->member = ASTPath::Segment::Identifier(expect(TType::Identifier).value);
+        dot->member = ASTPath::Segment::Identifier(expect(TType::Integer).value);
       } else if (peek().type == TType::Identifier) {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
