@@ -285,12 +285,16 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
       Scope *scope = ctx.scope;
       size_t index = 0;
       for (auto &segment : path->segments) {
-        Symbol *symbol;
+        Symbol *symbol = nullptr;
+        Type *type = nullptr;
         if (segment.tag == ASTPath::Segment::IDENTIFIER) {
           auto ident = segment.get_identifier();
           symbol = scope->lookup(ident);
+          if (!symbol) {
+            throw_error("INTERNAL COMPILER ERROR: symbol null in path", node->source_range);
+          }
         } else if (segment.tag == ASTPath::Segment::TYPE) {
-          symbol = ctx.get_symbol(segment.get_type()).get();
+          type = segment.get_type()->resolved_type;
         } else {
           throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier",
                       node->source_range);
@@ -300,8 +304,10 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
         if (index == path->length() - 1) {
           return symbol;
         }
-
-        if (!segment.generic_arguments.empty()) {
+        
+        if (type) {
+          scope = type->info->scope;
+        } else if (!segment.generic_arguments.empty()) {
           if (symbol->is_type) {
             auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
 

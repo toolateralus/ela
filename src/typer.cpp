@@ -3349,26 +3349,27 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       Scope *scope = this->scope;
       size_t index = 0;
       for (auto &part : path->segments) {
-        Symbol *symbol;
+        Symbol *symbol = nullptr;
+        Type *type = nullptr;
         if (part.tag == ASTPath::Segment::IDENTIFIER) {
           symbol = scope->lookup(part.get_identifier());
+          if (!symbol) {
+            return nullptr;
+          }
         } else if (part.tag == ASTPath::Segment::TYPE) {
-          symbol = get_symbol(part.get_type()).get();
+          type = part.get_type()->resolved_type;
         } else {
-          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
+          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor type",
                       node->source_range);
-          return nullptr;
-        }
-
-        if (!symbol) {
-          return nullptr;
         }
 
         if (index == path->length() - 1) {
           return symbol;
         }
 
-        if (!part.generic_arguments.empty()) {
+        if (type) {
+          scope = type->info->scope;
+        } else if (!part.generic_arguments.empty()) {
           if (symbol->is_type) {
             auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
 
@@ -3432,11 +3433,15 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       Scope *scope = this->scope;
       size_t index = 0;
       for (auto &part : path->segments) {
-        Symbol *symbol;
+        Symbol *symbol = nullptr;
+        Type *type = nullptr;
         if (part.tag == ASTPath::Segment::IDENTIFIER) {
           symbol = scope->lookup(part.get_identifier());
+          if (!symbol) {
+            throw_error("INTERNAL COMPILER ERROR: symbol null in path", node->source_range);
+          }
         } else if (part.tag == ASTPath::Segment::TYPE) {
-          symbol = get_symbol(part.get_type()).get();
+          type = part.get_type()->resolved_type;
         } else {
           throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
                       node->source_range);
@@ -3445,7 +3450,9 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
 
         if (index == path->length() - 1) return symbol->parent_scope;
 
-        if (!part.generic_arguments.empty()) {
+        if (type) {
+          scope = type->info->scope;
+        } else if (!part.generic_arguments.empty()) {
           if (symbol->is_type) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
