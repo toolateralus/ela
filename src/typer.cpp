@@ -13,6 +13,7 @@
 
 #include "ast.hpp"
 #include "copier.hpp"
+#include "strings.hpp"
 #include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -929,7 +930,7 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
   // .method
   ASTDotExpr dot;
   dot.base = &path;
-  dot.member = ASTPath::Segment{method_name};
+  dot.member = ASTPath::Segment::Identifier(method_name);
 
   call.callee = &dot;
   call.accept(this);
@@ -3466,7 +3467,7 @@ void Typer::visit(ASTMethodCall *node) {
       auto &args = node->arguments->arguments;
       auto dot = ast_alloc<ASTDotExpr>();
       dot->base = object;
-      dot->member = ASTPath::Segment{"instance"};
+      dot->member = ASTPath::Segment::Identifier(DYN_INSTANCE_KEY);
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});
       args.insert(args.begin(), dot);
       node->inserted_dyn_arg = true;

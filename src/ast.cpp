@@ -897,13 +897,23 @@ ASTExpr *Parser::parse_unary() {
 }
 
 ASTPath::Segment Parser::parse_path_segment() {
-  InternedString identifier = expect(TType::Identifier).value;
-  if (peek().type == TType::GenericBrace) {
-    auto generics = parse_generic_arguments();
-    return {identifier, generics};
+  ASTPath::Segment segment = {
+      .tag = ASTPath::Segment::INVALID,
+  };
+
+  if (peek().type == TType::Identifier) {
+    segment.tag = ASTPath::Segment::IDENTIFIER;
+    segment.identifier = expect(TType::Identifier).value;
   } else {
-    return {identifier, std::vector<ASTExpr *>{}};
+    segment.tag = ASTPath::Segment::EXPRESSION;
+    segment.expression = parse_expr();
   }
+
+  if (peek().type == TType::GenericBrace) {
+    segment.generic_arguments = parse_generic_arguments();
+  }
+
+  return segment;
 }
 
 ASTPath *Parser::parse_path(bool parsing_import_group) {
@@ -939,7 +949,7 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       dot->base = left;
       if (peek().type == TType::Integer) {
-        dot->member = ASTPath::Segment{eat().value};
+        dot->member = ASTPath::Segment::Identifier(expect(TType::Identifier).value);
       } else if (peek().type == TType::Identifier) {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
@@ -2197,10 +2207,12 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     auto result = process_directive(DIRECTIVE_KIND_STATEMENT, ident.value);
     if (result.is_null() || result.get()->get_node_type() != AST_NODE_BLOCK) {
       end_node(block, range);
-      throw_error(std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't", ident.value),
-                  range);
+      throw_error(
+          std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't",
+                      ident.value),
+          range);
     }
-    return (ASTBlock*)result.get();
+    return (ASTBlock *)result.get();
   }
 
   if (peek().type == TType::ExpressionBody) {

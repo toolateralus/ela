@@ -114,7 +114,7 @@ struct ASTNode {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
-  
+
   Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
   Scope *declaring_scope;
   SourceRange source_range{};
@@ -343,9 +343,18 @@ struct ASTTypeExtension {
 
 struct ASTPath : ASTExpr {
   struct Segment {
-    InternedString identifier{};
-    std::vector<ASTExpr *> generic_arguments;
+    enum Tag {
+      INVALID,
+      EXPRESSION,
+      IDENTIFIER,
+    } tag;
 
+    union {
+      InternedString identifier{};
+      ASTExpr *expression;
+    };
+
+    std::vector<ASTExpr *> generic_arguments;
     Type *resolved_type = Type::INVALID_TYPE;
 
     inline std::vector<Type *> get_resolved_generics() {
@@ -354,6 +363,22 @@ struct ASTPath : ASTExpr {
         generics.push_back(arg->resolved_type);
       }
       return generics;
+    }
+
+    static Segment Identifier(InternedString ident, std::vector<ASTExpr *> generics = {}) {
+      Segment seg;
+      seg.tag = IDENTIFIER;
+      seg.identifier = ident;
+      seg.generic_arguments = generics;
+      return seg;
+    }
+
+    static Segment Expression(ASTExpr *expr, std::vector<ASTExpr *> generics = {}) {
+      Segment seg;
+      seg.tag = EXPRESSION;
+      seg.expression = expr;
+      seg.generic_arguments = generics;
+      return seg;
     }
   };
 
@@ -376,10 +401,12 @@ struct ASTPath : ASTExpr {
   void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
-  inline void push_segment(InternedString identifier) { segments.emplace_back(identifier); }
+  inline void push_segment(ASTExpr *expression, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back({.tag = Segment::EXPRESSION, .expression = expression, .generic_arguments = generic_arguments});
+  }
 
-  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
-    segments.emplace_back(identifier, generic_arguments);
+  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back({.tag = Segment::IDENTIFIER, .identifier = identifier, .generic_arguments = generic_arguments});
   }
 };
 
@@ -602,12 +629,10 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_extern : 1 = false;
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
-  bool is_macro: 1 = false;
-  bool is_hygenic_macro: 1 = false;
+  bool is_macro : 1 = false;
+  bool is_hygenic_macro : 1 = false;
 
-  bool requires_self_ptr() const {
-    return params->has_self && params->params[0]->self.is_pointer;
-  }
+  bool requires_self_ptr() const { return params->has_self && params->params[0]->self.is_pointer; }
 
   bool has_defer = false;
   bool is_declared = false;
