@@ -3352,8 +3352,8 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         Symbol *symbol;
         if (part.tag == ASTPath::Segment::IDENTIFIER) {
           symbol = scope->lookup(part.get_identifier());
-        } else if (part.tag == ASTPath::Segment::EXPRESSION) {
-          symbol = get_symbol(part.get_expression()).get();
+        } else if (part.tag == ASTPath::Segment::TYPE) {
+          symbol = get_symbol(part.get_type()).get();
         } else {
           throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
                       node->source_range);
@@ -3435,8 +3435,8 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
         Symbol *symbol;
         if (part.tag == ASTPath::Segment::IDENTIFIER) {
           symbol = scope->lookup(part.get_identifier());
-        } else if (part.tag == ASTPath::Segment::EXPRESSION) {
-          symbol = get_symbol(part.get_expression()).get();
+        } else if (part.tag == ASTPath::Segment::TYPE) {
+          symbol = get_symbol(part.get_type()).get();
         } else {
           throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
                       node->source_range);
@@ -3649,8 +3649,8 @@ void Typer::visit(ASTPath *node) {
         throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
       }
       scope = nullptr;
-    } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
-      symbol = ctx.get_symbol(segment.get_expression()).get();
+    } else if (segment.tag == ASTPath::Segment::TYPE) {
+      symbol = ctx.get_symbol(segment.get_type()).get();
     } else {
       throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
     }
@@ -3739,8 +3739,8 @@ void Typer::visit_path_for_call(ASTPath *node) {
     if (segment.tag == ASTPath::Segment::IDENTIFIER) {
       auto ident = segment.get_identifier();
       symbol = scope->lookup(ident);
-    } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
-      symbol = ctx.get_symbol(segment.get_expression()).get();
+    } else if (segment.tag == ASTPath::Segment::TYPE) {
+      symbol = ctx.get_symbol(segment.get_type()).get();
     } else {
       throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
       return;

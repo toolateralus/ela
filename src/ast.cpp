@@ -904,8 +904,8 @@ ASTPath::Segment Parser::parse_path_segment() {
     segment.set_identifier(expect(TType::Identifier).value);
   } else {
     std::printf("%s\n", peek().location.ToString().c_str());
-    segment.tag = ASTPath::Segment::EXPRESSION;
-    segment.set_expression(parse_type());
+    segment.tag = ASTPath::Segment::TYPE;
+    segment.set_type(parse_type());
   }
 
   if (peek().type == TType::GenericBrace) {

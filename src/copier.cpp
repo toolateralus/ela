@@ -693,9 +693,9 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
         new_generic_args.push_back(new_arg);
       }
     }
-    if (part.tag == ASTPath::Segment::EXPRESSION) {
-      const auto expr = part.get_expression();
-      auto new_expr = (ASTExpr *)copy_node(expr);
+    if (part.tag == ASTPath::Segment::TYPE) {
+      const auto expr = part.get_type();
+      auto new_expr = (ASTType *)copy_node(expr);
       new_node->push_segment(new_expr, new_generic_args);
     } else if (part.tag == ASTPath::Segment::IDENTIFIER) {
       new_node->push_segment(part.get_identifier(), new_generic_args);

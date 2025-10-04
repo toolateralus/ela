@@ -341,18 +341,19 @@ struct ASTTypeExtension {
   ASTExpr *expression;
 };
 
+struct ASTType;
 struct ASTPath : ASTExpr {
   struct Segment {
    private:
     union {
       InternedString identifier;
-      ASTExpr *expression;
+      ASTType *expression;
     };
 
    public:
     enum Tag {
       INVALID,
-      EXPRESSION,
+      TYPE,
       IDENTIFIER,
     } tag;
 
@@ -371,8 +372,8 @@ struct ASTPath : ASTExpr {
       this->tag = IDENTIFIER;
       this->identifier = identifier;
     }
-    void set_expression(ASTExpr *expr) {
-      this->tag = EXPRESSION;
+    void set_type(ASTType *expr) {
+      this->tag = TYPE;
       this->expression = expr;
     }
 
@@ -384,8 +385,8 @@ struct ASTPath : ASTExpr {
       std::exit(1);
     }
 
-    ASTExpr *get_expression() const {
-      if (tag == EXPRESSION) {
+    ASTType *get_type() const {
+      if (tag == TYPE) {
         return expression;
       }
       throw_error("tried to get an expression for a non-expression path segment.", {});
@@ -400,9 +401,9 @@ struct ASTPath : ASTExpr {
       return seg;
     }
 
-    static Segment Expression(ASTExpr *expr, std::vector<ASTExpr *> generics = {}) {
+    static Segment Expression(ASTType *expr, std::vector<ASTExpr *> generics = {}) {
       Segment seg;
-      seg.tag = EXPRESSION;
+      seg.tag = TYPE;
       seg.expression = expr;
       seg.generic_arguments = generics;
       return seg;
@@ -434,7 +435,7 @@ struct ASTPath : ASTExpr {
   void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
-  inline void push_segment(ASTExpr *expression, std::vector<ASTExpr *> generic_arguments = {}) {
+  inline void push_segment(ASTType *expression, std::vector<ASTExpr *> generic_arguments = {}) {
     segments.push_back(Segment::Expression(expression, generic_arguments));
   }
 

@@ -289,8 +289,8 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
         if (segment.tag == ASTPath::Segment::IDENTIFIER) {
           auto ident = segment.get_identifier();
           symbol = scope->lookup(ident);
-        } else if (segment.tag == ASTPath::Segment::EXPRESSION) {
-          symbol = ctx.get_symbol(segment.get_expression()).get();
+        } else if (segment.tag == ASTPath::Segment::TYPE) {
+          symbol = ctx.get_symbol(segment.get_type()).get();
         } else {
           throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier",
                       node->source_range);
