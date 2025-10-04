@@ -897,13 +897,28 @@ ASTExpr *Parser::parse_unary() {
 }
 
 ASTPath::Segment Parser::parse_path_segment() {
-  InternedString identifier = expect(TType::Identifier).value;
-  if (peek().type == TType::GenericBrace) {
-    auto generics = parse_generic_arguments();
-    return {identifier, generics};
+  auto token = eat();
+  ASTPath::Segment segment;
+  if (token.type == TType::LBrace) {
+    segment.identifier = "Slice";
+    segment.generic_arguments.push_back(parse_type());
+    expect(TType::RBrace);
+  } else if (token.type == TType::Identifier) {
+    segment.identifier = token.value;
+    if (peek().type == TType::GenericBrace) {
+      segment.generic_arguments = parse_generic_arguments();
+    }
+  } else if (token.type == TType::Self) {
+    if (peek().type == TType::GenericBrace) {
+      throw_error("Cannot apply generic arguments to a Self type", token.location);
+    }
+    segment.is_self_type = true;
   } else {
-    return {identifier, std::vector<ASTExpr *>{}};
+    throw_error(
+        std::format("Expected Identifier, Self, or LBrace, got {} : {}", TTypeToString(token.type), token.value),
+        token.location);
   }
+  return segment;
 }
 
 ASTPath *Parser::parse_path(bool parsing_import_group) {
@@ -1090,9 +1105,6 @@ ASTExpr *Parser::parse_primary() {
       node->expression = parse_expr();
       return node;
     };
-    case TType::Self: {
-      return parse_type();
-    }
     case TType::If: {
       return parse_if();
     }
@@ -1251,6 +1263,8 @@ ASTExpr *Parser::parse_primary() {
       end_node(node, range);
       return node;
     }
+    case TType::Self:
+    case TType::LBrace:
     case TType::Identifier: {
       return parse_path();
     }
@@ -1353,9 +1367,6 @@ ASTExpr *Parser::parse_primary() {
       }
 
       return expr;
-    }
-    case TType::LBrace: {
-      return parse_type();
     }
     default: {
       auto error_range = begin_node();
@@ -1467,12 +1478,7 @@ ASTType *Parser::parse_type() {
     return node;
   }
 
-  if (next_type == TType::Self) {
-    eat();
-    node->kind = ASTType::SELF;
-  }
-
-  if (node->kind == ASTType::NORMAL && !node->normal.path) {
+  if ((node->kind == ASTType::NORMAL || next_type == TType::Self) && !node->normal.path) {
     node->normal.path = parse_path();
     node->normal.path->source_range = range;
   }
@@ -2197,10 +2203,12 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     auto result = process_directive(DIRECTIVE_KIND_STATEMENT, ident.value);
     if (result.is_null() || result.get()->get_node_type() != AST_NODE_BLOCK) {
       end_node(block, range);
-      throw_error(std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't", ident.value),
-                  range);
+      throw_error(
+          std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't",
+                      ident.value),
+          range);
     }
-    return (ASTBlock*)result.get();
+    return (ASTBlock *)result.get();
   }
 
   if (peek().type == TType::ExpressionBody) {
@@ -2670,7 +2678,10 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
         condition = (ASTExpr *)binexpr;
       }
       NODE_ALLOC(ASTType, self_type, range, defer, this);
-      self_type->kind = ASTType::SELF;
+      self_type->kind = ASTType::NORMAL;
+      NODE_ALLOC(ASTPath, path, range1, defer1, this);
+      path->push_self_segment();
+      self_type->normal.path = path;
       return {self_type, condition};
     };
     constraints.push_back(parse_constraint());

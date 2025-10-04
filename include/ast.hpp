@@ -347,6 +347,7 @@ struct ASTPath : ASTExpr {
     std::vector<ASTExpr *> generic_arguments;
 
     Type *resolved_type = Type::INVALID_TYPE;
+    bool is_self_type = false;
 
     inline std::vector<Type *> get_resolved_generics() {
       std::vector<Type *> generics;
@@ -377,6 +378,7 @@ struct ASTPath : ASTExpr {
   inline size_t length() const { return segments.size(); }
 
   inline void push_segment(InternedString identifier) { segments.emplace_back(identifier); }
+  inline void push_self_segment() { segments.push_back({.is_self_type = true}); }
 
   inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
     segments.emplace_back(identifier, generic_arguments);
@@ -390,7 +392,6 @@ struct ASTType : ASTExpr {
     NORMAL,
     TUPLE,
     FUNCTION,
-    SELF,
     STRUCTURAL_DECLARATIVE_ASCRIPTION,  // something like ` x: struct { x: f32, y: f32 } `
   } kind = NORMAL;
 
@@ -416,7 +417,6 @@ struct ASTType : ASTExpr {
     kind = other.kind;
     switch (kind) {
       case NORMAL:
-      case SELF:
         normal = decltype(normal)(other.normal);
         break;
       case TUPLE:

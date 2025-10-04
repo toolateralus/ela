@@ -222,7 +222,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
 
-  // create a type context for #self.
+  // create a type context for Self.
   auto old_type_context = type_context;
   ASTType ast_type;
   ast_type.resolved_type = type;
@@ -417,7 +417,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
 
   if (node->is_macro && !macro_expansion) {
     // These get thier bodies type checked on call, not here.
-    return;  
+    return;
   }
 
   ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
@@ -1071,8 +1071,9 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
     if (first->is_mut_pointer()) {
       if (!self_type->is_pointer() && self_symbol && self_symbol.get()->is_const()) {
-        throw_error("cannot call a '*mut self' method with an immutable variable, consider adding 'mut' to the declaration.",
-                    node->source_range);
+        throw_error(
+            "cannot call a '*mut self' method with an immutable variable, consider adding 'mut' to the declaration.",
+            node->source_range);
       }
       if (is_const_pointer(self)) {
         throw_error(
@@ -1579,9 +1580,11 @@ void Typer::visit(ASTVariable *node) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
   }
 
-
   if (node->type->resolved_type->is_kind(TYPE_TRAIT)) {
-    throw_error("You cannot have a variable of a 'trait' type -- it is sizeless and only used at compile time to enforce rules.", node->source_range);
+    throw_error(
+        "You cannot have a variable of a 'trait' type -- it is sizeless and only used at compile time to enforce "
+        "rules.",
+        node->source_range);
   }
 
   if (node->value.is_not_null()) {
@@ -2150,17 +2153,6 @@ void Typer::visit(ASTType *node) {
       }
       node->resolved_type = global_find_function_type_id(info, extensions);
     } break;
-    case ASTType::SELF: {
-      auto self = get_self_type();
-      if (self == Type::INVALID_TYPE) {
-        throw_error("Cannot locate #self type.", node->source_range);
-      }
-      auto self_w_ext = global_find_type_id(self, extensions);
-      if (self_w_ext == Type::INVALID_TYPE) {
-        throw_error("Cannot locate #self type with extensions", node->source_range);
-      }
-      node->resolved_type = self_w_ext;
-    } break;
     case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
       node->declaration->accept(this);
       node->resolved_type = global_find_type_id(node->declaration->resolved_type, extensions);
@@ -2716,7 +2708,7 @@ void Typer::visit(ASTSwitch *node) {
       throw_error(
           std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum, non-choice type that "
                       "doesn't implement "
-                      "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
+                      "Eq (== operator on Self), or qualify for pattern matching (choice types).\ngot type '{}'",
                       type->to_string()),
           node->expression->source_range);
     }
@@ -3232,9 +3224,11 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
       }
     }
 
-    if (declaration->return_type->kind == ASTType::SELF) {
+    auto return_type_ast = declaration->return_type;
+    if (return_type_ast->kind == ASTType::NORMAL && return_type_ast->normal.path != nullptr &&
+        return_type_ast->normal.path->segments[0].is_self_type) {
       throw_error(
-          "just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
+          "just as we can't take 'self' by value in a 'dyn' trait, you can't return 'Self', even by pointer, "
           "because we would have to return it as a type erased *const void. return the concrete type.",
           range);
     }
@@ -3272,7 +3266,8 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
           continue;
         }
         auto type = (ASTType *)constraint.first;
-        if (type->kind != ASTType::SELF) {
+        if (type->kind == ASTType::NORMAL && type->normal.path != nullptr &&
+            type->normal.path->segments[0].is_self_type) {
           continue;
         }
         if (!constraint.second->resolved_type->is_kind(TYPE_TRAIT)) {
@@ -3585,14 +3580,24 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   size_t index = 0;
   Type *previous_type = nullptr;
+  Type *self_type = nullptr;
   Symbol *symbol = nullptr;
 
   for (auto &segment : node->segments) {
-    auto &ident = segment.identifier;
-    symbol = scope->lookup(ident);
-    if (!symbol) {
-      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+    if (segment.is_self_type) {
+      self_type = get_self_type();
+      if (self_type == Type::INVALID_TYPE) {
+        throw_error("Cannot locate Self type.", node->source_range);
+      }
+    } else {
+      self_type = nullptr;
+      auto &ident = segment.identifier;
+      symbol = scope->lookup(ident);
+      if (!symbol) {
+        throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+      }
     }
+
     scope = nullptr;
 
     if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
@@ -3614,7 +3619,9 @@ void Typer::visit(ASTPath *node) {
         generic_args.push_back(arg->resolved_type);
       }
       ASTDeclaration *instantiation = nullptr;
-      if (symbol->is_type) {
+      if (self_type) {
+        throw_error("cannot apply generic arguments to Self type", node->source_range);
+      } else if (symbol->is_type) {
         auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
 
         if (!decl) {
@@ -3629,10 +3636,13 @@ void Typer::visit(ASTPath *node) {
         instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
       }
       segment.resolved_type = instantiation->resolved_type;
-
     } else {
-      if (symbol->is_module) {
+      if (self_type) {
+        scope = self_type->info->scope;
+        segment.resolved_type = self_type;
+      } else if (symbol->is_module) {
         scope = symbol->module.declaration->scope;
+        segment.resolved_type = symbol->resolved_type;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
           throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
@@ -3640,8 +3650,8 @@ void Typer::visit(ASTPath *node) {
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
+        segment.resolved_type = symbol->resolved_type;
       }
-      segment.resolved_type = symbol->resolved_type;
     }
     if (!scope && index < node->segments.size() - 1) {
       throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),

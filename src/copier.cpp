@@ -125,8 +125,6 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
     case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
       new_node->declaration = node->declaration;
     } break;
-    case ASTType::SELF:
-      break;
     case ASTType::NORMAL:
       if (node->normal.path) {
         new_node->normal.path = (ASTPath *)copy_node(node->normal.path);
