@@ -2103,15 +2103,12 @@ void Typer::visit(ASTType *node) {
     case ASTType::NORMAL: {
       auto &normal_ty = node->normal;
       normal_ty.path->accept(this);
-      auto symbol = ctx.get_symbol(normal_ty.path).get();
 
-      if (!symbol) {
+      if (!type_is_valid(normal_ty.path->resolved_type)) {
         throw_error("use of undeclared type", node->source_range);
-      } else if (!symbol->is_type) {
-        throw_error("cannot use a non-type symbol as a type", node->source_range);
+        return;
       }
 
-      normal_ty.path->accept(this);
       auto base_ty = normal_ty.path->resolved_type;
       if (!base_ty) {
         if (normal_ty.path->resolved_type == Type::INVALID_TYPE) {
@@ -2120,6 +2117,7 @@ void Typer::visit(ASTType *node) {
           throw_error("use of unresolved generic type", node->source_range);
         }
       }
+
       node->resolved_type = global_find_type_id(base_ty, extensions);
 
       if (node->normal.is_dyn) {

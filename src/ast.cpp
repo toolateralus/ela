@@ -920,7 +920,9 @@ ASTPath *Parser::parse_path(bool parsing_import_group) {
   while (!parsing_import_group || (peek().type != TType::LCurly &&
                                    peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
                                                                   // place to simplify parsing of import groups.
-    path->segments.push_back(parse_path_segment());
+
+    auto segment = parse_path_segment();
+    path->segments.push_back(segment);
     if (peek().type == TType::DoubleColon) {
       eat();
     } else {
@@ -1359,12 +1361,9 @@ ASTExpr *Parser::parse_primary() {
 
       return expr;
     }
-    case TType::Self: {
+    case TType::LBrace:
+    case TType::Self:
       return parse_path();
-    }
-    case TType::LBrace: {
-      return parse_path();
-    }
     default: {
       auto error_range = begin_node();
       throw_error(
