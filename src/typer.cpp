@@ -560,6 +560,26 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
   node->resolved_type = global_find_function_type_id(info, {});
 }
 
+bool type_equals_or_matches_trait(Type *expected, Type *input) {
+  if (expected->is_kind(TYPE_TRAIT)) {
+    if (expected->generic_base_type != Type::INVALID_TYPE) {
+      if (!input->implements(expected->generic_base_type)) {
+        return false;
+      }
+      if (expected->generic_args != input->generic_args) {
+        return false;
+      }
+    } else {
+      if (!input->implements(expected)) {
+        return false;
+      }
+    }
+  } else if (expected != input) {
+    return false;
+  }
+  return true;
+}
+
 bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
   FunctionTypeInfo *trait_method_info = trait_method->info->as<FunctionTypeInfo>();
   FunctionTypeInfo *impl_method_info = impl_method->info->as<FunctionTypeInfo>();
@@ -571,41 +591,14 @@ bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
   for (size_t i = 0; i < trait_method_info->params_len; ++i) {
     Type *trait_param = trait_method_info->parameter_types[i];
     Type *impl_param = impl_method_info->parameter_types[i];
-
-    if (trait_param->is_kind(TYPE_TRAIT)) {
-      if (!impl_param->implements(trait_param)) {
-        return false;
-      }
-      if (trait_param->generic_args != impl_param->generic_args) {
-        return false;
-      }
-    } else if (trait_param != impl_param) {
+    if (!type_equals_or_matches_trait(trait_param, impl_param)) {
       return false;
     }
   }
 
-  {
-    Type *trait_return = trait_method_info->return_type;
-    Type *impl_return = impl_method_info->return_type;
-    if (trait_return->is_kind(TYPE_TRAIT)) {
-      if (trait_return->generic_base_type != Type::INVALID_TYPE) {
-        if (!impl_return->implements(trait_return->generic_base_type)) {
-          return false;
-        }
-        if (trait_return->generic_args != impl_return->generic_args) {
-          return false;
-        }
-      } else {
-        if (!impl_return->implements(trait_return)) {
-          return false;
-        }
-      }
-    } else if (trait_return != impl_return) {
-      return false;
-    }
-  }
-
-  return true;
+  Type *trait_return = trait_method_info->return_type;
+  Type *impl_return = impl_method_info->return_type;
+  return type_equals_or_matches_trait(trait_return, impl_return);
 }
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args) {
@@ -1290,7 +1283,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
   return instantiation;
 }
 
-// #undef USE_GENERIC_PANIC_HANDLER
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range) {
 #ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
@@ -1676,9 +1668,6 @@ void Typer::visit(ASTBlock *node) {
   node->resolved_type = node->control_flow.type;
 }
 
-// TODO: Remove ParamDecl, and ArgumentDecl probably. Such unneccesary nodes, a ton of boilerplate visitor logic
-// and no real benefit.
-// TODO: we can keep an ASTParamsDecl but meh
 void Typer::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
@@ -2196,7 +2185,7 @@ void Typer::visit(ASTBinExpr *node) {
                         node->source_range);
           }
         } else {
-          throw_error("can't assign a non-existent variable (TODO verify this error is correct)", node->source_range);
+          throw_error("can't assign a non-existent variable", node->source_range);
         }
 
         // we assume this is mutable since we made it past that?
@@ -2204,7 +2193,7 @@ void Typer::visit(ASTBinExpr *node) {
         if (symbol && symbol->is_variable) {
           symbol->variable.initial_value = node->right;
         } else {
-          throw_error("Cannot assign to non-variable symbol", node->source_range);
+          throw_error("cannot assign to non-variable", node->source_range);
         }
       }
     }
@@ -3654,7 +3643,7 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
         throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->source_range);
       }
     } else if (segment.tag == ASTPath::Segment::TYPE) {
-      auto type_ast = segment.get_type(); 
+      auto type_ast = segment.get_type();
       visit(type_ast);
       type = type_ast->resolved_type;
     } else {
@@ -3674,7 +3663,7 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
     }
 
     scope = nullptr;
-    
+
     if (type) {
       previous_type = type;
       scope = previous_type->info->scope;
@@ -3733,9 +3722,7 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
 }
 
-void Typer::visit(ASTPath *node) {
-  visit_path(node);
-}
+void Typer::visit(ASTPath *node) { visit_path(node); }
 
 bool Typer::visit_where_predicate_throws(Type *target_type, ASTExpr *predicate) {
   switch (predicate->get_node_type()) {
