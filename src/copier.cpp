@@ -55,7 +55,7 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
     new_node->block = (ASTBlock *)copy_node(node->block.get());
     node->block.get()->scope->parent = new_node->scope;
   }
-  
+
   current_scope = old_scope;
   return new_node;
 }
@@ -685,16 +685,22 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
   auto new_node = make_copy(node);
   new_node->segments.clear();
   for (const auto &part : node->segments) {
+    std::vector<ASTExpr *> new_generic_args;
     if (!part.generic_arguments.empty()) {
-      std::vector<ASTExpr *> args;
       for (auto arg : part.generic_arguments) {
         auto new_arg = (ASTExpr *)copy_node(arg);
         new_arg->resolved_type = Type::INVALID_TYPE;
-        args.push_back(new_arg);
+        new_generic_args.push_back(new_arg);
       }
-      new_node->push_segment(part.identifier, args);
+    }
+    if (part.tag == ASTPath::Segment::TYPE) {
+      const auto expr = part.get_type();
+      auto new_expr = (ASTType *)copy_node(expr);
+      new_node->push_segment(new_expr, new_generic_args);
+    } else if (part.tag == ASTPath::Segment::IDENTIFIER) {
+      new_node->push_segment(part.get_identifier(), new_generic_args);
     } else {
-      new_node->push_segment(part.identifier, {});
+      throw_error("Invalid path segment, was neither identifier nor expression", node->source_range);
     }
   }
   return new_node;

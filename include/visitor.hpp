@@ -93,8 +93,6 @@ struct Typer : VisitorBase {
   void implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *choice, const bool generic_instantiation,
                                               const std::vector<Type *> generic_args = {});
 
-  void visit_path_for_call(ASTPath *node);
-
   void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
                           const SourceRange &range);
   /*
@@ -126,6 +124,8 @@ struct Typer : VisitorBase {
 
   Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                              const SourceRange &source_range);
+
+  void visit_path(ASTPath *node, bool from_call = false);
 
   void visit(ASTWhereStatement *node) override;
   void visit(ASTMethodCall *node) override;

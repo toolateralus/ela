@@ -114,7 +114,7 @@ struct ASTNode {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
-  
+
   Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
   Scope *declaring_scope;
   SourceRange source_range{};
@@ -341,11 +341,23 @@ struct ASTTypeExtension {
   ASTExpr *expression;
 };
 
+struct ASTType;
 struct ASTPath : ASTExpr {
   struct Segment {
-    InternedString identifier{};
-    std::vector<ASTExpr *> generic_arguments;
+   private:
+    union {
+      InternedString identifier;
+      ASTType *type;
+    };
 
+   public:
+    enum Tag {
+      INVALID,
+      TYPE,
+      IDENTIFIER,
+    } tag;
+
+    std::vector<ASTExpr *> generic_arguments;
     Type *resolved_type = Type::INVALID_TYPE;
 
     inline std::vector<Type *> get_resolved_generics() {
@@ -354,6 +366,53 @@ struct ASTPath : ASTExpr {
         generics.push_back(arg->resolved_type);
       }
       return generics;
+    }
+
+    void set_identifier(InternedString identifier) {
+      this->tag = IDENTIFIER;
+      this->identifier = identifier;
+    }
+    void set_type(ASTType *expr) {
+      this->tag = TYPE;
+      this->type = expr;
+    }
+
+    InternedString get_identifier() const {
+      if (tag == IDENTIFIER) {
+        return identifier;
+      }
+      throw_error("tried to get an identifier for a non-identifier path segment.", {});
+      std::exit(1);
+    }
+
+    ASTType *get_type() const {
+      if (tag == TYPE) {
+        return type;
+      }
+      throw_error("tried to get an expression for a non-expression path segment.", {});
+      std::exit(1);
+    }
+
+    static Segment Identifier(InternedString ident, std::vector<ASTExpr *> generics = {}) {
+      Segment seg;
+      seg.tag = IDENTIFIER;
+      seg.identifier = ident;
+      seg.generic_arguments = generics;
+      return seg;
+    }
+
+    static Segment Expression(ASTType *expr, std::vector<ASTExpr *> generics = {}) {
+      Segment seg;
+      seg.tag = TYPE;
+      seg.type = expr;
+      seg.generic_arguments = generics;
+      return seg;
+    }
+
+    static Segment Invalid() {
+      Segment seg;
+      seg.tag = INVALID;
+      return seg;
     }
   };
 
@@ -376,10 +435,12 @@ struct ASTPath : ASTExpr {
   void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
-  inline void push_segment(InternedString identifier) { segments.emplace_back(identifier); }
+  inline void push_segment(ASTType *expression, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back(Segment::Expression(expression, generic_arguments));
+  }
 
-  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
-    segments.emplace_back(identifier, generic_arguments);
+  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments = {}) {
+    segments.push_back(Segment::Identifier(identifier, generic_arguments));
   }
 };
 
@@ -602,12 +663,10 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_extern : 1 = false;
   bool is_inline : 1 = false;
   bool is_entry : 1 = false;
-  bool is_macro: 1 = false;
-  bool is_hygenic_macro: 1 = false;
+  bool is_macro : 1 = false;
+  bool is_hygenic_macro : 1 = false;
 
-  bool requires_self_ptr() const {
-    return params->has_self && params->params[0]->self.is_pointer;
-  }
+  bool requires_self_ptr() const { return params->has_self && params->params[0]->self.is_pointer; }
 
   bool has_defer = false;
   bool is_declared = false;

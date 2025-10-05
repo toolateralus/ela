@@ -897,13 +897,21 @@ ASTExpr *Parser::parse_unary() {
 }
 
 ASTPath::Segment Parser::parse_path_segment() {
-  InternedString identifier = expect(TType::Identifier).value;
-  if (peek().type == TType::GenericBrace) {
-    auto generics = parse_generic_arguments();
-    return {identifier, generics};
+  ASTPath::Segment segment = ASTPath::Segment::Invalid();
+
+  if (peek().type == TType::Identifier) {
+    segment.tag = ASTPath::Segment::IDENTIFIER;
+    segment.set_identifier(expect(TType::Identifier).value);
   } else {
-    return {identifier, std::vector<ASTExpr *>{}};
+    segment.tag = ASTPath::Segment::TYPE;
+    segment.set_type(parse_type());
   }
+
+  if (peek().type == TType::GenericBrace) {
+    segment.generic_arguments = parse_generic_arguments();
+  }
+
+  return segment;
 }
 
 ASTPath *Parser::parse_path(bool parsing_import_group) {
@@ -912,7 +920,9 @@ ASTPath *Parser::parse_path(bool parsing_import_group) {
   while (!parsing_import_group || (peek().type != TType::LCurly &&
                                    peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
                                                                   // place to simplify parsing of import groups.
-    path->segments.push_back(parse_path_segment());
+
+    auto segment = parse_path_segment();
+    path->segments.push_back(segment);
     if (peek().type == TType::DoubleColon) {
       eat();
     } else {
@@ -939,7 +949,7 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       dot->base = left;
       if (peek().type == TType::Integer) {
-        dot->member = ASTPath::Segment{eat().value};
+        dot->member = ASTPath::Segment::Identifier(expect(TType::Integer).value);
       } else if (peek().type == TType::Identifier) {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
@@ -1090,9 +1100,6 @@ ASTExpr *Parser::parse_primary() {
       node->expression = parse_expr();
       return node;
     };
-    case TType::Self: {
-      return parse_type();
-    }
     case TType::If: {
       return parse_if();
     }
@@ -1354,9 +1361,9 @@ ASTExpr *Parser::parse_primary() {
 
       return expr;
     }
-    case TType::LBrace: {
-      return parse_type();
-    }
+    case TType::LBrace:
+    case TType::Self:
+      return parse_path();
     default: {
       auto error_range = begin_node();
       throw_error(
@@ -1444,7 +1451,7 @@ ASTType *Parser::parse_type() {
       auto slice = ast_alloc<ASTType>();
       slice->kind = ASTType::NORMAL;
       slice->normal.path = ast_alloc<ASTPath>();
-      slice->normal.path->push_segment("Slice", {type});
+      slice->normal.path->push_segment("Slice", std::vector<ASTExpr*>{type});
       return slice;
     }
     return node;
@@ -1559,13 +1566,14 @@ ASTImport *Parser::parse_import() {
   Scope *scope = create_child(ctx.root_scope);
   ENTER_SCOPE(scope)
 
-  if (this->import(root_segment.identifier, &scope)) {
+  auto identifier = root_segment.get_identifier();
+  if (this->import(identifier, &scope)) {
     NODE_ALLOC(ASTModule, the_module, range, _, this)
     // again, make certain that we are attached to the root scope for imported modules.
     the_module->declaring_scope = ctx.root_scope;
-    the_module->module_name = root_segment.identifier;
+    the_module->module_name = identifier;
     the_module->scope = scope;
-    scope->name = root_segment.identifier;
+    scope->name = identifier;
     {
       ENTER_AST_STATEMENT_LIST(the_module->statements);
       while (!peek().is_eof()) {
@@ -1706,10 +1714,11 @@ ASTStatement *Parser::parse_using_stmt() {
     // variable.
     NODE_ALLOC(ASTPath, path, range1, defer1, this);
     path->push_segment(variable->name);
+
     // .destroy()
     NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
     dot->base = path;
-    dot->member = ASTPath::Segment{.identifier = "destroy"};
+    dot->member = ASTPath::Segment::Identifier("destroy");
     method_call->callee = dot;
   }
 
@@ -2197,10 +2206,12 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     auto result = process_directive(DIRECTIVE_KIND_STATEMENT, ident.value);
     if (result.is_null() || result.get()->get_node_type() != AST_NODE_BLOCK) {
       end_node(block, range);
-      throw_error(std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't", ident.value),
-                  range);
+      throw_error(
+          std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't",
+                      ident.value),
+          range);
     }
-    return (ASTBlock*)result.get();
+    return (ASTBlock *)result.get();
   }
 
   if (peek().type == TType::ExpressionBody) {
