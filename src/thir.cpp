@@ -372,13 +372,13 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
 
   auto symbol = get_symbol(ast);
 
-  if (symbol_map.contains(symbol)) {
-    return symbol_map[symbol];
-  }
-
   if (!symbol) {
     throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it",
                 ast->source_range);
+  }
+
+  if (symbol_map.contains(symbol)) {
+    return symbol_map[symbol];
   }
 
   if (symbol->is_variable) {
@@ -404,11 +404,7 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
     decl = find_generic_instance(decl->generic_instantiations, ast->segments.back().get_resolved_generics());
   }
 
-  if (ast_map.contains(decl)) {
-    return ast_map[decl];
-  } else {
-    return visit_node(decl);
-  }
+  return visit_node(decl);
 }
 
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
@@ -1015,6 +1011,10 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
 }
 
 THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
+  if (ast_map.contains(ast)) {
+    return ast_map[ast];
+  }
+
   const static bool is_testing = compile_command.has_flag("test");
 
   if (ast->is_macro && !is_making_call) {
@@ -1105,6 +1105,10 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 }
 
 THIR *THIRGen::visit_variable(ASTVariable *ast) {
+  if (ast_map.contains(ast)) {
+    return ast_map[ast];
+  }
+
   THIR_ALLOC(THIRVariable, thir, ast);
 
   thir->is_global = !ast->is_local;
@@ -1120,7 +1124,12 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   bind(symbol, thir);
 
   if (!ast->is_local && !ast->is_extern) {
-    thir->name = ctx.scope->full_name() + "$" + ast->name.get_str();
+    auto scope_name = ast->declaring_scope->full_name();
+    if (scope_name.empty()) {
+      thir->name = ast->name.get_str();
+    } else {
+      thir->name = scope_name + ast->name.get_str();
+    }
   } else {
     thir->name = ast->name;
   }
@@ -1167,7 +1176,14 @@ THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
     return nullptr;
   }
 
+  if (ast_map.contains(ast)) {
+    return ast_map[ast];
+  }
+
   THIR_ALLOC(THIRType, thir, ast);
+
+  bind(ast, thir);
+
   extract_thir_values_for_type_members(thir->type);
   return thir;
 }
@@ -1177,18 +1193,32 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
     return nullptr;
   }
 
+  if (ast_map.contains(ast)) {
+    return ast_map[ast];
+  }
+
   // We just ignore these i think?
   if (ast->is_forward_declared) {
     return nullptr;
   }
 
   THIR_ALLOC(THIRType, thir, ast);
+
+  bind(ast, thir);
+  
   extract_thir_values_for_type_members(thir->type);
   return thir;
 }
 
 THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
+  if (ast_map.contains(ast)) {
+    return ast_map[ast];
+  }
+
   THIR_ALLOC(THIRType, thir, ast);
+
+  bind(ast, thir);
+
   extract_thir_values_for_type_members(thir->type);
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
