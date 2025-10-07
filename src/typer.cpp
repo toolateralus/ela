@@ -136,6 +136,132 @@ bool expr_is_literal(const ASTExpr *expr) {
   }
 }
 
+const InternedString get_identifier_from_attribute_arguments(const SourceRange &source_range,
+                                                             const Attribute &attribute) {
+  if (attribute.arguments.size() == 0) {
+    throw_error(
+        "@[compiler_feature(...)] must have exactly one argument, and it must be an identifier pointing to the "
+        "correct feature.",
+        source_range);
+  }
+
+  ASTNode *argument = attribute.arguments[0];
+
+  if (argument->get_node_type() != AST_NODE_PATH) {
+    throw_error(
+        "@[compiler_feature(...)] must have exactly one argument, and it must be an identifier pointing to the "
+        "correct feature.",
+        source_range);
+  }
+
+  ASTPath *path = (ASTPath *)argument;
+
+  if (path->segments.size() != 1 || path->segments[0].tag != ASTPath::Segment::IDENTIFIER) {
+    throw_error(
+        "@[compiler_feature(...)] must have exactly one argument, and it must be an identifier pointing to the "
+        "correct feature.",
+        source_range);
+  }
+
+  return path->segments[0].get_identifier();
+}
+
+void fetch_compiler_features_for_function_declaration(ASTFunctionDeclaration *node) {
+  for (const auto &attribute : node->attributes) {
+    if (attribute.tag == ATTRIBUTE_COMPILER_FEATURE) {
+      const InternedString identifier = get_identifier_from_attribute_arguments(node->source_range, attribute);
+      if (identifier == COMPILER_FEATURE_TEST_RUNNER_FN_KEY) {
+        g_testing_test_runner_fn = node;
+      } else {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      }
+    }
+  }
+}
+
+void fetch_compiler_features_for_varaible_declaration(ASTVariable *node) {
+  for (const auto &attribute : node->attributes) {
+    if (attribute.tag == ATTRIBUTE_COMPILER_FEATURE) {
+      const InternedString identifier = get_identifier_from_attribute_arguments(node->source_range, attribute);
+      if (identifier == COMPILER_FEATURE_TESTS_LIST_KEY) {
+        g_testing_all_tests_list_variable = node;
+        break;
+      } else {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      }
+    }
+  }
+}
+
+void fetch_compiler_features_for_trait_declaration(ASTTraitDeclaration *node, Type *type) {
+  for (const auto &attribute : node->attributes) {
+    if (attribute.tag == ATTRIBUTE_COMPILER_FEATURE) {
+      const InternedString identifier = get_identifier_from_attribute_arguments(node->source_range, attribute);
+      if (identifier == COMPILER_FEATURE_DESTROY_KEY) {
+        g_destroy_trait = type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_OPTION_KEY) {
+        g_Option_type = type;
+        break;
+      } else {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      }
+    }
+  }
+}
+
+void fetch_compiler_features_for_struct_declaration(ASTStructDeclaration *node, Type *attribute_feature_type) {
+  for (const auto &attribute : node->attributes) {
+    if (attribute.tag == ATTRIBUTE_COMPILER_FEATURE) {
+      const InternedString identifier = get_identifier_from_attribute_arguments(node->source_range, attribute);
+      if (identifier == COMPILER_FEATURE_FIELD_KEY) {
+        g_refl_Field_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_METHOD_KEY) {
+        g_refl_Method_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_TYPE_KEY) {
+        g_refl_Type_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_TEST_KEY) {
+        g_testing_Test_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_STR_KEY) {
+        g_str_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_STRING_KEY) {
+        g_String_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_INITLIST_KEY) {
+        g_InitList_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_LIST_KEY) {
+        g_List_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_SLICE_KEY) {
+        g_Slice_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_SLICEMUT_KEY) {
+        g_SliceMut_type = attribute_feature_type;
+        break;
+      } else if (identifier == COMPILER_FEATURE_TESTS_LIST_KEY) {
+        // TODO handle in ASTVariable* visitor
+        break;
+      } else if (identifier == COMPILER_FEATURE_DESTROY_KEY) {
+        // TODO: handling in trait visitor
+        break;
+      } else if (identifier == COMPILER_FEATURE_TEST_RUNNER_FN_KEY) {
+        // TODO: handle in function visitor.
+      } else if (identifier == COMPILER_FEATURE_OPTION_KEY) {
+        // TODO: handle in choice
+        break;
+      } else {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      }
+    }
+  }
+}
+
 void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
   std::vector<Type *> members;
   for (auto member : node->members) {
@@ -210,6 +336,14 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   if (!type) {
     throw_error("internal compiler error: struct type was null on declaration", node->source_range);
   }
+
+  Type *attribute_feature_type = type;
+
+  if (generic_instantiation) {
+    attribute_feature_type = type->generic_base_type;
+  }
+
+  fetch_compiler_features_for_struct_declaration(node, attribute_feature_type);
 
   // tidy up some references.
   type->declaring_node = node;
@@ -883,6 +1017,12 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
     }
   }
 
+  Type *attribute_feature_type = type;
+  if (generic_instantiation) {
+    attribute_feature_type = type->generic_base_type;
+  }
+  fetch_compiler_features_for_trait_declaration(node, attribute_feature_type);
+
   node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
 
   type->declaring_node = node;
@@ -1522,6 +1662,8 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   visit_function_header(node, true, false, {});
 
+  fetch_compiler_features_for_function_declaration(node);
+
   if (node->is_forward_declared) {
     ctx.scope->forward_declare_function(node->name, node->resolved_type, node);
     return;
@@ -1571,6 +1713,8 @@ void Typer::visit(ASTVariable *node) {
         "that name,",
         node->source_range);
   }
+
+  fetch_compiler_features_for_varaible_declaration(node);
 
   node->type->accept(this);
 
@@ -2998,7 +3142,7 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
       if (symbol.has_alias) {
         import_scope->create_reference(name, module_scope, symbol.alias);
       }
-      
+
       import_scope->create_reference(name, module_scope);
     }
   }
@@ -3030,7 +3174,6 @@ void Typer::visit(ASTImport *node) {
   }
 
   Scope *module_scope = the_module->module.declaration->scope;
-
   // propagate the module itself, when we add symbols from it, so we can access it like
   /*
     `
@@ -3044,6 +3187,7 @@ void Typer::visit(ASTImport *node) {
       `api::subapi::function();`
     or whatever.
   */
+
   ctx.scope->symbols[the_module->name] = *the_module;
 
   visit_import_group(node->root_group, module_scope, ctx.scope, node->source_range);

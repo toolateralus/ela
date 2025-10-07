@@ -9,6 +9,21 @@
   this is used for std::format() with the type id to get the reflected upon type info.
 */
 
+constexpr const char *COMPILER_FEATURE_FIELD_KEY = "Field";
+constexpr const char *COMPILER_FEATURE_METHOD_KEY = "Method";
+constexpr const char *COMPILER_FEATURE_TYPE_KEY = "Type";
+constexpr const char *COMPILER_FEATURE_TEST_KEY = "Test";
+constexpr const char *COMPILER_FEATURE_TESTS_LIST_KEY = "tests";
+constexpr const char *COMPILER_FEATURE_TEST_RUNNER_FN_KEY = "test_runner";
+constexpr const char *COMPILER_FEATURE_DESTROY_KEY = "Destroy";
+constexpr const char *COMPILER_FEATURE_STR_KEY = "str";
+constexpr const char *COMPILER_FEATURE_STRING_KEY = "String";
+constexpr const char *COMPILER_FEATURE_INITLIST_KEY = "InitList";
+constexpr const char *COMPILER_FEATURE_LIST_KEY = "List";
+constexpr const char *COMPILER_FEATURE_SLICE_KEY = "Slice";
+constexpr const char *COMPILER_FEATURE_SLICEMUT_KEY = "SliceMut";
+constexpr const char *COMPILER_FEATURE_OPTION_KEY = "Option";
+
 
 // TODO: reorder these, they're crappy and it's not that hard. 
 // would just be nice if they were in a neat logical order.

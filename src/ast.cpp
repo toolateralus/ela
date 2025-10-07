@@ -1766,6 +1766,96 @@ ASTStatement *Parser::parse_using_stmt() {
   }
 }
 
+int attribute_tag_takes_arguments(AttributeTag tag) {
+  switch (tag) {
+    case ATTRIBUTE_IMPL:
+    case ATTRIBUTE_COMPILER_FEATURE:
+      return -1;
+    case ATTRIBUTE_INLINE:
+    case ATTRIBUTE_ENTRY:
+    case ATTRIBUTE_CONST:
+    case ATTRIBUTE_PUB:
+    case ATTRIBUTE_NO_MANGLE:
+    case ATTRIBUTE_NO_RETURN:
+    default:
+      return 0;
+  }
+}
+
+bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *tag) {
+  if (ident == "no_return") {
+    *tag = ATTRIBUTE_NO_RETURN;
+  } else if (ident == "pub") {
+    *tag = ATTRIBUTE_PUB;
+  } else if (ident == "entry") {
+    *tag = ATTRIBUTE_ENTRY;
+  } else if (ident == "impl") {
+    *tag = ATTRIBUTE_IMPL;
+  } else if (ident == "no_mangle") {
+    *tag = ATTRIBUTE_NO_MANGLE;
+  } else if (ident == "inline") {
+    *tag = ATTRIBUTE_INLINE;
+  } else if (ident == "compiler_feature") {
+    *tag = ATTRIBUTE_COMPILER_FEATURE;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+std::vector<Attribute> Parser::parse_statement_attributes() {
+  std::vector<Attribute> attributes;
+  expect(TType::Attribute);
+  expect(TType::LBrace);
+  while (peek().type != TType::RBrace) {
+    Attribute attribute;
+    if (peek().type == TType::Impl) {
+      eat();
+      attribute.tag = ATTRIBUTE_IMPL;
+      expect(TType::LParen);
+      while (peek().type != TType::RParen) {
+        attribute.arguments.push_back(parse_type());
+        if (peek().type != TType::RParen) expect(TType::Comma);
+      }
+      expect(TType::RParen);
+    } else if (peek().type == TType::Const) {
+      eat();
+      attribute.tag = ATTRIBUTE_CONST;
+    } else {
+      AttributeTag tag;
+      const std::string &ident = expect(TType::Identifier).value.get_str();
+      if (!try_get_attribute_tag_from_string(ident, &tag)) {
+        throw_error(std::format("invalid attribute {}", ident), {peek().location});
+      }
+      attribute.tag = tag;
+      int argument_count = attribute_tag_takes_arguments(tag);
+      
+      if (argument_count != 0 && peek().type == TType::LParen) {
+        eat();
+        argument_count = argument_count == -1 ? INT_MAX : argument_count;
+        for (int i = 0; i < argument_count; ++i) {
+          attribute.arguments.push_back(parse_expr());
+          if (peek().type != TType::RParen) {
+            expect(TType::Comma);
+          } else {
+            break;
+          }
+        }
+        expect(TType::RParen);
+      }
+    }
+    if (peek().type != TType::RBrace) {
+      expect(TType::Comma);
+    }
+    attributes.push_back(std::move(attribute));
+  }
+  expect(TType::RBrace);
+  if (peek().type == TType::Attribute) {
+    throw_error("doubling up attributes declarations leads to an overwrite. just use one @[...]", {peek().location});
+  }
+  return attributes;
+}
+
 ASTStatement *Parser::parse_statement() {
   auto parent_range = begin_node();
 
@@ -1792,54 +1882,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.type == TType::Attribute) {
-    std::vector<Attribute> attributes;
-    {
-      eat();
-      expect(TType::LBrace);
-      while (peek().type != TType::RBrace) {
-        Attribute attribute;
-        if (peek().type == TType::Impl) {
-          eat();
-          attribute.tag = ATTRIBUTE_IMPL;
-          expect(TType::LParen);
-          while (peek().type != TType::RParen) {
-            attribute.arguments.push_back(parse_type());
-            if (peek().type != TType::RParen) expect(TType::Comma);
-          }
-          expect(TType::RParen);
-        } else if (peek().type == TType::Const) {
-          eat();
-          attribute.tag = ATTRIBUTE_CONST;
-        } else {
-          auto ident = expect(TType::Identifier).value.get_str();
-          if (ident == "no_return") {
-            attribute.tag = ATTRIBUTE_NO_RETURN;
-          } else if (ident == "pub") {
-            attribute.tag = ATTRIBUTE_PUB;
-          } else if (ident == "entry") {
-            attribute.tag = ATTRIBUTE_ENTRY;
-          } else if (ident == "impl") {
-            attribute.tag = ATTRIBUTE_IMPL;
-          } else if (ident == "no_mangle") {
-            attribute.tag = ATTRIBUTE_NO_MANGLE;
-          } else if (ident == "inline") {
-            attribute.tag = ATTRIBUTE_INLINE;
-          } else {
-            throw_error(std::format("invalid attribute {}", ident), {peek().location});
-          }
-        }
-        if (peek().type != TType::RBrace) {
-          expect(TType::Comma);
-        }
-        attributes.push_back(std::move(attribute));
-      }
-      expect(TType::RBrace);
-    }
-
-    if (peek().type == TType::Attribute) {
-      throw_error("doubling up attributes declarations leads to an overwrite. just use one @[...]", {peek().location});
-    }
-
+    std::vector<Attribute> attributes = parse_statement_attributes();
     auto statement = parse_statement();
     statement->attributes = std::move(attributes);
     return statement;

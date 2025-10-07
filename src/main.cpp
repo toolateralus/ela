@@ -21,7 +21,6 @@
 using std::string;
 using std::vector;
 
-// It might be more optimal to reduce these sizes since now they're linked lists.
 jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};
@@ -38,9 +37,6 @@ std::unordered_map<std::string, void *> loaded_ffi_extern_functions{};
 
 size_t lambda_unique_id = 0;
 
-// TODO: remove me, we want file scopes.
-Scope *root_scope;
-
 void *error_user_data;
 
 PanicHandler panic_handler = get_default_panic_handler();
@@ -50,11 +46,20 @@ CompileCommand compile_command;
 std::unordered_map<InternedString, Scope *> import_scopes;
 std::unordered_set<InternedString> include_set;
 
-/*
-  #########################
-  ### PROVIDING EXTERNS ###
-  #########################
-*/
+Type *g_refl_Field_type = nullptr;
+Type *g_refl_Method_type = nullptr;
+Type *g_refl_Type_type = nullptr;
+Type *g_testing_Test_type = nullptr;
+ASTVariable *g_testing_all_tests_list_variable = nullptr;
+ASTFunctionDeclaration *g_testing_test_runner_fn = nullptr;
+Type *g_destroy_trait = nullptr;
+Type *g_str_type = nullptr;
+Type *g_String_type = nullptr;
+Type *g_InitList_type = nullptr;
+Type *g_List_type = nullptr;
+Type *g_Slice_type = nullptr;
+Type *g_SliceMut_type = nullptr;
+Type *g_Option_type = nullptr;
 
 int ignored_warnings = 0;
 

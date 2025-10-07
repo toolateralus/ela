@@ -145,7 +145,18 @@ enum AttributeTag {
   // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this
   // function will never return control flow back to the caller, when called.
   ATTRIBUTE_NO_RETURN,
+
+  // @[compiler_feature(some_identifier)] defines a type, function, variable, etc that fufills a dependency for the
+  // compiler.
+  // Specifically one that is absolutely neccesary for normal compilation to continue,
+  // such as the 'str' literal type, Range!<s32> for '0..10', Iterator traits, Slice!<T>, testing dependencies, etc.
+  ATTRIBUTE_COMPILER_FEATURE,
 };
+
+bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *tag);
+// returns either a fixed number of arguments (usually 0)
+// or returns -1 meaning can take an arbitrary number of arguments.
+int attribute_tag_takes_arguments(AttributeTag);
 
 struct Attribute {
   AttributeTag tag;
@@ -1274,6 +1285,9 @@ struct Typer;
   Defer $scope_defer([&] { ctx.scope = $old_scope; }); \
   ctx.scope = $scope;
 
+
+
+
 struct Parser {
   Typer *typer;
   Context &ctx;
@@ -1297,6 +1311,8 @@ struct Parser {
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_using_stmt();
+  
+  std::vector<Attribute> parse_statement_attributes();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();

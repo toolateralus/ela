@@ -11,7 +11,6 @@
 #include "type.hpp"
 
 struct VisitorBase {
-
   ASTNode *parent_node = nullptr;
   ASTNode *parent_prev = nullptr;
 
@@ -74,6 +73,21 @@ struct VisitorBase {
     return;
   };
 };
+
+extern Type *g_refl_Field_type;
+extern Type *g_refl_Method_type;
+extern Type *g_refl_Type_type;
+extern Type *g_testing_Test_type;
+extern ASTVariable *g_testing_all_tests_list_variable;
+extern ASTFunctionDeclaration *g_testing_test_runner_fn;
+extern Type *g_destroy_trait;
+extern Type *g_str_type;
+extern Type *g_String_type;
+extern Type *g_InitList_type;
+extern Type *g_List_type;
+extern Type *g_Slice_type;
+extern Type *g_SliceMut_type;
+extern Type *g_Option_type;
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
@@ -169,7 +183,7 @@ struct Typer : VisitorBase {
   void visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                std::vector<Type *> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node, bool macro_expansion);
-  
+
   void expand_macro(ASTFunctionDeclaration *macro, ASTCall *originator);
 
   Type *get_self_type();
