@@ -304,7 +304,7 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
         if (index == path->length() - 1) {
           return symbol;
         }
-        
+
         if (type) {
           scope = type->info->scope;
         } else if (!segment.generic_arguments.empty()) {
@@ -394,6 +394,9 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
     decl = symbol->function.declaration;
   } else if (symbol->is_type) {
     decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
+    if (!decl) {
+      decl = dynamic_cast<ASTDeclaration *>(symbol->resolved_type->declaring_node.get());
+    }
   }
 
   if (!decl) {
@@ -1097,7 +1100,12 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     defer_stack = std::move(saved_defer_stack);
   }
 
-  if (is_testing && ast->is_test) {
+
+  // Either the tests have to be in the root scope, i.e declared or included via a main.ela file or a test.ela file,
+  // or this flag has to be present
+  auto should_be_tested = ast->declaring_scope->name.get_str().empty() || compile_command.has_flag("run-every-test");
+  
+  if (is_testing && ast->is_test && should_be_tested) {
     test_functions.push_back(thir);
   }
 
@@ -1610,28 +1618,53 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
   current_statement_list->push_back(cached_base);
 
   for (const DestructureElement &element : ast->elements) {
-    THIR_ALLOC(THIRVariable, var, ast);
-    var->name = element.identifier;
-    var->type = element.type;
+    if (ast->op == TType::Assign) {
+      THIR_ALLOC(THIRBinExpr, assign, ast);
+      assign->op = TType::Assign;
+      assign->is_statement = true;
 
-    THIR_ALLOC(THIRMemberAccess, member_access, ast);
-    var->value = member_access;
+      auto symbol = ctx.scope->local_lookup(element.identifier);
+      auto declaration = symbol_map[symbol];
+      assign->left = declaration;
 
-    const auto member = *members_iter;
-    members_iter++;
+      THIR_ALLOC(THIRMemberAccess, member_access, ast);
+      assign->right = member_access;
 
-    member_access->member = member.name;
-    member_access->base = cached_base;
-    member_access->type = element.type;
+      const auto member = *members_iter;
+      members_iter++;
 
-    if (is_pointer_semantic(element.semantic)) {
-      var->value = take_address_of(member_access, ast);
+      member_access->member = member.name;
+      member_access->base = cached_base;
+      member_access->type = element.type;
+
+      if (is_pointer_semantic(element.semantic)) {
+        assign->right = take_address_of(member_access, ast);
+      }
+
+      current_statement_list->push_back(assign);
+    } else {
+      THIR_ALLOC(THIRVariable, var, ast);
+      var->name = element.identifier;
+      var->type = element.type;
+
+      THIR_ALLOC(THIRMemberAccess, member_access, ast);
+      var->value = member_access;
+
+      const auto member = *members_iter;
+      members_iter++;
+
+      member_access->member = member.name;
+      member_access->base = cached_base;
+      member_access->type = element.type;
+
+      if (is_pointer_semantic(element.semantic)) {
+        var->value = take_address_of(member_access, ast);
+      }
+
+      auto symbol = ctx.scope->local_lookup(element.identifier);
+      bind(symbol, var);
+      current_statement_list->push_back(var);
     }
-
-    auto symbol = ctx.scope->local_lookup(element.identifier);
-    bind(symbol, var);
-
-    current_statement_list->push_back(var);
   }
 }
 
@@ -2224,142 +2257,149 @@ THIR *THIRGen::make_cast(THIR *operand, Type *type) {
 THIRFunction *THIRGen::emit_runtime_entry_point() {
   // TODO: implement global static initializers in the emitter.
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { global_ini->name = "ela_run_global_initializers"; }
-
+  const bool is_testing = compile_command.has_flag("test");
   Type *const_u8_ptr_ptr_type = char_ptr_type()->take_pointer_to(false);  // u8 const* const*;
 
-  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, main) {  // setup main function, get type, parameters, etc.
-    FunctionTypeInfo main_info{};
-    main_info.params_len = 2;
-    main_info.parameter_types[0] = s32_type();             // int
-    main_info.parameter_types[1] = const_u8_ptr_ptr_type;  // u8 **
-    main_info.return_type = s32_type();
+  if (entry_point->get_node_type() == THIRNodeType::Function || is_testing) {
+    THIR_ALLOC_NO_SRC_RANGE(THIRFunction, main) {  // setup main function, get type, parameters, etc.
+      FunctionTypeInfo main_info{};
+      main_info.params_len = 2;
+      main_info.parameter_types[0] = s32_type();             // int
+      main_info.parameter_types[1] = const_u8_ptr_ptr_type;  // u8 **
+      main_info.return_type = s32_type();
 
-    Type *main_type = global_find_function_type_id(main_info, {});
+      Type *main_type = global_find_function_type_id(main_info, {});
 
-    main->name = "main";
-    main->type = main_type;
+      main->name = "main";
+      main->type = main_type;
 
-    THIRParameter argv = {.name = "argv"}, argc = {.name = "argc"};
-    main->parameters.push_back(argc);
-    main->parameters.push_back(argv);
+      THIRParameter argv = {.name = "argv"}, argc = {.name = "argc"};
+      main->parameters.push_back(argc);
+      main->parameters.push_back(argv);
+    }
+    THIR_ALLOC_NO_SRC_RANGE(THIRBlock, block) {  // Create block for main.
+      if (!compile_command.has_flag("nostdlib") &&
+          !compile_command.has_flag("freestanding")) {  // Call Env::initialize(argc, argv);
+        // Find the damn call
+        ASTFunctionDeclaration *env_initialize = nullptr;
+        ASTPath env_initialize_path;
+        env_initialize_path.push_segment("Env");
+        env_initialize_path.push_segment("initialize");
+        auto symbol = get_symbol(&env_initialize_path);
+        env_initialize = symbol->function.declaration;
+
+        THIR_ALLOC_NO_SRC_RANGE(THIRCall, initialize);
+        initialize->callee = visit_node(env_initialize);
+        initialize->type = env_initialize->return_type->resolved_type;
+
+        // Parameterize the damn call
+        THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv);
+        argv->name = "argv";
+        argv->is_global = false;
+        argv->type = const_u8_ptr_ptr_type;
+
+        THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argc);
+        argc->name = "argc";
+        argc->is_global = false;
+        argc->type = s32_type();
+
+        initialize->arguments.push_back(argc);
+        initialize->arguments.push_back(argv);
+        initialize->is_statement = true;
+        // Call the damn call
+        block->statements.push_back(initialize);
+      }
+
+      if (!is_testing && !compile_command.has_flag("freestanding") &&
+          this->entry_point->get_node_type() == THIRNodeType::Function) {
+        // Call __ela_main_();
+        // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
+        THIRFunction *entry_point = (THIRFunction *)this->entry_point;
+        THIR_ALLOC_NO_SRC_RANGE(THIRCall, entry_call)
+        entry_call->callee = entry_point;
+        entry_call->arguments = {};
+        entry_call->is_statement = true;
+
+        FunctionTypeInfo entry_type;
+        entry_type.return_type = void_type();
+        entry_type.is_varargs = false;
+        entry_type.params_len = 0;
+        entry_call->type = global_find_function_type_id(entry_type, {});
+        block->statements.push_back(entry_call);
+      }
+
+      if (is_testing) {
+        ASTVariable *all_tests_list_ast;
+        // List!<Test> and Test type fetching
+        ASTFunctionDeclaration *push_function;
+        Type *test_struct_type;
+        {
+          ASTPath test_path;
+          test_path.push_segment("testing");
+          test_path.push_segment("Test");
+
+          auto test_struct_sym = get_symbol(&test_path);
+          test_struct_type = test_struct_sym->resolved_type;
+
+          ASTPath all_tests_list_path;
+          all_tests_list_path.push_segment("testing");
+          all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
+
+          auto all_tests_list = get_symbol(&all_tests_list_path);
+          all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
+
+          push_function =
+              all_tests_list_ast->type->resolved_type->info->scope->local_lookup("push")->function.declaration;
+        }
+
+        const auto list_ptr = take_address_of(get_thir(all_tests_list_ast), all_tests_list_ast);
+
+        for (const auto &function : test_functions) {
+          THIR_ALLOC_NO_SRC_RANGE(THIRCall, push_call)
+          push_call->callee = visit_node(push_function);
+          push_call->is_statement = true;
+          push_call->type = void_type();
+          block->statements.push_back(push_call);
+
+          THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_init);
+          auto fn_ptr = take_address_of(function, all_tests_list_ast);
+          auto function_name = function->name.get_str();
+
+          // Replace all occurrences of '$' with "::", so the tests match what the user typed.
+          size_t pos = 0;
+          while ((pos = function_name.find('$', pos)) != std::string::npos) {
+            function_name.replace(pos, 1, "::");
+            pos += 2;
+          }
+
+          test_init->key_values = {{"function", fn_ptr}, {"name", make_str(function_name, function->source_range)}};
+          test_init->type = test_struct_type;
+
+          push_call->arguments = {list_ptr, test_init};
+        }
+
+        THIR_ALLOC_NO_SRC_RANGE(THIRCall, _run_all_tests_call) {
+          ASTPath run_all_tests;
+          run_all_tests.push_segment("testing");
+          run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
+
+          auto _run_all_tests_function = get_symbol(&run_all_tests);
+
+          ASTFunctionDeclaration *ast_func = _run_all_tests_function->function.declaration;
+
+          _run_all_tests_call->callee = visit_node(ast_func);
+          _run_all_tests_call->arguments = {};
+          _run_all_tests_call->type = void_type();
+          _run_all_tests_call->is_statement = true;
+          block->statements.push_back(_run_all_tests_call);
+        }
+      }
+    }
+    main->block = block;
+    return main;
   }
-  THIR_ALLOC_NO_SRC_RANGE(THIRBlock, block) {  // Create block for main.
 
-    block->statements.push_back(global_initializer_call);
-
-    if (!compile_command.has_flag("nostdlib") &&
-        !compile_command.has_flag("freestanding")) {  // Call Env::initialize(argc, argv);
-      // Find the damn call
-      ASTFunctionDeclaration *env_initialize = nullptr;
-      ASTPath env_initialize_path;
-      env_initialize_path.push_segment("Env");
-      env_initialize_path.push_segment("initialize");
-      auto symbol = get_symbol(&env_initialize_path);
-      env_initialize = symbol->function.declaration;
-
-      THIR_ALLOC_NO_SRC_RANGE(THIRCall, initialize);
-      initialize->callee = visit_node(env_initialize);
-      initialize->type = env_initialize->return_type->resolved_type;
-
-      // Parameterize the damn call
-      THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv);
-      argv->name = "argv";
-      argv->is_global = false;
-      argv->type = const_u8_ptr_ptr_type;
-
-      THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argc);
-      argc->name = "argc";
-      argc->is_global = false;
-      argc->type = s32_type();
-
-      initialize->arguments.push_back(argc);
-      initialize->arguments.push_back(argv);
-      initialize->is_statement = true;
-      // Call the damn call
-      block->statements.push_back(initialize);
-    }
-
-    const bool is_testing = compile_command.has_flag("test");
-
-    if (!is_testing && !compile_command.has_flag("freestanding") &&
-        this->entry_point->get_node_type() == THIRNodeType::Function) {
-      // Call __ela_main_();
-      // TODO: actually check this. won't work in freestanding builds or library (main-less) builds
-      THIRFunction *entry_point = (THIRFunction *)this->entry_point;
-      THIR_ALLOC_NO_SRC_RANGE(THIRCall, entry_call)
-      entry_call->callee = entry_point;
-      entry_call->arguments = {};
-      entry_call->is_statement = true;
-
-      FunctionTypeInfo entry_type;
-      entry_type.return_type = void_type();
-      entry_type.is_varargs = false;
-      entry_type.params_len = 0;
-      entry_call->type = global_find_function_type_id(entry_type, {});
-      block->statements.push_back(entry_call);
-    }
-
-    if (is_testing) {
-      ASTVariable *all_tests_list_ast;
-      // List!<Test> and Test type fetching
-      ASTFunctionDeclaration *push_function;
-      Type *test_struct_type;
-      {
-        ASTPath test_path;
-        test_path.push_segment("testing");
-        test_path.push_segment("Test");
-
-        auto test_struct_sym = get_symbol(&test_path);
-        test_struct_type = test_struct_sym->resolved_type;
-
-        ASTPath all_tests_list_path;
-        all_tests_list_path.push_segment("testing");
-        all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
-
-        auto all_tests_list = get_symbol(&all_tests_list_path);
-        all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
-
-        push_function =
-            all_tests_list_ast->type->resolved_type->info->scope->local_lookup("push")->function.declaration;
-      }
-
-      const auto list_ptr = take_address_of(get_thir(all_tests_list_ast), all_tests_list_ast);
-
-      for (const auto &function : test_functions) {
-        THIR_ALLOC_NO_SRC_RANGE(THIRCall, push_call)
-        push_call->callee = visit_node(push_function);
-        push_call->is_statement = true;
-        push_call->type = void_type();
-        block->statements.push_back(push_call);
-
-        THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_init);
-        auto fn_ptr = take_address_of(function, all_tests_list_ast);
-        test_init->key_values = {{"function", fn_ptr}, {"name", make_str(function->name, function->source_range)}};
-        test_init->type = test_struct_type;
-
-        push_call->arguments = {list_ptr, test_init};
-      }
-
-      THIR_ALLOC_NO_SRC_RANGE(THIRCall, _run_all_tests_call) {
-        ASTPath run_all_tests;
-        run_all_tests.push_segment("testing");
-        run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
-
-        auto _run_all_tests_function = get_symbol(&run_all_tests);
-
-        ASTFunctionDeclaration *ast_func = _run_all_tests_function->function.declaration;
-
-        _run_all_tests_call->callee = visit_node(ast_func);
-        _run_all_tests_call->arguments = {};
-        _run_all_tests_call->type = void_type();
-        _run_all_tests_call->is_statement = true;
-        block->statements.push_back(_run_all_tests_call);
-      }
-    }
-  }
-
-  main->block = block;
-  return main;
+  return nullptr;
 }
 
 THIR *THIRGen::visit_unpack_element(ASTUnpackElement *ast) {

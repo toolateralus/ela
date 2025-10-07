@@ -214,3 +214,4 @@ static inline size_t calculate_strings_actual_length(const std::string_view &str
   const auto $old_scope_ = ctx.scope; \
   ctx.scope = $new_scope;             \
   const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
+

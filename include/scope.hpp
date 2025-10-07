@@ -132,6 +132,7 @@ struct Scope {
   std::set<SymbolReference> references;
   std::unordered_map<InternedString, Symbol> symbols = {};
   InternedString name = "";
+  bool is_module_scope = false;
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
   void insert_local_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,

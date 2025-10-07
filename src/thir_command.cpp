@@ -54,7 +54,9 @@ int CompileCommand::compile() {
     { // emit global initializer function that's called in main
       emitter.code.clear();
       THIRFunction *global_ini = thir_gen.global_initializer_function;
-      resolver.visit_node(global_ini);
+      emitter.emitting_global_initializer = true;
+      resolver.visit_function(global_ini);
+      emitter.emitting_global_initializer = false;
       output << emitter.code.str();
       emitter.code.clear();
     }
@@ -62,7 +64,9 @@ int CompileCommand::compile() {
     // Emit our main last always
     {
       THIRFunction *ep = thir_gen.emit_runtime_entry_point();
-      emitter.emit_function(ep);
+      if (ep) { // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
+        emitter.emit_function(ep);
+      }
       output << emitter.code.str();
     }
   });

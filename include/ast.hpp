@@ -15,7 +15,7 @@
 extern size_t lambda_unique_id;
 extern jstl::Arena ast_arena;
 struct VisitorBase;
-extern std::unordered_map<InternedString, Scope *> import_map;
+extern std::unordered_map<InternedString, Scope *> import_scopes;
 extern std::unordered_set<InternedString> include_set;
 
 constexpr std::string CONTEXT_IDENTIFIER = "context";
@@ -293,7 +293,6 @@ struct ASTImport : ASTStatement {
       return symbol;
     }
   };
-
   Group root_group;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPORT; }
   void accept(VisitorBase *visitor) override;
@@ -1276,8 +1275,24 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
-  ASTPath *context_identifier();
+  Typer *typer;
+  Context &ctx;
+  Lexer lexer{};
 
+  std::vector<Lexer::State> states;
+  ASTModule *current_module_decl = nullptr;
+  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  Nullable<ASTImpl> current_impl_decl = nullptr;
+  Nullable<ASTTraitDeclaration> current_trait_decl = nullptr;
+
+  std::vector<ASTNode *> *current_statement_list;
+  std::vector<ASTNode *> *program_statement_list;
+
+  static Nullable<ASTBlock> current_block;
+  static std::vector<DirectiveRoutine> directive_routines;
+
+  ASTPath *context_identifier();
   ASTType *context_trait_ast_type();
 
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
@@ -1328,7 +1343,15 @@ struct Parser {
 
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<ASTExpr> try_parse_directive_expr();
-  bool import(InternedString name, Scope **scope);
+
+  // Returns true if we've pushed a new Lexer::State to the stack,
+  // false if we've already included the module, or if it doesn't exist.
+
+  // the scope will be the existing module's scope if returns false,
+  // or it will be a brand new scope attached to the root scope if it's
+  // the first time we're importing (i.e returned true)
+  bool try_import(InternedString name, Scope **scope);
+
   inline std::deque<Token> &lookahead_buf() { return states.back().lookahead_buffer; }
 
   Token eat();
@@ -1341,24 +1364,8 @@ struct Parser {
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
-
   Parser(const std::string &filename, Context &context);
   ~Parser();
-
-  Typer *typer;
-  Context &ctx;
-  Lexer lexer{};
-
-  std::vector<Lexer::State> states;
-  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  Nullable<ASTImpl> current_impl_decl = nullptr;
-  Nullable<ASTTraitDeclaration> current_trait_decl = nullptr;
-
-  std::vector<ASTNode *> *current_statement_list;
-
-  static Nullable<ASTBlock> current_block;
-  static std::vector<DirectiveRoutine> directive_routines;
 };
 
 template <class T>
@@ -1384,3 +1391,8 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
+
+#define ENTER_MODULE($module)                    \
+  const auto $old_module_ = current_module_decl; \
+  current_module_decl = $module;                 \
+  const Defer $module_defer([&] { current_module_decl = $old_module_; });

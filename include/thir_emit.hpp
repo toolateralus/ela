@@ -5,6 +5,7 @@
 #include "thir.hpp"
 
 struct Emitter {
+  bool emitting_global_initializer = false;
   StringBuilder code{};
   int indent_level = 0;
   const THIRFunction *entry_point;

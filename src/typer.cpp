@@ -2974,7 +2974,7 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
     if (symbol.is_group) {  // Group import
       Nullable<Symbol> submod_sym = ctx.get_symbol(symbol.group.path);
       if (!submod_sym || !submod_sym.get()->is_module) {
-        throw_error("submodule '{}' not found in module", range);
+        throw_error("submodule or type '{}' not found in module", range);
       }
       auto submod = submod_sym.get();
       visit_import_group(symbol.group, submod->module.declaration->scope, import_scope, range);
@@ -2984,18 +2984,21 @@ void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scop
 
       if (symbol.path->segments.back().tag != ASTPath::Segment::IDENTIFIER) {
         throw_error(
-            "got a non-identifier path in an import, this is not valid. You don't need to apply generics or anything "
-            "to imports",
+            "got a non-identifier path in an import, this is not valid. "
+            "You don't need to apply generics or anything to imports",
             {});
       }
 
       InternedString name = symbol.path->segments.back().get_identifier();
+
       if (!sym) {
         throw_error(std::format("symbol: {} not found in module", name), range);
       }
+
       if (symbol.has_alias) {
         import_scope->create_reference(name, module_scope, symbol.alias);
       }
+      
       import_scope->create_reference(name, module_scope);
     }
   }
@@ -3019,6 +3022,8 @@ void Typer::visit(ASTImport *node) {
   }
 
   const Symbol *the_module = the_module_nullable.get();
+
+  printf("visiting import for '%s'\n", the_module->name.get_str().c_str());
 
   // This means that we imported a single symbol.
   if (!the_module->is_module) {
@@ -3128,7 +3133,9 @@ void Typer::visit(ASTModule *node) {
 
   if (Symbol *mod = ctx.scope->lookup(node->module_name)) {
     if (!mod->is_module) {
-      throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
+      throw_error(
+          std::format("cannot create module '{}': an identifier exists in this scope with that name.", mod->name),
+          node->source_range);
     }
     auto scope = mod->module.declaration->scope;
     // See above: we need to check for redefinitions.

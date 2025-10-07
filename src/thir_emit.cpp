@@ -485,6 +485,10 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
 void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
+  if (emitting_global_initializer && thir->name == "ela_run_global_initializers") {
+    code << "__attribute__((constructor))\n";
+  }
+
   if (thir->is_extern || thir->is_exported) {
     code << "extern ";
   }

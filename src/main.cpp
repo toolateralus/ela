@@ -34,8 +34,7 @@ std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
-std::unordered_map<std::string, void*> loaded_ffi_extern_functions {};
-
+std::unordered_map<std::string, void *> loaded_ffi_extern_functions{};
 
 size_t lambda_unique_id = 0;
 
@@ -48,7 +47,7 @@ PanicHandler panic_handler = get_default_panic_handler();
 
 CompileCommand compile_command;
 
-std::unordered_map<InternedString, Scope *> import_map;
+std::unordered_map<InternedString, Scope *> import_scopes;
 std::unordered_set<InternedString> include_set;
 
 /*
@@ -58,7 +57,6 @@ std::unordered_set<InternedString> include_set;
 */
 
 int ignored_warnings = 0;
-
 
 bool run_on_finished = false;
 
@@ -78,7 +76,8 @@ int main(int argc, char *argv[]) {
 
   std::vector<std::string> runtime_args;
   bool run_on_finished = false, run_tests = false, lldb = false;
-  compile_command = CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests, lldb);
+  compile_command =
+      CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests, lldb);
 
   auto result = compile_command.compile();
 
@@ -120,7 +119,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "\033[1;31mfailed with unknown status\033[0m\n";
       }
     }
-
   }
 
   if (run_tests) {

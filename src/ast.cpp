@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -657,7 +658,7 @@ ASTProgram *Parser::parse_program() {
 
   // put bootstrap on root scope
   if (!compile_command.has_flag("nostdlib")) {
-    if (!import("bootstrap", &ctx.root_scope)) {
+    if (!try_import("bootstrap", &ctx.root_scope)) {
       throw_error("Unable to find bootstrap lib", {});
       return nullptr;
     }
@@ -1567,7 +1568,7 @@ ASTImport *Parser::parse_import() {
   ENTER_SCOPE(scope)
 
   auto identifier = root_segment.get_identifier();
-  if (this->import(identifier, &scope)) {
+  if (this->try_import(identifier, &scope)) {
     NODE_ALLOC(ASTModule, the_module, range, _, this)
     // again, make certain that we are attached to the root scope for imported modules.
     the_module->declaring_scope = ctx.root_scope;
@@ -3105,7 +3106,7 @@ inline void Parser::fill_buffer_if_needed(Lexer::State &state) {
   }
 }
 
-bool Parser::import(InternedString name, Scope **scope) {
+bool Parser::try_import(InternedString name, Scope **scope) {
   static std::string ela_lib_path = ({
     std::string path;
     if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
@@ -3129,8 +3130,8 @@ bool Parser::import(InternedString name, Scope **scope) {
   }
 
   // Right now, we just return false if we're double including.
-  if (import_map.contains(module_name)) {
-    *scope = import_map[module_name];
+  if (import_scopes.contains(module_name)) {
+    *scope = import_scopes[module_name];
     return false;
   }
 
@@ -3145,7 +3146,7 @@ bool Parser::import(InternedString name, Scope **scope) {
     return false;
   }
 
-  import_map.insert({module_name, *scope});
+  import_scopes.insert({module_name, *scope});
   states.push_back(Lexer::State::from_file(filename));
   fill_buffer_if_needed(states.back());
   return true;
