@@ -3023,8 +3023,6 @@ void Typer::visit(ASTImport *node) {
 
   const Symbol *the_module = the_module_nullable.get();
 
-  printf("visiting import for '%s'\n", the_module->name.get_str().c_str());
-
   // This means that we imported a single symbol.
   if (!the_module->is_module) {
     ctx.scope->create_reference(ctx.get_symbol_and_scope(node->root_group.path));
