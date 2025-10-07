@@ -655,6 +655,8 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
 ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
   ENTER_AST_STATEMENT_LIST(program->statements);
+  program_statement_list = &program->statements;
+  ENTER_SCOPE(ctx.root_scope);
 
   // put bootstrap on root scope
   if (!compile_command.has_flag("nostdlib")) {
@@ -1452,7 +1454,7 @@ ASTType *Parser::parse_type() {
       auto slice = ast_alloc<ASTType>();
       slice->kind = ASTType::NORMAL;
       slice->normal.path = ast_alloc<ASTPath>();
-      slice->normal.path->push_segment("Slice", std::vector<ASTExpr*>{type});
+      slice->normal.path->push_segment("Slice", std::vector<ASTExpr *>{type});
       return slice;
     }
     return node;
@@ -1535,20 +1537,42 @@ ASTIf *Parser::parse_if() {
 }
 
 ASTModule *Parser::parse_module() {
-  NODE_ALLOC(ASTModule, the_module, range, _, this);
-  the_module->scope = create_child(ctx.scope);
-  ENTER_SCOPE(the_module->scope);
+  NODE_ALLOC(ASTModule, mod, range, _, this);
   expect(TType::Module);
-  the_module->module_name = expect(TType::Identifier).value;
-  expect(TType::LCurly);
-  while (peek().type != TType::RCurly) {
-    the_module->statements.push_back(parse_statement());
+
+  mod->module_name = expect(TType::Identifier).value;
+
+  TType expected_delimiter = TType::Eof;
+
+  if (peek().type == TType::Semi) {
+    eat();
+  } else if (peek().type == TType::LCurly) {
+    eat();
+    expected_delimiter = TType::RCurly;
+  } else {
+    throw_error(std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'",
+                            peek().value.get_str()),
+                mod->source_range);
+  }
+
+  if (expected_delimiter == TType::Eof &&
+      (current_func_decl || current_impl_decl || current_struct_decl || current_trait_decl)) {
+    throw_error("file-scoped modules can only be declared at the top-level", mod->source_range);
+  }
+
+  mod->scope = create_child(ctx.scope);
+  mod->scope->is_module_scope = true;
+  ENTER_SCOPE(mod->scope);
+
+  while (peek().type != expected_delimiter) {
+    mod->statements.push_back(parse_statement());
     if (peek().type == TType::Semi) {
       eat();
     }
   }
-  expect(TType::RCurly);
-  return the_module;
+
+  expect(expected_delimiter);
+  return mod;
 }
 
 ASTImport *Parser::parse_import() {
@@ -1557,6 +1581,7 @@ ASTImport *Parser::parse_import() {
 
   // Parse the root group (could be a single path, a group, or a wildcard, or a recursive set of groups.)
   import->root_group = parse_import_group(nullptr);
+  expect(TType::Semi);
 
   ASTPath *path = import->root_group.path;
   ASTPath::Segment root_segment = path->segments[0];
@@ -1587,7 +1612,6 @@ ASTImport *Parser::parse_import() {
     std::filesystem::current_path(states.back().path.parent_path());
   }
 
-  expect(TType::Semi);
   return import;
 }
 
@@ -3120,8 +3144,8 @@ bool Parser::try_import(InternedString name, Scope **scope) {
     }
     path;
   });
-  // TODO: we'll use weave with a local .cache, this is not a great system currently.
 
+  // TODO: we'll eventually use weave with a local ./pkg_cache/, this is not a great system currently.
   std::string module_name = name.get_str();
   std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();
 

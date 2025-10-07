@@ -1280,7 +1280,6 @@ struct Parser {
   Lexer lexer{};
 
   std::vector<Lexer::State> states;
-  ASTModule *current_module_decl = nullptr;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl_decl = nullptr;
@@ -1391,8 +1390,3 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                         \
     deferred;                                                              \
   });
-
-#define ENTER_MODULE($module)                    \
-  const auto $old_module_ = current_module_decl; \
-  current_module_decl = $module;                 \
-  const Defer $module_defer([&] { current_module_decl = $old_module_; });
