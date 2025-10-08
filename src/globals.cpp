@@ -63,3 +63,5 @@ Type *g_Init_trait_type = nullptr, *g_Iterable_trait_type = nullptr, *g_Iterator
 int ignored_warnings = 0;
 
 bool run_on_finished = false;
+
+std::string current_lexer_path, previous_lexer_path;

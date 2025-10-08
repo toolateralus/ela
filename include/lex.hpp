@@ -430,6 +430,26 @@ static inline std::string ttype_get_operator_string(TType type, const SourceRang
   return {};
 }
 
+extern std::string current_lexer_path;
+
+static inline std::vector<std::string> &lexer_path_stack() {
+  static std::vector<std::string> s;
+  return s;
+}
+
+static inline void enter_path(const std::string &path) {
+  lexer_path_stack().push_back(current_lexer_path);
+  current_lexer_path = path;
+}
+
+static inline void exit_lexer_path() {
+  if (lexer_path_stack().empty()) {
+    throw_error("INTERNAL COMPILER ERROR: called exit_lexer_path() but the stack was empty", {});
+  }
+  current_lexer_path = lexer_path_stack().back();
+  lexer_path_stack().pop_back();
+}
+
 struct Lexer {
   struct State {
     bool operator==(const Lexer::State &other) const { return other.input == input; }
@@ -449,31 +469,45 @@ struct Lexer {
     static State from_string(const std::string &input) { return State(input, 0, input.length(), ""); }
 
     static State from_file(const std::string &filename) {
-      auto canonical = std::filesystem::canonical(filename);
-      auto path = canonical.string();
-      std::filesystem::current_path(canonical.parent_path());
+      std::filesystem::path input_path{filename};
+      std::filesystem::path candidate;
 
-      if (!std::filesystem::exists(canonical)) {
-        printf("File %s does not exist. Quitting..", canonical.string().c_str());
+      if (input_path.is_absolute()) {
+        candidate = input_path;
+      } else {
+        if (!current_lexer_path.empty()) {
+          candidate = std::filesystem::path(current_lexer_path) / input_path;
+        } else {
+          candidate = input_path;
+        }
+      }
+
+      if (!std::filesystem::exists(candidate)) {
+        printf("File %s does not exist. Quitting..", candidate.string().c_str());
         exit(1);
       }
 
-      std::ifstream file(canonical);
+      auto canonical = std::filesystem::canonical(candidate);
+      auto path_str = canonical.string();
+
+      enter_path(canonical.parent_path());
+
+      std::ifstream input_file(canonical);
       std::stringstream ss;
-      ss << file.rdbuf();
+      ss << input_file.rdbuf();
       auto input = ss.str();
 
       bool found = false;
       size_t file_idx = 0;
       for (const auto &file : SourceRange::files()) {
-        if (file == path) {
-          found = 1;
-        } else {
-          ++file_idx;
+        if (file == path_str) {
+          found = true;
+          break;
         }
+        ++file_idx;
       }
       if (!found) {
-        SourceRange::files().push_back(path);
+        SourceRange::files().push_back(path_str);
       }
       return State(input, file_idx, input.length(), canonical);
     }

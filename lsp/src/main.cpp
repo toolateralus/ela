@@ -86,8 +86,6 @@ size_t get_file_index(const std::string &uri) {
 }
 
 int main() {
-  setenv("ELA_LIB_PATH", "/home/josh/source/ela/ela-stdlib", 1);
-
   init_type_system();
 
   log_info("Logger initialized, logs will be written to ./logs.log");

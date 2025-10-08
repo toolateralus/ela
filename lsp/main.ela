@@ -1,0 +1,7 @@
+import io;
+
+fn main() {
+  for i in 0..100 {
+    io::println("Hello, World!");
+  }
+}

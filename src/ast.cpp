@@ -138,16 +138,29 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "include",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto filename = parser->expect(TType::String).value;
-        if (!std::filesystem::exists(filename.get_str())) {
+        auto token = parser->expect(TType::String);
+        auto filename = token.value;
+
+        auto exists_at_path = std::filesystem::exists(current_lexer_path + '/' + filename.get_str());
+        auto exists_here = std::filesystem::exists(filename.get_str());
+
+        if (!exists_at_path && !exists_here) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
-                                  std::filesystem::current_path().string()),
-                      {});
+                                  current_lexer_path),
+                    token.location);
         }
-        if (include_set.contains(filename)) {
+
+        auto filename_for_set = filename;
+        if (exists_at_path) {
+          filename_for_set = current_lexer_path + "/" + filename.get_str();
+        }
+
+        if (include_set.contains(filename_for_set)) {
           return nullptr;
         }
-        include_set.insert(filename);
+
+        include_set.insert(filename_for_set);
+
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
         parser->fill_buffer_if_needed(parser->states.back());
         parser->fill_buffer_if_needed(parser->states.back());
@@ -157,7 +170,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         parser->expect(TType::Eof);
         parser->states.pop_back();
-        std::filesystem::current_path(parser->states.back().path.parent_path());
+        exit_lexer_path();
         return list;
     }},
 
@@ -679,7 +692,7 @@ ASTProgram *Parser::parse_program() {
       return nullptr;
     }
 
-    std::filesystem::current_path(states.back().path.parent_path());
+    exit_lexer_path();
   }
 
   program->end_of_bootstrap_index = program->statements.size();
@@ -1609,7 +1622,7 @@ ASTImport *Parser::parse_import() {
     current_statement_list->push_back(the_module);
     expect(TType::Eof);
     states.pop_back();
-    std::filesystem::current_path(states.back().path.parent_path());
+    exit_lexer_path();
   }
 
   return import;
@@ -1829,7 +1842,7 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
       }
       attribute.tag = tag;
       int argument_count = attribute_tag_takes_arguments(tag);
-      
+
       if (argument_count != 0 && peek().type == TType::LParen) {
         eat();
         argument_count = argument_count == -1 ? INT_MAX : argument_count;
@@ -1843,8 +1856,6 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
         }
         expect(TType::RParen);
       }
-
-
     }
     if (peek().type != TType::RBrace) {
       expect(TType::Comma);
