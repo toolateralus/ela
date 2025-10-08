@@ -1100,11 +1100,10 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     defer_stack = std::move(saved_defer_stack);
   }
 
-
   // Either the tests have to be in the root scope, i.e declared or included via a main.ela file or a test.ela file,
   // or this flag has to be present
   auto should_be_tested = ast->declaring_scope->name.get_str().empty() || compile_command.has_flag("run-every-test");
-  
+
   if (is_testing && ast->is_test && should_be_tested) {
     test_functions.push_back(thir);
   }
@@ -1213,7 +1212,7 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
   THIR_ALLOC(THIRType, thir, ast);
 
   bind(ast, thir);
-  
+
   extract_thir_values_for_type_members(thir->type);
   return thir;
 }
@@ -2496,4 +2495,53 @@ std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
     }
   }
   return out;
+}
+
+THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
+  if (!for_emitter) {
+    return;
+  }
+  if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) {
+    Type *type_ptr_ty = g_refl_Type_type->take_pointer_to(CONST);
+    Type *method_ty = g_refl_Method_type;
+    Type *field_ty = g_refl_Field_type;
+
+    const ASTDeclaration *list_decl = g_List_declaration;
+
+    const ASTDeclaration *list_instance = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty});
+    const ASTDeclaration *method_instance = find_generic_instance(list_decl->generic_instantiations, {method_ty});
+    const ASTDeclaration *field_instance = find_generic_instance(list_decl->generic_instantiations, {field_ty});
+
+    if (!list_instance) {
+      throw_error("INTERNAL COMPILER ERROR: unable to find List!<*Type> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+    }
+    if (!method_instance) {
+      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Method> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+    }
+    if (!field_instance) {
+      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Field> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+    }
+
+    type_ptr_list = list_instance->resolved_type;
+    method_list = method_instance->resolved_type;
+    field_list = field_instance->resolved_type;
+  }
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
+  global_initializer_function = global_ini;
+  FunctionTypeInfo info;
+  info.params_len = 0;
+  info.return_type = void_type();
+  global_ini->type = global_find_function_type_id(info, {});
+  global_ini->is_statement = true;
+  global_ini->name = "ela_run_global_initializers";
+  global_ini->parameters = {};
+  global_ini->block = thir_alloc<THIRBlock>();
+  global_ini->block->is_statement = true;
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRCall, global_ini_call);
+  global_initializer_call = global_ini_call;
+  global_ini_call->callee = global_ini;
+  global_ini_call->is_statement = true;
+  global_ini_call->arguments = {};
 }

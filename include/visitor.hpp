@@ -74,20 +74,19 @@ struct VisitorBase {
   };
 };
 
-extern Type *g_refl_Field_type;
-extern Type *g_refl_Method_type;
-extern Type *g_refl_Type_type;
+extern ASTVariable *g_testing_tests_declaration;
+extern ASTFunctionDeclaration *g_testing_runner_declaration;
 extern Type *g_testing_Test_type;
-extern ASTVariable *g_testing_all_tests_list_variable;
-extern ASTFunctionDeclaration *g_testing_test_runner_fn;
-extern Type *g_destroy_trait;
-extern Type *g_str_type;
-extern Type *g_String_type;
-extern Type *g_InitList_type;
-extern Type *g_List_type;
-extern Type *g_Slice_type;
-extern Type *g_SliceMut_type;
-extern Type *g_Option_type;
+
+extern ASTStructDeclaration *g_List_declaration;
+extern ASTStructDeclaration *g_InitList_declaration;
+extern ASTStructDeclaration *g_Slice_declaration;
+extern ASTStructDeclaration *g_SliceMut_declaration;
+extern ASTChoiceDeclaration *g_Option_type;
+
+extern Type *g_refl_Method_type, *g_refl_Field_type, *g_refl_Type_type;
+extern Type *g_str_type, *g_String_type;
+extern Type *g_Init_trait_type, *g_Iterable_trait_type, *g_Iterator_trait_type, *g_Destroy_trait_type;
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
@@ -97,9 +96,9 @@ struct Typer : VisitorBase {
   Context &ctx;
 
   // This is strictly for unpack expressions right now,
-  // collection initializers  '[...tuple] '
+  // collection initializers  '.[...tuple] '
   // other tuples             '(...tuple) '
-  // arguments                'fn(...tuple)'
+  // arguments                'fn_call(...tuple)'
   Nullable<std::vector<ASTExpr *>> current_expression_list;
 
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
@@ -109,32 +108,6 @@ struct Typer : VisitorBase {
 
   void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
                           const SourceRange &range);
-  /*
-  TODO:
-    Why are these in the typer and not just globally available?
-    they're static and lazily evaluated, and these things are all
-    from the stdlib, which is in Context::root_scope, which is also
-    statically available I think.
-  */
-  Type *iterator_trait() {
-    static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
-    return iter_id;
-  }
-
-  Type *iterable_trait() {
-    static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
-    return iterable_id;
-  }
-
-  Type *destroy_trait() {
-    static Type *destroy_id = ctx.scope->lookup("Destroy")->resolved_type;
-    return destroy_id;
-  }
-
-  Type *init_trait() {
-    static Type *init_id = ctx.scope->lookup("Init")->resolved_type;
-    return init_id;
-  }
 
   Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
                              const SourceRange &source_range);

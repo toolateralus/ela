@@ -1843,6 +1843,8 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
         }
         expect(TType::RParen);
       }
+
+
     }
     if (peek().type != TType::RBrace) {
       expect(TType::Comma);

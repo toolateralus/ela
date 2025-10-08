@@ -1,4 +1,5 @@
 #pragma once
+#include <cstring>
 #include <string>
 
 /*
@@ -23,6 +24,37 @@ constexpr const char *COMPILER_FEATURE_LIST_KEY = "List";
 constexpr const char *COMPILER_FEATURE_SLICE_KEY = "Slice";
 constexpr const char *COMPILER_FEATURE_SLICEMUT_KEY = "SliceMut";
 constexpr const char *COMPILER_FEATURE_OPTION_KEY = "Option";
+
+constexpr const char *COMPILER_FEATURE_ITERATOR_KEY = "Iterator";
+constexpr const char *COMPILER_FEATURE_ITERABLE_KEY = "Iterable";
+constexpr const char *COMPILER_FEATURE_INIT_KEY = "Init";
+
+
+constexpr const char * COMPILER_FEATURES[] = {
+  COMPILER_FEATURE_FIELD_KEY,
+  COMPILER_FEATURE_METHOD_KEY,
+  COMPILER_FEATURE_TYPE_KEY,
+  COMPILER_FEATURE_TEST_KEY,
+  COMPILER_FEATURE_TESTS_LIST_KEY,
+  COMPILER_FEATURE_TEST_RUNNER_FN_KEY,
+  COMPILER_FEATURE_DESTROY_KEY,
+  COMPILER_FEATURE_STR_KEY,
+  COMPILER_FEATURE_STRING_KEY,
+  COMPILER_FEATURE_INITLIST_KEY,
+  COMPILER_FEATURE_LIST_KEY,
+  COMPILER_FEATURE_SLICE_KEY,
+  COMPILER_FEATURE_SLICEMUT_KEY,
+  COMPILER_FEATURE_OPTION_KEY,
+};
+
+constexpr bool compiler_feature_exists(const char *s) {
+  for (const auto &feature: COMPILER_FEATURES) {
+    if (strcmp(s, feature) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 
 // TODO: reorder these, they're crappy and it's not that hard. 

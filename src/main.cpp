@@ -50,16 +50,20 @@ Type *g_refl_Field_type = nullptr;
 Type *g_refl_Method_type = nullptr;
 Type *g_refl_Type_type = nullptr;
 Type *g_testing_Test_type = nullptr;
-ASTVariable *g_testing_all_tests_list_variable = nullptr;
-ASTFunctionDeclaration *g_testing_test_runner_fn = nullptr;
-Type *g_destroy_trait = nullptr;
+Type *g_Destroy_trait_type = nullptr;
 Type *g_str_type = nullptr;
 Type *g_String_type = nullptr;
-Type *g_InitList_type = nullptr;
-Type *g_List_type = nullptr;
-Type *g_Slice_type = nullptr;
-Type *g_SliceMut_type = nullptr;
-Type *g_Option_type = nullptr;
+
+ASTVariable *g_testing_tests_declaration = nullptr;
+ASTFunctionDeclaration *g_testing_runner_declaration = nullptr;
+
+ASTStructDeclaration *g_List_declaration = nullptr;
+ASTStructDeclaration *g_InitList_declaration = nullptr;
+ASTStructDeclaration *g_Slice_declaration = nullptr;
+ASTStructDeclaration *g_SliceMut_declaration = nullptr;
+ASTChoiceDeclaration *g_Option_type = nullptr;
+
+Type *g_Init_trait_type = nullptr, *g_Iterable_trait_type = nullptr, *g_Iterator_trait_type = nullptr;
 
 int ignored_warnings = 0;
 

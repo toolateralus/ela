@@ -95,17 +95,17 @@ struct THIRBinExpr;
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
-  // Global variables will always have ".value" stored in here as .right, and this is what will get 
+  // Global variables will always have ".value" stored in here as .right, and this is what will get
   // read from and mutated during compile time.
   THIRBinExpr *global_initializer_assignment;
   Value *compile_time_value;
   Symbol *symbol;
-  
-  bool use_compile_time_value_at_emit_time: 1 = false;
+
+  bool use_compile_time_value_at_emit_time : 1 = false;
   bool is_static : 1 = false;
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;
-  bool is_extern: 1 = false;
+  bool is_extern : 1 = false;
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -152,7 +152,7 @@ struct THIRFunction : THIR {
   bool is_entry : 1 = false;
   bool is_no_return : 1 = false;
   bool is_no_mangle : 1 = false;
-  bool is_macro: 1 = false;
+  bool is_macro : 1 = false;
 
   InternedString name;
   std::vector<THIRParameter> parameters;
@@ -299,43 +299,7 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  THIRGen(Context &ctx, bool for_emitter = true) : ctx(ctx) {
-
-    if (!for_emitter) {
-      return;
-    }
-
-    if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) {
-      auto type_ptr_ty = ctx.scope->find_type_id("Type", {{TYPE_EXT_POINTER_CONST}});
-      auto method_ty = ctx.scope->find_type_id("Method", {});
-      auto field_ty = ctx.scope->find_type_id("Field", {});
-  
-      auto list_decl = (ASTDeclaration *)ctx.scope->lookup("List")->type.declaration.get();
-  
-      type_ptr_list = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty})->resolved_type;
-      method_list = find_generic_instance(list_decl->generic_instantiations, {method_ty})->resolved_type;
-      field_list = find_generic_instance(list_decl->generic_instantiations, {field_ty})->resolved_type;
-    }
-
-    THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
-    global_initializer_function = global_ini;
-    FunctionTypeInfo info;
-    info.params_len = 0;
-    info.return_type = void_type();
-    global_ini->type = global_find_function_type_id(info, {});
-    global_ini->is_statement = true;
-    global_ini->name = "ela_run_global_initializers";
-    global_ini->parameters = {};
-    global_ini->block = thir_alloc<THIRBlock>();
-    global_ini->block->is_statement = true;
-
-    THIR_ALLOC_NO_SRC_RANGE(THIRCall, global_ini_call);
-    global_initializer_call = global_ini_call;
-    global_ini_call->callee = global_ini;
-    global_ini_call->is_statement = true;
-    global_ini_call->arguments = {};
-  }
-
+  THIRGen(Context &ctx, bool for_emitter = true);
 
   std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
@@ -350,7 +314,7 @@ struct THIRGen {
   void exit_defer_boundary();
 
   Symbol *get_symbol(ASTNode *);
-  
+
   // remove frames up to `boundary` and return defers in execution order
   std::vector<THIR *> collect_defers_up_to(DeferBoundary boundary);
 
