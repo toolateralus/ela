@@ -65,6 +65,6 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   console.log("[ELA LSP] Deactivating extension");
   if (lsp) {
-    console.log("[ELA LSP] Killed LSP process");
+    lsp.kill();
   }
 }

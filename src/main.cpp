@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::string> runtime_args;
   bool run_on_finished = false, run_tests = false, lldb = false;
   compile_command = CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests, lldb);
-
+  
   auto result = compile_command.compile();
 
   if (lldb) {

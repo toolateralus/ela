@@ -27,7 +27,7 @@ struct Arena final {
 
   inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
-  inline ~Arena() { delete[] data; delete next; }
+  inline ~Arena() { delete[] data; delete next; ptr = 0; }
 
   inline char *allocate(size_t size_in_bytes) {
     constexpr size_t MAX_ALIGN = alignof(std::max_align_t);

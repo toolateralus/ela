@@ -164,7 +164,7 @@ struct TypeInfo {
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
   bool is_forward_declared = false;
-  
+
   // Zero size type.
   size_t size_in_bytes() const override { return 0; }
 };
@@ -628,4 +628,76 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
   }
 
   return kind_flags;
+}
+
+/* Global storage for commonly used types and traits.
+  These are initialized in init_type_system(). */
+extern Type *g_u64_type;
+extern Type *g_u32_type;
+extern Type *g_u16_type;
+extern Type *g_u8_type;
+extern Type *g_u8_ptr_type;
+extern Type *g_s64_type;
+extern Type *g_s32_type;
+extern Type *g_s16_type;
+extern Type *g_s8_type;
+extern Type *g_f64_type;
+extern Type *g_f32_type;
+extern Type *g_char_type;
+extern Type *g_char_ptr_type;
+extern Type *g_bool_type;
+extern Type *g_void_type;
+extern Type *g_unit_type;
+
+/* Traits */
+extern Type *g_is_fn_ptr_trait;
+extern Type *g_is_fn_trait;
+extern Type *g_is_tuple_trait;
+extern Type *g_is_struct_trait;
+extern Type *g_is_enum_trait;
+extern Type *g_is_choice_trait;
+extern Type *g_is_dyn_trait;
+extern Type *g_is_union_trait;
+extern Type *g_is_array_trait;
+extern Type *g_is_pointer_trait;
+extern Type *g_is_mut_pointer_trait;
+extern Type *g_is_const_pointer_trait;
+extern Type *g_is_slice_trait;
+extern Type *g_is_slice_mut_trait;
+extern Type *g_blittable_trait;
+
+static inline void reset_global_types() {
+  g_u64_type = nullptr;
+  g_u32_type = nullptr;
+  g_u16_type = nullptr;
+  g_u8_type = nullptr;
+  g_u8_ptr_type = nullptr;
+  g_s64_type = nullptr;
+  g_s32_type = nullptr;
+  g_s16_type = nullptr;
+  g_s8_type = nullptr;
+  g_f64_type = nullptr;
+  g_f32_type = nullptr;
+  g_char_type = nullptr;
+  g_char_ptr_type = nullptr;
+  g_bool_type = nullptr;
+  g_void_type = nullptr;
+  g_unit_type = nullptr;
+
+  // Traits
+  g_is_fn_ptr_trait = nullptr;
+  g_is_fn_trait = nullptr;
+  g_is_tuple_trait = nullptr;
+  g_is_struct_trait = nullptr;
+  g_is_enum_trait = nullptr;
+  g_is_choice_trait = nullptr;
+  g_is_dyn_trait = nullptr;
+  g_is_union_trait = nullptr;
+  g_is_array_trait = nullptr;
+  g_is_pointer_trait = nullptr;
+  g_is_mut_pointer_trait = nullptr;
+  g_is_const_pointer_trait = nullptr;
+  g_is_slice_trait = nullptr;
+  g_is_slice_mut_trait = nullptr;
+  g_blittable_trait = nullptr;
 }

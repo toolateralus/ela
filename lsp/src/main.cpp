@@ -49,9 +49,19 @@ void lsp_panic_handler(const std::string &msg, const SourceRange &source_range, 
   std::string full_msg = msg + " at " + loc;
   log_error(full_msg);
 
-  json notification = {
-      {"jsonrpc", "2.0"}, {"method", "window/showMessage"}, {"params", {{"type", 1}, {"message", full_msg}}}};
-  std::cout << notification.dump() << std::endl;
+  json diagnostic = {{"jsonrpc", "2.0"},
+                     {"method", "textDocument/publishDiagnostics"},
+                     {"params",
+                      {{"uri", SourceRange::files()[source_range.file]},
+                       {"diagnostics",
+                        {{
+                            {"range",
+                             {{"start", {{"line", source_range.line}, {"character", source_range.column}}},
+                              {"end", {{"line", source_range.line}, {"character", source_range.column + 1}}}}},
+                            {"message", full_msg},
+                            {"severity", 1}  // 1 = Error
+                        }}}}}};
+  std::cout << diagnostic.dump() << std::endl;
   std::cout.flush();
 }
 
@@ -86,11 +96,11 @@ size_t get_file_index(const std::string &uri) {
 }
 
 int main() {
-  init_type_system();
-
   log_info("Logger initialized, logs will be written to ./logs.log");
 
   while (true) {
+    reset_all_global_state();
+    init_type_system();
     std::string line;
 
     if (!std::getline(std::cin, line)) {
@@ -113,6 +123,8 @@ int main() {
     log_info(std::string("Method: ") + method);
 
     if (method == "textDocument/didOpen" || method == "textDocument/didChange") {
+
+
       std::string file = msg["params"]["textDocument"]["uri"];
       log_info(std::string("didOpen/didChange for file: ") + file);
 
@@ -130,9 +142,7 @@ int main() {
 
       type_file(program, context);
 
-    }
-
-    else if (method == "textDocument/hover" || method == "textDocument/definition") {
+    } else if (method == "textDocument/hover" || method == "textDocument/definition") {
       std::string file = msg["params"]["textDocument"]["uri"];
       int line_num = msg["params"]["position"]["line"];
       int col_num = msg["params"]["position"]["character"];
@@ -140,7 +150,6 @@ int main() {
       log_info(std::string("Hover/Definition request for ") + file + " at line " + std::to_string(line_num) + " col " +
                std::to_string(col_num));
 
-      // Fresh context per request (no caching). Re-parse each time.
       Context context;
       panic_handler = lsp_panic_handler;
 
@@ -208,6 +217,10 @@ int main() {
   }
 
   log_info("Shutting down");
-  if (log_file.is_open()) log_file.close();
+
+  if (log_file.is_open()) {
+    log_file.close();
+  }
+
   return 0;
 }

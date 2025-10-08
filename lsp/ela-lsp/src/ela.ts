@@ -35,6 +35,47 @@ export class ElaLSP {
     this.spawnProcess();
   }
 
+  public kill() {
+    console.info('[ElaLSP] killing language server process...');
+
+    if (this.rl) {
+      try {
+        this.rl.close();
+      } catch (err) {
+        console.error('[ElaLSP] error closing readline:', err);
+      }
+      this.rl = undefined;
+    }
+
+    if (this.proc) {
+      try {
+        if (this.proc.stdin && typeof (this.proc.stdin as any).end === 'function') {
+          (this.proc.stdin as NodeJS.WritableStream).end();
+        }
+      } catch (err) {
+        console.error('[ElaLSP] error ending stdin:', err);
+      }
+
+      try {
+        this.proc.kill();
+        console.info('[ElaLSP] process kill signal sent');
+      } catch (err) {
+        console.error('[ElaLSP] error killing process:', err);
+      }
+
+      this.proc = undefined;
+    }
+
+    for (const [id, resolve] of this.pendingResponses) {
+      try {
+        resolve({ error: 'language server killed' });
+      } catch (err) {
+        console.error(`[ElaLSP] error resolving pending response id=${id}:`, err);
+      }
+    }
+    this.pendingResponses.clear();
+  }
+
   private spawnProcess() {
     console.info('[ElaLSP] Spawning language server process...');
     try {
@@ -67,11 +108,6 @@ export class ElaLSP {
 
       this.proc.on('exit', (code, signal) => {
         console.error(`[ElaLSP] language server exited. code=${code}, signal=${signal}`);
-        // Respawn on crash
-        setTimeout(() => {
-          console.info('[ElaLSP] respawning language server...');
-          this.spawnProcess();
-        }, 100);
       });
 
       this.proc.on('error', (err) => {
@@ -79,8 +115,6 @@ export class ElaLSP {
       });
     } catch (err) {
       console.error('[ElaLSP] failed to spawn process:', err);
-      // try again later
-      setTimeout(() => this.spawnProcess(), 1000);
     }
   }
 
@@ -140,17 +174,16 @@ export class ElaLSP {
     }
   }
 
-  definition(file: string, line: number, character: number): Promise<DefinitionResult | null> {
+  async definition(file: string, line: number, character: number): Promise<DefinitionResult | null> {
     console.info('[ElaLSP] definition', { file, line, character });
-    return this.sendRequest('textDocument/definition', { textDocument: { uri: file }, position: { line, character } })
-      .then((res: DefinitionResult) => {
-        console.debug('[ElaLSP] definition result:', res);
-        return res || null;
-      })
-      .catch(err => {
-        console.error('[ElaLSP] definition failed:', err);
-        return null;
-      });
+    try {
+      const res = await this.sendRequest('textDocument/definition', { textDocument: { uri: file }, position: { line, character } });
+      console.debug('[ElaLSP] definition result:', res);
+      return res || null;
+    } catch (err) {
+      console.error('[ElaLSP] definition failed:', err);
+      return null;
+    }
   }
 
   private handleDiagnostics(params: { uri: string; diagnostics: Diagnostic[] }) {

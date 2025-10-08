@@ -615,18 +615,89 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_in
   return info;
 }
 
-Type *bool_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
-  return type;
-}
-Type *void_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
-  return type;
-}
+Type *u64_type() { return g_u64_type; }
+Type *u32_type() { return g_u32_type; }
+Type *u16_type() { return g_u16_type; }
+Type *u8_type() { return g_u8_type; }
+Type *u8_ptr_type() { return g_u8_ptr_type; }
 
-// an empty tuple type. this is a ZST just like void.
-Type *unit_type() {
-  static auto create = []() {
+Type *s64_type() { return g_s64_type; }
+Type *s32_type() { return g_s32_type; }
+Type *s16_type() { return g_s16_type; }
+Type *s8_type() { return g_s8_type; }
+
+Type *f64_type() { return g_f64_type; }
+Type *f32_type() { return g_f32_type; }
+
+Type *char_type() { return g_char_type; }
+Type *char_ptr_type() { return g_char_ptr_type; }
+
+/* Trait accessors */
+Type *is_struct_trait() { return g_is_struct_trait; }
+Type *is_enum_trait() { return g_is_enum_trait; }
+Type *is_choice_trait() { return g_is_choice_trait; }
+Type *is_dyn_trait() { return g_is_dyn_trait; }
+Type *is_union_trait() { return g_is_union_trait; }
+
+Type *is_array_trait() { return g_is_array_trait; }
+Type *is_pointer_trait() { return g_is_pointer_trait; }
+Type *is_mut_pointer_trait() { return g_is_mut_pointer_trait; }
+Type *is_const_pointer_trait() { return g_is_const_pointer_trait; }
+
+Type *is_slice_trait() { return g_is_slice_trait; }
+Type *is_slice_mut_trait() { return g_is_slice_mut_trait; }
+
+Type *blittable_trait() { return g_blittable_trait; }
+
+Type *is_fn_ptr_trait() { return g_is_fn_ptr_trait; }
+Type *is_fn_trait() { return g_is_fn_trait; }
+Type *is_tuple_trait() { return g_is_tuple_trait; }
+
+Type *bool_type() { return g_bool_type; }
+Type *void_type() { return g_void_type; }
+
+Type *unit_type() { return g_unit_type; }
+
+void init_type_system() {
+  // initialize trait types.
+  g_is_fn_ptr_trait = global_create_trait_type("IsFnPtr", create_child(nullptr), {});
+  g_is_fn_trait = global_create_trait_type("IsFn", create_child(nullptr), {});
+  g_is_tuple_trait = global_create_trait_type("IsTuple", create_child(nullptr), {});
+  g_is_struct_trait = global_create_trait_type("IsStruct", create_child(nullptr), {});
+  g_is_enum_trait = global_create_trait_type("IsEnum", create_child(nullptr), {});
+  g_is_choice_trait = global_create_trait_type("IsChoice", create_child(nullptr), {});
+  g_is_dyn_trait = global_create_trait_type("IsDyn", create_child(nullptr), {});
+  g_is_union_trait = global_create_trait_type("IsUnion", create_child(nullptr), {});
+  g_is_array_trait = global_create_trait_type("IsArray", create_child(nullptr), {});
+  g_is_pointer_trait = global_create_trait_type("IsPointer", create_child(nullptr), {});
+  g_is_mut_pointer_trait = global_create_trait_type("IsMutPointer", create_child(nullptr), {});
+  g_is_const_pointer_trait = global_create_trait_type("IsConstPointer", create_child(nullptr), {});
+  g_is_slice_trait = global_create_trait_type("IsSlice", create_child(nullptr), {});
+  g_is_slice_mut_trait = global_create_trait_type("IsSliceMut", create_child(nullptr), {});
+  g_blittable_trait = global_create_trait_type("Blittable", create_child(nullptr), {});
+  
+  // Signed integers
+  g_s64_type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
+  g_s32_type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
+  g_s16_type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
+  g_s8_type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
+
+  // Unsigned integers
+  g_u64_type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
+  g_u32_type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
+  g_u16_type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
+  g_u8_type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
+  g_u8_ptr_type = global_find_type_id(g_u8_type, {{TYPE_EXT_POINTER_CONST}});
+
+  // Floats
+  g_f64_type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
+  g_f32_type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
+
+  // Other
+  g_bool_type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
+  g_void_type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
+  // Create the unit type (()): an empty tuple ZST
+  {
     type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
     Type *type = type_table.back();
     type->set_base(get_tuple_type_name({}));
@@ -634,123 +705,10 @@ Type *unit_type() {
     info->types = {};
     type->set_info(info);
     info->scope = create_child(nullptr);
-    return type;
-  };
-  static auto type = create();
-  return type;
-}
-
-Type *u64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
-  return type;
-}
-Type *u32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
-  return type;
-}
-Type *u16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
-  return type;
-}
-
-Type *u8_ptr_type() {
-  static Type *type = global_find_type_id(u8_type(), {{TYPE_EXT_POINTER_CONST}});
-  return type;
-}
-
-Type *char_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
-  return type;
-}
-
-Type *char_ptr_type() {
-  static Type *type = global_find_type_id(char_type(), {{TYPE_EXT_POINTER_CONST}});
-  return type;
-}
-
-Type *u8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
-  return type;
-}
-
-Type *s64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
-  return type;
-}
-Type *s32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
-  return type;
-}
-Type *s16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
-  return type;
-}
-Type *s8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
-  return type;
-}
-Type *f32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
-  return type;
-}
-Type *f64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
-  return type;
-}
-
-// TODO(Josh) 10/5/2024, 10:04:29 AM
-// TODO(Josh) 4/14/2024 9:59 AM
-// idk just crazy how long it's been since I wrote that, this compiler is like 8 months old at this point.
-// I removed the code that this original todo was for, but it's krazy how long it's been.
-void init_type_system() {
-  // Signed integers
-
-  {
-    s64_type();
-    s32_type();
-    s16_type();
-    s8_type();
+    g_unit_type = type;
   }
-
-  // Unsigned integers
-  {
-    u64_type();
-    u32_type();
-    u16_type();
-    u8_type();
-  }
-
-  // Floats
-  {
-    f64_type();
-    f32_type();
-  }
-
-  // Other
-  {
-    bool_type();
-    void_type();
-    char_type();
-    char_ptr_type();
-  }
-
-  {  // initialize trait types.
-    is_fn_ptr_trait();
-    is_fn_trait();
-    is_tuple_trait();
-    is_struct_trait();
-    is_enum_trait();
-    is_choice_trait();
-    is_dyn_trait();
-    is_union_trait();
-    is_array_trait();
-    is_pointer_trait();
-    is_mut_pointer_trait();
-    is_const_pointer_trait();
-    is_slice_trait();
-    is_slice_mut_trait();
-    blittable_trait();
-  }
+  g_char_type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
+  g_char_ptr_type = global_find_type_id(g_char_type, {{TYPE_EXT_POINTER_CONST}});
 }
 
 bool type_is_numerical(const Type *t) {
@@ -953,77 +911,6 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
     i++;
   }
   return s;
-}
-
-Type *is_fn_ptr_trait() {
-  static Type *id = global_create_trait_type("IsFnPtr", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_fn_trait() {
-  static Type *id = global_create_trait_type("IsFn", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_tuple_trait() {
-  static Type *id = global_create_trait_type("IsTuple", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_struct_trait() {
-  static Type *id = global_create_trait_type("IsStruct", create_child(nullptr), {});
-  return id;
-}
-Type *is_enum_trait() {
-  static Type *id = global_create_trait_type("IsEnum", create_child(nullptr), {});
-  return id;
-}
-Type *is_choice_trait() {
-  static Type *id = global_create_trait_type("IsChoice", create_child(nullptr), {});
-  return id;
-}
-Type *is_dyn_trait() {
-  static Type *id = global_create_trait_type("IsDyn", create_child(nullptr), {});
-  return id;
-}
-Type *is_union_trait() {
-  static Type *id = global_create_trait_type("IsUnion", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_array_trait() {
-  static Type *id = global_create_trait_type("IsArray", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_pointer_trait() {
-  static Type *id = global_create_trait_type("IsPointer", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_mut_pointer_trait() {
-  static Type *id = global_create_trait_type("IsMutPointer", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_const_pointer_trait() {
-  static Type *id = global_create_trait_type("IsConstPointer", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_slice_trait() {
-  static Type *id = global_create_trait_type("IsSlice", create_child(nullptr), {});
-  return id;
-}
-
-Type *is_slice_mut_trait() {
-  static Type *id = global_create_trait_type("IsSliceMut", create_child(nullptr), {});
-  return id;
-}
-
-Type *blittable_trait() {
-  static Type *id = global_create_trait_type("Blittable", create_child(nullptr), {});
-  return id;
 }
 
 Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const {
@@ -1378,7 +1265,6 @@ bool Type::has_dependencies() const {
     case TYPE_DYN: {
       // this doesn't depend on any other type, rather function declarations, but that's not relevant.
       return false;
-    }
-    break;
+    } break;
   }
 }

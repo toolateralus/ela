@@ -52,6 +52,9 @@ Context::Context() {
     if (type_table[i]->info->scope) {
       type_table[i]->info->scope->parent = scope;
     }
+    if (type_table[i]->has_extensions()) {
+      continue;
+    }
     scope->create_type_alias(type_table[i]->basename, type_table[i], nullptr);
   }
 }
