@@ -10,7 +10,6 @@
 
 #include "interned_string.hpp"
 
-
 enum struct TType {
   Eof = -1,
   Identifier,
@@ -257,6 +256,20 @@ struct SourceRange {
     return files;
   }
   std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
+
+  bool contains(size_t query_file, size_t query_line, size_t query_col) const {
+    if (file != query_file) return false;
+    if (line == query_line && column == query_col) return true;
+    if (line == query_line) return true;
+    return false;
+  }
+
+  size_t distance(size_t query_file, size_t query_line, size_t query_col) const {
+    if (file != query_file) return SIZE_MAX;  // different file = ignore
+    size_t line_diff = line > query_line ? line - query_line : query_line - line;
+    size_t col_diff = column > query_col ? column - query_col : query_col - column;
+    return line_diff * 1000 + col_diff;  // simple weighted metric
+  }
 };
 
 static inline bool ttype_is_relational(TType type) {

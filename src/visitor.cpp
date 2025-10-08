@@ -1,4 +1,5 @@
 #include "visitor.hpp"
+#include <csetjmp>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -13,21 +14,17 @@
 // {
 
 // We use this so we have a chance to dynamically erase AST and replace it at visitation time.
-#define NODE_VISIT()                               \
-  ASTNode *old_parent = visitor->parent_node;      \
-  ASTNode *old_parent_prev = visitor->parent_prev; \
-  visitor->parent_prev = old_parent;               \
-  visitor->parent_node = this;                     \
-  Defer _defer([&] {                               \
-    visitor->parent_node = old_parent;             \
-    visitor->parent_prev = old_parent_prev;        \
-  });                                              \
-  visitor->visit(this);
+#define NODE_VISIT()                                                \
+  visitor->visit(this);                                             \
+  if (visitor->ctx.on_visit_complete != nullptr) {                  \
+    if (visitor->ctx.on_visit_complete(visitor, (ASTNode *)this)) { \
+      std ::longjmp(visitor->ctx.visitor_entry_jmp, 1);             \
+    }                                                               \
+  }
 
 // clang-format off
 void ASTUnpackElement::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTUnpack::accept(VisitorBase *visitor) { NODE_VISIT() }
-
 void ASTDyn_Of::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTWhere::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTModule::accept(VisitorBase *visitor) { NODE_VISIT() }

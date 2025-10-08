@@ -661,7 +661,7 @@ ASTProgram *Parser::parse_program() {
   // put bootstrap on root scope
   if (!compile_command.has_flag("nostdlib")) {
     if (!try_import("bootstrap", &ctx.root_scope)) {
-      throw_error("Unable to find bootstrap lib", {});
+      throw_error(std::format("Unable to find bootstrap lib: 'ELA_LIB_PATH={}'", get_ela_lib_path()), {});
       return nullptr;
     }
 
@@ -3175,7 +3175,7 @@ inline void Parser::fill_buffer_if_needed(Lexer::State &state) {
   }
 }
 
-bool Parser::try_import(InternedString name, Scope **scope) {
+std::string get_ela_lib_path() {
   static std::string ela_lib_path = ({
     std::string path;
     if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
@@ -3189,6 +3189,11 @@ bool Parser::try_import(InternedString name, Scope **scope) {
     }
     path;
   });
+  return ela_lib_path;
+}
+
+bool Parser::try_import(InternedString name, Scope **scope) {
+  const std::string ela_lib_path = get_ela_lib_path();
 
   // TODO: we'll eventually use weave with a local ./pkg_cache/, this is not a great system currently.
   std::string module_name = name.get_str();

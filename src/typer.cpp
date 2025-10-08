@@ -1547,6 +1547,10 @@ std::vector<Type *> Typer::get_generic_arg_types(const std::vector<ASTExpr *> &a
 }
 
 void Typer::visit(ASTProgram *node) {
+  if (setjmp(ctx.visitor_entry_jmp) == 1) {
+    return;
+  }
+
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
   for (auto &statement : node->statements) {

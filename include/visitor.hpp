@@ -10,11 +10,16 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-struct VisitorBase {
-  ASTNode *parent_node = nullptr;
-  ASTNode *parent_prev = nullptr;
+enum {
+  ON_VISIT_COMPLETE_TERMINATE_VISITATION = true,
+  ON_VISIT_COMPLETE_CONTINUE = false,
+};
 
-  virtual ~VisitorBase() = default;
+struct VisitorBase {
+  VisitorBase(Context &ctx) : ctx(ctx) {}
+  Context &ctx;
+
+  virtual ~VisitorBase() {};
   void visit(ASTNoop *) { return; }
 
   virtual void visit(ASTRun *) = 0;
@@ -92,8 +97,9 @@ struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
   Type *expected_type = Type::INVALID_TYPE;
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
-  Typer(Context &context) : ctx(context) {}
-  Context &ctx;
+  Typer(Context &context) : VisitorBase(context) {}
+
+  ~Typer() {}
 
   // This is strictly for unpack expressions right now,
   // collection initializers  '.[...tuple] '

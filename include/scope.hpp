@@ -1,5 +1,6 @@
 #pragma once
 
+#include <csetjmp>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -292,10 +293,17 @@ static Scope *create_child(Scope *parent) {
   return scope;
 }
 
+struct VisitorBase;
+struct ASTNode;
+
 struct Context {
   Scope *root_scope = nullptr;
   Scope *scope = nullptr;
   Context();
+
+  std::function<bool (VisitorBase *sender, ASTNode*)> on_visit_complete;
+  jmp_buf visitor_entry_jmp;
+
   inline void set_scope(Scope *in_scope = nullptr) {
     if (!in_scope) {
       in_scope = create_child(scope);

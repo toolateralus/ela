@@ -95,6 +95,8 @@ struct ControlFlow {
 
 struct ASTBlock;
 
+std::string get_ela_lib_path();
+
 struct ASTNode {
   bool is_insert_node = false;
   bool is_temporary_value() const {
