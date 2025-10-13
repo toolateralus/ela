@@ -683,7 +683,6 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, co
 
   ffi_call(&cif, FFI_FN(fn_ptr), ret_storage.data(), ctx.arg_values.data());
 
-  // writeback any modified nested buffers to managed Values
   ctx.writeback_pointer_values(args);
 
   if (!ret_type || ret_type == void_type()) {
