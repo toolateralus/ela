@@ -134,10 +134,26 @@ struct TypeMember {
   Nullable<THIR> thir_value;
 };
 
-struct TypeInfo {
-  Scope *scope = nullptr;
+struct ImplMethod {
+  Type *signature;
+  // TODO: we need to add a compiled-non-ast where constraint here so we can quickly check
+  // against call site usage, instead of checking it at impl time.
+};
 
+extern size_t impl_uid_base;
+
+struct ASTImpl;
+static inline size_t make_impl_unique_get_id(ASTImpl *impl);
+
+struct Impl {
+  Nullable<Type> trait_type;
+  std::unordered_map<InternedString, ImplMethod> methods;
+};
+
+struct TypeInfo {
   std::vector<TypeMember> members;
+  std::vector<Impl> impls; // no longer storing a scope, just impls & members.
+
   TypeInfo() {}
 
   template <class T>
@@ -164,7 +180,7 @@ struct TypeInfo {
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
   bool is_forward_declared = false;
-  
+
   // Zero size type.
   size_t size_in_bytes() const override { return 0; }
 };
@@ -631,4 +647,4 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 }
 
 void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRange &source_range,
-                                    const std::string &message);
+                                        const std::string &message);

@@ -24,8 +24,8 @@ struct ASTCopier {
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);
   ASTFunctionDeclaration *copy_function_declaration(ASTFunctionDeclaration *node);
-  ASTParamsDecl *copy_params_decl(ASTParamsDecl *node);
-  ASTParamDecl *copy_param_decl(ASTParamDecl *node);
+  ParameterList copy_parameters(const ParameterList &node);
+  Parameter copy_parameter(const Parameter &parameter);
   ASTVariable *copy_variable(ASTVariable *node);
   ASTExprStatement *copy_expr_statement(ASTExprStatement *node);
   ASTBinExpr *copy_bin_expr(ASTBinExpr *node);
@@ -55,6 +55,7 @@ struct ASTCopier {
   ASTSize_Of *copy_sizeof(ASTSize_Of *node);
   ASTDefer *copy_defer(ASTDefer *node);
   ASTLambda *copy_lambda(ASTLambda *node);
+  
   ASTChoiceDeclaration *copy_choice_declaration(ASTChoiceDeclaration *node);
   ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTNode *copy_node(ASTNode *node);

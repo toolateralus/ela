@@ -2221,9 +2221,7 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
     case AST_NODE_TRAIT_DECLARATION:
       return nullptr;
 
-    case AST_NODE_PARAMS_DECL:
     case AST_NODE_TYPE:
-    case AST_NODE_PARAM_DECL:
     case AST_NODE_ARGUMENTS:
     case AST_NODE_WHERE:
     case AST_NODE_UNPACK:

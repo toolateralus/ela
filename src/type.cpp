@@ -1404,3 +1404,7 @@ void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRan
     };
   }
 }
+
+static inline size_t make_impl_unique_get_id(ASTImpl *impl) {
+  return impl->uid = impl_uid_base;
+}

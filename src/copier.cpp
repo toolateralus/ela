@@ -36,8 +36,8 @@ ASTBlock *ASTCopier::copy_block(ASTBlock *node) {
 
 ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclaration *node) {
   auto new_node = make_copy(node);
-  new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
-  new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
+  new_node->parameters = copy_parameters(node->parameters);
+  new_node->return_type = (ASTType *)(copy_node(node->return_type));
   new_node->generic_instantiations.clear();
 
   auto old_scope = current_scope;
@@ -57,31 +57,6 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
   }
 
   current_scope = old_scope;
-  return new_node;
-}
-
-ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
-  auto new_node = make_copy(node);
-  new_node->params.clear();
-  for (auto param : node->params) {
-    new_node->params.push_back((ASTParamDecl *)copy_node(param));
-  }
-  return new_node;
-}
-/*
-  ! When passing an argument to a generic function that has a default parameter in that position, we get junk values out
-  and it crashes.
-*/
-ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
-  auto new_node = make_copy(node);
-  if (new_node->tag == ASTParamDecl::Normal) {
-    new_node->normal.type = (ASTType *)copy_node(node->normal.type);
-    if (node->normal.default_value.is_not_null()) {
-      new_node->normal.default_value = (ASTType *)copy_node(node->normal.default_value.get());
-    }
-  } else {
-    new_node->self.is_pointer = node->self.is_pointer;
-  }
   return new_node;
 }
 
@@ -466,10 +441,6 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_block(static_cast<ASTBlock *>(node));
     case AST_NODE_FUNCTION_DECLARATION:
       return copy_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
-    case AST_NODE_PARAMS_DECL:
-      return copy_params_decl(static_cast<ASTParamsDecl *>(node));
-    case AST_NODE_PARAM_DECL:
-      return copy_param_decl(static_cast<ASTParamDecl *>(node));
     case AST_NODE_VARIABLE:
       return copy_variable(static_cast<ASTVariable *>(node));
     case AST_NODE_EXPR_STATEMENT:
@@ -586,7 +557,7 @@ ASTDefer *ASTCopier::copy_defer(ASTDefer *node) {
 ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   auto new_node = make_copy(node);
   new_node->resolved_type = nullptr;
-  new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
+  new_node->parameters = copy_parameters(node->parameters);
   new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
@@ -711,4 +682,29 @@ ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   new_node->callee = (ASTDotExpr *)copy_node(node->callee);
   new_node->arguments = (ASTArguments *)copy_node(node->arguments);
   return new_node;
+}
+
+ParameterList ASTCopier::copy_parameters(const ParameterList &node) {
+  ParameterList copy = node;
+  copy.values.clear();
+  for (const auto &param : node.values) {
+    copy.values.push_back(copy_parameter(param));
+  }
+  return copy;
+}
+
+Parameter ASTCopier::copy_parameter(const Parameter &parameter) {
+  Parameter copy = parameter;
+  switch (parameter.tag) {
+    case PARAM_IS_NAMED:
+      copy.named.type = (ASTType *)copy_node(parameter.named.type);
+      break;
+    case PARAM_IS_NAMELESS:
+      copy.nameless.type = (ASTType *)copy_node(parameter.nameless.type);
+      break;
+    // For self parameters, shallow copy is sufficient
+    default:
+      break;
+  }
+  return copy;
 }

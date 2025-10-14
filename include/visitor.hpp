@@ -31,8 +31,6 @@ struct VisitorBase {
   virtual void visit(ASTProgram *node) = 0;
   virtual void visit(ASTBlock *node) = 0;
   virtual void visit(ASTFunctionDeclaration *node) = 0;
-  virtual void visit(ASTParamsDecl *node) = 0;
-  virtual void visit(ASTParamDecl *node) = 0;
   virtual void visit(ASTVariable *node) = 0;
   virtual void visit(ASTExprStatement *node) = 0;
   virtual void visit(ASTBinExpr *node) = 0;
@@ -125,8 +123,6 @@ struct Typer : VisitorBase {
   void visit(ASTImport *node) override;
   void visit(ASTFunctionDeclaration *node) override;
   void visit(ASTBlock *node) override;
-  void visit(ASTParamsDecl *node) override;
-  void visit(ASTParamDecl *node) override;
   void visit(ASTVariable *node) override;
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
@@ -161,7 +157,7 @@ struct Typer : VisitorBase {
 
   Type *get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
+  void type_check_args_from_params(ASTArguments *node, const ParameterList &parameters, ASTFunctionDeclaration *function,
                                    Nullable<ASTExpr> self, bool is_deinit_call);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,

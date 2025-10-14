@@ -61,12 +61,6 @@ struct Typisting {
       case AST_NODE_TRAIT_DECLARATION:
         visit_trait_declaration((ASTTraitDeclaration *)node);
         break;
-      case AST_NODE_PARAMS_DECL:
-        visit_params_decl((ASTParamsDecl *)node);
-        break;
-      case AST_NODE_PARAM_DECL:
-        visit_param_decl((ASTParamDecl *)node);
-        break;
       case AST_NODE_VARIABLE:
         visit_variable((ASTVariable *)node);
         break;
@@ -182,8 +176,6 @@ struct Typisting {
   void visit_enum_declaration(ASTEnumDeclaration *node);
   void visit_choice_declaration(ASTChoiceDeclaration *node);
   void visit_trait_declaration(ASTTraitDeclaration *node);
-  void visit_params_decl(ASTParamsDecl *node);
-  void visit_param_decl(ASTParamDecl *node);
   void visit_variable(ASTVariable *node);
   void visit_expr_statement(ASTExprStatement *node);
   void visit_bin_expr(ASTBinExpr *node);

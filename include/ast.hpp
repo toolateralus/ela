@@ -41,8 +41,6 @@ enum ASTNodeType {
   AST_NODE_CHOICE_DECLARATION,
   AST_NODE_TRAIT_DECLARATION,
 
-  AST_NODE_PARAMS_DECL,
-  AST_NODE_PARAM_DECL,
   AST_NODE_VARIABLE,
 
   AST_NODE_EXPR_STATEMENT,
@@ -96,6 +94,11 @@ struct ControlFlow {
 struct ASTBlock;
 
 struct ASTNode {
+  // if this node declares a symbol, a stable pointer to it will be placed here.
+  // this will allow us cross reference symbol metadata, THIR, type metadata, without lookups.
+  // the same is true for THIR, Symbol, and Type :: all have this so we can cross reference stable
+  // pointers for
+  Nullable<Symbol *> symbol;
   bool is_insert_node = false;
   bool is_temporary_value() const {
     switch (get_node_type()) {
@@ -110,22 +113,21 @@ struct ASTNode {
         return false;
     }
   }
+
   ControlFlow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE,
   };
 
-  Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
+  // CLEANUP: there has to be a better way to do defers than putting yet another pointer on this struct.
+  Nullable<ASTBlock> declaring_block;
   Scope *declaring_scope;
   SourceRange source_range{};
+  // CLEANUP: eventually this shouldn't exist, we will go directly from AST -> THIR
   Type *resolved_type = Type::INVALID_TYPE;
-  bool is_emitted = false;
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
-  virtual void accept_typed_replacement(ASTNode *) {
-    printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
-  }
   bool is_expr();
 };
 
@@ -166,9 +168,6 @@ struct Attribute {
 struct ASTStatement : ASTNode {
   std::vector<Attribute> attributes = {};
   virtual ASTNodeType get_node_type() const override = 0;
-  virtual void accept_typed_replacement(ASTNode *) override {
-    printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
-  }
 };
 
 struct ASTStatementList : ASTStatement {
@@ -532,14 +531,11 @@ struct ASTVariable : ASTStatement {
 
   bool is_local = false;
   bool is_extern = false;
-  bool is_constexpr = false;
   bool is_static = false;
   bool is_bitfield = false;
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
-
-  void accept_typed_replacement(ASTNode *node) override { value = (ASTExpr *)node; }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -609,7 +605,7 @@ struct ASTTuple : ASTExpr {
 
 enum Parameter_Tag {
   PARAM_IS_SELF_BY_VALUE,
-  PARAM_IS_SELF_BY_POINTER,
+  PARAM_IS_SELF_BY_CONST_POINTER,
   PARAM_IS_SELF_BY_MUT_POINTER,
   PARAM_IS_NAMED,
   PARAM_IS_NAMELESS,  // this is just for ease of declaring externs, 'extern fn printf(*u8, ...);' etc.
@@ -617,19 +613,22 @@ enum Parameter_Tag {
 
 struct Parameter {
   Parameter_Tag tag;
-  union {
-    struct {
-      InternedString name;
-      ASTType *type;
-    } named;
-    struct {
-      ASTType *type;
-    } nameless;
-  };
+  Mutability mutability;
+  // Avoid using a union because of the nonsense copy semantics in C++.
+  // even though we lose 8 bytes.
+  struct {
+    InternedString name;
+    ASTType *type;
+  } named;
+  struct {
+    ASTType *type;
+  } nameless;
 };
 
 struct ParameterList {
   std::vector<Parameter> values;
+  bool has_self;
+  bool has_self_by_pointer;
   bool is_varargs;
 };
 
@@ -670,11 +669,11 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_hygenic_macro : 1 = false;
 
   inline bool requires_self_ptr() const {
-    if (params.values.empty()) {
+    if (parameters.values.empty()) {
       return false;
     }
-    switch (params.values.front().tag) {
-      case PARAM_IS_SELF_BY_POINTER:
+    switch (parameters.values.front().tag) {
+      case PARAM_IS_SELF_BY_CONST_POINTER:
       case PARAM_IS_SELF_BY_MUT_POINTER:
         return true;
       case PARAM_IS_SELF_BY_VALUE:
@@ -690,7 +689,7 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   std::vector<Type *> generic_arguments;
   Scope *scope;
-  ParameterList params;
+  ParameterList parameters;
   Nullable<ASTBlock> block;
   InternedString name;
   ASTType *return_type;
@@ -1043,7 +1042,7 @@ struct ASTCast : ASTExpr {
 // These do not support closures!!
 struct ASTLambda : ASTExpr {
   InternedString unique_identifier;
-  ParameterList params;
+  ParameterList parameters;
   ASTType *return_type;
   ASTBlock *block;
   ASTNodeType get_node_type() const override { return AST_NODE_LAMBDA; }
@@ -1286,13 +1285,14 @@ struct Typer;
   Defer $stmt_list_defer([&] { current_statement_list = $old_list; }); \
   current_statement_list = &$list;
 
+#define AST_ENTER_NEW_SCOPE() AST_ENTER_SCOPE(create_child(ctx.scope))
+
 #define AST_ENTER_SCOPE($scope)                        \
   auto $old_scope = ctx.scope;                         \
   Defer $scope_defer([&] { ctx.scope = $old_scope; }); \
   ctx.scope = $scope;
 
 struct Parser {
-  Typer *typer;
   Context &ctx;
   Lexer lexer{};
 

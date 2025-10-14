@@ -9,7 +9,6 @@
 #include <string>
 #include <unordered_set>
 #include "value.hpp"
-#include "visitor.hpp"
 #include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -230,7 +229,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (compile_command.has_flag("test")) {
           return func;
         } else {
-          parser->ctx.scope->erase(func->name);
+          parser->ctx.scope->erase(func->name, {}, false);
           return nullptr;
         }
     }},
@@ -1507,15 +1506,14 @@ ASTIf *Parser::parse_if() {
 
   if (peek().type == TType::Then) {
     NODE_ALLOC(ASTBlock, block, _range, defer, this);
+    AST_ENTER_NEW_SCOPE();
     eat();
     node->block = block;
-    ctx.enter_scope_or_create_and_enter_new_child_scope();
     auto statement = parse_statement();
     node->block->statements = {statement};
     if (statement->get_node_type() == AST_NODE_VARIABLE) {
       throw_warning(WARNING_INACCESSIBLE_DECLARATION, "Inaccesible declared variable", statement->source_range);
     }
-    node->block->scope = ctx.exit_scope();
   } else {
     node->block = parse_block();
   }
@@ -1890,9 +1888,8 @@ ASTStatement *Parser::parse_statement() {
 
   if (tok.type == TType::Const) {
     eat();
+    // TODO: make this actually do something.
     auto variable = parse_variable();
-    variable->is_constexpr = true;
-    ctx.scope->insert(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST, variable);
     return variable;
   }
 
@@ -2266,7 +2263,13 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   current_block = block;
   ENTER_AST_STATEMENT_LIST(block->statements);
 
-  ctx.enter_scope_or_create_and_enter_new_child_scope(scope);
+  if (!scope) {
+    scope = create_child(ctx.scope);
+  }
+
+  AST_ENTER_SCOPE(scope);
+
+  block->scope = ctx.scope;
 
   if (peek().type == TType::Directive) {
     eat();
@@ -2287,8 +2290,6 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     expect(TType::ExpressionBody);
     $return->expression = parse_expr();
     block->statements = {$return};
-    block->scope = ctx.exit_scope();  // we do this, even though it owns no scope, because it would get created later
-                                      // anyway when entering it.
     if (peek().type == TType::Semi) eat();
     return block;
   }
@@ -2315,127 +2316,153 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     block->statements.push_back(statement);
     while (semicolon()) eat();
   }
+
   expect(TType::RCurly);
-  block->scope = ctx.exit_scope();
   end_node(block, range);
   return block;
 }
 
-std::vector<Parameter> Parser::parse_parameters() {
-  ParameterList parameters {};
+ParameterList Parser::parse_parameters() {
+  ParameterList params{};
+  params.has_self = false;
+  params.has_self_by_pointer = false;
+  params.is_varargs = false;
   SourceRange range = begin_node();
   expect(TType::LParen);
-  while (peek().type != TType::RParen) {
-    Parameter paremeter {};
 
-    if (parameters.is_varargs) {
+  // attempt parsing a self parameter when appropriate.
+  const auto try_parse_self = [&]() -> bool {
+    if (!params.values.empty()) {
+      return false;  // self must be first
+    }
+    // Lookahead without consuming until pattern confirmed.
+    auto t0 = peek();
+    // mut self
+    if (t0.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[1].value == "self") {
+      eat();  // mut
+      eat();  // self
+      Parameter p{};
+      p.tag = PARAM_IS_SELF_BY_VALUE;
+      p.mutability = MUT;
+      params.values.push_back(p);
+      params.has_self = true;
+      params.has_self_by_pointer = false;
+      return true;
+    }
+    // self
+    if (t0.type == TType::Identifier && t0.value == "self") {
+      eat();
+      Parameter p{};
+      p.tag = PARAM_IS_SELF_BY_VALUE;
+      p.mutability = CONST;
+      params.values.push_back(p);
+      params.has_self = true;
+      params.has_self_by_pointer = false;
+      return true;
+    }
+    // * (mut|const)? self
+    if (t0.type == TType::Mul) {
+      auto t1 = lookahead_buf()[1];
+      size_t offset = 1;
+      Mutability mutability = CONST;
+      if (t1.type == TType::Mut) {
+        mutability = MUT;
+        offset++;
+      } else if (t1.type == TType::Const) {
+        mutability = CONST;
+        offset++;
+      }
+      auto self_tok = lookahead_buf()[offset];
+      if (self_tok.type == TType::Identifier && self_tok.value == "self") {
+        // Confirmed pattern; now consume tokens.
+        eat();  // *
+        if (mutability == MUT)
+          eat();
+        else if (mutability == CONST && (t1.type == TType::Const))
+          eat();
+        if (self_tok.type == TType::Identifier) {
+          eat();  // self
+        }
+        Parameter p{};
+        p.mutability = mutability;
+        p.tag = (mutability == MUT) ? PARAM_IS_SELF_BY_MUT_POINTER : PARAM_IS_SELF_BY_CONST_POINTER;
+        params.values.push_back(p);
+        params.has_self = true;
+        params.has_self_by_pointer = true;
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Parse loop
+  while (peek().type != TType::RParen) {
+    if (params.is_varargs) {
       end_node(nullptr, range);
       throw_error("var-args \"...\" must be the last declaration in a parameter signature", range);
     }
 
-    auto subrange = begin_node();
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
-        throw_error(
-            "Cannot use varargs outside of a function declaration. "
-            "Only use this for #foreign functions.",
-            range);
+        throw_error("Cannot use varargs outside of a function declaration. Only use this for #foreign functions.",
+                    range);
       }
       current_func_decl.get()->is_varargs = true;
-      params->is_varargs = true;
+      params.is_varargs = true;
+      if (peek().type != TType::RParen) {
+        throw_error("var-args must be final parameter", range);
+      }
+      break;
+    }
+
+    if (try_parse_self()) {
+      if (peek().type != TType::RParen) expect(TType::Comma);
       continue;
     }
 
-    auto next = peek();
-    if (next.type == TType::Mut && lookahead_buf()[1].value == "self") {
-      param->tag = ASTParamDecl::Self;
-      param->self.is_pointer = false;
-      param->mutability = MUT;
-      params->has_self = true;
-      params->params.push_back(param);
-      eat();
-      eat();  // eat the dang tokens.
-      if (peek().type != TType::RParen) {
-        expect(TType::Comma);
-      }
-      continue;
-    } else if (next.type == TType::Mul || next.value == "self") {  // parse self parameters.
-      Mutability mutability = CONST;
-      bool is_pointer = false;
-
-      if (next.type == TType::Mul) {
-        eat();
-        is_pointer = true;
-        if (peek().type == TType::Const) {
-          eat();
-          mutability = CONST;
-        } else if (peek().type == TType::Mut) {
-          eat();
-          mutability = MUT;
-        }
-      }
-
-      auto ident = expect(TType::Identifier);
-      param->self.is_pointer = is_pointer;
-      param->mutability = mutability;
-
-      if (ident.value == "self") {
-        param->tag = ASTParamDecl::Self;
-      } else {
-        end_node(nullptr, range);
-        throw_error("when we got *mut/*const, we expected \'self\', since the parameter was not named", range);
-      }
-
-      if (params->params.size() != 0) {
-        end_node(nullptr, range);
-        throw_error("'self' must be the first parameter in the signature", range);
-      }
-
-      params->has_self = true;
-
-      params->params.push_back(param);
-
-      if (peek().type != TType::RParen) {
-        expect(TType::Comma);
-      }
-      continue;
-    }
-
+    // Determine if named parameter: (mut)? Identifier ':'
+    bool is_named = false;
     Mutability mutability = CONST;
-    if (peek().type == TType::Mut) {
-      eat();
+    // no name_index needed
+    if (peek().type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
+        lookahead_buf()[2].type == TType::Colon) {
       mutability = MUT;
+      is_named = true;
+    } else if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::Colon) {
+      is_named = true;
     }
 
-    auto name = expect(TType::Identifier).value;
-
-    expect(TType::Colon);
-    param->normal.type = parse_type();
-    param->tag = ASTParamDecl::Normal;
-    param->mutability = mutability;
-    param->normal.name = name;
-
-    if (peek().type == TType::Assign) {
-      if (param->tag == ASTParamDecl::Self) {
-        throw_error("self parameters cannot have a default value.", param->source_range);
+    if (is_named) {
+      if (mutability == MUT) {
+        eat();  // consume 'mut'
       }
-      eat();
-      param->normal.default_value = parse_expr();
+      auto name_tok = expect(TType::Identifier);
+      expect(TType::Colon);
+      ASTType *type_ast = parse_type();
+      Parameter p{};
+      p.tag = PARAM_IS_NAMED;
+      p.mutability = mutability;
+      p.named.name = name_tok.value;
+      p.named.type = type_ast;
+      params.values.push_back(p);
+    } else {
+      // nameless parameter: parse type directly
+      ASTType *type_ast = parse_type();
+      Parameter p{};
+      p.tag = PARAM_IS_NAMELESS;
+      p.mutability = CONST;
+      p.nameless.type = type_ast;
+      params.values.push_back(p);
     }
-
-    params->params.push_back(param);
-    end_node(param, subrange);
 
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
-    } else {
-      break;
     }
   }
 
   expect(TType::RParen);
-  end_node(params, range);
+  end_node(nullptr, range);
   return params;
 }
 
@@ -2455,22 +2482,14 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = node;
 
-  node->params = parse_parameters();
+  node->parameters = parse_parameters();
   node->name = name;
 
-  // check for definition.
-  auto has_definition = false;
-  {
-    auto sym = ctx.scope->local_find(name);
-    if (sym && (sym->is_forward_declared) == 0) {
-      has_definition = true;
-    }
-  }
+  // existing declaration detection (simple local duplicate check)
+  bool has_definition = ctx.scope->local_find(name) != nullptr;
 
-  // TODO: why are we inserting the functions at parse time?
-  // Really, we never ended up removing symbol table interactions from the parser,
-  // and this is biting us in the ass later on (now)
-  ctx.scope->insert_function(name, Type::INVALID_TYPE, node);
+  // insert placeholder symbol for this function (no generics handled here)
+  ctx.scope->insert(name, Type::INVALID_TYPE, CONST, node, {}, false);
 
   if (peek().type != TType::Arrow) {
     node->return_type = ASTType::get_void();
@@ -2485,7 +2504,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
 
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
-    ctx.scope->local_find(name)->is_forward_declared = true;
     end_node(node, range);
     current_func_decl = last_func_decl;
     return node;
@@ -2493,7 +2511,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
 
   ctx.enter_scope_or_create_and_enter_new_child_scope();
 
-  if (node->params->has_self) {
+  if (node->parameters.has_self) {
     node->is_method = true;
   }
 
@@ -2506,7 +2524,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   }
 
   end_node(node, range);
-  node->scope = ctx.exit_scope();
+  node->scope = ctx.scope;  // scope already set by enter/exit elsewhere; adjust if needed
   return node;
 }
 
@@ -2559,9 +2577,10 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
       eat();
     }
 
-    ctx.scope->insert_local_variable(iden, s32_type(), value, CONST);
+    ctx.scope->insert(iden, s32_type(), CONST, nullptr, {}, false);
     node->key_values.push_back({iden, value});
   }
+
   end_node(node, range);
   std::vector<InternedString> keys;
   std::set<InternedString> keys_set;
@@ -2586,8 +2605,8 @@ ASTImpl *Parser::parse_impl() {
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, _, this, current_impl_decl = nullptr)
   expect(TType::Impl);
 
-  ctx.enter_scope_or_create_and_enter_new_child_scope();
-  node->scope = ctx.exit_scope();
+  AST_ENTER_NEW_SCOPE();
+  node->scope = ctx.scope;  // REFACTOR! this used to exit the scope immediately, im not sure why.
 
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
@@ -2611,12 +2630,14 @@ ASTImpl *Parser::parse_impl() {
     node->where_clause = parse_where_clause();
   }
 
+  // CLEANUP: get rid of this nonsense, just parse the individual statements here so it's more concise and not broken
   auto block = parse_block(node->scope);
   end_node(node, range);
 
   node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
+    node->declaring_scope = ctx.scope;  // REFACTOR! added this since the old exit behaviour.
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       node->methods.push_back(function);
@@ -2629,6 +2650,7 @@ ASTImpl *Parser::parse_impl() {
       throw_error("invalid statement: only methods and aliases are allowed in 'impl's", statement->source_range);
     }
   }
+
   return node;
 }
 
@@ -2896,13 +2918,14 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
 
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
-    ctx.exit_scope();
+    // REFACTOR! this used to exit scope here, and i have no idea why. that doesn't even make sense.
     return node;
   }
 
-  ctx.enter_scope_or_create_and_enter_new_child_scope(nullptr);
+  AST_ENTER_NEW_SCOPE();
   node->scope = ctx.scope;
   expect(TType::LCurly);
+
   while (peek().type != TType::RCurly) {
     ASTChoiceVariant variant;
     variant.name = expect(TType::Identifier).value;
@@ -2929,7 +2952,7 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     node->variants.push_back(variant);
     if (peek().type != TType::RCurly) expect(TType::Comma);
   }
-  ctx.exit_scope();
+
   expect(TType::RCurly);
   end_node(node, range);
   return node;
@@ -3048,7 +3071,7 @@ ASTType *Parser::parse_function_type() {
 ASTLambda *Parser::parse_lambda() {
   NODE_ALLOC(ASTLambda, node, range, _, this);
   expect(TType::Fn);
-  node->params = parse_parameters();
+  node->parameters = parse_parameters();
   if (peek().type == TType::Arrow) {
     eat();
     node->return_type = parse_type();
@@ -3229,10 +3252,7 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed(states.back());
-  typer = new Typer(context);
 }
-
-Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
 

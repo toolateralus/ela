@@ -23,7 +23,7 @@ void get_varargs_handlers(Context *c) {
 
   va_start->name = "va_start";
   va_start->params = ast_alloc<ASTParamsDecl>();
-  va_start->params->is_varargs = true;
+  va_start->parameters->is_varargs = true;
   va_start->return_type = ast_alloc<ASTType>();
   va_start->return_type->normal.path = nullptr;
   va_start->return_type->resolved_type = void_type();
@@ -32,7 +32,7 @@ void get_varargs_handlers(Context *c) {
 
   va_end->name = "va_end";
   va_end->params = ast_alloc<ASTParamsDecl>();
-  va_end->params->is_varargs = true;
+  va_end->parameters->is_varargs = true;
   va_end->return_type = ast_alloc<ASTType>();
   va_end->return_type->normal.path = nullptr;
   va_end->return_type->resolved_type = void_type();
@@ -41,7 +41,7 @@ void get_varargs_handlers(Context *c) {
 
   va_copy->name = "va_copy";
   va_copy->params = ast_alloc<ASTParamsDecl>();
-  va_copy->params->is_varargs = true;
+  va_copy->parameters->is_varargs = true;
   va_copy->return_type = ast_alloc<ASTType>();
   va_copy->return_type->normal.path = nullptr;
   va_copy->return_type->resolved_type = void_type();

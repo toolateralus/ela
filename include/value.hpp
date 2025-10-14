@@ -199,8 +199,6 @@ struct LValue : Value {
 };
 
 struct ASTBlock;
-struct ASTParamsDecl;
-
 struct Interpreter;
 
 struct THIRBlock;

@@ -668,7 +668,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
                 node->source_range);
   }
 
-  node->params->accept(this);
+  node->parameters->accept(this);
 
   FunctionTypeInfo info;
   // Get function type id from header.
@@ -1326,7 +1326,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       }
 
       auto args = arguments->resolved_argument_types;
-      auto parameters = func->params->params;
+      auto parameters = func->parameters->params;
       auto generics = func->generic_parameters;
 
       // TODO: I added this little ternary to stop crashes but this whole thing needs a rework if this was commonly
@@ -1554,7 +1554,7 @@ void Typer::visit(ASTChoiceDeclaration *node) {
 
 void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(lambda_unique_id++);
-  node->params->accept(this);
+  node->parameters->accept(this);
   node->return_type->accept(this);
   ENTER_EXPECTED_TYPE(node->return_type->resolved_type);
   std::vector<int> param_types;
@@ -2123,7 +2123,7 @@ void Typer::visit(ASTCall *node) {
                                                   node->source_range);
       }
 
-      if (func_decl->params->has_self) {
+      if (func_decl->parameters->has_self) {
         throw_error("cannot call a method as if it was an associated function anymore", node->source_range);
       }
 
@@ -2166,7 +2166,7 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    type_check_args_from_params(node->arguments, func_decl->params, func_decl, nullptr, func_decl->name == "destroy");
+    type_check_args_from_params(node->arguments, func_decl->parameters, func_decl, nullptr, func_decl->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -3693,10 +3693,10 @@ void Typer::visit(ASTMethodCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    if (!func_decl->params->has_self) {
+    if (!func_decl->parameters->has_self) {
       throw_error("Calling static methods with instance not allowed", node->source_range);
     }
-    type_check_args_from_params(node->arguments, func_decl->params, func_decl, node->callee->base,
+    type_check_args_from_params(node->arguments, func_decl->parameters, func_decl, node->callee->base,
                                 func_sym->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
@@ -4022,7 +4022,7 @@ void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, c
     first_param->mutability = MUT;
     first_param->tag = ASTParamDecl::Self;
     first_param->self.is_pointer = true;
-    declaration->params->params.push_back(first_param);
+    declaration->parameters->params.push_back(first_param);
   }
   {
     ASTParamDecl *second_param = ast_alloc<ASTParamDecl>();
@@ -4038,7 +4038,7 @@ void Typer::implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *node, c
       second_param->normal.type = ast_alloc<ASTType>();
       second_param->normal.type->resolved_type = bool_type();
     }
-    declaration->params->params.push_back(second_param);
+    declaration->parameters->params.push_back(second_param);
   }
 
   info->scope->insert_function("destroy", destroy_method_type_id, declaration);
