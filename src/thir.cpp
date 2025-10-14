@@ -417,8 +417,8 @@ THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   thir->member = ast->member.get_identifier();
 
   // Tuple.0;
-  if (thir->member == "0" || atoi(thir->member.get_str().c_str()) != 0) {
-    thir->member = "$" + thir->member.get_str();
+  if (thir->member == "0" || atoi(thir->member.str().c_str()) != 0) {
+    thir->member = "$" + thir->member.str();
   }
 
   return thir;
@@ -1002,7 +1002,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
   } else {
     std::string name;
     if (ast->declaring_type) {
-      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.get_str();
+      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.str();
     } else {
       name = ast->scope->full_name();
     }
@@ -1102,7 +1102,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   // Either the tests have to be in the root scope, i.e declared or included via a main.ela file or a test.ela file,
   // or this flag has to be present
-  auto should_be_tested = ast->declaring_scope->name.get_str().empty() || compile_command.has_flag("run-every-test");
+  auto should_be_tested = ast->declaring_scope->name.str().empty() || compile_command.has_flag("run-every-test");
 
   if (is_testing && ast->is_test && should_be_tested) {
     test_functions.push_back(thir);
@@ -1133,9 +1133,9 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   if (!ast->is_local && !ast->is_extern) {
     auto scope_name = ast->declaring_scope->full_name();
     if (scope_name.empty()) {
-      thir->name = ast->name.get_str();
+      thir->name = ast->name.str();
     } else {
-      thir->name = scope_name + ast->name.get_str();
+      thir->name = scope_name + ast->name.str();
     }
   } else {
     thir->name = ast->name;
@@ -1734,7 +1734,7 @@ THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_rang
   thir->source_range = src_range;
   thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type(), ASTLiteral::String)});
-  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())),
+  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.str())),
                                                      src_range, u64_type(), ASTLiteral::Integer)});
   return thir;
 }

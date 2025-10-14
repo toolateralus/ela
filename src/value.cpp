@@ -31,13 +31,13 @@ bool StringValue::is_truthy() const { return !value.empty(); }
 
 PointerValue* new_pointer(Value** value) { return value_arena_alloc<PointerValue>((*value)->value_type, value); }
 CharValue* new_char(char val) { return value_arena_alloc<CharValue>(val); }
-IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.get_str())); }
+IntValue* new_int(const InternedString& str) { return value_arena_alloc<IntValue>(std::stoll(str.str())); }
 IntValue* new_int(size_t val) { return value_arena_alloc<IntValue>(val); }
-FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.get_str())); }
+FloatValue* new_float(const InternedString& str) { return value_arena_alloc<FloatValue>(std::stod(str.str())); }
 FloatValue* new_float(double val) { return value_arena_alloc<FloatValue>(val); }
-BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.get_str() == "true"); }
+BoolValue* new_bool(const InternedString& str) { return value_arena_alloc<BoolValue>(str.str() == "true"); }
 BoolValue* new_bool(bool val) { return value_arena_alloc<BoolValue>(val); }
-StringValue* new_string(const InternedString& str) { return value_arena_alloc<StringValue>(str.get_str()); }
+StringValue* new_string(const InternedString& str) { return value_arena_alloc<StringValue>(str.str()); }
 StringValue* new_string(const std::string& str) { return value_arena_alloc<StringValue>(str); }
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr) { return value_arena_alloc<ArrayValue>(type, arr); }
 ArrayValue* new_array(Type* type) { return value_arena_alloc<ArrayValue>(type); }

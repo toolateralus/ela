@@ -126,8 +126,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::LParen);
         auto string = parser->expect(TType::String);
         parser->expect(TType::RParen);
-        DYNAMIC_LIBRARY_LOAD_PATH.push_back(string.value.get_str());
-        printf("adding dynamic library to compile time function dispatch tool: %s\n", string.value.get_str().c_str());
+        DYNAMIC_LIBRARY_LOAD_PATH.push_back(string.value.str());
+        printf("adding dynamic library to compile time function dispatch tool: %s\n", string.value.str().c_str());
         return nullptr;
       }
     },
@@ -138,7 +138,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto filename = parser->expect(TType::String).value;
-        if (!std::filesystem::exists(filename.get_str())) {
+        if (!std::filesystem::exists(filename.str())) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
                                   std::filesystem::current_path().string()),
                       {});
@@ -147,7 +147,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return nullptr;
         }
         include_set.insert(filename);
-        parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+        parser->states.push_back(Lexer::State::from_file(filename.str()));
         parser->fill_buffer_if_needed(parser->states.back());
         parser->fill_buffer_if_needed(parser->states.back());
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
@@ -165,7 +165,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto str = parser->expect(TType::String);
-        std::cout << str.value.get_str() << "\n";
+        std::cout << str.value.str() << "\n";
         return nullptr;
      }
     },
@@ -187,7 +187,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           // could be binary, and whatever other options
           mode = parser->eat().value;
         }
-        if (!std::filesystem::exists(filename.get_str())) {
+        if (!std::filesystem::exists(filename.str())) {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
 
@@ -196,12 +196,12 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         string->tag = ASTLiteral::String;
         std::stringstream ss;
         if (mode == "binary") {
-          std::ifstream isftr(filename.get_str(), std::ios::binary);
+          std::ifstream isftr(filename.str(), std::ios::binary);
           ss << isftr.rdbuf();
           string->value = ss.str();
           return string;
         } else {
-          std::ifstream isftr(filename.get_str());
+          std::ifstream isftr(filename.str());
           ss << isftr.rdbuf();
           string->value = ss.str();
           return string;
@@ -261,7 +261,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error("Can only throw a literal as a error", error->source_range);
         }
         auto literal = static_cast<ASTLiteral *>(error);
-        throw_error(literal->value.get_str(), error->source_range);
+        throw_error(literal->value.str(), error->source_range);
         return nullptr;
     }},
 
@@ -272,9 +272,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto string = parser->expect(TType::String).value;
         if (string == "-g") {
-          compile_command.flags[string.get_str()] = true;
+          compile_command.flags[string.str()] = true;
         }
-        compile_command.add_c_flag(string.get_str());
+        compile_command.add_c_flag(string.str());
         return nullptr;
     }},
     
@@ -683,55 +683,57 @@ ASTProgram *Parser::parse_program() {
 
   program->end_of_bootstrap_index = program->statements.size();
 
-  // put the rest on the program scope
-  ctx.enter_scope_or_create_and_enter_new_child_scope();
-  program->scope = ctx.scope;
-  while (true) {
-    while (semicolon()) {
-      eat();
-    }
-    if (peek().is_eof()) {
-      break;
-    }
-
-    if (peek().type == TType::Directive) {
-      eat();
-      InternedString identifier = eat().value;
-      auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
-      if (result.is_not_null()) {
-        auto statement = static_cast<ASTStatement *>(result.get());
-        program->statements.push_back(statement);
-      }
-      if (semicolon()) {
+  {
+    // put the rest on the program scope
+    AST_ENTER_NEW_SCOPE();
+    program->scope = ctx.scope;
+    while (true) {
+      while (semicolon()) {
         eat();
       }
-      continue;
-    }
-
-    auto statement = parse_statement();
-
-    auto type = statement->get_node_type();
-    switch (type) {
-      case AST_NODE_STRUCT_DECLARATION:
-      case AST_NODE_FUNCTION_DECLARATION:
-      case AST_NODE_TRAIT_DECLARATION:
-      case AST_NODE_ENUM_DECLARATION:
-      case AST_NODE_CHOICE_DECLARATION:
-      case AST_NODE_ALIAS:
-      case AST_NODE_VARIABLE:
-      case AST_NODE_NOOP:
-      case AST_NODE_IMPL:
-      case AST_NODE_IMPORT:
-      case AST_NODE_MODULE:
-      case AST_NODE_STATEMENT_LIST:
+      if (peek().is_eof()) {
         break;
-      default:
-        throw_error("Statement not allowed at the top-level of a program", statement->source_range);
-    }
+      }
 
-    program->statements.push_back(statement);
+      if (peek().type == TType::Directive) {
+        eat();
+        InternedString identifier = eat().value;
+        auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
+        if (result.is_not_null()) {
+          auto statement = static_cast<ASTStatement *>(result.get());
+          program->statements.push_back(statement);
+        }
+        if (semicolon()) {
+          eat();
+        }
+        continue;
+      }
+
+      auto statement = parse_statement();
+
+      auto type = statement->get_node_type();
+      switch (type) {
+        case AST_NODE_STRUCT_DECLARATION:
+        case AST_NODE_FUNCTION_DECLARATION:
+        case AST_NODE_TRAIT_DECLARATION:
+        case AST_NODE_ENUM_DECLARATION:
+        case AST_NODE_CHOICE_DECLARATION:
+        case AST_NODE_ALIAS:
+        case AST_NODE_VARIABLE:
+        case AST_NODE_NOOP:
+        case AST_NODE_IMPL:
+        case AST_NODE_IMPORT:
+        case AST_NODE_MODULE:
+        case AST_NODE_STATEMENT_LIST:
+          break;
+        default:
+          throw_error("Statement not allowed at the top-level of a program", statement->source_range);
+      }
+
+      program->statements.push_back(statement);
+    }
+    end_node(program, range);
   }
-  end_node(program, range);
   return program;
 }
 
@@ -1549,7 +1551,7 @@ ASTModule *Parser::parse_module() {
     expected_delimiter = TType::RCurly;
   } else {
     throw_error(std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'",
-                            peek().value.get_str()),
+                            peek().value.str()),
                 mod->source_range);
   }
 
@@ -1821,7 +1823,7 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
       attribute.tag = ATTRIBUTE_CONST;
     } else {
       AttributeTag tag;
-      const std::string &ident = expect(TType::Identifier).value.get_str();
+      const std::string &ident = expect(TType::Identifier).value.str();
       if (!try_get_attribute_tag_from_string(ident, &tag)) {
         throw_error(std::format("invalid attribute {}", ident), {peek().location});
       }
@@ -2509,7 +2511,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     return node;
   }
 
-  ctx.enter_scope_or_create_and_enter_new_child_scope();
+  AST_ENTER_NEW_SCOPE();
 
   if (node->parameters.has_self) {
     node->is_method = true;
@@ -2524,7 +2526,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   }
 
   end_node(node, range);
-  node->scope = ctx.scope;  // scope already set by enter/exit elsewhere; adjust if needed
+  node->scope = ctx.scope;
   return node;
 }
 
@@ -3208,8 +3210,8 @@ bool Parser::try_import(InternedString name, Scope **scope) {
   });
 
   // TODO: we'll eventually use weave with a local ./pkg_cache/, this is not a great system currently.
-  std::string module_name = name.get_str();
-  std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();
+  std::string module_name = name.str();
+  std::string filename = std::filesystem::path(ela_lib_path) / name.str();
 
   if (std::filesystem::exists(module_name) || std::filesystem::exists(module_name + ".ela")) {
     filename = module_name;

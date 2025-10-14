@@ -125,7 +125,7 @@ static inline std::string c_type_string(const Type *type) {
     case TYPE_STRUCT:
     case TYPE_TRAIT:
     case TYPE_CHOICE: {
-      output = type_to_string_with_extensions(type->extensions, type->info->scope->full_name());
+      output = type_to_string_with_extensions(type->extensions, type->full_mangled_name.str());
       break;
     }
     case TYPE_TUPLE: {
@@ -197,7 +197,7 @@ void Emitter::emit_literal(const THIRLiteral *thir) {
     code << '\"';
   }
 
-  code << thir->value.get_str();
+  code << thir->value.str();
 
   if (is_string) {
     code << '\"';
@@ -211,7 +211,7 @@ void Emitter::emit_member_access(const THIRMemberAccess *thir) {
   } else {
     code << '.';
   }
-  code << thir->member.get_str();
+  code << thir->member.str();
 }
 
 void Emitter::emit_cast(const THIRCast *thir) {
@@ -231,7 +231,7 @@ void Emitter::emit_index(const THIRIndex *thir) {
 void Emitter::emit_aggregate_initializer(const THIRAggregateInitializer *thir) {
   code << "(" << c_type_string(thir->type) << "){ ";
   for (const auto &[key, value] : thir->key_values) {
-    code << '.' << key.get_str() << " = ";
+    code << '.' << key.str() << " = ";
     emit_expr(value);
     code << ", ";
   }
@@ -358,7 +358,7 @@ void Emitter::emit_struct_body(Type *type) {
       emit_anonymous_struct(member.type);
       code << ";\n";
     } else {
-      code << get_declaration_type_signature_and_identifier(member.name.get_str(), member.type) << ";\n";
+      code << get_declaration_type_signature_and_identifier(member.name.str(), member.type) << ";\n";
     }
   }
   indent_level--;
@@ -372,7 +372,7 @@ void Emitter::emit_choice(Type *type) {
 
   for (auto &variant : info->members) {
     if (variant.type->kind == TYPE_STRUCT) {
-      const auto variant_name = variant.name.get_str();
+      const auto variant_name = variant.name.str();
       const auto subtype_name = choice_type_name + "$" + variant_name;
       variant.type->basename = subtype_name;
       emit_struct(variant.type);
@@ -387,17 +387,17 @@ void Emitter::emit_choice(Type *type) {
   indent_level++;
   for (const auto &variant : info->members) {
     if (variant.type->kind == TYPE_STRUCT) {
-      const auto variant_name = variant.name.get_str();
+      const auto variant_name = variant.name.str();
       const auto subtype_name = choice_type_name + "$" + variant_name;
       indented(subtype_name + ' ' + variant_name + ";\n");
     } else if (variant.type->kind == TYPE_TUPLE) {
-      const auto variant_name = variant.name.get_str();
+      const auto variant_name = variant.name.str();
       indented(c_type_string(variant.type) + ' ' + variant_name + ";\n");
     } else if (variant.type == void_type()) {
       // We emit empty structs here because it has no impact on type
       // size and gives us a predictable memory layout, as well as
       // making sense in runtime reflection.
-      const auto variant_name = variant.name.get_str();
+      const auto variant_name = variant.name.str();
       indented("struct {}" + variant_name + ";\n");
     }
   }
@@ -414,7 +414,7 @@ void Emitter::emit_enum(Type *type) {
 
   for (const auto &[name, _, __, thir_value] : info->members) {
     indented();
-    code << type->basename.get_str() + '$' + name.get_str() << " = ";
+    code << type->basename.str() + '$' + name.str() << " = ";
     emit_expr(thir_value.get());
     code << ",\n";
   }
@@ -476,7 +476,7 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
   code << "typedef struct " << name << " {\n";
   indented("void *instance;\n");
   for (const auto &[method_name, method_type] : methods) {
-    std::string method_pointer_name = method_name.get_str();
+    std::string method_pointer_name = method_name.str();
     indented(get_function_pointer_type_string(method_type, &method_pointer_name, false) + ";\n");
   }
   code << "} " << name << ";\n";
@@ -508,7 +508,7 @@ void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) 
       const auto parameter = *param_iter;
       if (i) outer_params_decl += ", ";
       outer_params_decl +=
-          get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
+          get_declaration_type_signature_and_identifier(parameter.name.str(), info->parameter_types[i]);
       param_iter++;
     }
     if (thir->is_varargs) {
@@ -516,7 +516,7 @@ void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) 
       outer_params_decl += "...";
     }
 
-    std::string ident = std::string("*") + thir->name.get_str() + "(" + outer_params_decl + ")";
+    std::string ident = std::string("*") + thir->name.str() + "(" + outer_params_decl + ")";
     code << get_function_pointer_type_string(info->return_type, &ident, false);
     if (thir->block && !forward_declaration) {
       emit_block(thir->block);
@@ -527,13 +527,13 @@ void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) 
   }
 
   code << c_type_string(info->return_type);
-  code << ' ' << thir->name.get_str() << "(";
+  code << ' ' << thir->name.str() << "(";
 
   auto param_iter = thir->parameters.begin();
 
   for (size_t i = 0; i < info->params_len; ++i) {
     const auto parameter = *param_iter;
-    code << get_declaration_type_signature_and_identifier(parameter.name.get_str(), info->parameter_types[i]);
+    code << get_declaration_type_signature_and_identifier(parameter.name.str(), info->parameter_types[i]);
     param_iter++;
     if (i < info->params_len - 1) {
       code << ", ";
@@ -584,10 +584,10 @@ void Emitter::emit_block(const THIRBlock *thir) {
 void Emitter::emit_expr(const THIR *thir) {
   if (thir->get_node_type() == THIRNodeType::Function) {
     auto function = static_cast<const THIRFunction *>(thir);
-    code << function->name.get_str();
+    code << function->name.str();
   } else if (thir->get_node_type() == THIRNodeType::Variable) {
     auto variable = static_cast<const THIRVariable *>(thir);
-    code << variable->name.get_str();
+    code << variable->name.str();
   } else {
     emit_node(thir);
   }
@@ -595,14 +595,14 @@ void Emitter::emit_expr(const THIR *thir) {
 
 void Emitter::emit_variable(const THIRVariable *thir) {
   if (thir->is_extern) {
-    indented("extern " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type) + ";\n");
+    indented("extern " + get_declaration_type_signature_and_identifier(thir->name.str(), thir->type) + ";\n");
     return;
   } else if (thir->is_constexpr) {
-    indented("const " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+    indented("const " + get_declaration_type_signature_and_identifier(thir->name.str(), thir->type));
   } else if (thir->is_static) {
-    indented("static " + get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+    indented("static " + get_declaration_type_signature_and_identifier(thir->name.str(), thir->type));
   } else {
-    indented(get_declaration_type_signature_and_identifier(thir->name.get_str(), thir->type));
+    indented(get_declaration_type_signature_and_identifier(thir->name.str(), thir->type));
   }
 
   if (!thir->value) {
@@ -706,7 +706,7 @@ std::string Emitter::reflection_prelude(const std::unordered_map<const Type *, R
   StringBuilder code;
   code << "typedef struct Type Type;\n";
   for (const auto &[_, info] : info) {
-    code << "extern Type " << info.definition->name.get_str() << ";\n";
+    code << "extern Type " << info.definition->name.str() << ";\n";
   }
   return code.str();
 }

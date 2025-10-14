@@ -151,8 +151,8 @@ void fetch_compiler_features_for_function_declaration(ASTFunctionDeclaration *no
       const InternedString identifier = get_identifier_from_attribute_arguments(node->source_range, attribute);
       if (identifier == COMPILER_FEATURE_TEST_RUNNER_FN_KEY) {
         g_testing_runner_declaration = node;
-      } else if (!compiler_feature_exists(identifier.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(identifier.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.str()), node->source_range);
       }
     }
   }
@@ -165,8 +165,8 @@ void fetch_compiler_features_for_varaible_declaration(ASTVariable *node) {
       if (identifier == COMPILER_FEATURE_TESTS_LIST_KEY) {
         g_testing_tests_declaration = node;
         break;
-      } else if (!compiler_feature_exists(identifier.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(identifier.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.str()), node->source_range);
       }
     }
   }
@@ -179,8 +179,8 @@ void fetch_compiler_features_for_choice_declaration_generic(ASTChoiceDeclaration
       if (identifier == COMPILER_FEATURE_OPTION_KEY) {
         g_Option_type = node;
         break;
-      } else if (!compiler_feature_exists(identifier.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(identifier.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.str()), node->source_range);
       }
     }
   }
@@ -199,8 +199,8 @@ void fetch_compiler_features_for_trait_declaration(ASTTraitDeclaration *node, Ty
         g_Iterable_trait_type = type;
       } else if (identifier == COMPILER_FEATURE_INIT_KEY) {
         g_Init_trait_type = type;
-      } else if (!compiler_feature_exists(identifier.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", identifier.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(identifier.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", identifier.str()), node->source_range);
       }
     }
   }
@@ -239,8 +239,8 @@ void fetch_compiler_features_for_struct_declaration_concrete(ASTStructDeclaratio
       } else if (feature == COMPILER_FEATURE_OPTION_KEY) {
         // TODO: handle in choice
         break;
-      } else if (!compiler_feature_exists(feature.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", feature.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(feature.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", feature.str()), node->source_range);
       }
     }
   }
@@ -262,8 +262,8 @@ void fetch_compiler_features_for_struct_declaration_generic(ASTStructDeclaration
       } else if (feature == COMPILER_FEATURE_SLICEMUT_KEY) {
         g_SliceMut_declaration = node;
         break;
-      } else if (!compiler_feature_exists(feature.get_str().c_str())) {
-        throw_error(std::format("unknown compiler feature: '{}'", feature.get_str()), node->source_range);
+      } else if (!compiler_feature_exists(feature.str().c_str())) {
+        throw_error(std::format("unknown compiler feature: '{}'", feature.str()), node->source_range);
       }
     }
   }
@@ -446,7 +446,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
       ctx.scope->create_type_alias(param.identifier, *generic_arg, type->declaring_node.get());
       generic_arg++;
     }
-    type = global_create_choice_type(node->name.get_str(), node->scope, generic_args);
+    type = global_create_choice_type(node->name.str(), node->scope, generic_args);
   }
 
   node->resolved_type = type;
@@ -654,7 +654,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
   }
 
   if (!node->is_forward_declared && !node->is_extern) {
-    node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
+    node->scope->name = node->name.str() + mangled_type_args(generic_args);
   }
 
   if (node->where_clause && visit_where_clause) {
@@ -797,7 +797,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       throw_error("Attempted to implement a forward declared but not yet defined trait type", node->source_range);
     }
 
-    node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
+    node->scope->name = node->scope->name.str() + "_of" + std::to_string(trait_id->uid);
 
     auto decl_node = (ASTTraitDeclaration *)trait_id->declaring_node.get();
 
@@ -1028,7 +1028,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   }
   fetch_compiler_features_for_trait_declaration(node, attribute_feature_type);
 
-  node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
+  node->scope->name = node->name.str() + mangled_type_args(generic_args);
 
   type->declaring_node = node;
   node->resolved_type = type;
@@ -1594,7 +1594,7 @@ void Typer::visit(ASTStructDeclaration *node) {
 
 void Typer::visit(ASTEnumDeclaration *node) {
   if (ctx.scope->find_type(node->name, {}) != Type::INVALID_TYPE) {
-    throw_error("Redefinition of enum " + node->name.get_str(), node->source_range);
+    throw_error("Redefinition of enum " + node->name.str(), node->source_range);
   }
 
   auto underlying_type = Type::INVALID_TYPE;
@@ -1714,7 +1714,7 @@ void Typer::visit(ASTVariable *node) {
     }
   }
 
-  if (ctx.scope->find_type(node->name, {}) != Type::INVALID_TYPE || keywords.contains(node->name.get_str())) {
+  if (ctx.scope->find_type(node->name, {}) != Type::INVALID_TYPE || keywords.contains(node->name.str())) {
     throw_error(
         "Invalid variable declaration: a type or keyword exists with "
         "that name,",
@@ -1760,7 +1760,7 @@ void Typer::visit(ASTVariable *node) {
   }
 
   if (variable_type == void_type()) {
-    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
+    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.str()), node->source_range);
   }
 
   if (node->is_constexpr) {
@@ -2514,7 +2514,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
-      auto value = node->value.get_str();
+      auto value = node->value.str();
 
       if (value.starts_with("0x")) {
         if (value.length() > 18) {
@@ -2715,7 +2715,7 @@ void Typer::visit(ASTInitializerList *node) {
     for collection style initializer lists.
   */
   Type *target_element_type = Type::INVALID_TYPE;
-  if (target_type->basename.get_str().starts_with("InitList$")) {
+  if (target_type->basename.str().starts_with("InitList$")) {
     target_element_type = target_type->generic_args[0];
   } else if (target_type->is_fixed_sized_array()) {
     target_element_type = target_type->get_element_type();
@@ -3422,8 +3422,8 @@ Type *Scope::find_or_instantiate_dyn_type(Type *trait_type, SourceRange range, T
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
-    dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
-    dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
+    dyn_info->methods.push_back({name.str(), function_type /* , declaration */});
+    dyn_info->scope->insert_variable(name.str(), function_type, nullptr, MUT, nullptr);
   };
 
   for (const auto &[name, sym] : trait_info->scope->symbols) {

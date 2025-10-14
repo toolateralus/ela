@@ -18,7 +18,7 @@ struct InternedString {
     return table;
   }
 
-  std::string get_str() const { 
+  std::string str() const { 
     return *str_ptr;
   }
 
@@ -61,7 +61,7 @@ template <> struct formatter<InternedString, char> {
 
   template <class FormatContext>
   typename FormatContext::iterator format(const InternedString &s, FormatContext &ctx) const {
-    return std::format_to(ctx.out(), "{}", s.get_str());
+    return std::format_to(ctx.out(), "{}", s.str());
   }
 };
 } // namespace std

@@ -538,7 +538,7 @@ Value *Interpreter::visit_literal(THIRLiteral *node) {
     case ASTLiteral::Bool:
       return new_bool(node->value);
     case ASTLiteral::Char:
-      return new_char(node->value.get_str()[0]);
+      return new_char(node->value.str()[0]);
     case ASTLiteral::String:
     case ASTLiteral::MultiLineString:
       return new_string(node->value);

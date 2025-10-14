@@ -253,10 +253,10 @@ struct Scope final {
     if (parent) {
       auto parent_name = parent->full_name();
       if (!parent_name.empty()) {
-        return parent->full_name() + "$" + name.get_str();
+        return parent->full_name() + "$" + name.str();
       }
     }
-    return name.get_str();
+    return name.str();
   }
 
   inline void create_reference(const InternedString &name, Scope *original_scope) {

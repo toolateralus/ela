@@ -388,7 +388,9 @@ struct Type {
   // the parent choice type that declared this subvariant. more than often null, so TODO: this should be nullable.
   Type *choice_parent = nullptr;
 
-  // TODO: move a lot of the querying methods from *info into here too.
+  InternedString full_mangled_name;
+
+  // TODO: m1ove a lot of the querying methods from *info into here too.
   // a specialized polymorphic type info, used for kind-specific attributes. use the 'as' method for easy casting.
   TypeInfo *info;
 
@@ -552,7 +554,7 @@ Type *find_operator_overload(int mutability, Type *left_ty, TType op, OperationK
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
 static inline std::string get_unmangled_name(const Type *type) {
-  std::string base = type->basename.get_str();
+  std::string base = type->basename.str();
   auto first = base.find("$");
   if (first != std::string::npos) {
     base = base.substr(0, first);

@@ -109,7 +109,7 @@ void SymbolPass::type_enum(ASTEnumDeclaration* node) {
   Scope* scope = node->declaring_scope;
 
   if (scope->find_type(node->name, {}) != Type::INVALID_TYPE) {
-    throw_error("Redefinition of enum " + node->name.get_str(), node->source_range);
+    throw_error("Redefinition of enum " + node->name.str(), node->source_range);
   }
 
   auto underlying_type = Type::INVALID_TYPE;
@@ -167,7 +167,7 @@ void SymbolPass::run(ASTProgram* ast) {
   collect_declarations(ast);
 
   for (auto* func : function_declarations) {
-    printf("inserting function %s\n", func->name.get_str().c_str());
+    printf("inserting function %s\n", func->name.str().c_str());
     func->declaring_scope->insert_function(func->name, nullptr, func);
   }
 

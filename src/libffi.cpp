@@ -635,7 +635,7 @@ Value* unmarshal_scalar_return(Type* rtype, ScalarTypeInfo* info, const std::vec
 }
 
 Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, const std::vector<Value*>& args) {
-  void* fn_ptr = try_load_symbol(name.get_str());
+  void* fn_ptr = try_load_symbol(name.str());
 
   if (!fn_ptr) {
     return nullptr;
