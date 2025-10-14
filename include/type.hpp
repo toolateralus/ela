@@ -536,7 +536,8 @@ struct Type {
   // To have a null, yet identifyable unresolved generic type,
   // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
   // but will still effectively be a poison/invalid, but distinct and comparable value.
-  // use `type_is_valid()` to check for this as well as null, instead of `type != nullptr`
+  // use `type_is_valid()` to check for this as well as null, instead of `type != nullptr`, because you
+  // will fail to catch invalid types if you check against nullptr or INVALID_TYPE.
   static Type *UNRESOLVED_GENERIC;
   constexpr static Type *INVALID_TYPE = nullptr;
 

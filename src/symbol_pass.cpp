@@ -80,17 +80,17 @@ void SymbolPass::collect_declarations(ASTNode* node) {
 
 void SymbolPass::process_type_declarations() {
   for (auto* decl : struct_declarations) {
-    auto type = decl->declaring_scope->create_struct_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
+    auto type = decl->declaring_scope->create_struct_type(decl->name, decl, {}, decl->generic_parameters.size());
     auto info = type->info->as<StructTypeInfo>();
     info->is_forward_declared = true;
     decl->resolved_type = type;
   }
   for (auto* decl : trait_declarations) {
-    auto type = decl->declaring_scope->create_trait_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
+    auto type = decl->declaring_scope->create_trait_type(decl->name, decl, {}, decl->generic_parameters.size());
     decl->resolved_type = type;
   }
   for (auto* decl : choice_declarations) {
-    auto type = decl->declaring_scope->create_choice_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
+    auto type = decl->declaring_scope->create_choice_type(decl->name, decl, {}, decl->generic_parameters.size());
     decl->resolved_type = type;
   }
 
@@ -120,7 +120,7 @@ void SymbolPass::type_enum(ASTEnumDeclaration* node) {
     underlying_type = node->underlying_type_ast->resolved_type;
   }
 
-  auto enum_type = scope->create_enum_type(node->name, create_child(scope), node->is_flags, node);
+  auto enum_type = scope->create_enum_type(node->name, node->is_flags, node);
   enum_type->declaring_node = node;
   auto info = enum_type->info->as<EnumTypeInfo>();
 
