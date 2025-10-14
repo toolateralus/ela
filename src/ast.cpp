@@ -685,7 +685,7 @@ ASTProgram *Parser::parse_program() {
   program->end_of_bootstrap_index = program->statements.size();
 
   // put the rest on the program scope
-  ctx.set_scope();
+  ctx.enter_scope_or_create_and_enter_new_child_scope();
   program->scope = ctx.scope;
   while (true) {
     while (semicolon()) {
@@ -1509,7 +1509,7 @@ ASTIf *Parser::parse_if() {
     NODE_ALLOC(ASTBlock, block, _range, defer, this);
     eat();
     node->block = block;
-    ctx.set_scope();
+    ctx.enter_scope_or_create_and_enter_new_child_scope();
     auto statement = parse_statement();
     node->block->statements = {statement};
     if (statement->get_node_type() == AST_NODE_VARIABLE) {
@@ -2266,7 +2266,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   current_block = block;
   ENTER_AST_STATEMENT_LIST(block->statements);
 
-  ctx.set_scope(scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(scope);
 
   if (peek().type == TType::Directive) {
     eat();
@@ -2321,15 +2321,16 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   return block;
 }
 
-ASTParamsDecl *Parser::parse_parameters() {
-  NODE_ALLOC(ASTParamsDecl, params, range, defer, this);
+std::vector<Parameter> Parser::parse_parameters() {
+  ParameterList parameters {};
+  SourceRange range = begin_node();
   expect(TType::LParen);
-
   while (peek().type != TType::RParen) {
-    NODE_ALLOC(ASTParamDecl, param, range, _, this)
-    if (params->is_varargs) {
+    Parameter paremeter {};
+
+    if (parameters.is_varargs) {
       end_node(nullptr, range);
-      throw_error("var args \"...\" must be the last parameter", range);
+      throw_error("var-args \"...\" must be the last declaration in a parameter signature", range);
     }
 
     auto subrange = begin_node();
@@ -2490,7 +2491,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     return node;
   }
 
-  ctx.set_scope();
+  ctx.enter_scope_or_create_and_enter_new_child_scope();
 
   if (node->params->has_self) {
     node->is_method = true;
@@ -2585,7 +2586,7 @@ ASTImpl *Parser::parse_impl() {
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, _, this, current_impl_decl = nullptr)
   expect(TType::Impl);
 
-  ctx.set_scope();
+  ctx.enter_scope_or_create_and_enter_new_child_scope();
   node->scope = ctx.exit_scope();
 
   if (peek().type == TType::GenericBrace) {
@@ -2899,7 +2900,7 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     return node;
   }
 
-  ctx.set_scope(nullptr);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(nullptr);
   node->scope = ctx.scope;
   expect(TType::LCurly);
   while (peek().type != TType::RCurly) {

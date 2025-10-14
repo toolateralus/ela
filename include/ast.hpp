@@ -607,37 +607,30 @@ struct ASTTuple : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_TUPLE; }
 };
 
-struct ASTParamDecl : ASTNode {
-  enum {
-    Normal,
-    Self,
-  } tag;
-  Mutability mutability;
-  union {
-    struct {
-      ASTType *type;
-      InternedString name;
-      Nullable<ASTExpr> default_value;
-    } normal;
-    struct {
-      bool is_pointer;
-    } self;
-  };
-  ~ASTParamDecl() {}
-  ASTParamDecl() {}
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_PARAM_DECL; }
+enum Parameter_Tag {
+  PARAM_IS_SELF_BY_VALUE,
+  PARAM_IS_SELF_BY_POINTER,
+  PARAM_IS_SELF_BY_MUT_POINTER,
+  PARAM_IS_NAMED,
+  PARAM_IS_NAMELESS,  // this is just for ease of declaring externs, 'extern fn printf(*u8, ...);' etc.
 };
 
-struct ASTParamsDecl : ASTStatement {
-  std::vector<ASTParamDecl *> params;
+struct Parameter {
+  Parameter_Tag tag;
+  union {
+    struct {
+      InternedString name;
+      ASTType *type;
+    } named;
+    struct {
+      ASTType *type;
+    } nameless;
+  };
+};
 
-  bool has_self = false;
-  bool self_is_pointer = false;
-
-  bool is_varargs = false;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
+struct ParameterList {
+  std::vector<Parameter> values;
+  bool is_varargs;
 };
 
 struct ASTGenericParameter {
@@ -676,7 +669,20 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   bool is_macro : 1 = false;
   bool is_hygenic_macro : 1 = false;
 
-  bool requires_self_ptr() const { return params->has_self && params->params[0]->self.is_pointer; }
+  inline bool requires_self_ptr() const {
+    if (params.values.empty()) {
+      return false;
+    }
+    switch (params.values.front().tag) {
+      case PARAM_IS_SELF_BY_POINTER:
+      case PARAM_IS_SELF_BY_MUT_POINTER:
+        return true;
+      case PARAM_IS_SELF_BY_VALUE:
+      case PARAM_IS_NAMED:
+      case PARAM_IS_NAMELESS:
+        return false;
+    }
+  }
 
   bool has_defer = false;
   bool is_declared = false;
@@ -684,7 +690,7 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   std::vector<Type *> generic_arguments;
   Scope *scope;
-  ASTParamsDecl *params;
+  ParameterList params;
   Nullable<ASTBlock> block;
   InternedString name;
   ASTType *return_type;
@@ -1037,7 +1043,7 @@ struct ASTCast : ASTExpr {
 // These do not support closures!!
 struct ASTLambda : ASTExpr {
   InternedString unique_identifier;
-  ASTParamsDecl *params;
+  ParameterList params;
   ASTType *return_type;
   ASTBlock *block;
   ASTNodeType get_node_type() const override { return AST_NODE_LAMBDA; }
@@ -1285,9 +1291,6 @@ struct Typer;
   Defer $scope_defer([&] { ctx.scope = $old_scope; }); \
   ctx.scope = $scope;
 
-
-
-
 struct Parser {
   Typer *typer;
   Context &ctx;
@@ -1311,7 +1314,7 @@ struct Parser {
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_using_stmt();
-  
+
   std::vector<Attribute> parse_statement_attributes();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
@@ -1334,7 +1337,7 @@ struct Parser {
   std::vector<ASTGenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
 
-  ASTParamsDecl *parse_parameters();
+  ParameterList parse_parameters();
 
   ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);

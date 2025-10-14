@@ -9,7 +9,7 @@ void get_varargs_handlers(Context *c) {
   auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
   va_list_type->info->as<StructTypeInfo>()->is_forward_declared = true;
 
-  scope->insert_type(va_list_type, "va_list", nullptr);
+  scope->insert_type("va_list", va_list_type);
 
   FunctionTypeInfo func_type_info;
   func_type_info.is_varargs = true;
@@ -17,9 +17,37 @@ void get_varargs_handlers(Context *c) {
 
   auto va_func_type = global_find_function_type_id(func_type_info, {});
 
-  scope->insert_function("va_start", va_func_type, nullptr);
-  scope->insert_function("va_end", va_func_type, nullptr);
-  scope->insert_function("va_copy", va_func_type, nullptr);
+  auto va_start = ast_alloc<ASTFunctionDeclaration>();
+  auto va_end = ast_alloc<ASTFunctionDeclaration>();
+  auto va_copy = ast_alloc<ASTFunctionDeclaration>();
+
+  va_start->name = "va_start";
+  va_start->params = ast_alloc<ASTParamsDecl>();
+  va_start->params->is_varargs = true;
+  va_start->return_type = ast_alloc<ASTType>();
+  va_start->return_type->normal.path = nullptr;
+  va_start->return_type->resolved_type = void_type();
+  va_start->resolved_type = va_func_type;
+  scope->insert("va_start", va_func_type, CONST, va_end, {}, false);
+
+  va_end->name = "va_end";
+  va_end->params = ast_alloc<ASTParamsDecl>();
+  va_end->params->is_varargs = true;
+  va_end->return_type = ast_alloc<ASTType>();
+  va_end->return_type->normal.path = nullptr;
+  va_end->return_type->resolved_type = void_type();
+  va_end->resolved_type = va_func_type;
+  scope->insert("va_end", va_func_type, CONST, va_end, {}, false);
+
+  va_copy->name = "va_copy";
+  va_copy->params = ast_alloc<ASTParamsDecl>();
+  va_copy->params->is_varargs = true;
+  va_copy->return_type = ast_alloc<ASTType>();
+  va_copy->return_type->normal.path = nullptr;
+  va_copy->return_type->resolved_type = void_type();
+  va_copy->resolved_type = va_func_type;
+  scope->insert("va_copy", va_func_type, CONST, va_copy, {}, false);
+
 }
 
 Context::Context() {
@@ -54,69 +82,4 @@ Context::Context() {
     }
     scope->create_type_alias(type_table[i]->basename, type_table[i], nullptr);
   }
-}
-
-/*
-  TODO: optimize lookups for local and other symbols.
-*/
-Symbol *Scope::local_find(const InternedString &name) {
-  if (symbols.contains(name)) {
-    return &symbols[name];
-  }
-
-  for (auto it = references.begin(); it != references.end(); ++it) {
-    if (it->original_name == name || it->alias_name == name) {
-      return it->scope->local_lookup(it->original_name);
-    }
-  }
-
-  return nullptr;
-}
-
-Symbol *Scope::find(const InternedString &name) {
-  if (symbols.find(name) != symbols.end()) {
-    return &symbols[name];
-  }
-
-  for (auto it = references.begin(); it != references.end(); ++it) {
-    if (it->original_name == name || it->alias_name == name) {
-      return it->scope->local_lookup(it->original_name);
-    }
-  }
-
-  if (parent) {
-    return parent->lookup(name);
-  }
-
-  return nullptr;
-}
-
-void Scope::erase(const InternedString &name) { symbols.erase(name); }
-
-bool Symbol::is_generic_function() const {
-  if (!is_function) return false;
-  auto &declaration = this->function.declaration;
-  if (declaration->generic_parameters.size() != 0 || declaration->generic_arguments.size() != 0 ||
-      declaration->generic_instantiations.size() != 0) {
-    return true;
-  }
-
-  return false;
-}
-
-size_t Scope::methods_count() const {
-  size_t methods = 0;
-  for (const auto &[_, sym] : symbols) {
-    if (sym.is_function && sym.function.declaration->is_method) {
-      methods++;
-    }
-  }
-  return methods;
-}
-
-void Scope::create_reference(SymbolScopePair pair) {
-  references.insert({
-    .scope=pair.scope,
-    .original_name=pair.symbol->name,
-  });
 }

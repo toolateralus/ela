@@ -10,29 +10,26 @@
 #include "value.hpp"
 
 extern jstl::Arena scope_arena;
+extern jstl::Arena symbol_arena;
 
 struct ASTNode;
-struct ASTStructDeclaration;
-struct ASTFunctionDeclaration;
-struct ASTChoiceDeclaration;
-struct ASTEnumDeclaration;
-struct ASTModule;
+struct THIR;
 
 enum Mutability : char {
   CONST,
   MUT,
 };
 
-struct Scope;
-struct THIR;
-struct ASTNode;
-
 struct Key {
   // the bare name of the symbol
   InternedString name;
   // the generic arguments this type or function was created with, to differentiate instantiations from templates
   // and create unique symbols per instantiation
+
+  // *PERFORMANCE: use a pointer to a set of interned generic arguments, so we don't have to frequently copy and compare
+  // *entire vectors everywhere. we can use this too for type extensions.
   std::vector<Type *> generics;
+
   bool is_generic_template;  // is this a generic-argument-free template of a generic type or symbol?
 
   inline bool operator==(const Key &other) const {
@@ -96,23 +93,29 @@ struct Scope final {
   Scope *parent = nullptr;
 
   std::set<Reference> references;
-  std::unordered_map<Key, Symbol, Key::Hash> symbols = {};
+  std::unordered_map<Key, Symbol *, Key::Hash> symbols = {};
   std::unordered_map<Key, Type *, Key::Hash> types;
 
   Scope(Scope *parent) : parent(parent) {}
 
   inline void insert(const InternedString &name, Type *type, Mutability mutability, ASTNode *ast,
                      const std::vector<Type *> &generics, bool is_generic_template) {
-    Symbol sym = {
-        .parent_scope = this,
-        .type = type,
-        .mutability = mutability,
-        .name = name,
-        .ast = ast,
-        .thir = nullptr,
-        .value = nullptr,
-    };
+    Symbol *sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol();
+    sym->parent_scope = this;
+    sym->type = type;
+    sym->mutability = mutability;
+    sym->name = name;
+    sym->ast = ast;
+    sym->thir = nullptr;
+    sym->value = nullptr;
     symbols.insert_or_assign(Key::from(name, generics, is_generic_template), sym);
+  }
+
+  // Your type should already have declaring_node set if applicable by now, we don't need to duplicate it in the scope
+  // table.
+  inline void insert_type(const InternedString &name, Type *type, const std::vector<Type *> &generics = {},
+                          bool is_generic_template = false) {
+    types.insert_or_assign(Key::from(name, generics, is_generic_template), type);
   }
 
   // use is_generic_template with an empty array for generics to find the actual template instead of a specific
@@ -120,12 +123,9 @@ struct Scope final {
   inline Symbol *find(const InternedString &name, const std::vector<Type *> generics = {},
                       bool is_generic_template = false) {
     Key key = Key::from(name, generics, is_generic_template);
-    if (Symbol *symbol = &symbols[key]) {
-      return symbol;
-    } else {
-      // stupid c++, access == insertion.
-      // still preferred over .contains which guarantees 2 hashes, here we might get lucky and only hash once.
-      symbols.erase(key);
+    auto it = symbols.find(key);
+    if (it != symbols.end()) {
+      return it->second;
     }
 
     // Try to look up a reference from another scope.
@@ -149,11 +149,9 @@ struct Scope final {
   inline Symbol *local_find(const InternedString &name, const std::vector<Type *> generics = {},
                             bool is_generic_template = false) {
     Key key = Key::from(name, generics, is_generic_template);
-    if (Symbol *symbol = &symbols[key]) {
-      return symbol;
-    } else {
-      // see lookup to understand why we erase.
-      symbols.erase(key);
+    auto it = symbols.find(key);
+    if (it != symbols.end()) {
+      return it->second;
     }
 
     // local lookup will still check references since this scope does in fact own the reference,
@@ -173,7 +171,7 @@ struct Scope final {
     symbols.erase(Key::from(name, generics, is_generic_template));
   }
 
-  Type *create_choice_type(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration,
+  Type *create_choice_type(const InternedString &name, Scope *scope, ASTNode *declaration,
                            const std::vector<Type *> &generics, bool is_generic_template) {
     auto type = global_create_choice_type(name, scope, generics);
     this->insert(name, type, CONST, (ASTNode *)declaration, generics, is_generic_template);
@@ -206,38 +204,50 @@ struct Scope final {
     return type;
   }
 
-  void create_module(const InternedString &name, ASTModule *declaration) {
-    // modules  can't have generics, nor are they a template.
-    this->insert(name, nullptr, CONST, (ASTNode *)declaration, {}, false);
-  }
-
   Type *create_tuple_type(const std::vector<Type *> &types) {
     auto type = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // tuple types don't have associated AST
     // they can't have generics, nor are they a template.
-    this->insert(name, type, CONST, nullptr, {}, false);  
+    this->insert(name, type, CONST, nullptr, {}, false);
     return type;
   }
 
-  Type *find_type(const InternedString &name, const TypeExtensions &ext) {
-    auto symbol = find(name);
+  void create_module(const InternedString &name, ASTNode *declaration) {
+    // modules  can't have generics, nor are they a template.
+    this->insert(name, nullptr, CONST, (ASTNode *)declaration, {}, false);
+  }
 
-    if (!symbol) {
-      if (parent) {
-        return parent->find_type(name, ext);
-      } else {
-        return Type::INVALID_TYPE;
+  inline Type *find_type(const InternedString &name, const std::vector<Type *> &generics, bool is_generic_template,
+                         const TypeExtensions &ext) {
+    Key key = Key::from(name, generics, is_generic_template);
+
+    auto it = types.find(key);
+    if (it != types.end()) {
+      Type *type = it->second;
+
+      // if it already equals, we don't need to do the expensive global_find_type_id, just return it.
+      if (type->extensions_equals(ext)) {
+        return type;
       }
+
+      if (type->has_extensions()) {  // don't double compound extensions up.
+        type = type->base_type;
+      }
+
+      return global_find_type_id(type->base_type, ext);
     }
 
-    // TODO: this shouldn't happen, if you can't find the symbol in the scope, you don't have access to it.
-    return global_find_type_id(symbol->type, ext);
+    if (parent) {
+      return parent->find_type(name, generics, is_generic_template, ext);
+    }
+
+    return nullptr;
   }
 
   // CLEANUP: this should not be in the scope.
   // the typer should do this, we should simply use find_type to find a dyn type.
-  Type *find_or_instantiate_dyn_type(Type *trait, SourceRange range, Typer *typer);
+  Type *find_or_instantiate_dyn_type(Type *trait, SourceRange range, void *typer);
 
   inline std::string full_name() const {
     if (parent) {
@@ -249,11 +259,11 @@ struct Scope final {
     return name.get_str();
   }
 
-  void create_reference(SymbolScopePair pair);
   inline void create_reference(const InternedString &name, Scope *original_scope) {
     references.insert({original_scope, name});
   }
-  void create_reference(const InternedString &original_name, Scope *original_scope,
+
+  inline void create_reference(const InternedString &original_name, Scope *original_scope,
                         const InternedString &aliased_name) {
     references.insert({.scope = original_scope, .original_name = original_name, .alias_name = aliased_name});
   }
@@ -262,13 +272,16 @@ struct Scope final {
     static std::unordered_set<InternedString> defines;
     return defines;
   };
+
   inline static bool add_def(const InternedString &define) { return defines().insert(define).second; }
+
   inline static bool has_def(const InternedString &define) {
     if (defines().contains(define)) {
       return true;
     }
     return false;
   }
+
   inline static void undef(const InternedString &define) { defines().erase(define); }
 };
 
@@ -281,25 +294,12 @@ struct Context {
   Scope *root_scope = nullptr;
   Scope *scope = nullptr;
   Context();
-  inline void set_scope(Scope *in_scope = nullptr) {
-    if (!in_scope) {
-      in_scope = create_child(scope);
-    }
-    scope = in_scope;
-  }
 
-  // !This should only be used really in the parser.
-
-  // ONLY use this for exiting a scope you JUST created.
-  // just store the scope you left in any other case,
-  // and return in the appropriate place.
-  // this has adverse effects in many places.
-  inline Scope *exit_scope() {
-    auto old_scope = scope;
-    if (scope) {
-      scope = scope->parent;
+  inline void enter_scope_or_create_and_enter_new_child_scope(Scope *in = nullptr) {
+    if (!in) {
+      in = create_child(scope);
     }
-    return old_scope;
+    scope = in;
   }
 
   Nullable<Symbol> get_symbol(ASTNode *node);

@@ -360,7 +360,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   // swap to the struct's scope.
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
 
   // create a type context for #self.
   auto old_type_context = type_context;
@@ -503,7 +503,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
         variants.emplace_back(alias_tuple{variant.name, type, TYPE_TUPLE, variant.tuple});
       } break;
       case ASTChoiceVariant::STRUCT: {
-        ctx.set_scope();  // create new scope.
+        ctx.enter_scope_or_create_and_enter_new_child_scope();  // create new scope.
         for (const auto &field : variant.struct_declarations) {
           field->accept(this);
           field->resolved_type = field->type->resolved_type;
@@ -622,9 +622,9 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
                                   std::vector<Type *> generic_args) {
   // Setup context.
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
 
-  Defer _([&] { ctx.set_scope(old_scope); });
+  Defer _([&] { ctx.enter_scope_or_create_and_enter_new_child_scope(old_scope); });
 
   //// TODO: handle more attributes
   for (auto attr : node->attributes) {
@@ -744,12 +744,12 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   auto previous = ctx.scope;
   auto old_type = type_context;
   Defer _([&] {
-    ctx.set_scope(previous);
+    ctx.enter_scope_or_create_and_enter_new_child_scope(previous);
     type_context = old_type;
   });
 
   type_context = node->target;
-  ctx.set_scope(node->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
 
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -813,9 +813,9 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       GENERIC_PANIC_HANDLER(
           data, 1,
           {
-            ctx.set_scope(decl_node->scope);
+            ctx.enter_scope_or_create_and_enter_new_child_scope(decl_node->scope);
             decl_node->where_clause.get()->accept(this);
-            ctx.set_scope(node->scope);
+            ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
           },
           node->source_range);
     } else if (decl_node && !decl_node->trait_bounds.empty()) {
@@ -998,8 +998,8 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   }
 
   auto previous = ctx.scope;
-  Defer _([&] { ctx.set_scope(previous); });
-  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.enter_scope_or_create_and_enter_new_child_scope(previous); });
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
 
   Type *type = nullptr;
   if (was_forward_declared) {
@@ -1526,7 +1526,7 @@ std::vector<Type *> Typer::get_generic_arg_types(const std::vector<ASTExpr *> &a
 }
 
 void Typer::visit(ASTProgram *node) {
-  ctx.set_scope(ctx.root_scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(ctx.root_scope);
   size_t index = 0;
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {
@@ -1535,7 +1535,7 @@ void Typer::visit(ASTProgram *node) {
     statement->accept(this);
     index++;
   }
-  ctx.set_scope(ctx.root_scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(ctx.root_scope);
 }
 
 void Typer::visit(ASTChoiceDeclaration *node) {
@@ -1780,7 +1780,7 @@ void Typer::visit(ASTBlock *node) {
   auto old_scope = ctx.scope;
 
   Defer _([&] { ctx.scope = old_scope; });
-  ctx.set_scope(node->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->scope);
 
   node->control_flow.type = Type::INVALID_TYPE;
   for (auto &statement : node->statements) {
@@ -1897,7 +1897,7 @@ void Typer::visit(ASTBreak *node) { node->control_flow = {BLOCK_FLAGS_BREAK, Typ
 
 void Typer::visit(ASTFor *node) {
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->block->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->block->scope);
 
   node->right->accept(this);
   Type *iterable_type_id = node->right->resolved_type;
@@ -3714,7 +3714,7 @@ void Typer::visit(ASTPatternMatch *node) {
   node->target_type_path->accept(this);
 
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->target_block->scope);
+  ctx.enter_scope_or_create_and_enter_new_child_scope(node->target_block->scope);
   Defer _([&] { ctx.scope = old_scope; });
 
   auto target_type = node->target_type_path->resolved_type;
