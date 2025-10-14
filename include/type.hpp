@@ -629,3 +629,6 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 
   return kind_flags;
 }
+
+void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRange &source_range,
+                                    const std::string &message);

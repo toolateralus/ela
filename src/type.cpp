@@ -1382,3 +1382,25 @@ bool Type::has_dependencies() const {
     break;
   }
 }
+
+#include "ast.hpp"
+
+void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRange &source_range,
+                                    const std::string &message) {
+  auto from_t = expr->resolved_type;
+  auto to_t = to;
+  auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
+  if (to != expr->resolved_type && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
+    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()),
+                source_range);
+  }
+
+  if (conv_rule == CONVERT_IMPLICIT) {
+    expr->resolved_type = to;
+    expr->conversion = {
+        .has_value = true,
+        .from = from_t,
+        .to = to_t,
+    };
+  }
+}

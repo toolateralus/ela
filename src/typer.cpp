@@ -95,27 +95,6 @@ auto generic_instantiation_panic_handler(auto msg, auto range, auto void_data) {
   longjmp(data->save_state, 1);
 };
 
-void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const SourceRange &source_range,
-                                    const std::string &message) {
-  auto from_t = expr->resolved_type;
-  auto to_t = to;
-  auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
-  if (to != expr->resolved_type && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
-    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()),
-                source_range);
-  }
-
-  if (conv_rule == CONVERT_IMPLICIT) {
-    expr->resolved_type = to;
-    // TODO: would a single expression ever go through multiple implicit conversions?
-    expr->conversion = {
-        .has_value = true,
-        .from = from_t,
-        .to = to_t,
-    };
-  }
-}
-
 void implicit_cast(ASTExpr *expr, Type *to) {
   expr->conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
   expr->resolved_type = to;
@@ -1141,7 +1120,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
           arg->accept(this);
 
-          assert_types_can_cast_or_equal(
+          assert_types_can_cast_or_are_equal(
               arg, param->resolved_type, arg->source_range,
               std::format("unexpected argument type.. parameter #{} of function",
                           arg_index + 1));  // +1 here to make it 1-based indexing for user. more intuitive
@@ -1283,7 +1262,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
     // Normal parameter position — type-check against parameter type.
     expected_type = info->parameter_types[i];
     arg->accept(this);
-    assert_types_can_cast_or_equal(arg, info->parameter_types[i], arg->source_range,
+    assert_types_can_cast_or_are_equal(arg, info->parameter_types[i], arg->source_range,
                                    std::format("invalid argument type for parameter #{}", i + 1));
 
     ++i;
@@ -1656,7 +1635,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
     } else {
-      assert_types_can_cast_or_equal(value, underlying_type, node->source_range,
+      assert_types_can_cast_or_are_equal(value, underlying_type, node->source_range,
                                      "inconsistent types in enum declaration.");
     }
   }
@@ -1764,7 +1743,7 @@ void Typer::visit(ASTVariable *node) {
 
     ENTER_EXPECTED_TYPE(node->type->resolved_type);
     node->value.get()->accept(this);
-    assert_types_can_cast_or_equal(node->value.get(), node->type->resolved_type, node->source_range,
+    assert_types_can_cast_or_are_equal(node->value.get(), node->type->resolved_type, node->source_range,
                                    "invalid type in declaration");
   }
 
@@ -1884,7 +1863,7 @@ void Typer::visit(ASTReturn *node) {
     type = expr->resolved_type;
 
     if (expected_type != Type::INVALID_TYPE && expected_type != void_type()) {
-      assert_types_can_cast_or_equal(expr, expected_type, node->source_range, "invalid return type");
+      assert_types_can_cast_or_are_equal(expr, expected_type, node->source_range, "invalid return type");
     }
 
     if (expr->get_node_type() == AST_NODE_PATH) {
@@ -2797,7 +2776,7 @@ void Typer::visit(ASTInitializerList *node) {
 
         ENTER_EXPECTED_TYPE(symbol->resolved_type);
         value->accept(this);
-        assert_types_can_cast_or_equal(
+        assert_types_can_cast_or_are_equal(
             value, symbol->resolved_type, value->source_range,
             std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
       }
@@ -2831,7 +2810,7 @@ void Typer::visit(ASTInitializerList *node) {
 
         value->accept(this);
         expected_type = old;
-        assert_types_can_cast_or_equal(
+        assert_types_can_cast_or_are_equal(
             value, target_element_type, value->source_range,
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
       }
@@ -2927,7 +2906,7 @@ void Typer::visit(ASTSwitch *node) {
     if (type_is_numerical(type)) {
       continue;
     } else if (branch.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
-      assert_types_can_cast_or_equal(branch.expression, type_id, node->source_range, "Invalid switch case.");
+      assert_types_can_cast_or_are_equal(branch.expression, type_id, node->source_range, "Invalid switch case.");
     }
   }
 
@@ -2992,7 +2971,7 @@ void Typer::visit(ASTTuple *node) {
     value->accept(this);
 
     if (declaring_type_set) {
-      assert_types_can_cast_or_equal(value, expected_type, value->source_range,
+      assert_types_can_cast_or_are_equal(value, expected_type, value->source_range,
                                      "tuple value was incapable of casting to expected tuple element type");
       value->resolved_type = expected_type;
     }

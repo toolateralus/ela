@@ -1,6 +1,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "strings.hpp"
+#include "symbol_pass.hpp"
 #include "thir.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -28,7 +29,10 @@ int CompileCommand::compile() {
 
   lower.run<void>("typing & lowering to C", [&] {
     Typer typer{context};
-    typer.visit(program);
+    
+    SymbolPass sym_pass{typer};
+    sym_pass.run(program);
+
     THIRGen thir_gen(context);
     Emitter emitter;
     Resolver resolver(emitter);

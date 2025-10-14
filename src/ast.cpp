@@ -1829,7 +1829,7 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
       }
       attribute.tag = tag;
       int argument_count = attribute_tag_takes_arguments(tag);
-      
+
       if (argument_count != 0 && peek().type == TType::LParen) {
         eat();
         argument_count = argument_count == -1 ? INT_MAX : argument_count;
@@ -1843,8 +1843,6 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
         }
         expect(TType::RParen);
       }
-
-
     }
     if (peek().type != TType::RBrace) {
       expect(TType::Comma);
@@ -2895,20 +2893,15 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     node->where_clause = parse_where_clause();
   }
 
-  auto scope = create_child(ctx.scope);
-  auto type = ctx.scope->create_tagged_union(node->name, scope, node);
-  ctx.set_scope(scope);
-  node->scope = scope;
-  node->resolved_type = type;
-
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
     ctx.exit_scope();
     return node;
   }
 
+  ctx.set_scope(nullptr);
+  node->scope = ctx.scope;
   expect(TType::LCurly);
-
   while (peek().type != TType::RCurly) {
     ASTChoiceVariant variant;
     variant.name = expect(TType::Identifier).value;

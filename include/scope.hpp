@@ -167,7 +167,7 @@ struct Scope {
   Symbol *lookup(const InternedString &name);
   Symbol *local_lookup(const InternedString &name);
   void erase(const InternedString &name);
-  Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
+  Type *create_choice_type(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto type = global_create_choice_type(name, scope, {});
     auto sym = Symbol::create_type(type, name, (ASTNode *)declaration);
     type->declaring_node.set((ASTNode *)declaration);
