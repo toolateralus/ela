@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <cstddef>
@@ -15,10 +14,8 @@
 #include "lex.hpp"
 #include "strings.hpp"
 
-// fwd
 struct Type;
 struct ASTVariable;
-struct Scope;
 struct Context;
 
 extern std::vector<Type *> type_table;
@@ -147,12 +144,21 @@ static inline size_t make_impl_unique_get_id(ASTImpl *impl);
 
 struct Impl {
   Nullable<Type> trait_type;
-  std::unordered_map<InternedString, ImplMethod> methods;
+  std::unordered_map<Key, ImplMethod, Key::Hash> methods;
+  const ImplMethod *find(const Key &method_name) const {
+    auto it = methods.find(method_name);
+    if (it != methods.end()) {
+      return &it->second;
+    }
+    return nullptr;
+  }
 };
 
 struct TypeInfo {
   std::vector<TypeMember> members;
-  std::vector<Impl> impls; // no longer storing a scope, just impls & members.
+  // !REFACTOR
+  //  no longer storing a scope, just impls & members.
+  std::vector<Impl> impls;  
 
   TypeInfo() {}
 
@@ -171,6 +177,16 @@ struct TypeInfo {
     for (auto member = members.begin(); member != members.end(); ++member) {
       if (member->name == name) {
         return member.base();
+      }
+    }
+    return nullptr;
+  }
+
+  const ImplMethod *find_method(const Key &method_name) const {
+    for (auto &impl : impls) {
+      const ImplMethod *method = impl.find(method_name);
+      if (method) {
+        return method;
       }
     }
     return nullptr;
@@ -338,15 +354,15 @@ void assess_and_try_add_blittable_trait(Type *type);
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
-Type *global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
+Type *global_create_type(TypeKind, const InternedString &name, const InternedString &mangled, TypeInfo * = nullptr, const TypeExtensions & = {},
                          Type * = nullptr);
 
-Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Type *> generic_args = {});
+Type *global_create_struct_type(const InternedString &name, const InternedString &mangled, std::vector<Type *> generic_args = {});
 
-Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
+Type *global_create_trait_type(const InternedString &name, const InternedString &mangled,std::vector<Type *> generic_args);
 
-Type *global_create_choice_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args);
-Type *global_create_enum_type(const InternedString &, Scope *, bool = false, Type *element_type = s32_type());
+Type *global_create_choice_type(const InternedString &name, const InternedString &mangled,const std::vector<Type *> &generic_args);
+Type *global_create_enum_type(const InternedString &name, const InternedString &mangled, bool is_flags_enum = false, Type *element_type = s32_type());
 
 Type *global_create_tuple_type(const std::vector<Type *> &types);
 
@@ -390,7 +406,6 @@ struct Type {
 
   InternedString full_mangled_name;
 
-  // TODO: m1ove a lot of the querying methods from *info into here too.
   // a specialized polymorphic type info, used for kind-specific attributes. use the 'as' method for easy casting.
   TypeInfo *info;
 

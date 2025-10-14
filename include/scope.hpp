@@ -20,40 +20,8 @@ enum Mutability : char {
   MUT,
 };
 
-struct Key {
-  // the bare name of the symbol
-  InternedString name;
-  // the generic arguments this type or function was created with, to differentiate instantiations from templates
-  // and create unique symbols per instantiation
-
-  // *PERFORMANCE: use a pointer to a set of interned generic arguments, so we don't have to frequently copy and compare
-  // *entire vectors everywhere. we can use this too for type extensions.
-  std::vector<Type *> generics;
-
-  bool is_generic_template;  // is this a generic-argument-free template of a generic type or symbol?
-
-  inline bool operator==(const Key &other) const {
-    return name == other.name && generics == other.generics && is_generic_template == other.is_generic_template;
-  }
-
-  struct Hash {
-    std::size_t operator()(const Key &k) const {
-      std::size_t h = std::hash<InternedString>{}(k.name);
-      for (auto *t : k.generics) {
-        h ^= std::hash<Type *>{}(t) + 0x9e3779b9 + (h << 6) + (h >> 2);
-      }
-      h ^= std::hash<bool>{}(k.is_generic_template) + 0x9e3779b9 + (h << 6) + (h >> 2);
-      return h;
-    }
-  };
-
-  static inline Key from(const InternedString &name, const std::vector<Type *> &generics = {},
-                         bool is_generic_template = false) {
-    return {name, generics, is_generic_template};
-  }
-};
-
 extern size_t global_num_symbols_declared;
+struct Scope;
 
 struct Symbol {
   size_t index = global_num_symbols_declared++;
@@ -171,23 +139,41 @@ struct Scope final {
     symbols.erase(Key::from(name, generics, is_generic_template));
   }
 
-  Type *create_choice_type(const InternedString &name, Scope *scope, ASTNode *declaration,
-                           const std::vector<Type *> &generics, bool is_generic_template) {
-    auto type = global_create_choice_type(name, scope, generics);
+  Type *create_choice_type(const InternedString &name, ASTNode *declaration, const std::vector<Type *> &generics,
+                           bool is_generic_template) {
+    const auto &self_name = full_name();
+    InternedString full_mangled_name = name;
+    if (!self_name.empty()) {
+      full_mangled_name = self_name + "$" + name.str();
+    }
+
+    auto type = global_create_choice_type(name, full_mangled_name, generics);
     this->insert(name, type, CONST, (ASTNode *)declaration, generics, is_generic_template);
     return type;
   }
 
-  Type *create_trait_type(const InternedString &name, Scope *scope, ASTNode *declaration,
-                          const std::vector<Type *> &generics, bool is_generic_template) {
-    auto type = global_create_trait_type(name, scope, generics);
+  Type *create_trait_type(const InternedString &name, ASTNode *declaration, const std::vector<Type *> &generics,
+                          bool is_generic_template) {
+    const auto &self_name = full_name();
+    InternedString full_mangled_name = name;
+    if (!self_name.empty()) {
+      full_mangled_name = self_name + "$" + name.str();
+    }
+
+    auto type = global_create_trait_type(name, full_mangled_name, generics);
     this->insert(name, type, CONST, (ASTNode *)declaration, generics, is_generic_template);
     return type;
   }
 
-  Type *create_struct_type(const InternedString &name, Scope *scope, ASTNode *declaration,
-                           const std::vector<Type *> &generics, bool is_generic_template) {
-    auto type = global_create_struct_type(name, scope, generics);
+  Type *create_struct_type(const InternedString &name, ASTNode *declaration, const std::vector<Type *> &generics,
+                           bool is_generic_template) {
+    const auto &self_name = full_name();
+    InternedString full_mangled_name = name;
+    if (!self_name.empty()) {
+      full_mangled_name = self_name + "$" + name.str();
+    }
+
+    auto type = global_create_struct_type(name, full_mangled_name, generics);
     this->insert(name, type, CONST, (ASTNode *)declaration, generics, is_generic_template);
     return type;
   }
@@ -197,8 +183,14 @@ struct Scope final {
     this->insert(name, type, CONST, declaring_node, generics, is_generic_template);
   }
 
-  Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTNode *declaration) {
-    auto type = global_create_enum_type(name, scope, flags);
+  Type *create_enum_type(const InternedString &name, bool flags, ASTNode *declaration) {
+    const auto &self_name = full_name();
+    InternedString full_mangled_name = name;
+    if (!self_name.empty()) {
+      full_mangled_name = self_name + "$" + name.str();
+    }
+
+    auto type = global_create_enum_type(name, full_mangled_name, flags);
     // enums can't have generics, nor are they a template.
     this->insert(name, type, CONST, (ASTNode *)declaration, {}, false);
     return type;
@@ -264,7 +256,7 @@ struct Scope final {
   }
 
   inline void create_reference(const InternedString &original_name, Scope *original_scope,
-                        const InternedString &aliased_name) {
+                               const InternedString &aliased_name) {
     references.insert({.scope = original_scope, .original_name = original_name, .alias_name = aliased_name});
   }
 

@@ -215,3 +215,37 @@ static inline size_t calculate_strings_actual_length(const std::string_view &str
   ctx.scope = $new_scope;             \
   const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
 
+
+struct Type;
+struct Key {
+  // the bare name of the symbol
+  InternedString name;
+  // the generic arguments this type or function was created with, to differentiate instantiations from templates
+  // and create unique symbols per instantiation
+
+  // *PERFORMANCE: use a pointer to a set of interned generic arguments, so we don't have to frequently copy and compare
+  // *entire vectors everywhere. we can use this too for type extensions.
+  std::vector<Type *> generics;
+
+  bool is_generic_template;  // is this a generic-argument-free template of a generic type or symbol?
+
+  inline bool operator==(const Key &other) const {
+    return name == other.name && generics == other.generics && is_generic_template == other.is_generic_template;
+  }
+
+  struct Hash {
+    std::size_t operator()(const Key &k) const {
+      std::size_t h = std::hash<InternedString>{}(k.name);
+      for (auto *t : k.generics) {
+        h ^= std::hash<Type *>{}(t) + 0x9e3779b9 + (h << 6) + (h >> 2);
+      }
+      h ^= std::hash<bool>{}(k.is_generic_template) + 0x9e3779b9 + (h << 6) + (h >> 2);
+      return h;
+    }
+  };
+
+  static inline Key from(const InternedString &name, const std::vector<Type *> &generics = {},
+                         bool is_generic_template = false) {
+    return {name, generics, is_generic_template};
+  }
+};

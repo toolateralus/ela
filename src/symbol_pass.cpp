@@ -1,6 +1,7 @@
 #include "symbol_pass.hpp"
 #include "ast.hpp"
 #include "thir_interpreter.hpp"
+#include "type.hpp"
 #include "visitor.hpp"
 
 void SymbolPass::collect_declarations(ASTNode* node) {
@@ -79,17 +80,17 @@ void SymbolPass::collect_declarations(ASTNode* node) {
 
 void SymbolPass::process_type_declarations() {
   for (auto* decl : struct_declarations) {
-    auto type = decl->declaring_scope->create_struct_type(decl->name, decl->scope, decl);
+    auto type = decl->declaring_scope->create_struct_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
     auto info = type->info->as<StructTypeInfo>();
     info->is_forward_declared = true;
     decl->resolved_type = type;
   }
   for (auto* decl : trait_declarations) {
-    auto type = decl->declaring_scope->create_trait_type(decl->name, decl->scope, {}, decl);
+    auto type = decl->declaring_scope->create_trait_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
     decl->resolved_type = type;
   }
   for (auto* decl : choice_declarations) {
-    auto type = decl->declaring_scope->create_choice_type(decl->name, decl->scope, decl);
+    auto type = decl->declaring_scope->create_choice_type(decl->name, decl->scope, decl, {}, decl->generic_parameters.size());
     decl->resolved_type = type;
   }
 
@@ -99,7 +100,7 @@ void SymbolPass::process_type_declarations() {
   enum_declarations.clear();
 
   for (auto* decl : alias_declarations) {
-    decl->declaring_scope->create_type_alias(decl->name, nullptr, decl);
+    decl->declaring_scope->create_type_alias(decl->name, nullptr, decl, {}, false);
   }
 }
 
@@ -108,7 +109,7 @@ void SymbolPass::process_function_headers() {}
 void SymbolPass::type_enum(ASTEnumDeclaration* node) {
   Scope* scope = node->declaring_scope;
 
-  if (scope->find_type(node->name, {}) != Type::INVALID_TYPE) {
+  if (scope->find_type(node->name, {}, false, {}) != Type::INVALID_TYPE) {
     throw_error("Redefinition of enum " + node->name.str(), node->source_range);
   }
 
@@ -144,13 +145,15 @@ void SymbolPass::type_enum(ASTEnumDeclaration* node) {
       }
     }
 
-    info->scope->insert(key, node_ty, value, CONST);
-    info->members.push_back({key, node_ty, value, nullptr});
+    TypeMember member = {.name = key, .type = node_ty, .default_value = value};
+
+    info->members.push_back(member);
+
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
     } else {
       assert_types_can_cast_or_are_equal(value, underlying_type, node->source_range,
-                                     "inconsistent types in enum declaration.");
+                                         "inconsistent types in enum declaration.");
     }
   }
 
@@ -168,7 +171,7 @@ void SymbolPass::run(ASTProgram* ast) {
 
   for (auto* func : function_declarations) {
     printf("inserting function %s\n", func->name.str().c_str());
-    func->declaring_scope->insert_function(func->name, nullptr, func);
+    func->declaring_scope->insert(func->name, nullptr, CONST, func, {}, func->generic_parameters.size());
   }
 
   process_type_declarations();

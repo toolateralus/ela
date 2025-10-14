@@ -6,7 +6,7 @@
 void get_varargs_handlers(Context *c) {
   auto scope = c->root_scope;
 
-  auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", nullptr, {}, nullptr);
+  auto va_list_type = global_create_type(TYPE_STRUCT, "va_list", "va_list");
   va_list_type->info->as<StructTypeInfo>()->is_forward_declared = true;
 
   scope->insert_type("va_list", va_list_type);
@@ -22,17 +22,17 @@ void get_varargs_handlers(Context *c) {
   auto va_copy = ast_alloc<ASTFunctionDeclaration>();
 
   va_start->name = "va_start";
-  va_start->params = ast_alloc<ASTParamsDecl>();
-  va_start->parameters->is_varargs = true;
+  va_start->parameters = ParameterList{};
+  va_start->parameters.is_varargs = true;
   va_start->return_type = ast_alloc<ASTType>();
   va_start->return_type->normal.path = nullptr;
   va_start->return_type->resolved_type = void_type();
   va_start->resolved_type = va_func_type;
-  scope->insert("va_start", va_func_type, CONST, va_end, {}, false);
+  scope->insert("va_start", va_func_type, CONST, va_start, {}, false);
 
   va_end->name = "va_end";
-  va_end->params = ast_alloc<ASTParamsDecl>();
-  va_end->parameters->is_varargs = true;
+  va_end->parameters = ParameterList{};
+  va_end->parameters.is_varargs = true;
   va_end->return_type = ast_alloc<ASTType>();
   va_end->return_type->normal.path = nullptr;
   va_end->return_type->resolved_type = void_type();
@@ -40,14 +40,13 @@ void get_varargs_handlers(Context *c) {
   scope->insert("va_end", va_func_type, CONST, va_end, {}, false);
 
   va_copy->name = "va_copy";
-  va_copy->params = ast_alloc<ASTParamsDecl>();
-  va_copy->parameters->is_varargs = true;
+  va_copy->parameters = ParameterList{};
+  va_copy->parameters.is_varargs = true;
   va_copy->return_type = ast_alloc<ASTType>();
   va_copy->return_type->normal.path = nullptr;
   va_copy->return_type->resolved_type = void_type();
   va_copy->resolved_type = va_func_type;
   scope->insert("va_copy", va_func_type, CONST, va_copy, {}, false);
-
 }
 
 Context::Context() {
@@ -77,9 +76,7 @@ Context::Context() {
   }
 
   for (size_t i = 0; i < type_table.size(); ++i) {
-    if (type_table[i]->info->scope) {
-      type_table[i]->info->scope->parent = scope;
-    }
-    scope->create_type_alias(type_table[i]->basename, type_table[i], nullptr);
+    Type *type = type_table[i];
+    scope->create_type_alias(type->basename, type, nullptr, type->generic_args, false);
   }
 }

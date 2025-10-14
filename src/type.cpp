@@ -85,10 +85,10 @@ Type *global_find_function_type_id(const FunctionTypeInfo &info, const TypeExten
   auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
 
   if (type_extensions.size()) {
-    base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
+    base = global_create_type(TYPE_FUNCTION, type_name, type_name, info_ptr, {});
   }
 
-  auto type = global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+  auto type = global_create_type(TYPE_FUNCTION, type_name, type_name, info_ptr, type_extensions, base);
 
   function_type_table.push_back(type);
 
@@ -125,7 +125,6 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
   }
 
   // Base types have a seperate scope from the extended types now.
-
   TypeInfo *info = nullptr;
   switch (base_t->kind) {
     case TYPE_SCALAR: {
@@ -154,12 +153,8 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
     } break;
   }
 
-  // not bad- arena allocator.
-  info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-  info->scope->parent = base_t->info->scope->parent;
-
   // rare (comparatively) case-- have to create a new extended type.
-  return global_create_type(base_t->kind, base_t->basename, info, extensions_copy, base_t);
+  return global_create_type(base_t->kind, base_t->basename, base_t->full_mangled_name, info, extensions_copy, base_t);
 }
 
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions) {
@@ -458,7 +453,8 @@ std::string Type::to_string() const {
   }
 }
 
-Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
+Type *global_create_trait_type(const InternedString &name, const InternedString &full_mangled_name,
+                               std::vector<Type *> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_TRAIT));
   Type *type = type_table.back();
   std::string base = name.str();
@@ -467,14 +463,14 @@ Type *global_create_trait_type(const InternedString &name, Scope *scope, std::ve
   }
   type->set_base(base);
   type->generic_args = generic_args;
+  type->full_mangled_name = full_mangled_name;
   TraitTypeInfo *info = type_info_alloc<TraitTypeInfo>();
-  info->scope = scope;
   type->set_info(info);
-  info->scope->name = name;
   return type;
 }
 
-Type *global_create_struct_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
+Type *global_create_struct_type(const InternedString &name, const InternedString &full_mangled_name,
+                                std::vector<Type *> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
   Type *type = type_table.back();
   std::string base = name.str();
@@ -485,12 +481,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
 
-  // ! THIS SHOULD NOT INHERIT THE NODES SCOPE,
-  // ! IT SHOULD HAVE IT'S OWN SCOPE THAT'S DETACHED FROM THE ROOT SCOPE
-  // ! ALL TYPES SUFFER THIS ISSUE, IT NEEDS TO BE FIXED.
-  info->scope = scope;
-
-  info->scope->name = base;
+  type->full_mangled_name = full_mangled_name;
   type->set_info(info);
 
   if (info->is_union) {
@@ -499,19 +490,11 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
     type->traits.push_back(is_struct_trait());
   }
 
-  for (const auto &[name, symbol] : scope->symbols) {
-    if (symbol.is_variable) {
-      info->members.push_back(TypeMember{
-          .name = name,
-          .type = symbol.type,
-      });
-    }
-  }
-
   return type;
 }
 
-Type *global_create_choice_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args) {
+Type *global_create_choice_type(const InternedString &name, const InternedString &full_mangled_name,
+                                const std::vector<Type *> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_CHOICE));
   Type *type = type_table.back();
   std::string base = name.str();
@@ -521,22 +504,21 @@ Type *global_create_choice_type(const InternedString &name, Scope *scope, const 
   type->set_base(base);
   type->generic_args = generic_args;
   ChoiceTypeInfo *info = type_info_alloc<ChoiceTypeInfo>();
-  info->scope = scope;
-  info->scope->name = base;
+  type->full_mangled_name = full_mangled_name;
   type->set_info(info);
   type->traits.push_back(is_choice_trait());
   return type;
 }
 
-Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, Type *underlying_type) {
+Type *global_create_enum_type(const InternedString &name, const InternedString &full_mangled_name, bool is_flags,
+                              Type *underlying_type) {
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->underlying_type = underlying_type;
   info->is_flags = is_flags;
-  info->scope = scope;
-  info->scope->name = name;
+  type->full_mangled_name = full_mangled_name;
   type->set_info(info);
   type->traits.push_back(is_enum_trait());
   return type;
@@ -577,10 +559,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     type->traits.push_back(is_slice_mut_trait());
   }
 
-  if (!info->scope) {
-    info->scope = create_child(nullptr);
-  }
-  info->scope->name = name;
+  // !REFACTOR we removed type scopes, so mangled names from here may not be absolutely correct.
+  // We should probably just take a 'full_mangled_name' here as well.
+
   return type;
 }
 
@@ -616,11 +597,11 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_in
 }
 
 Type *bool_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "bool", "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
   return type;
 }
 Type *void_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
+  static Type *type = global_create_type(TYPE_SCALAR, "void", "void", create_scalar_type_info(TYPE_VOID, 0));
   return type;
 }
 
@@ -633,7 +614,7 @@ Type *unit_type() {
     auto info = type_info_alloc<TupleTypeInfo>();
     info->types = {};
     type->set_info(info);
-    info->scope = create_child(nullptr);
+    type->full_mangled_name = "$tuple";
     return type;
   };
   static auto type = create();
@@ -641,15 +622,15 @@ Type *unit_type() {
 }
 
 Type *u64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u64", "u64", create_scalar_type_info(TYPE_U64, 8, true));
   return type;
 }
 Type *u32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u32", "u32", create_scalar_type_info(TYPE_U32, 4, true));
   return type;
 }
 Type *u16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u16", "u16", create_scalar_type_info(TYPE_U16, 2, true));
   return type;
 }
 
@@ -659,7 +640,7 @@ Type *u8_ptr_type() {
 }
 
 Type *char_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "char", "char", create_scalar_type_info(TYPE_CHAR, 1, true));
   return type;
 }
 
@@ -669,32 +650,32 @@ Type *char_ptr_type() {
 }
 
 Type *u8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u8", "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
 }
 
 Type *s64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s64", "s64", create_scalar_type_info(TYPE_S64, 8, true));
   return type;
 }
 Type *s32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s32", "s32", create_scalar_type_info(TYPE_S32, 4, true));
   return type;
 }
 Type *s16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s16", "s16", create_scalar_type_info(TYPE_S16, 2, true));
   return type;
 }
 Type *s8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s8", "s16", create_scalar_type_info(TYPE_S8, 1, true));
   return type;
 }
 Type *f32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
+  static Type *type = global_create_type(TYPE_SCALAR, "f32", "f32", create_scalar_type_info(TYPE_FLOAT, 4));
   return type;
 }
 Type *f64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
+  static Type *type = global_create_type(TYPE_SCALAR, "f64", "f32", create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
 
@@ -786,10 +767,8 @@ Type *global_create_tuple_type(const std::vector<Type *> &types) {
   info->types = types;
 
   type->set_info(info);
-  info->scope = create_child(nullptr);
 
   for (size_t i = 0; i < types.size(); ++i) {
-    info->scope->insert(std::to_string(i), types[i], nullptr, MUT);
     info->members.push_back(TypeMember{
         .name = "$" + std::to_string(i),
         .type = types[i],
@@ -909,14 +888,11 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
     op_str = "index_mut";
   }
 
-  auto scope = type->info->scope;
+  // TODO: allow for generic operator overloads.
+  auto method = type->info->find_method(Key::from(op_str));
 
-  if (!scope) return Type::INVALID_TYPE;
-
-  if (auto symbol = scope->local_find(op_str)) {
-    if (symbol->is_function && type_is_valid(symbol->type)) {
-      return symbol->type;
-    }
+  if (method) {
+    return method->signature;
   }
 
   return Type::INVALID_TYPE;
@@ -956,73 +932,73 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
 }
 
 Type *is_fn_ptr_trait() {
-  static Type *id = global_create_trait_type("IsFnPtr", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsFnPtr", "IsFnPtr", {});
   return id;
 }
 
 Type *is_fn_trait() {
-  static Type *id = global_create_trait_type("IsFn", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsFn", "IsFn", {});
   return id;
 }
 
 Type *is_tuple_trait() {
-  static Type *id = global_create_trait_type("IsTuple", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsTuple", "IsTuple", {});
   return id;
 }
 
 Type *is_struct_trait() {
-  static Type *id = global_create_trait_type("IsStruct", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsStruct", "IsStruct", {});
   return id;
 }
 Type *is_enum_trait() {
-  static Type *id = global_create_trait_type("IsEnum", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsEnum", "IsEnum", {});
   return id;
 }
 Type *is_choice_trait() {
-  static Type *id = global_create_trait_type("IsChoice", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsChoice", "IsChoice", {});
   return id;
 }
 Type *is_dyn_trait() {
-  static Type *id = global_create_trait_type("IsDyn", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsDyn", "IsDyn", {});
   return id;
 }
 Type *is_union_trait() {
-  static Type *id = global_create_trait_type("IsUnion", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsUnion", "IsUnion", {});
   return id;
 }
 
 Type *is_array_trait() {
-  static Type *id = global_create_trait_type("IsArray", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsArray", "IsArray", {});
   return id;
 }
 
 Type *is_pointer_trait() {
-  static Type *id = global_create_trait_type("IsPointer", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsPointer", "IsPointer", {});
   return id;
 }
 
 Type *is_mut_pointer_trait() {
-  static Type *id = global_create_trait_type("IsMutPointer", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsMutPointer", "IsMutPointer", {});
   return id;
 }
 
 Type *is_const_pointer_trait() {
-  static Type *id = global_create_trait_type("IsConstPointer", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsConstPointer", "IsConstPointer", {});
   return id;
 }
 
 Type *is_slice_trait() {
-  static Type *id = global_create_trait_type("IsSlice", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsSlice", "IsSlice", {});
   return id;
 }
 
 Type *is_slice_mut_trait() {
-  static Type *id = global_create_trait_type("IsSliceMut", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("IsSliceMut", "IsSliceMut", {});
   return id;
 }
 
 Type *blittable_trait() {
-  static Type *id = global_create_trait_type("Blittable", create_child(nullptr), {});
+  static Type *id = global_create_trait_type("Blittable", "Blittable", {});
   return id;
 }
 
@@ -1378,15 +1354,14 @@ bool Type::has_dependencies() const {
     case TYPE_DYN: {
       // this doesn't depend on any other type, rather function declarations, but that's not relevant.
       return false;
-    }
-    break;
+    } break;
   }
 }
 
 #include "ast.hpp"
 
 void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRange &source_range,
-                                    const std::string &message) {
+                                        const std::string &message) {
   auto from_t = expr->resolved_type;
   auto to_t = to;
   auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
@@ -1405,6 +1380,4 @@ void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRan
   }
 }
 
-static inline size_t make_impl_unique_get_id(ASTImpl *impl) {
-  return impl->uid = impl_uid_base;
-}
+static inline size_t make_impl_unique_get_id(ASTImpl *impl) { return impl->uid = impl_uid_base; }

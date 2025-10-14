@@ -1007,6 +1007,7 @@ struct ASTAlias : ASTStatement {  // TODO: Implement where clauses for generic a
 };
 
 struct ASTImpl : ASTDeclaration {
+  size_t uid;  // used for methods in types
   Nullable<ASTWhere> where_clause;
   // impl 'target' or impl *trait for 'target'
   ASTType *target;
