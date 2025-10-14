@@ -1892,7 +1892,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto variable = parse_variable();
     variable->is_constexpr = true;
-    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST, variable);
+    ctx.scope->insert(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST, variable);
     return variable;
   }
 
@@ -2460,7 +2460,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   // check for definition.
   auto has_definition = false;
   {
-    auto sym = ctx.scope->local_lookup(name);
+    auto sym = ctx.scope->local_find(name);
     if (sym && (sym->is_forward_declared) == 0) {
       has_definition = true;
     }
@@ -2484,7 +2484,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
 
   if (peek().type == TType::Semi) {
     node->is_forward_declared = true;
-    ctx.scope->local_lookup(name)->is_forward_declared = true;
+    ctx.scope->local_find(name)->is_forward_declared = true;
     end_node(node, range);
     current_func_decl = last_func_decl;
     return node;

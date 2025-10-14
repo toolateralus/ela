@@ -59,7 +59,7 @@ Context::Context() {
 /*
   TODO: optimize lookups for local and other symbols.
 */
-Symbol *Scope::local_lookup(const InternedString &name) {
+Symbol *Scope::local_find(const InternedString &name) {
   if (symbols.contains(name)) {
     return &symbols[name];
   }
@@ -73,7 +73,7 @@ Symbol *Scope::local_lookup(const InternedString &name) {
   return nullptr;
 }
 
-Symbol *Scope::lookup(const InternedString &name) {
+Symbol *Scope::find(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];
   }

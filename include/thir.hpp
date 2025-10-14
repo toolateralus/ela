@@ -365,12 +365,12 @@ struct THIRGen {
   void set_reflection_types(Typer &typer);
 
   inline Type *iterator_trait() const {
-    static Type *iter_id = ctx.scope->lookup("Iterator")->resolved_type;
+    static Type *iter_id = ctx.scope->find("Iterator")->type;
     return iter_id;
   }
 
   inline Type *iterable_trait() const {
-    static Type *iterable_id = ctx.scope->lookup("Iterable")->resolved_type;
+    static Type *iterable_id = ctx.scope->find("Iterable")->type;
     return iterable_id;
   }
 
@@ -450,6 +450,12 @@ struct THIRGen {
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
   THIR *visit_expr_statement(ASTExprStatement *node);
+  void visit_module(ASTModule *node);
+  void visit_import(ASTImport *node);
+  void visit_impl(ASTImpl *node);
+  void visit_destructure(ASTDestructure *node);
+  void visit_where_statement(ASTWhereStatement *node);
+  THIR *visit_run(ASTRun *);
 
   THIR *take_address_of(const THIR *node, ASTNode *ast);
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
@@ -458,14 +464,6 @@ struct THIRGen {
   THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag);
 
   THIR *make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
-
-  void visit_module(ASTModule *node);
-  void visit_import(ASTImport *node);
-  void visit_impl(ASTImpl *node);
-  void visit_destructure(ASTDestructure *node);
-  void visit_where_statement(ASTWhereStatement *node);
-
-  THIR *visit_run(ASTRun *);
 
   // instantiate conversions bool is needed because we recurse on these to set the
   // operand of a cast when capturing otherwise implicit casts as explicit casts.

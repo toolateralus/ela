@@ -21,6 +21,7 @@
 using std::string;
 using std::vector;
 
+size_t global_num_symbols_declared; // used to key symbols.
 jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};

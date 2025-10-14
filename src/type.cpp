@@ -503,7 +503,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
     if (symbol.is_variable) {
       info->members.push_back(TypeMember{
           .name = name,
-          .type = symbol.resolved_type,
+          .type = symbol.type,
       });
     }
   }
@@ -789,7 +789,7 @@ Type *global_create_tuple_type(const std::vector<Type *> &types) {
   info->scope = create_child(nullptr);
 
   for (size_t i = 0; i < types.size(); ++i) {
-    info->scope->insert_variable(std::to_string(i), types[i], nullptr, MUT);
+    info->scope->insert(std::to_string(i), types[i], nullptr, MUT);
     info->members.push_back(TypeMember{
         .name = "$" + std::to_string(i),
         .type = types[i],
@@ -913,9 +913,9 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
 
   if (!scope) return Type::INVALID_TYPE;
 
-  if (auto symbol = scope->local_lookup(op_str)) {
-    if (symbol->is_function && type_is_valid(symbol->resolved_type)) {
-      return symbol->resolved_type;
+  if (auto symbol = scope->local_find(op_str)) {
+    if (symbol->is_function && type_is_valid(symbol->type)) {
+      return symbol->type;
     }
   }
 

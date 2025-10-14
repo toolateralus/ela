@@ -108,7 +108,7 @@ void SymbolPass::process_function_headers() {}
 void SymbolPass::type_enum(ASTEnumDeclaration* node) {
   Scope* scope = node->declaring_scope;
 
-  if (scope->find_type_id(node->name, {}) != Type::INVALID_TYPE) {
+  if (scope->find_type(node->name, {}) != Type::INVALID_TYPE) {
     throw_error("Redefinition of enum " + node->name.get_str(), node->source_range);
   }
 
@@ -144,7 +144,7 @@ void SymbolPass::type_enum(ASTEnumDeclaration* node) {
       }
     }
 
-    info->scope->insert_variable(key, node_ty, value, CONST);
+    info->scope->insert(key, node_ty, value, CONST);
     info->members.push_back({key, node_ty, value, nullptr});
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;
