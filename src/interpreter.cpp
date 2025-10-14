@@ -7,21 +7,15 @@
 #include "type.hpp"
 #include "value.hpp"
 
-Value *interpret_from_ast(ASTNode *node, Context &ctx) {
-  THIRGen thir_gen{ctx, false};
-
-  if (!node->resolved_type) {
-    Typer typer{ctx};
-    node->accept(&typer);
-  }
-
+Value *interpret_from_ast(ASTNode *node) {
+  THIRGen thir_gen{false};
   auto thir = thir_gen.visit_node(node);
-  Interpreter interp{ctx};
+  Interpreter interp{};
   return interp.visit_node(thir);
 }
 
-Value *interpret(THIR *node, Context &ctx) {
-  Interpreter interpeter(ctx);
+Value *interpret(THIR *node) {
+  Interpreter interpeter {};
   return interpeter.visit_node(node);
 }
 

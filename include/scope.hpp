@@ -62,22 +62,12 @@ struct Scope final {
 
   std::set<Reference> references;
   std::unordered_map<Key, Symbol *, Key::Hash> symbols = {};
-  std::unordered_map<Key, Type *, Key::Hash> types;
+  std::unordered_map<Key, Type *, Key::Hash> types = {};
 
   Scope(Scope *parent) : parent(parent) {}
 
-  inline void insert(const InternedString &name, Type *type, Mutability mutability, ASTNode *ast,
-                     const std::vector<Type *> &generics, bool is_generic_template) {
-    Symbol *sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol();
-    sym->parent_scope = this;
-    sym->type = type;
-    sym->mutability = mutability;
-    sym->name = name;
-    sym->ast = ast;
-    sym->thir = nullptr;
-    sym->value = nullptr;
-    symbols.insert_or_assign(Key::from(name, generics, is_generic_template), sym);
-  }
+  void insert(const InternedString &name, Type *type, Mutability mutability, ASTNode *ast,
+              const std::vector<Type *> &generics, bool is_generic_template);
 
   // Your type should already have declaring_node set if applicable by now, we don't need to duplicate it in the scope
   // table.

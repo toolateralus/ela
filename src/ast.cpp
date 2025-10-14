@@ -66,7 +66,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
     executed = !parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
-    auto value = interpret_from_ast(condition, parser->ctx);
+    auto value = interpret_from_ast(condition); // ! refactor, this is untyped and will break
     executed = value->is_truthy();
   } else {
     throw_error(
@@ -2562,7 +2562,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
-      auto evaluated_value = interpret_from_ast(value, this->ctx);
+      auto evaluated_value = interpret_from_ast(value); // ! refactor, this is untyped and will break
       if (evaluated_value->value_type != ValueType::INTEGER) {
         throw_error("Enums can only have integers", value->source_range);
       }

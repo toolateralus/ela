@@ -145,6 +145,9 @@ static inline size_t make_impl_unique_get_id(ASTImpl *impl);
 struct Impl {
   Nullable<Type> trait_type;
   std::unordered_map<Key, ImplMethod, Key::Hash> methods;
+  // TODO: make another key that uses a FunctionTypeInfo * type signature
+  // so we can lookup methods quickly by an expected return type + parameters
+  // or just parameters.
   const ImplMethod *find(const Key &method_name) const {
     auto it = methods.find(method_name);
     if (it != methods.end()) {
@@ -158,7 +161,7 @@ struct TypeInfo {
   std::vector<TypeMember> members;
   // !REFACTOR
   //  no longer storing a scope, just impls & members.
-  std::vector<Impl> impls;  
+  std::vector<Impl> impls;
 
   TypeInfo() {}
 
@@ -354,15 +357,19 @@ void assess_and_try_add_blittable_trait(Type *type);
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
-Type *global_create_type(TypeKind, const InternedString &name, const InternedString &mangled, TypeInfo * = nullptr, const TypeExtensions & = {},
-                         Type * = nullptr);
+Type *global_create_type(TypeKind, const InternedString &name, const InternedString &mangled, TypeInfo * = nullptr,
+                         const TypeExtensions & = {}, Type * = nullptr);
 
-Type *global_create_struct_type(const InternedString &name, const InternedString &mangled, std::vector<Type *> generic_args = {});
+Type *global_create_struct_type(const InternedString &name, const InternedString &mangled,
+                                std::vector<Type *> generic_args = {});
 
-Type *global_create_trait_type(const InternedString &name, const InternedString &mangled,std::vector<Type *> generic_args);
+Type *global_create_trait_type(const InternedString &name, const InternedString &mangled,
+                               std::vector<Type *> generic_args);
 
-Type *global_create_choice_type(const InternedString &name, const InternedString &mangled,const std::vector<Type *> &generic_args);
-Type *global_create_enum_type(const InternedString &name, const InternedString &mangled, bool is_flags_enum = false, Type *element_type = s32_type());
+Type *global_create_choice_type(const InternedString &name, const InternedString &mangled,
+                                const std::vector<Type *> &generic_args);
+Type *global_create_enum_type(const InternedString &name, const InternedString &mangled, bool is_flags_enum = false,
+                              Type *element_type = s32_type());
 
 Type *global_create_tuple_type(const std::vector<Type *> &types);
 

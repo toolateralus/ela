@@ -299,11 +299,9 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  THIRGen(Context &ctx, bool for_emitter = true);
-
+  THIRGen(bool for_emitter = true);
   std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
-  Context &ctx;
   std::vector<THIRFunction *> test_functions;
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;

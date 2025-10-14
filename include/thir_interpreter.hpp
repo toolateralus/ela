@@ -10,20 +10,12 @@ struct ASTExpr;
 
 struct ASTNode;
 Value *interpret(THIR *node, Context &ctx);
-Value *interpret_from_ast(ASTNode *node, Context &ctx);
+Value *interpret_from_ast(ASTNode *node);
 
 struct Interpreter {
   std::unordered_map<InternedString, ExternFunctionValue> extern_functions{};
-  Scope *root_scope;
-  Scope *scope;
-  Context &ctx;
 
   void write_to_lvalue(THIR *left, Value *right);
-
-  Interpreter(Context &context) : ctx(context) {
-    root_scope = create_child(ctx.scope);
-    scope = root_scope;
-  }
 
   Value *try_link_extern_function(THIRFunction *function);
   LValue *get_lvalue(THIR *);

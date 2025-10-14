@@ -1,20 +1,35 @@
 #include "ast.hpp"
 
-
 struct Typisting {
+  std::vector<ASTStructDeclaration *> struct_declarations;
+  std::vector<ASTTraitDeclaration *> trait_declarations;
+  std::vector<ASTChoiceDeclaration *> choice_declarations;
+  std::vector<ASTEnumDeclaration *> enum_declarations;
+  std::vector<ASTFunctionDeclaration *> function_declarations;
+  std::vector<ASTAlias *> alias_declarations;
+  std::vector<ASTImpl *> impl_declarations;
+  void collect_declarations(ASTNode *node);
+  void run(ASTProgram *ast);
+  void process_type_headers();
+  void process_function_headers();
+  void type_enum(ASTEnumDeclaration *node);
+
+  enum TaskKind {
+    TASK_FUNC_SIGNATURE,
+    TASK_FUNC_BODY,
+    TASK_TYPE_SHELL,
+    TASK_TYPE_BODY,
+    TASK_IMPL_SHELL,
+    TASK_IMPL_BODY,
+  };
+
   inline void visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
-      case AST_NODE_PROGRAM:
-        visit_program((ASTProgram *)node);
-        break;
       case AST_NODE_BLOCK:
         visit_block((ASTBlock *)node);
         break;
       case AST_NODE_FUNCTION_DECLARATION:
         visit_function_declaration((ASTFunctionDeclaration *)node);
-        break;
-      case AST_NODE_NOOP:
-        visit_noop((ASTNoop *)node);
         break;
       case AST_NODE_ALIAS:
         visit_alias((ASTAlias *)node);
@@ -152,15 +167,13 @@ struct Typisting {
         visit_run((ASTRun *)node);
         break;
       default:
-        // Handle unknown node type if necessary
+        // some types are not neccesary to visit
         break;
     }
   }
 
-  void visit_program(ASTProgram *node);
   void visit_block(ASTBlock *node);
   void visit_function_declaration(ASTFunctionDeclaration *node);
-  void visit_noop(ASTNoop *node);
   void visit_alias(ASTAlias *node);
   void visit_impl(ASTImpl *node);
   void visit_import(ASTImport *node);

@@ -5,8 +5,6 @@
 #include <format>
 #include <iostream>
 #include <linux/limits.h>
-#include <ranges>
-#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -302,6 +300,103 @@ void Typer::visit_structural_type_declaration(ASTStructDeclaration *node) {
   }
 }
 
+Type *Typer::get_self_type() {
+  if (type_context.is_not_null()) {
+    type_context.get()->accept(this);
+    return type_context.get()->resolved_type;
+  }
+  return Type::INVALID_TYPE;
+}
+
+bool is_const_pointer(ASTNode *node) {
+  if (node == nullptr) return false;
+
+  if (auto index = dynamic_cast<ASTIndex *>(node)) {
+    return is_const_pointer(index->base);
+  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
+    return is_const_pointer(dot->base);
+  }
+
+  auto type = node->resolved_type;
+  if (type->is_const_pointer()) {
+    return true;
+  }
+
+  return false;
+}
+
+bool type_equals_or_matches_trait(Type *expected, Type *input) {
+  if (expected->is_kind(TYPE_TRAIT)) {
+    if (expected->generic_base_type != Type::INVALID_TYPE) {
+      if (!input->implements(expected->generic_base_type)) {
+        return false;
+      }
+      if (expected->generic_args != input->generic_args) {
+        return false;
+      }
+    } else {
+      if (!input->implements(expected)) {
+        return false;
+      }
+    }
+  } else if (expected != input) {
+    return false;
+  }
+  return true;
+}
+
+bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
+  FunctionTypeInfo *trait_method_info = trait_method->info->as<FunctionTypeInfo>();
+  FunctionTypeInfo *impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+
+  if (trait_method_info->params_len != impl_method_info->params_len) {
+    return false;
+  }
+
+  for (size_t i = 0; i < trait_method_info->params_len; ++i) {
+    Type *trait_param = trait_method_info->parameter_types[i];
+    Type *impl_param = impl_method_info->parameter_types[i];
+    if (!type_equals_or_matches_trait(trait_param, impl_param)) {
+      return false;
+    }
+  }
+
+  Type *trait_return = trait_method_info->return_type;
+  Type *impl_return = impl_method_info->return_type;
+  return type_equals_or_matches_trait(trait_return, impl_return);
+}
+
+Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
+                                  const SourceRange &source_range) {
+  ASTStatement *instantiation = nullptr;
+  auto symbol = ctx.scope->find(base);
+
+  // Probably not a generic type?
+  if (!symbol || !symbol->is_type) {
+    return Type::INVALID_TYPE;
+  }
+
+  auto declaring_node = symbol->type.declaration.get();
+
+  if (!declaring_node) {
+    throw_error("internal compiler error: unable to find type's declaring node", source_range);
+  }
+
+  switch (declaring_node->get_node_type()) {
+    case AST_NODE_STRUCT_DECLARATION:
+    case AST_NODE_FUNCTION_DECLARATION:
+    case AST_NODE_TRAIT_DECLARATION:
+      break;
+    default:
+      throw_error("Invalid target to generic args", source_range);
+      break;
+  }
+
+  instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, source_range);
+
+  return global_find_type_id(instantiation->resolved_type, {});
+}
+
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<Type *> generic_args) {
   if (node->is_structural) {
@@ -315,6 +410,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type_argument = *generic_arg;
+
+
       node->scope->create_type_alias(param.identifier, *generic_arg, type_argument->declaring_node.get());
       generic_arg++;
     }
@@ -579,45 +676,6 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
     throw_error("Not all code paths return a value.", node->source_range);
 }
 
-Type *Typer::get_self_type() {
-  if (type_context.is_not_null()) {
-    type_context.get()->accept(this);
-    return type_context.get()->resolved_type;
-  }
-  return Type::INVALID_TYPE;
-}
-
-Type *Typer::find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
-                                  const SourceRange &source_range) {
-  ASTStatement *instantiation = nullptr;
-  auto symbol = ctx.scope->find(base);
-
-  // Probably not a generic type?
-  if (!symbol || !symbol->is_type) {
-    return Type::INVALID_TYPE;
-  }
-
-  auto declaring_node = symbol->type.declaration.get();
-
-  if (!declaring_node) {
-    throw_error("internal compiler error: unable to find type's declaring node", source_range);
-  }
-
-  switch (declaring_node->get_node_type()) {
-    case AST_NODE_STRUCT_DECLARATION:
-    case AST_NODE_FUNCTION_DECLARATION:
-    case AST_NODE_TRAIT_DECLARATION:
-      break;
-    default:
-      throw_error("Invalid target to generic args", source_range);
-      break;
-  }
-
-  instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, source_range);
-
-  return global_find_type_id(instantiation->resolved_type, {});
-}
-
 void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where_clause, bool generic_instantiation,
                                   std::vector<Type *> generic_args) {
   // Setup context.
@@ -697,47 +755,6 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
     throw_error("internal compiler error: unresolved generic return type.", node->source_range);
   }
   node->resolved_type = global_find_function_type_id(info, {});
-}
-
-bool type_equals_or_matches_trait(Type *expected, Type *input) {
-  if (expected->is_kind(TYPE_TRAIT)) {
-    if (expected->generic_base_type != Type::INVALID_TYPE) {
-      if (!input->implements(expected->generic_base_type)) {
-        return false;
-      }
-      if (expected->generic_args != input->generic_args) {
-        return false;
-      }
-    } else {
-      if (!input->implements(expected)) {
-        return false;
-      }
-    }
-  } else if (expected != input) {
-    return false;
-  }
-  return true;
-}
-
-bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
-  FunctionTypeInfo *trait_method_info = trait_method->info->as<FunctionTypeInfo>();
-  FunctionTypeInfo *impl_method_info = impl_method->info->as<FunctionTypeInfo>();
-
-  if (trait_method_info->params_len != impl_method_info->params_len) {
-    return false;
-  }
-
-  for (size_t i = 0; i < trait_method_info->params_len; ++i) {
-    Type *trait_param = trait_method_info->parameter_types[i];
-    Type *impl_param = impl_method_info->parameter_types[i];
-    if (!type_equals_or_matches_trait(trait_param, impl_param)) {
-      return false;
-    }
-  }
-
-  Type *trait_return = trait_method_info->return_type;
-  Type *impl_return = impl_method_info->return_type;
-  return type_equals_or_matches_trait(trait_return, impl_return);
 }
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args) {
@@ -1074,23 +1091,6 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
   call.accept(this);
 }
 
-bool is_const_pointer(ASTNode *node) {
-  if (node == nullptr) return false;
-
-  if (auto index = dynamic_cast<ASTIndex *>(node)) {
-    return is_const_pointer(index->base);
-  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
-    return is_const_pointer(dot->base);
-  }
-
-  auto type = node->resolved_type;
-  if (type->is_const_pointer()) {
-    return true;
-  }
-
-  return false;
-}
-
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, ASTFunctionDeclaration *function,
                                         Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
   // this just stores the old type and restores it when we exit.
@@ -1263,7 +1263,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
     expected_type = info->parameter_types[i];
     arg->accept(this);
     assert_types_can_cast_or_are_equal(arg, info->parameter_types[i], arg->source_range,
-                                   std::format("invalid argument type for parameter #{}", i + 1));
+                                       std::format("invalid argument type for parameter #{}", i + 1));
 
     ++i;
   }
@@ -1636,7 +1636,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
       underlying_type = node_ty;
     } else {
       assert_types_can_cast_or_are_equal(value, underlying_type, node->source_range,
-                                     "inconsistent types in enum declaration.");
+                                         "inconsistent types in enum declaration.");
     }
   }
 
@@ -1744,7 +1744,7 @@ void Typer::visit(ASTVariable *node) {
     ENTER_EXPECTED_TYPE(node->type->resolved_type);
     node->value.get()->accept(this);
     assert_types_can_cast_or_are_equal(node->value.get(), node->type->resolved_type, node->source_range,
-                                   "invalid type in declaration");
+                                       "invalid type in declaration");
   }
 
   if (!node->is_constexpr && ctx.scope->local_find(node->name)) {
@@ -2135,9 +2135,9 @@ void Typer::visit(ASTCall *node) {
 
   } else if (symbol && symbol->is_type) {
     if (!symbol->type.choice) {
-      throw_error(std::format("type {} must be a choice variant to use '(..)' constructor for now",
-                              symbol->type->basename),
-                  node->source_range);
+      throw_error(
+          std::format("type {} must be a choice variant to use '(..)' constructor for now", symbol->type->basename),
+          node->source_range);
     }
     if (!symbol->type->is_kind(TYPE_TUPLE)) {
       throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->type->basename),
@@ -2166,7 +2166,8 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    type_check_args_from_params(node->arguments, func_decl->parameters, func_decl, nullptr, func_decl->name == "destroy");
+    type_check_args_from_params(node->arguments, func_decl->parameters, func_decl, nullptr,
+                                func_decl->name == "destroy");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -2263,8 +2264,8 @@ void Typer::visit(ASTType *node) {
       if (node->normal.is_dyn) {
         auto type = node->resolved_type;
         auto extension = type->extensions;
-        auto ty = ctx.scope->find_or_instantiate_dyn_type(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
-                                                        node->source_range, this);
+        auto ty = ctx.scope->find_or_instantiate_dyn_type(
+            type->base_type == Type::INVALID_TYPE ? type : type->base_type, node->source_range, this);
         if (extensions.size()) {
           node->resolved_type = global_find_type_id(ty, extensions);
         } else {
@@ -2972,7 +2973,7 @@ void Typer::visit(ASTTuple *node) {
 
     if (declaring_type_set) {
       assert_types_can_cast_or_are_equal(value, expected_type, value->source_range,
-                                     "tuple value was incapable of casting to expected tuple element type");
+                                         "tuple value was incapable of casting to expected tuple element type");
       value->resolved_type = expected_type;
     }
 
@@ -3337,7 +3338,7 @@ void Typer::visit(ASTDyn_Of *node) {
   }
 
   auto ty = ctx.scope->find_or_instantiate_dyn_type(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
-                                                  node->source_range, this);
+                                                    node->source_range, this);
   node->resolved_type = ty;
 }
 

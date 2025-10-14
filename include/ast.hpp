@@ -98,7 +98,7 @@ struct ASTNode {
   // this will allow us cross reference symbol metadata, THIR, type metadata, without lookups.
   // the same is true for THIR, Symbol, and Type :: all have this so we can cross reference stable
   // pointers for
-  Nullable<Symbol *> symbol;
+  Nullable<Symbol> symbol;
   bool is_insert_node = false;
   bool is_temporary_value() const {
     switch (get_node_type()) {

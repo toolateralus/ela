@@ -2505,7 +2505,6 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
     Type *field_ty = g_refl_Field_type;
 
     const ASTDeclaration *list_decl = g_List_declaration;
-
     const ASTDeclaration *list_instance = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty});
     const ASTDeclaration *method_instance = find_generic_instance(list_decl->generic_instantiations, {method_ty});
     const ASTDeclaration *field_instance = find_generic_instance(list_decl->generic_instantiations, {field_ty});
