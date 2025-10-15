@@ -2471,6 +2471,11 @@ ParameterList Parser::parse_parameters() {
       p.mutability = mutability;
       p.named.name = name_tok.value;
       p.named.type = type_ast;
+
+      if (peek().type == TType::Assign) {
+        p.default_value = parse_expr();
+      }
+
       params.values.push_back(p);
     } else {
       // nameless parameter: parse type directly
@@ -2479,6 +2484,11 @@ ParameterList Parser::parse_parameters() {
       p.tag = PARAM_IS_NAMELESS;
       p.mutability = CONST;
       p.nameless.type = type_ast;
+
+      if (peek().type == TType::Assign) {
+        p.default_value = parse_expr();
+      }
+
       params.values.push_back(p);
     }
 

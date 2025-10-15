@@ -130,8 +130,10 @@ struct TypeMember {
   Nullable<ASTExpr> default_value;
   Nullable<THIR> thir_value;
 };
-
+struct ASTFunctionDeclaration;
 struct ImplMethod {
+  InternedString name;
+  ASTFunctionDeclaration *declaration;
   Type *signature;
   // TODO: we need to add a compiled-non-ast where constraint here so we can quickly check
   // against call site usage, instead of checking it at impl time.
@@ -162,6 +164,26 @@ struct TypeInfo {
   // !REFACTOR
   //  no longer storing a scope, just impls & members.
   std::vector<Impl> impls;
+
+  // TODO:
+  // remove the impls thing and use pattern matched method usage, like rust. for now, we use this.
+  size_t methods_count() const {
+    size_t count{};
+    for (auto impl : impls) {
+      count += impl.methods.size();
+    }
+    return count;
+  }
+
+  std::vector<ImplMethod> all_methods_flattened() {
+    std::vector<ImplMethod> methods;
+    for (auto impl : impls) {
+      for (auto method: impl.methods) {
+        methods.push_back(method.second);
+      }
+    }
+    return methods;
+  }
 
   TypeInfo() {}
 
@@ -302,8 +324,9 @@ struct TupleTypeInfo : TypeInfo {
 
 struct DynTypeInfo : TypeInfo {
   Type *trait_type;
-  std::vector<std::pair<InternedString, Type *>> methods;
-
+  // TODO; figure this out better. same with 'impls' on the type, we shouldn't
+  // track impls on types at all, instead treat impls as patterns we match against when calling methods.
+  std::vector<ImplMethod> methods;
   size_t size_in_bytes() const override {
     size_t method_ptrs_size = methods.size() * sizeof(void *);
     size_t instance_size = sizeof(void *);

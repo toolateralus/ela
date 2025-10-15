@@ -327,6 +327,7 @@ struct THIRGen {
       throw_error("Bound a null thir to an AST", ast->source_range);
     }
     ast_map[ast] = thir;
+    ast->thir = thir;
   }
 
   inline void bind(Symbol *sym, THIR *thir) {
@@ -357,6 +358,7 @@ struct THIRGen {
   std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
 
   Type *type_ptr_list = nullptr;
+  Type *type_ptr_type = nullptr;
   Type *method_list = nullptr;
   Type *field_list = nullptr;
 

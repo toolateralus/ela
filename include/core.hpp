@@ -215,7 +215,6 @@ static inline size_t calculate_strings_actual_length(const std::string_view &str
   ctx.scope = $new_scope;             \
   const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
 
-
 struct Type;
 struct Key {
   // the bare name of the symbol
@@ -228,6 +227,21 @@ struct Key {
   std::vector<Type *> generics;
 
   bool is_generic_template;  // is this a generic-argument-free template of a generic type or symbol?
+
+  // allow implicit construction from an InternedString (and optional generics / template flag)
+  Key() = default;
+  Key(const std::string &n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
+    : name(n), generics(g), is_generic_template(is_generic_template_) {}
+
+  Key(std::string &&n, std::vector<Type *> &&g = {}, bool is_generic_template_ = false)
+    : name(std::move(n)), generics(std::move(g)), is_generic_template(is_generic_template_) {}
+
+  Key(const char *n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
+    : name(n), generics(g), is_generic_template(is_generic_template_) {}
+  Key(const InternedString &n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
+      : name(n), generics(g), is_generic_template(is_generic_template_) {}
+  Key(InternedString &&n, std::vector<Type *> &&g = {}, bool is_generic_template_ = false)
+      : name(std::move(n)), generics(std::move(g)), is_generic_template(is_generic_template_) {}
 
   inline bool operator==(const Key &other) const {
     return name == other.name && generics == other.generics && is_generic_template == other.is_generic_template;

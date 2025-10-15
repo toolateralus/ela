@@ -306,7 +306,7 @@ Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
 Value* default_value_of_dyn_t(Type* type, DynTypeInfo* info) {
   auto object = new_object(type);
   object->values["instance"] = null_value();
-  for (const auto& [name, _] : info->methods) {
+  for (const auto& [name, _, _d] : info->methods) {
     object->values[name] = null_value();
   }
   return object;

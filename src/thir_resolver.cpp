@@ -98,8 +98,8 @@ void Resolver::emit_type_definition(Type *type) {
       const auto *info = base->info->as<DynTypeInfo>();
       declare_or_define_type(info->trait_type);
 
-      for (const auto &[name, method_type]: info->methods) {
-        declare_or_define_type(method_type);
+      for (const auto &[name, method_type, sig]: info->methods) {
+        declare_or_define_type(sig);
       }
 
       emitter.emit_dyn_dispatch_object_struct(base);

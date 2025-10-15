@@ -43,9 +43,7 @@ void ASTVariable::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTBinExpr::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTUnaryExpr::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTLiteral::accept(VisitorBase *visitor) { NODE_VISIT() }
-void ASTParamDecl::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTMethodCall::accept(VisitorBase *visitor) { NODE_VISIT() }
-void ASTParamsDecl::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTWhereStatement::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTFunctionDeclaration::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTTuple::accept(VisitorBase *visitor) { NODE_VISIT() }

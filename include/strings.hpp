@@ -88,6 +88,10 @@ constexpr const char *OPTION_SOME_DISCRIMINANT_VALUE = "2";
 constexpr const char *COMPILER_VERSION = "v0.0.0";
 
 // We should probably not rely on this since RangeBase is defined in the stdlib.
+
+constexpr const char *RANGE_TYPE_HAS_BEGIN_KEY = "has_begin";
+constexpr const char *RANGE_TYPE_HAS_END_KEY = "has_end";
+constexpr const char *RANGE_TYPE_IS_INCLUSIVE_KEY = "is_inclusive";
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";
 constexpr const char *RANGE_TYPE_END_KEY = "end";
 

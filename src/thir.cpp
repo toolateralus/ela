@@ -231,7 +231,7 @@ THIR *THIRGen::try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *tar
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
   ASTExpr *base = ast->callee->base;
-  const ASTExpr *callee = ast->resolved_callee;
+  const ASTNode *callee = ast->resolved_callee;
 
   thir->is_dyn_call = ast->inserted_dyn_arg;
   thir->dyn_method_name = ast->dyn_method_name;
@@ -242,7 +242,7 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   } else {
     // Push the self argument
     self = visit_node(base);
-    ASTFunctionDeclaration *fn = (ASTFunctionDeclaration*)callee;
+    ASTFunctionDeclaration *fn = (ASTFunctionDeclaration *)callee;
     const auto requires_self_ptr = fn->requires_self_ptr();
     // auto dereference / address of logic.
     self = try_deref_or_take_ptr_to_if_needed(base, self, requires_self_ptr);
@@ -260,143 +260,15 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   return thir;
 }
 
-Symbol *THIRGen::get_symbol(ASTNode *node) {
-  switch (node->get_node_type()) {
-    case AST_NODE_TYPE: {
-      auto type_node = static_cast<ASTType *>(node);
-      if (type_node->kind != ASTType::NORMAL) {
-        return nullptr;
-      }
-      return get_symbol(type_node->normal.path);
-    }
-    case AST_NODE_PATH: {
-      auto path = static_cast<ASTPath *>(node);
-      Scope *scope = ctx.scope;
-      size_t index = 0;
-      for (auto &segment : path->segments) {
-        Symbol *symbol = nullptr;
-        Type *type = nullptr;
-        if (segment.tag == ASTPath::Segment::IDENTIFIER) {
-          auto ident = segment.get_identifier();
-          symbol = scope->find(ident);
-          if (!symbol) {
-            throw_error("INTERNAL COMPILER ERROR: symbol null in path", node->source_range);
-          }
-        } else if (segment.tag == ASTPath::Segment::TYPE) {
-          type = segment.get_type()->resolved_type;
-        } else {
-          throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier",
-                      node->source_range);
-          return nullptr;
-        }
-
-        if (index == path->length() - 1) {
-          return symbol;
-        }
-
-        if (type) {
-          scope = type->info->scope;
-        } else if (!segment.generic_arguments.empty()) {
-          if (symbol->is_type) {
-            auto decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
-
-            if (!decl) {
-              throw_error("Cannot apply generic arguments to that type", node->source_range);
-            }
-
-            auto instantiation =
-                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      segment.get_resolved_generics());
-            auto type = instantiation->resolved_type;
-            scope = type->info->scope;
-          } else {
-            return nullptr;
-          }
-        } else {
-          if (symbol->is_module) {
-            scope = symbol->module.declaration->scope;
-          } else if (symbol->is_type) {
-            auto resolved_type = symbol->type;
-            scope = resolved_type->info->scope;
-
-            // We do this here because it's not neccesarily true that these would have been visited already,
-            // duplicates don't matter all that much, and we _need_ the child symbols to be bound otherwise
-            // we get null variables in paths.
-
-            // There's probably a much better solution than this, but this works.
-
-            if (resolved_type->declaring_node) {
-              auto thir = visit_node(resolved_type->declaring_node.get());
-              if (thir) program->statements.push_back(thir);
-            }
-
-          } else {
-            return nullptr;
-          }
-        }
-        index++;
-      }
-    } break;
-    case AST_NODE_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
-      auto type = dotnode->base->resolved_type;
-      auto symbol = type->info->scope->local_find(dotnode->member.get_identifier());
-      // Implicit dereference, we look at the base scope.
-      if (!symbol && type->is_pointer()) {
-        type = type->get_element_type();
-        symbol = type->info->scope->local_find(dotnode->member.get_identifier());
-      }
-      return symbol;
-    }
-    default:
-      return nullptr;
-  }
-  return nullptr;
-}
+// !REFACTOR just a quick and dirty hack, dunno if this is sufficient.
+Symbol *THIRGen::get_symbol(ASTNode *node) { return node->symbol.get(); }
 
 THIR *THIRGen::visit_path(ASTPath *ast) {
   if (should_emit_choice_type_marker_variant_instantiation(ast)) {
     return get_choice_type_instantiation_boilerplate(ast, this);
   }
-
-  auto symbol = get_symbol(ast);
-
-  if (!symbol) {
-    throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it",
-                ast->source_range);
-  }
-
-  if (symbol_map.contains(symbol)) {
-    return symbol_map[symbol];
-  }
-
-  if (symbol->is_variable) {
-    auto var_ast = symbol->variable.declaration.get();
-    if (!var_ast) {
-      throw_error("INTERNAL COMPILER ERROR: variable declaration null in path", ast->source_range);
-    }
-    return visit_node(var_ast);
-  }
-
-  ASTDeclaration *decl = nullptr;
-  if (symbol->is_function) {
-    decl = symbol->function.declaration;
-  } else if (symbol->is_type) {
-    decl = dynamic_cast<ASTDeclaration *>(symbol->type.declaration.get());
-    if (!decl) {
-      decl = dynamic_cast<ASTDeclaration *>(symbol->type->declaring_node.get());
-    }
-  }
-
-  if (!decl) {
-    throw_error("INTERNAL COMPILER ERROR: Invalid type in path", ast->source_range);
-  }
-
-  if (!decl->generic_parameters.empty()) {
-    decl = find_generic_instance(decl->generic_instantiations, ast->segments.back().get_resolved_generics());
-  }
-
-  return visit_node(decl);
+  ASTNode *resolved_ast = ast->resolved_ast;
+  return visit_node(resolved_ast);
 }
 
 THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
@@ -516,11 +388,14 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     return binexpr;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->left->resolved_type->info->scope;
-    auto symbol = scope->local_find(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-        ast->left, visit_node(ast->left), symbol->function.declaration->requires_self_ptr()));
+    TypeInfo *info = ast->left->resolved_type->info;
+    // TODO: allow generic arguments here, and have the typer resolve this and replace the node with
+    // a call so we don't have to patch shit up in here.
+    auto method = info->find_method(Key::from(get_operator_overload_name(ast->op, OPERATION_BINARY)));
+    overload_call->callee = visit_node(method->declaration);
+    THIR *first_argument =
+        try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left), method->declaration->requires_self_ptr());
+    overload_call->arguments.push_back(first_argument);
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
@@ -534,13 +409,14 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     return unary;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->operand->resolved_type->info->scope;
-    auto symbol = scope->local_find(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-        ast->operand, visit_node(ast->operand), symbol->function.declaration->requires_self_ptr()));
+    const TypeInfo *info = ast->operand->resolved_type->info;
+    InternedString name = get_operator_overload_name(ast->op, OPERATION_UNARY);
+    const ImplMethod *method = info->find_method(Key::from(name));
+    overload_call->callee = visit_node(method->declaration);
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(ast->operand, visit_node(ast->operand),
+                                                                          method->declaration->requires_self_ptr()));
 
-    if (symbol->name == "deref") {
+    if (name == "deref") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
       deref->op = TType::Mul;
       deref->operand = overload_call;
@@ -561,12 +437,12 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     return index;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->base->resolved_type->info->scope;
-    auto symbol = scope->local_find(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_node(symbol->function.declaration);
+    const TypeInfo *info = ast->base->resolved_type->info;
+    const ImplMethod *method = info->find_method(Key::from(get_operator_overload_name(TType::LBrace, OPERATION_INDEX)));
+    overload_call->callee = visit_node(method->declaration);
 
-    auto self = try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base),
-                                                   symbol->function.declaration->requires_self_ptr());
+    const bool requires_self_ptr = method->declaration->requires_self_ptr();
+    auto self = try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base), requires_self_ptr);
 
     overload_call->arguments.push_back(self);
     overload_call->arguments.push_back(visit_node(ast->index));
@@ -611,10 +487,7 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   THIR_ALLOC(THIRAggregateInitializer, dynof, ast);
 
   dynof->key_values.push_back({"instance", visit_node(ast->object)});
-
-  auto dyn_info = ast->resolved_type->info->as<DynTypeInfo>();
-  auto object_type_nonptr = ast->object->resolved_type->get_element_type();
-  auto scope = object_type_nonptr->info->scope;
+  DynTypeInfo *dyn_info = ast->resolved_type->info->as<DynTypeInfo>();
 
   const auto get_function_pointer = [&](ASTFunctionDeclaration *func) -> THIR * {
     auto function = visit_node(func);
@@ -634,11 +507,10 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
     return make_cast(addr, new_type);
   };
 
-  for (auto &[name, method_type] : dyn_info->methods) {
-    auto symbol = scope->local_lookup(name);
+  for (auto &method : dyn_info->methods) {
     dynof->key_values.push_back({
-        name,
-        get_function_pointer(symbol->function.declaration),
+        method.declaration->name,
+        get_function_pointer(method.declaration),
     });
   }
 
@@ -647,8 +519,23 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
 
 THIR *THIRGen::visit_range(ASTRange *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
-  thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, visit_node(ast->left)});
-  thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->right)});
+
+  THIR *has_begin = make_literal(ast->right ? "true" : "false", ast->source_range, bool_type(), ASTLiteral::Bool);
+  thir->key_values.push_back({RANGE_TYPE_HAS_BEGIN_KEY, has_begin});
+  THIR *has_end = make_literal(ast->left ? "true" : "false", ast->source_range, bool_type(), ASTLiteral::Bool);
+  thir->key_values.push_back({RANGE_TYPE_HAS_END_KEY, has_end});
+  THIR *inclusive = make_literal(ast->inclusive ? "true" : "false", ast->source_range, bool_type(), ASTLiteral::Bool);
+  thir->key_values.push_back({RANGE_TYPE_IS_INCLUSIVE_KEY, inclusive});
+
+  // TODO: push default initialized values if left or right isn't present
+  if (ast->left) {
+    thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, visit_node(ast->left.get())});
+  }
+
+  if (ast->right) {
+    thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->right.get())});
+  }
+
   return thir;
 }
 
@@ -832,37 +719,32 @@ THIR *THIRGen::visit_cast(ASTCast *ast) {
 }
 
 THIR *THIRGen::visit_lambda(ASTLambda *ast) {
-  auto symbol = ctx.scope->find(ast->unique_identifier);
-  if (auto thir = symbol_map[symbol]) {
-    return thir;
+  if (ast->thir) {
+    return ast->thir;
   }
-  THIR_ALLOC(THIRFunction, thir, ast);
 
-  bind(symbol, thir);
-  bind(ast, thir);
+  THIR_ALLOC(THIRFunction, thir, ast);
 
   thir->name = ast->unique_identifier;
 
-  for (const auto &ast_param : ast->params->params) {
+  for (const auto &param : ast->parameters.values) {
     THIRParameter thir_param = {
-        .name = ast_param->normal.name,
+        .name = param.named.name,
     };
 
-    THIR_ALLOC(THIRVariable, var, ast_param);
-    var->name = ast_param->normal.name;
-    var->type = ast_param->resolved_type;
+    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var);
+    var->source_range = ast->source_range;
+    var->name = param.named.name;
+    var->type = param.named.type->resolved_type;
     var->is_global = false;
 
-    if (ast_param->normal.default_value) {
-      thir_param.default_value = visit_node(ast_param->normal.default_value.get());
+    if (param.default_value) {
+      thir_param.default_value = visit_node(param.default_value.get());
       var->value = thir_param.default_value;
     }
 
-    auto symbol = ast->block->scope->local_lookup(ast_param->normal.name);
-
-    bind(symbol, var);
-    bind(ast_param, var);
-
+    auto symbol = ast->block->scope->local_find(param.named.name);
+    symbol->thir = var;
     thir->parameters.push_back(thir_param);
   }
 
@@ -885,9 +767,7 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
 }
 
 THIR *THIRGen::visit_block(ASTBlock *ast) {
-  ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRBlock, thir, ast);
-
   enter_defer_boundary(DeferBoundary::BLOCK);
 
   {
@@ -935,42 +815,33 @@ static inline void convert_function_attributes(THIRFunction *reciever, const std
 }
 
 void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&thir) {
-  for (const auto &param : ast->params->params) {
-    THIR_ALLOC(THIRVariable, var, param);
-    if (param->tag == ASTParamDecl::Normal) {
-      var->name = param->normal.name;
-      var->type = param->normal.type->resolved_type;
-      if (param->normal.default_value) {
-        auto vec = std::vector<THIR *>();
-        auto previous = current_expression_list;
-        current_expression_list = &vec;
-        auto result = visit_node(param->normal.default_value.get());
-        if (vec.size() || result == THIRNoop::shared()) {
-          var->value = vec[0];
-        } else {
-          var->value = result;
-        }
-        current_expression_list = previous;
+  for (const auto &param : ast->parameters.values) {
+    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var);
+    var->source_range = ast->source_range;
+
+    THIRParameter thir_param{};
+    thir_param.default_value = nullptr;
+    thir_param.associated_variable = nullptr;
+
+    if (param.tag == PARAM_IS_NAMELESS) {
+      var->name = get_temporary_variable();
+      var->type = param.nameless.type->resolved_type;
+      var->value = nullptr;
+    } else {
+      var->name = param.named.name;
+      var->type = param.named.type->resolved_type;
+      if (param.default_value) {
+        thir_param.default_value = visit_node(param.default_value.get());
+        var->value = thir_param.default_value;
       } else {
         var->value = nullptr;
       }
-    } else {
-      var->name = "self";
-      var->type = param->resolved_type;
     }
 
-    if (!ast->is_forward_declared) {
-      auto param_sym = ctx.scope->local_lookup(var->name);
-
-      bind(param_sym, var);
-      bind(param, var);
-    }
-
-    thir->parameters.push_back(THIRParameter{
-        .name = var->name,
-        .default_value = var->value,
-        .associated_variable = var,
-    });
+    thir_param.name = var->name;
+    thir_param.associated_variable = var;
+    thir_param.default_value = thir_param.default_value;
+    thir->parameters.push_back(thir_param);
   }
 }
 
@@ -991,7 +862,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
   } else {
     std::string name;
     if (ast->declaring_type) {
-      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.str();
+      name = ast->declaring_type->full_mangled_name.str() + "$" + ast->name.str();
     } else {
       name = ast->scope->full_name();
     }
@@ -1027,21 +898,8 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRFunction, thir, ast);
-
-  Symbol *symbol = nullptr;
-  if (ast->declaring_type) {
-    symbol = ast->declaring_type->info->scope->local_find(ast->name);
-  } else {
-    symbol = ast->declaring_scope->local_find(ast->name);
-  }
-
-  if (!symbol) {
-    throw_error("Unable to find symbol for function", ast->source_range);
-  }
-
   bind(ast, thir);
 
-  ENTER_SCOPE(ast->scope);
   convert_function_flags(thir, ast);
   convert_function_attributes(thir, ast->attributes);
   convert_parameters(ast, thir);
@@ -1057,13 +915,11 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
     // SUPER naive macro expansion, this will explode with C errors if you misuse it
     // I'm really only adding expand blocks to aide in the development of the self hosted compiler.
     if (ast->is_macro) {
-      ENTER_SCOPE(ast->block.get()->scope);
       for (const auto &stmt : ast->block.get()->statements) {
         if (stmt->get_node_type() == AST_NODE_DEFER && !stmt->is_insert_node) {
           continue;
         }
         auto result = visit_node(stmt);
-
         if (stmt->is_insert_node && stmt->get_node_type() == AST_NODE_EXPR_STATEMENT && current_expression_list) {
           current_expression_list->push_back(result);
         } else if (stmt->is_insert_node) {
@@ -1109,7 +965,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 
   thir->is_global = !ast->is_local;
   thir->is_static = ast->is_static;
-  thir->is_constexpr = ast->is_constexpr;
+  thir->is_constexpr = ast->is_constant;  // TODO; make this actually do something.
   thir->is_extern = ast->is_extern;
 
   auto symbol = ast->declaring_scope->local_find(ast->name);
@@ -1130,7 +986,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
     thir->name = ast->name;
   }
 
-  if (thir->is_global && !ast->is_constexpr && !ast->is_extern) {
+  if (thir->is_global && !ast->is_constant && !ast->is_extern) {
     // global variables don't get directly assigned, we will always use a static global initializer.
     // TODO: make some kind of analyzer that will actually figure this out for us, simple assignments dont
     // need to work like this for compile time constant friendly values.
@@ -1212,20 +1068,17 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRType, thir, ast);
-
   bind(ast, thir);
-
   extract_thir_values_for_type_members(thir->type);
+
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
     var->source_range = ast->source_range;
     var->is_global = false;
     var->is_statement = true;
-    var->name = ast->resolved_type->basename.get_str() + '$' + member.name.get_str();
+    var->name = ast->resolved_type->full_mangled_name.str() + member.name.str();
     var->value = member.thir_value.get();
     var->type = member.type;
-    auto symbol = ast->resolved_type->info->scope->local_lookup(member.name);
-    bind(symbol, var);
   }
 
   return thir;
@@ -1278,11 +1131,12 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
         return condition;
       } else {  // call an operator overload
         THIR_ALLOC(THIRCall, overload_call, ast);
-        auto scope = left->type->info->scope;
-        auto symbol = scope->local_find(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
-        overload_call->callee = visit_node(symbol->function.declaration);
-        overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-            branch.expression, left, symbol->function.declaration->requires_self_ptr()));
+        const TypeInfo *info = left->type->info;
+        const ImplMethod *method =
+            info->find_method(Key::from(get_operator_overload_name(TType::EQ, OPERATION_BINARY)));
+        overload_call->callee = visit_node(method->declaration);
+        overload_call->arguments.push_back(
+            try_deref_or_take_ptr_to_if_needed(branch.expression, left, method->declaration->requires_self_ptr()));
         overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
         return overload_call;
       }
@@ -1329,7 +1183,6 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
 }
 
 THIR *THIRGen::visit_program(ASTProgram *ast) {
-  ENTER_SCOPE(ast->scope);
   THIR_ALLOC(THIRProgram, thir, ast);
 
   program = thir;
@@ -1377,8 +1230,6 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   const InternedString result_key = get_temporary_variable();
   const InternedString cached_key = get_temporary_variable();
 
-  ENTER_SCOPE(ast->block->scope);
-
   // Cache the iterable/expression (evaluate once)
   THIR *iterable_value = visit_node(ast->right);
   THIR *iterable_var = make_variable(cached_key, iterable_value, ast->right);
@@ -1388,13 +1239,13 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Get the iterator (call iter() or use as iterator directly)
   THIR *iterator_var = nullptr;
   if (iterable_var->type->implements(iterable_trait())) {
-    auto iter_symbol = iterable_var->type->info->scope->local_find("iter");
-    bool expects_ptr = iter_symbol && iter_symbol->function.declaration->params->params[0]->self.is_pointer;
+    auto iter_symbol = iterable_var->type->info->find_method("iter");
+    bool expects_ptr = iter_symbol && iter_symbol->declaration->requires_self_ptr();
     THIR *iter_arg =
         (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast) : iterable_var;
 
     THIR_ALLOC(THIRCall, iter_call, ast);
-    iter_call->callee = visit_node(iter_symbol->function.declaration);
+    iter_call->callee = visit_node(iter_symbol->declaration);
     iter_call->arguments.push_back(iter_arg);
 
     const auto *info = iter_call->callee->type->info->as<FunctionTypeInfo>();
@@ -1407,13 +1258,13 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   }
 
   // Call next() on the iterator
-  auto next_symbol = iterator_var->type->info->scope->local_find("next");
+  auto next_method = iterator_var->type->info->find_method("next");
 
-  auto next_arg = try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var,
-                                                     next_symbol->function.declaration->requires_self_ptr());
+  auto next_arg =
+      try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var, next_method->declaration->requires_self_ptr());
 
   THIR_ALLOC(THIRCall, next_call, ast);
-  next_call->callee = visit_node(next_symbol->function.declaration);
+  next_call->callee = visit_node(next_method->declaration);
 
   const auto *next_info = next_call->callee->type->info->as<FunctionTypeInfo>();
   next_call->type = next_info->return_type;
@@ -1482,7 +1333,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
         variable->value = take_address_of(member_access, ast);
       }
 
-      auto symbol = ctx.scope->local_lookup(element.identifier);
+      auto symbol = ast->declaring_scope->local_find(element.identifier);
       bind(symbol, variable);
       statements.push_back(variable);
     }
@@ -1500,7 +1351,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
     block->statements.insert(block->statements.begin(), statements.begin(), statements.end());
   } else {
     const auto identifier_var = make_variable(ast->left.identifier, unwrapped_some, ast);
-    const auto identifier_symbol = ctx.scope->find(ast->left.identifier);
+    const auto identifier_symbol = ast->block->scope->local_find(ast->left.identifier);
 
     bind(identifier_symbol, identifier_var);
 
@@ -1611,7 +1462,7 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
       assign->op = TType::Assign;
       assign->is_statement = true;
 
-      auto symbol = ctx.scope->local_lookup(element.identifier);
+      auto symbol = ast->declaring_scope->local_find(element.identifier);
       auto declaration = symbol_map[symbol];
       assign->left = declaration;
 
@@ -1649,7 +1500,7 @@ void THIRGen::visit_destructure(ASTDestructure *ast) {
         var->value = take_address_of(member_access, ast);
       }
 
-      auto symbol = ctx.scope->local_lookup(element.identifier);
+      auto symbol = ast->declaring_scope->local_find(element.identifier);
       bind(symbol, var);
       current_statement_list->push_back(var);
     }
@@ -1681,7 +1532,6 @@ void THIRGen::visit_import(ASTImport *_) {
 }
 
 void THIRGen::visit_module(ASTModule *ast) {
-  ENTER_SCOPE(ast->scope);
   for (const auto &ast_stmt : ast->statements) {
     if (auto thir_stmt = visit_node(ast_stmt)) {
       current_statement_list->push_back(thir_stmt);
@@ -1694,7 +1544,6 @@ void THIRGen::visit_where_branch(const WhereBranch *branch) {
     visit_node(branch->where_stmt.get());
   } else {
     auto block = branch->block.get();
-    ENTER_SCOPE(block->scope);
     for (const auto &ast_stmt : block->statements) {
       if (auto thir_stmt = visit_node(ast_stmt)) {
         current_statement_list->push_back(thir_stmt);
@@ -1705,7 +1554,6 @@ void THIRGen::visit_where_branch(const WhereBranch *branch) {
 
 void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
   if (ast->should_compile) {
-    ENTER_SCOPE(ast->block->scope);
     for (const auto &ast_stmt : ast->block->statements) {
       if (auto thir_stmt = visit_node(ast_stmt)) {
         current_statement_list->push_back(thir_stmt);
@@ -1719,7 +1567,7 @@ void THIRGen::visit_where_statement(ASTWhereStatement *ast) {
 
 THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_range) {
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
-  static Type *str_type = ctx.scope->find_type("str", {});
+  static Type *str_type = g_str_type;
   thir->source_range = src_range;
   thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type(), ASTLiteral::String)});
@@ -1768,7 +1616,7 @@ THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
 }
 
 THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
-  static Type *method_struct_type = ctx.scope->find_type("Method", {});
+  static Type *method_struct_type = g_refl_Method_type;
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
   thir->type = method_struct_type;
   thir->key_values.push_back({
@@ -1779,9 +1627,9 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
   if (type->kind != TYPE_TRAIT) {
     ASTFunctionDeclaration *method;
     if (type->base_type) {
-      method = type->base_type->info->scope->find(name)->function.declaration;
+      method = type->base_type->info->find_method(name)->declaration;
     } else {
-      method = type->info->scope->find(name)->function.declaration;
+      method = type->info->find_method(name)->declaration;
     }
 
     if (method->generic_parameters.empty()) {
@@ -1806,7 +1654,7 @@ THIR *THIRGen::get_method_struct(const std::string &name, Type *type) {
 }
 
 THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
-  static Type *field_struct_type = ctx.scope->find_type("Field", {});
+  static Type *field_struct_type = g_refl_Field_type;
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
   thir->type = field_struct_type;
 
@@ -1844,14 +1692,14 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
 }
 
 THIR *THIRGen::get_field_struct_list(Type *type) {
-  static Type *field_type = ctx.scope->find_type("Field", {});
+  static Type *field_type = g_refl_Field_type;
   const auto length = type->info->members.size();
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->is_variable_length_array = true;
   collection->type = field_type->make_array_of(length);
 
   for (const auto &member : type->info->members) {
-    collection->values.push_back(get_field_struct(member.name.get_str(), member.type, type));
+    collection->values.push_back(get_field_struct(member.name.str(), member.type, type));
   }
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
@@ -1876,17 +1724,15 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
 }
 
 THIR *THIRGen::get_methods_list(Type *type) {
-  const auto length = type->info->scope->methods_count();
+  const auto length = type->info->methods_count();
   const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
-  static Type *method_type = ctx.scope->find_type("Method", {});
+  static Type *method_type = g_refl_Method_type;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->is_variable_length_array = true;
   collection->type = method_type->make_array_of(length);
-  for (const auto &[name, member] : type->info->scope->symbols) {
-    if (member.is_function) {
-      collection->values.push_back(get_method_struct(name.get_str(), type));
-    }
+  for (const auto method : type->info->all_methods_flattened()) {
+    collection->values.push_back(get_method_struct(method.declaration->name.str(), method.signature));
   }
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
@@ -1909,7 +1755,7 @@ THIR *THIRGen::get_traits_list(Type *type) {
   const auto length = type->traits.size();
   const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
 
-  static Type *type_type = ctx.scope->find_type("Type", {{TYPE_EXT_POINTER_CONST}});
+  static Type *type_type = g_refl_Type_type;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->is_variable_length_array = true;
@@ -1939,7 +1785,7 @@ THIR *THIRGen::get_generic_args_list(Type *type) {
   const auto length = type->generic_args.size();
   const auto length_literal = make_literal(std::to_string(length), {}, u64_type(), ASTLiteral::Integer);
 
-  static Type *type_type = ctx.scope->find_type("Type", {{TYPE_EXT_POINTER_CONST}});
+  static Type *type_type = type_ptr_type;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, collection);
   collection->is_variable_length_array = true;
@@ -1974,7 +1820,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
     return reflection_info;
   }
 
-  static Type *type_type = ctx.scope->find_type("Type", {});
+  static Type *type_type = g_refl_Type_type;
 
   ReflectionInfo &info = reflected_upon_types[type];
   info.created = true;
@@ -2063,7 +1909,7 @@ THIR *THIRGen::visit_run(ASTRun *ast) {
   compile_command.request_compile_time_code_execution(ast->source_range);
 
   auto thir = visit_node(ast->node_to_run);
-  auto result = interpret(thir, ctx);
+  auto result = interpret(thir);
   thir = result->to_thir();
   // Fix this.
   thir->is_statement = true;
@@ -2272,7 +2118,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         env_initialize_path.push_segment("Env");
         env_initialize_path.push_segment("initialize");
         auto symbol = get_symbol(&env_initialize_path);
-        env_initialize = symbol->function.declaration;
+        env_initialize = (ASTFunctionDeclaration *)symbol->ast.get();  // !REFACTOR: this is sloppy
 
         THIR_ALLOC_NO_SRC_RANGE(THIRCall, initialize);
         initialize->callee = visit_node(env_initialize);
@@ -2332,10 +2178,9 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
           all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
 
           auto all_tests_list = get_symbol(&all_tests_list_path);
-          all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
+          all_tests_list_ast = (ASTVariable *)all_tests_list->ast.get();
 
-          push_function =
-              all_tests_list_ast->type->resolved_type->info->scope->local_find("push")->function.declaration;
+          push_function = all_tests_list_ast->type->resolved_type->info->find_method("push")->declaration;
         }
 
         const auto list_ptr = take_address_of(get_thir(all_tests_list_ast), all_tests_list_ast);
@@ -2349,7 +2194,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
 
           THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_init);
           auto fn_ptr = take_address_of(function, all_tests_list_ast);
-          auto function_name = function->name.get_str();
+          auto function_name = function->name.str();
 
           // Replace all occurrences of '$' with "::", so the tests match what the user typed.
           size_t pos = 0;
@@ -2370,8 +2215,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
           run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
 
           auto _run_all_tests_function = get_symbol(&run_all_tests);
-
-          ASTFunctionDeclaration *ast_func = _run_all_tests_function->function.declaration;
+          ASTFunctionDeclaration *ast_func = (ASTFunctionDeclaration *)_run_all_tests_function->ast.get();
 
           _run_all_tests_call->callee = visit_node(ast_func);
           _run_all_tests_call->arguments = {};
@@ -2435,7 +2279,7 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
       p.push_segment("c");
       p.push_segment("memcpy");
       auto symbol = get_symbol(&p);
-      auto memcpy_fn = visit_node(symbol->function.declaration);
+      auto memcpy_fn = visit_node(symbol->ast.get());
       memcpy_call->callee = memcpy_fn;
 
       THIR_ALLOC_NO_SRC_RANGE(THIRVariable, temp);
@@ -2484,7 +2328,7 @@ std::vector<THIR *> THIRGen::collect_defers_up_to(DeferBoundary boundary) {
   return out;
 }
 
-THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
+THIRGen::THIRGen(bool for_emitter) {
   if (!for_emitter) {
     return;
   }
@@ -2499,15 +2343,25 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
     const ASTDeclaration *field_instance = find_generic_instance(list_decl->generic_instantiations, {field_ty});
 
     if (!list_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<*Type> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find List!<*Type> for reflection. if you're compiling with nostdlib, "
+          "make sure you satisfy the compiler dependencies you use.",
+          {});
     }
     if (!method_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Method> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find List!<Method> for reflection. if you're compiling with nostdlib, "
+          "make sure you satisfy the compiler dependencies you use.",
+          {});
     }
     if (!field_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Field> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find List!<Field> for reflection. if you're compiling with nostdlib, "
+          "make sure you satisfy the compiler dependencies you use.",
+          {});
     }
 
+    type_ptr_type = type_ptr_ty;
     type_ptr_list = list_instance->resolved_type;
     method_list = method_instance->resolved_type;
     field_list = field_instance->resolved_type;

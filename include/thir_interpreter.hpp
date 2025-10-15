@@ -9,7 +9,7 @@ struct Context;
 struct ASTExpr;
 
 struct ASTNode;
-Value *interpret(THIR *node, Context &ctx);
+Value *interpret(THIR *node);
 Value *interpret_from_ast(ASTNode *node);
 
 struct Interpreter {

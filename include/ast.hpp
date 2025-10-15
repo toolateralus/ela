@@ -93,6 +93,8 @@ struct ControlFlow {
 
 struct ASTBlock;
 
+struct THIR;
+
 struct ASTNode {
   // if this node declares a symbol, a stable pointer to it will be placed here.
   // this will allow us cross reference symbol metadata, THIR, type metadata, without lookups.
@@ -125,6 +127,9 @@ struct ASTNode {
   SourceRange source_range{};
   // CLEANUP: eventually this shouldn't exist, we will go directly from AST -> THIR
   Type *resolved_type = Type::INVALID_TYPE;
+
+  THIR* thir; // cached resolved THIR for this node.
+
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
@@ -439,6 +444,11 @@ struct ASTPath : ASTExpr {
   */
   std::vector<Segment> segments{};
 
+  // what this path intends to point to, will be resolved by the typer,
+  // so this is the cached result of this node.
+  // that includes generic instantiations etc.
+  ASTNode *resolved_ast;
+
   ASTNodeType get_node_type() const override { return AST_NODE_PATH; }
 
   void accept(VisitorBase *visitor) override;
@@ -533,6 +543,7 @@ struct ASTVariable : ASTStatement {
   bool is_extern = false;
   bool is_static = false;
   bool is_bitfield = false;
+  bool is_constant = false;
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
@@ -623,6 +634,7 @@ struct Parameter {
   struct {
     ASTType *type;
   } nameless;
+  Nullable<ASTExpr> default_value;
 };
 
 struct ParameterList {
@@ -739,7 +751,8 @@ struct ASTDotExpr : ASTExpr {
 struct ASTMethodCall : ASTExpr {
   ASTDotExpr *callee;
 
-  ASTExpr *resolved_callee;
+  ASTNode
+      *resolved_callee;  // the function that this method is calling. could be a variable, or a function declaration.
 
   ASTArguments *arguments;
 
