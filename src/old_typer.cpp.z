@@ -591,15 +591,15 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
   info->scope = node->scope;
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
-      case ASTChoiceVariant::NORMAL: {
+      case ASTChoiceVariant::MARKER_VARIANT: {
         variants.emplace_back(alias_tuple{variant.name, void_type(), TYPE_SCALAR, nullptr});
       } break;
-      case ASTChoiceVariant::TUPLE: {
+      case ASTChoiceVariant::TUPLE_VARIANT: {
         variant.tuple->accept(this);
         auto type = variant.tuple->resolved_type;
         variants.emplace_back(alias_tuple{variant.name, type, TYPE_TUPLE, variant.tuple});
       } break;
-      case ASTChoiceVariant::STRUCT: {
+      case ASTChoiceVariant::STRUCT_VARIANT: {
         ctx.enter_scope_or_create_and_enter_new_child_scope();  // create new scope.
         for (const auto &field : variant.struct_declarations) {
           field->accept(this);
@@ -1100,18 +1100,18 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   size_t param_index = self_nullable.is_not_null() ? 1 : 0;
 
   {  // Check the other parameters, besides self.
-    for (size_t arg_index = 0; arg_index < node->arguments.size() || param_index < params_ct;
+    for (size_t arg_index = 0; arg_index < node->values.size() || param_index < params_ct;
          ++arg_index, ++param_index) {
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
 
-        if (arg_index < node->arguments.size()) {
+        if (arg_index < node->values.size()) {
           // Argument provided, type-check it
           expected_type = param->resolved_type;
 
-          ASTExpr *arg = node->arguments[arg_index];
+          ASTExpr *arg = node->values[arg_index];
           if (arg->get_node_type() == AST_NODE_UNPACK) {
-            node->arguments.erase(node->arguments.begin() + arg_index);
+            node->values.erase(node->values.begin() + arg_index);
             arg_index--;
             param_index--;
             arg->accept(this);
@@ -1179,9 +1179,9 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           throw_error(ss.str(), node->source_range);
         }
 
-        ASTExpr *arg = node->arguments[arg_index];
+        ASTExpr *arg = node->values[arg_index];
         if (arg->get_node_type() == AST_NODE_UNPACK) {
-          node->arguments.erase(node->arguments.begin() + arg_index);
+          node->values.erase(node->values.begin() + arg_index);
           arg_index--;
           param_index--;
           arg->accept(this);
@@ -1189,7 +1189,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         }
 
         expected_type = Type::INVALID_TYPE;
-        node->arguments[arg_index]->accept(this);
+        node->values[arg_index]->accept(this);
       }
     }
   }
@@ -1230,14 +1230,14 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   // multiple arguments at visit time. We therefore must not cache the initial
   // argument count.
   size_t i = 0;
-  while (i < node->arguments.size()) {
-    auto arg = node->arguments[i];
+  while (i < node->values.size()) {
+    auto arg = node->values[i];
 
     // Handle unpack nodes by erasing the placeholder and visiting it which will
     // push `ASTUnpackElement` nodes into `node->arguments` at the current
     // insertion point via `current_expression_list` (see `visit(ASTUnpackExpr)`).
     if (arg->get_node_type() == AST_NODE_UNPACK) {
-      node->arguments.erase(node->arguments.begin() + i);
+      node->values.erase(node->values.begin() + i);
       arg->accept(this);
       // Do not advance `i` because new elements were inserted at position `i`.
       continue;
@@ -1248,7 +1248,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
       if (!info->is_varargs) {
         std::stringstream ss;
         ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
-           << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+           << ", Found: " << node->values.size() << "... function type: " << info->to_string();
         throw_error(ss.str(), node->source_range);
       }
 
@@ -1269,10 +1269,10 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   }
 
   // After expanding unpack expressions, ensure we have at least the required parameters.
-  if (node->arguments.size() < info->params_len) {
+  if (node->values.size() < info->params_len) {
     std::stringstream ss;
     ss << "Function call has incorrect number of arguments. Expected: " << info->params_len
-       << ", Found: " << node->arguments.size() << "... function type: " << info->to_string();
+       << ", Found: " << node->values.size() << "... function type: " << info->to_string();
     throw_error(ss.str(), node->source_range);
   }
 }
@@ -1286,7 +1286,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
                                                              ASTArguments *arguments, SourceRange source_range) {
   if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
-    if (arguments->arguments.empty() && func->generic_parameters.size() == 1) {
+    if (arguments->values.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL && type_is_valid(expected_type)) {
         auto return_ty_path = func->return_type->normal.path;
         /*
@@ -2083,7 +2083,7 @@ void Typer::visit(ASTCall *node) {
   // the generic args through inference.
 
   auto old_expression_list = current_expression_list;
-  current_expression_list = &node->arguments->arguments;
+  current_expression_list = &node->arguments->values;
   Defer _defer([&] { current_expression_list = old_expression_list; });
 
   if (node->callee->get_node_type() == AST_NODE_PATH) {
@@ -2144,7 +2144,7 @@ void Typer::visit(ASTCall *node) {
                   node->source_range);
     }
     ASTTuple tuple;
-    tuple.values = node->arguments->arguments;
+    tuple.values = node->arguments->values;
     ENTER_EXPECTED_TYPE(symbol->type);
     tuple.accept(this);
     node->resolved_type = symbol->type.choice.get()->resolved_type;
@@ -2181,14 +2181,14 @@ void Typer::visit(ASTArguments *node) {
   if (type) {
     info = dynamic_cast<FunctionTypeInfo *>(type->info);
   }
-  for (size_t i = 0; i < node->arguments.size(); ++i) {
-    auto arg = node->arguments[i];
+  for (size_t i = 0; i < node->values.size(); ++i) {
+    auto arg = node->values[i];
 
     /*
       TODO: let's add a more graceful way to do this
     */
     if (arg->get_node_type() == AST_NODE_UNPACK) {
-      node->arguments.erase(node->arguments.begin() + i);
+      node->values.erase(node->values.begin() + i);
       i--;
       arg->accept(this);
       continue;
@@ -2229,7 +2229,7 @@ void Typer::visit(ASTExprStatement *node) {
 
 void Typer::visit(ASTType_Of *node) {
   static auto type_ptr = ctx.scope->find_type("Type", {{TYPE_EXT_POINTER_CONST}});
-  node->target->accept(this);
+  node->target_type->accept(this);
   node->resolved_type = type_ptr;
 }
 
@@ -3631,7 +3631,7 @@ void Typer::visit(ASTMethodCall *node) {
   auto func_sym = ctx.get_symbol(node->callee).get();
 
   auto old_expression_list = current_expression_list;
-  current_expression_list = &node->arguments->arguments;
+  current_expression_list = &node->arguments->values;
   Defer _defer([&] { current_expression_list = old_expression_list; });
 
   if (func_sym && func_sym->is_function) {
@@ -3668,7 +3668,7 @@ void Typer::visit(ASTMethodCall *node) {
     auto obj_type = object->resolved_type;
 
     if (obj_type->is_kind(TYPE_DYN) && !node->inserted_dyn_arg) {
-      auto &args = node->arguments->arguments;
+      auto &args = node->arguments->values;
       auto dot = ast_alloc<ASTDotExpr>();
       dot->base = object;
       dot->member = ASTPath::Segment::Identifier(DYN_INSTANCE_KEY);

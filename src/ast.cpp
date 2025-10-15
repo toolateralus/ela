@@ -66,7 +66,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
     executed = !parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
-    auto value = interpret_from_ast(condition); // ! refactor, this is untyped and will break
+    auto value = interpret_from_ast(condition);  // ! refactor, this is untyped and will break
     executed = value->is_truthy();
   } else {
     throw_error(
@@ -285,7 +285,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         ASTEnumDeclaration *enum_decl = parser->parse_enum_declaration();
         int index = 0;
-        for (auto &key_value : enum_decl->key_values) {
+        for (auto &key_value : enum_decl->enumerations) {
           NODE_ALLOC(ASTLiteral, literal, range, _, parser);
           literal->tag = ASTLiteral::Integer;
           literal->value = std::to_string(1 << index);
@@ -741,7 +741,7 @@ ASTArguments *Parser::parse_arguments() {
   NODE_ALLOC(ASTArguments, args, range, _, this)
   expect(TType::LParen);
   while (peek().type != TType::RParen) {
-    args->arguments.push_back(parse_expr());
+    args->values.push_back(parse_expr());
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
     }
@@ -1035,7 +1035,20 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::Range) {
       NODE_ALLOC(ASTRange, node, range, _, this)
       eat();
-      node->right = parse_expr();
+      if (peek().type == TType::Assign) {
+        eat();
+        node->inclusive = true;
+      }
+
+      auto peeked = peek();
+
+      // TODO: im sure theres plenty of cases ive missed here, just trying to guess whether what's ahead is
+      // an expression or not.
+      if (peeked.type == TType::Integer || peeked.type == TType::Identifier || peeked.type == TType::Mul ||
+          peeked.type == TType::LParen) {
+        node->right = parse_expr();
+      }
+
       node->left = left;
       return node;
     } else if (peek().type == TType::As) {
@@ -1098,6 +1111,17 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    // ..100 or ..=100 etc.
+    case TType::Range: {
+      NODE_ALLOC(ASTRange, range, src_range, defer, this);
+      eat();
+      if (peek().type == TType::Assign) {
+        eat();
+        range->inclusive = true;
+      }
+      range->right = parse_expr();
+      return range;
+    }
     case TType::Varargs: {
       NODE_ALLOC(ASTUnpack, node, range, defer, this)
       eat();
@@ -1125,7 +1149,7 @@ ASTExpr *Parser::parse_primary() {
       expect(TType::Type_Of);
       NODE_ALLOC(ASTType_Of, type_of, range, _, this)
       expect(TType::LParen);
-      type_of->target = parse_type();
+      type_of->target_type = parse_type();
       expect(TType::RParen);
       return type_of;
     }
@@ -1754,7 +1778,7 @@ ASTStatement *Parser::parse_using_stmt() {
     NODE_ALLOC(ASTLiteral, literal, range4, defer4, this);
     literal->tag = ASTLiteral::Bool;
     literal->value = "true";
-    arguments->arguments.push_back(literal);
+    arguments->values.push_back(literal);
   }
   method_call->arguments = arguments;
 
@@ -2562,7 +2586,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
-      auto evaluated_value = interpret_from_ast(value); // ! refactor, this is untyped and will break
+      auto evaluated_value = interpret_from_ast(value);  // ! refactor, this is untyped and will break
       if (evaluated_value->value_type != ValueType::INTEGER) {
         throw_error("Enums can only have integers", value->source_range);
       }
@@ -2580,13 +2604,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     }
 
     ctx.scope->insert(iden, s32_type(), CONST, nullptr, {}, false);
-    node->key_values.push_back({iden, value});
+    node->enumerations.push_back({iden, value});
   }
 
   end_node(node, range);
   std::vector<InternedString> keys;
   std::set<InternedString> keys_set;
-  for (const auto &[key, value] : node->key_values) {
+  for (const auto &[key, value] : node->enumerations) {
     if (keys_set.find(key) != keys_set.end()) {
       throw_error(std::format("redefinition of enum variant: {}", key), node->source_range);
     }
@@ -2594,7 +2618,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
     keys_set.insert(key);
   }
 
-  if (node->key_values.empty()) {
+  if (node->enumerations.empty()) {
     end_node(nullptr, range);
     throw_error("Empty `enum` types are not allowed", range);
   }
@@ -2932,19 +2956,19 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     ASTChoiceVariant variant;
     variant.name = expect(TType::Identifier).value;
     if (peek().type == TType::Comma || peek().type == TType::RCurly) {
-      variant.kind = ASTChoiceVariant::NORMAL;
+      variant.kind = ASTChoiceVariant::MARKER_VARIANT;
     } else if (peek().type == TType::LCurly) {
-      variant.kind = ASTChoiceVariant::STRUCT;
+      variant.kind = ASTChoiceVariant::STRUCT_VARIANT;
       eat();
       while (peek().type != TType::RCurly) {
-        variant.struct_declarations.push_back(parse_variable());
+        variant.struct_members.push_back(parse_variable());
         if (peek().type == TType::Comma) {
           eat();
         }
       }
       expect(TType::RCurly);
     } else if (peek().type == TType::LParen) {
-      variant.kind = ASTChoiceVariant::TUPLE;
+      variant.kind = ASTChoiceVariant::TUPLE_VARIANT;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
     } else {

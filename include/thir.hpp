@@ -363,12 +363,12 @@ struct THIRGen {
   void set_reflection_types(Typer &typer);
 
   inline Type *iterator_trait() const {
-    static Type *iter_id = ctx.scope->find("Iterator")->type;
+    static Type *iter_id = g_Iterator_trait_type;
     return iter_id;
   }
 
   inline Type *iterable_trait() const {
-    static Type *iterable_id = ctx.scope->find("Iterable")->type;
+    static Type *iterable_id = g_Iterable_trait_type;
     return iterable_id;
   }
 

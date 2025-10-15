@@ -1,27 +1,91 @@
+#include "arena.hpp"
 #include "ast.hpp"
 
-struct Typisting {
-  std::vector<ASTStructDeclaration *> struct_declarations;
-  std::vector<ASTTraitDeclaration *> trait_declarations;
-  std::vector<ASTChoiceDeclaration *> choice_declarations;
-  std::vector<ASTEnumDeclaration *> enum_declarations;
-  std::vector<ASTFunctionDeclaration *> function_declarations;
-  std::vector<ASTAlias *> alias_declarations;
-  std::vector<ASTImpl *> impl_declarations;
-  void collect_declarations(ASTNode *node);
-  void run(ASTProgram *ast);
-  void process_type_headers();
-  void process_function_headers();
-  void type_enum(ASTEnumDeclaration *node);
+enum Phase : uint8_t {
+  PH_UNSOLVED,   // unprocessed.
+  PH_SHELL,      // symbol defined, no types assigned
+  PH_SIGNATURE,  // types assigned for function headers & struct definitions
+  PH_BODY,       // process struct bodies and function blocks etc, all executable regions.
+  PH_SOLVED,     // fully typed, no dependencies unsolved.
+};
 
-  enum TaskKind {
-    TASK_FUNC_SIGNATURE,
-    TASK_FUNC_BODY,
-    TASK_TYPE_SHELL,
-    TASK_TYPE_BODY,
-    TASK_IMPL_SHELL,
-    TASK_IMPL_BODY,
-  };
+struct Task;
+struct Dep {
+  Task *provider;         // what caused this dependency
+  Phase need = PH_SHELL;  // required phase of producer for this dependency to be satisfied
+  bool satisfied;
+};
+
+struct Task {
+  Phase phase = PH_UNSOLVED;       // progress made so far.
+  ASTNode *node;                   // a node that yields a declaration, variable, type, impl, function
+  std::vector<Dep> depends_on;     // what we depend on
+  std::vector<Task *> dependents;  // everyone that depends on us
+  size_t indegree;                 // number of unsolved dependencies.
+};
+
+struct Typisting {
+  std::vector<ASTImpl *> impls;
+  std::vector<ASTWhereStatement *> where_statements;
+  jstl::Arena task_arena{MB(10)};
+
+  void collect_symbols(ASTNode *node);
+  void try_generate_tasks_for_node(ASTNode *node, Task *consumer);
+  void run(ASTProgram *ast);
+  std::unordered_map<ASTNode *, Task *> tasks;
+
+  inline Task *create_task_bind_to_node_create_edge_to_consumer(ASTNode *node, Task *consumer = nullptr,
+                           Phase required_phase_to_progress = Phase::PH_SHELL) {
+    Task *task = new (task_arena.allocate(sizeof(Task))) Task();
+    task->node = node;
+    if (consumer) {
+      try_add_edge(consumer, task, required_phase_to_progress);
+    }
+    tasks[node] = task;
+    return task;
+  }
+
+  inline void try_add_edge(Task *consumer, Task *provider, Phase required_phase_to_progress) {
+    if (!consumer || !provider) {
+      return;
+    }
+    if (consumer == provider) {
+      return;
+    }
+
+    for (const Dep &d : consumer->depends_on) {
+      if (d.provider == provider && d.need == required_phase_to_progress) {
+        return;
+      }
+    }
+
+    consumer->depends_on.push_back(Dep{provider, required_phase_to_progress, false});
+    provider->dependents.push_back(consumer);
+
+    if (provider->phase < required_phase_to_progress) {
+      consumer->indegree++;
+    }
+  }
+
+  inline void task_advance_phase(Task *provider, Phase phase_reached, std::deque<Task *> &ready) {
+    for (Task *consumer : provider->dependents) {
+      bool became_ready = false;
+      for (Dep &dep : consumer->depends_on) {
+        if (!dep.satisfied && dep.provider == provider && dep.need <= phase_reached) {
+          dep.satisfied = true;
+          if (consumer->indegree > 0) {
+            consumer->indegree--;
+          }
+          if (consumer->indegree == 0) {
+            became_ready = true;
+          }
+        }
+      }
+      if (became_ready) {
+        ready.push_back(consumer);
+      }
+    }
+  }
 
   inline void visit_node(ASTNode *node) {
     switch (node->get_node_type()) {
@@ -148,7 +212,7 @@ struct Typisting {
       case AST_NODE_SWITCH:
         visit_switch((ASTSwitch *)node);
         break;
-      case AST_NODE_TUPLE_DECONSTRUCTION:
+      case AST_NODE_DESTRUCTURE:
         visit_destructure((ASTDestructure *)node);
         break;
       case AST_NODE_WHERE:

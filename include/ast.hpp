@@ -70,7 +70,7 @@ enum ASTNodeType {
   AST_NODE_UNPACK_ELEMENT,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
-  AST_NODE_TUPLE_DECONSTRUCTION,
+  AST_NODE_DESTRUCTURE,
   AST_NODE_WHERE,
   AST_NODE_PATTERN_MATCH,
   AST_NODE_STATEMENT_LIST,  // Used just to return a bunch of statments from a single directive.s
@@ -594,7 +594,7 @@ struct ASTDestructure : ASTStatement {
   ASTExpr *right;
   TType op;
   void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_TUPLE_DECONSTRUCTION; }
+  ASTNodeType get_node_type() const override { return AST_NODE_DESTRUCTURE; }
 };
 
 struct ASTTuple : ASTExpr {
@@ -700,7 +700,7 @@ struct ASTFunctionDeclaration : ASTDeclaration {
 };
 
 struct ASTArguments : ASTNode {
-  std::vector<ASTExpr *> arguments;
+  std::vector<ASTExpr *> values;
   std::vector<Type *> resolved_argument_types;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
@@ -738,6 +738,9 @@ struct ASTDotExpr : ASTExpr {
 
 struct ASTMethodCall : ASTExpr {
   ASTDotExpr *callee;
+
+  ASTExpr *resolved_callee;
+
   ASTArguments *arguments;
 
   struct {
@@ -766,8 +769,20 @@ struct ASTContinue : ASTStatement {
 };
 
 struct ASTRange : ASTExpr {
-  ASTExpr *left;
-  ASTExpr *right;
+  /*
+    these are nullable because we could have
+    1..100
+    1..
+    ..100
+    1..=100
+
+  im not sure if these inclusive ones make sense.
+    1..=
+    ..=100
+  */
+  Nullable<ASTExpr> left;
+  Nullable<ASTExpr> right;
+  bool inclusive;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
@@ -905,7 +920,7 @@ struct ASTDyn_Of : ASTExpr {
 };
 
 struct ASTType_Of : ASTExpr {
-  ASTType *target;
+  ASTType *target_type;
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
   void accept(VisitorBase *visitor) override;
 };
@@ -915,19 +930,19 @@ struct ASTEnumDeclaration : ASTStatement {
   Type *underlying_type;
   ASTType *underlying_type_ast;
   InternedString name;
-  std::vector<std::pair<InternedString, ASTExpr *>> key_values;
+  std::vector<std::pair<InternedString, ASTExpr *>> enumerations;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
 struct ASTChoiceVariant {
   enum Kind {
-    NORMAL,
-    TUPLE,
-    STRUCT,
+    MARKER_VARIANT,
+    TUPLE_VARIANT,
+    STRUCT_VARIANT,
   } kind;
   ASTType *tuple;
-  std::vector<ASTVariable *> struct_declarations;
+  std::vector<ASTVariable *> struct_members;
   InternedString name;
 };
 
@@ -1152,7 +1167,7 @@ struct ASTPatternMatch : ASTExpr {
     target_type_path = other.target_type_path;
     pattern_tag = other.pattern_tag;
     switch (pattern_tag) {
-      case NONE:
+      case MARKER:
         break;
       case STRUCT:
         struct_pattern = other.struct_pattern;
@@ -1185,7 +1200,7 @@ struct ASTPatternMatch : ASTExpr {
 
         }
     */
-    NONE,
+    MARKER,
     STRUCT,
     TUPLE,
   } pattern_tag;

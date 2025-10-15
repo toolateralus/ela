@@ -135,9 +135,9 @@ ASTCall *ASTCopier::copy_call(ASTCall *node) {
 
 ASTArguments *ASTCopier::copy_arguments(ASTArguments *node) {
   auto new_node = make_copy(node);
-  new_node->arguments.clear();
-  for (auto arg : node->arguments) {
-    new_node->arguments.push_back(static_cast<ASTExpr *>(copy_node(arg)));
+  new_node->values.clear();
+  for (auto arg : node->values) {
+    new_node->values.push_back(static_cast<ASTExpr *>(copy_node(arg)));
   }
   return new_node;
 }
@@ -231,9 +231,9 @@ ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
 
 ASTEnumDeclaration *ASTCopier::copy_enum_declaration(ASTEnumDeclaration *node) {
   auto new_node = make_copy(node);
-  new_node->key_values.clear();
-  for (auto &kv : node->key_values) {
-    new_node->key_values.push_back({kv.first, (ASTExpr *)copy_node(kv.second)});
+  new_node->enumerations.clear();
+  for (auto &kv : node->enumerations) {
+    new_node->enumerations.push_back({kv.first, (ASTExpr *)copy_node(kv.second)});
   }
   return new_node;
 }
@@ -285,8 +285,12 @@ ASTTraitDeclaration *ASTCopier::copy_trait_declaration(ASTTraitDeclaration *node
 
 ASTRange *ASTCopier::copy_range(ASTRange *node) {
   auto new_node = make_copy(node);
-  new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
-  new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
+  if (node->left) {
+    new_node->left = static_cast<ASTExpr *>(copy_node(node->left.get()));
+  }
+  if (node->right) {
+    new_node->right = static_cast<ASTExpr *>(copy_node(node->right.get()));
+  }
   return new_node;
 }
 
@@ -487,7 +491,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_range(static_cast<ASTRange *>(node));
     case AST_NODE_SWITCH:
       return copy_switch(static_cast<ASTSwitch *>(node));
-    case AST_NODE_TUPLE_DECONSTRUCTION:
+    case AST_NODE_DESTRUCTURE:
       return copy_destructure(static_cast<ASTDestructure *>(node));
     case AST_NODE_TRAIT_DECLARATION:
       return copy_trait_declaration(static_cast<ASTTraitDeclaration *>(node));
@@ -525,7 +529,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
 
 ASTType_Of *ASTCopier::copy_type_of(ASTType_Of *node) {
   auto new_node = make_copy(node);
-  new_node->target = (ASTType *)copy_type(node->target);
+  new_node->target_type = (ASTType *)copy_type(node->target_type);
   return new_node;
 }
 
@@ -574,15 +578,15 @@ ASTChoiceDeclaration *ASTCopier::copy_choice_declaration(ASTChoiceDeclaration *n
     new_variant.kind = variant.kind;
     new_variant.name = variant.name;
     switch (variant.kind) {
-      case ASTChoiceVariant::NORMAL:
+      case ASTChoiceVariant::MARKER_VARIANT:
         break;
-      case ASTChoiceVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE_VARIANT:
         new_variant.tuple = static_cast<ASTType *>(copy_node(variant.tuple));
         break;
-      case ASTChoiceVariant::STRUCT:
-        new_variant.struct_declarations.clear();
-        for (auto field : variant.struct_declarations) {
-          new_variant.struct_declarations.push_back(static_cast<ASTVariable *>(copy_node(field)));
+      case ASTChoiceVariant::STRUCT_VARIANT:
+        new_variant.struct_members.clear();
+        for (auto field : variant.struct_members) {
+          new_variant.struct_members.push_back(static_cast<ASTVariable *>(copy_node(field)));
         }
         break;
     }

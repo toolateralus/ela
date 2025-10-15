@@ -143,7 +143,7 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
   if (callee->get_node_type() == THIRNodeType::Function) {
     const auto function = (const THIRFunction *)callee;
     const auto &params = function->parameters;
-    const auto &ast_args = in_args->arguments;
+    const auto &ast_args = in_args->values;
 
     if (self.is_not_null()) {
       out_args.push_back(self.get());
@@ -172,7 +172,7 @@ void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTAr
     }
   } else {
     // Other calls, via function pointers, variables, non-symbol calls &c &c.
-    for (const auto &argument : in_args->arguments) {
+    for (const auto &argument : in_args->values) {
       out_args.push_back(visit_node(argument));
     }
   }
@@ -190,7 +190,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     const auto thir = get_choice_type_instantiation_boilerplate(path, this);
     ASTTuple tuple;
     tuple.resolved_type = info->get_variant_type(variant_name);
-    tuple.values = ast->arguments->arguments;
+    tuple.values = ast->arguments->values;
     thir->key_values.push_back({variant_name, visit_node(&tuple)});
     return thir;
   }
@@ -230,36 +230,25 @@ THIR *THIRGen::try_deref_or_take_ptr_to_if_needed(ASTExpr *const base, THIR *tar
 
 THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   THIR_ALLOC(THIRCall, thir, ast);
-  const auto base = ast->callee->base;
-  const auto symbol = get_symbol(ast->callee);
+  ASTExpr *base = ast->callee->base;
+  const ASTExpr *callee = ast->resolved_callee;
 
   thir->is_dyn_call = ast->inserted_dyn_arg;
   thir->dyn_method_name = ast->dyn_method_name;
 
   THIR *self = nullptr;
-  if (symbol->is_variable) {
+  if (callee->get_node_type() == AST_NODE_VARIABLE) {
     thir->callee = visit_node(ast->callee);
   } else {
     // Push the self argument
     self = visit_node(base);
-
-    const auto requires_self_ptr = symbol->function.declaration->requires_self_ptr();
-
+    ASTFunctionDeclaration *fn = (ASTFunctionDeclaration*)callee;
+    const auto requires_self_ptr = fn->requires_self_ptr();
     // auto dereference / address of logic.
     self = try_deref_or_take_ptr_to_if_needed(base, self, requires_self_ptr);
-
-    auto fn_sym = get_symbol(ast->callee);
-    auto fn = fn_sym->function.declaration;
-
     auto old = is_making_call;
     is_making_call = true;
-    if (fn->generic_parameters.size()) {
-      auto generics = ast->callee->member.get_resolved_generics();
-      auto function = find_generic_instance(fn->generic_instantiations, generics);
-      thir->callee = visit_function_declaration((ASTFunctionDeclaration *)function);
-    } else {
-      thir->callee = visit_function_declaration(fn);
-    }
+    thir->callee = visit_function_declaration(fn);
     is_making_call = old;
   }
 
@@ -818,7 +807,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
   return nullptr;
 }
 
-THIR *THIRGen::visit_type_of(ASTType_Of *ast) { return to_reflection_type_struct(ast->target->resolved_type); }
+THIR *THIRGen::visit_type_of(ASTType_Of *ast) { return to_reflection_type_struct(ast->target_type->resolved_type); }
 
 THIR *THIRGen::visit_cast(ASTCast *ast) {
   THIR_ALLOC(THIRCast, thir, ast);
@@ -2116,7 +2105,7 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
       return nullptr;
     }
     // These nodes can return many nodes, so they always return void, and push the nodes manually.
-    case AST_NODE_TUPLE_DECONSTRUCTION: {
+    case AST_NODE_DESTRUCTURE: {
       visit_destructure((ASTDestructure *)ast);
       return nullptr;
     }

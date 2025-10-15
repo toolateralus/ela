@@ -58,7 +58,11 @@ struct SymbolScopePair {
 struct Scope final {
   InternedString name = "";
   bool is_module_scope = false;
+
   Scope *parent = nullptr;
+  // since we got rid of the context, sometimes we need to scan both ways
+  // so we store children now (TODO: verify we 100% need this)
+  std::vector<Scope *> children;
 
   std::set<Reference> references;
   std::unordered_map<Key, Symbol *, Key::Hash> symbols = {};
@@ -269,6 +273,9 @@ struct Scope final {
 
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope(parent);
+  if (parent) {
+    parent->children.push_back(scope);
+  }
   return scope;
 }
 
