@@ -2265,12 +2265,23 @@ void THIRGen::setup__all_tests() {
       slice_data->values.push_back(test_struct_init);
     }
 
+    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, static_variable);
+    static_variable->is_static = true;
+    static_variable->is_global = false;
+    static_variable->name = get_temporary_variable();
+    static_variable->value = slice_data;
+    static_variable->type = slice_data->type;
+
     THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, ini);
     ini->is_statement = false;
     ini->type = all_tests_slice_thir->type;
     ini->key_values = {
-        {"data", slice_data},
+        {"data", static_variable},
         {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
+
+    
+    auto &statements = global_initializer_function->block->statements;
+    statements.insert(statements.begin(), static_variable);
 
     all_tests_slice_thir->global_initializer_assignment->right = ini;
   }
