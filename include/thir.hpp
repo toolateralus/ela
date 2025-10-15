@@ -51,6 +51,9 @@ struct THIR {
   // way to do this it is a bit messy, but it's far preferable to THIRStmt/THIRExpr && ThirExprStatement.
   bool is_statement = false;
 
+  bool deprecated;
+  Attribute deprecated_attr;
+
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
@@ -299,7 +302,8 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  void format_and_print_deprecated_warning(ASTNode *,const Attribute &attr);
+  void check_for_deprecation(THIR *thir);
+  void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
   THIRGen(Context &ctx, bool for_emitter = true);
 
   std::vector<THIR *> *current_expression_list;

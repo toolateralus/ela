@@ -12,6 +12,19 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
+static void check_deprecated(THIR *reciever, const std::vector<Attribute> &attrs) {
+  for (const auto &attr : attrs) {
+    switch (attr.tag) {
+      case ATTRIBUTE_DEPRECATED:
+        reciever->deprecated_attr = attr;
+        reciever->deprecated = true;
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.
 #define ENTER_STMT_VEC($stmt_vector)                                                       \
@@ -209,6 +222,8 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
   if (thir->callee == THIRNoop::shared()) {
     return THIRNoop::shared();
   }
+
+  check_for_deprecation(thir->callee);
 
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -934,6 +949,10 @@ static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDec
 static inline void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
   for (const auto &attr : attrs) {
     switch (attr.tag) {
+      case ATTRIBUTE_DEPRECATED:
+        reciever->deprecated_attr = attr;
+        reciever->deprecated = true;
+        break;
       case ATTRIBUTE_NO_MANGLE:
         reciever->is_no_mangle = true;
         break;
@@ -1118,7 +1137,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   }
 
   THIR_ALLOC(THIRVariable, thir, ast);
-
+  check_deprecated(thir, ast->attributes);
   thir->is_global = !ast->is_local;
   thir->is_static = ast->is_static;
   thir->is_constexpr = ast->is_constexpr;
@@ -1175,6 +1194,7 @@ void THIRGen::extract_thir_values_for_type_members(Type *type) {
 }
 
 THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
+  
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
@@ -1189,6 +1209,7 @@ THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRType, thir, ast);
+  check_deprecated(thir, ast->attributes);
 
   bind(ast, thir);
 
@@ -1211,7 +1232,7 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRType, thir, ast);
-
+  check_deprecated(thir, ast->attributes);
   bind(ast, thir);
 
   extract_thir_values_for_type_members(thir->type);
@@ -1224,7 +1245,7 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   }
 
   THIR_ALLOC(THIRType, thir, ast);
-
+  check_deprecated(thir, ast->attributes);
   bind(ast, thir);
 
   extract_thir_values_for_type_members(thir->type);
@@ -2069,64 +2090,44 @@ THIR *THIRGen::visit_run(ASTRun *ast) {
   }
 }
 
-void THIRGen::format_and_print_deprecated_warning(ASTNode *node, const Attribute &attr) {
+void THIRGen::format_and_print_deprecated_warning(THIR *node, const Attribute &attr) {
+  if (attr.tag != ATTRIBUTE_DEPRECATED) {
+    return;
+  }
   Typer typer{ctx};
   // we have to do this since this may refer to out of order code, and that's why we process this so late
   attr.arguments[1]->accept(&typer);
   auto symbol = ctx.get_symbol(attr.arguments[1]).get();
 
   SourceRange range = attr.arguments[1]->source_range;
-  if (symbol->is_variable) {
-    range = symbol->variable.declaration.get()->source_range;
-  } else if (symbol->is_function) {
-    range = symbol->function.declaration->source_range;
-  } else if (symbol->is_module) {
-    range = symbol->module.declaration->source_range;
-  } else if (symbol->is_type) {
-    range = symbol->type.declaration.get()->source_range;
+
+  if (symbol) {
+    if (symbol->is_variable && symbol->variable.declaration.get()) {
+      range = symbol->variable.declaration.get()->source_range;
+    } else if (symbol->is_function && symbol->function.declaration) {
+      range = symbol->function.declaration->source_range;
+    } else if (symbol->is_module && symbol->module.declaration) {
+      range = symbol->module.declaration->source_range;
+    } else if (symbol->is_type && symbol->type.declaration.get()) {
+      range = symbol->type.declaration.get()->source_range;
+    }
   }
 
   switch (node->get_node_type()) {
-    case AST_NODE_VARIABLE: {
-      auto var = static_cast<ASTVariable *>(node);
-      range = var->source_range;
+    case THIRNodeType::Variable: {
+      auto var = static_cast<THIRVariable *>(node);
       fprintf(stderr, "Deprecated variable: %s\n", var->name.get_str().c_str());
       break;
     }
-    case AST_NODE_FUNCTION_DECLARATION: {
-      auto func = static_cast<ASTFunctionDeclaration *>(node);
-      range = func->source_range;
+    case THIRNodeType::Function: {
+      auto func = static_cast<THIRFunction *>(node);
       fprintf(stderr, "Deprecated function: %s\n", func->name.get_str().c_str());
       break;
     }
-    case AST_NODE_STRUCT_DECLARATION: {
-      auto s = static_cast<ASTStructDeclaration *>(node);
-      range = s->source_range;
-      fprintf(stderr, "Deprecated struct: %s\n", s->name.get_str().c_str());
-      break;
-    }
-    case AST_NODE_ENUM_DECLARATION: {
-      auto e = static_cast<ASTEnumDeclaration *>(node);
-      range = e->source_range;
-      fprintf(stderr, "Deprecated enum: %s\n", e->name.get_str().c_str());
-      break;
-    }
-    case AST_NODE_CHOICE_DECLARATION: {
-      auto c = static_cast<ASTChoiceDeclaration *>(node);
-      range = c->source_range;
-      fprintf(stderr, "Deprecated choice: %s\n", c->name.get_str().c_str());
-      break;
-    }
-    case AST_NODE_ALIAS: {
-      auto a = static_cast<ASTAlias *>(node);
-      range = a->source_range;
-      fprintf(stderr, "Deprecated alias: %s\n", a->name.get_str().c_str());
-      break;
-    }
-    case AST_NODE_TRAIT_DECLARATION: {
-      auto t = static_cast<ASTTraitDeclaration *>(node);
-      range = t->source_range;
-      fprintf(stderr, "Deprecated trait: %s\n", t->name.get_str().c_str());
+    case THIRNodeType::Type: {
+      // Could be struct, enum, choice, etc.
+      auto type = static_cast<THIRType *>(node);
+      fprintf(stderr, "Deprecated type: %s\n", type->type->basename.get_str().c_str());
       break;
     }
     default:
@@ -2142,14 +2143,6 @@ void THIRGen::format_and_print_deprecated_warning(ASTNode *node, const Attribute
 }
 
 THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
-  if (!ast->attributes.empty()) {
-    for (auto attr : ast->attributes) {
-      if (attr.tag == ATTRIBUTE_DEPRECATED) {
-        format_and_print_deprecated_warning(ast, attr);
-      }
-    }
-  }
-
   if (ast->is_expr() && instantiate_conversions) {
     const ASTExpr *expr = (ASTExpr *)ast;
     THIR *result = visit_node(ast, false);
@@ -2618,4 +2611,10 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
   global_ini_call->callee = global_ini;
   global_ini_call->is_statement = true;
   global_ini_call->arguments = {};
+}
+
+void THIRGen::check_for_deprecation(THIR *thir) {
+  if (thir->deprecated) {
+    format_and_print_deprecated_warning(thir, thir->deprecated_attr);
+  }
 }
