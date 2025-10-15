@@ -524,13 +524,14 @@ Type *global_create_enum_type(const InternedString &name, const InternedString &
   return type;
 }
 
-Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
-                         Type *base_type) {
+Type *global_create_type(TypeKind kind, const InternedString &name, const InternedString &mangled, TypeInfo *info,
+                         const TypeExtensions &extensions, Type *base_type) {
   type_table.push_back(new Type(type_table.size(), kind));
   auto type = type_table.back();
   type->base_type = base_type;
   type->set_ext(extensions);
   type->set_base(name);
+  type->full_mangled_name = mangled;
 
   if (!info) {
     // ! What? why is this defaulting to struct type info?
@@ -1380,4 +1381,4 @@ void assert_types_can_cast_or_are_equal(ASTExpr *expr, Type *to, const SourceRan
   }
 }
 
-static inline size_t make_impl_unique_get_id(ASTImpl *impl) { return impl->uid = impl_uid_base; }
+size_t make_impl_unique_get_id(ASTImpl *impl) { return impl->uid = impl_uid_base; }

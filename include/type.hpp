@@ -142,7 +142,7 @@ struct ImplMethod {
 extern size_t impl_uid_base;
 
 struct ASTImpl;
-static inline size_t make_impl_unique_get_id(ASTImpl *impl);
+size_t make_impl_unique_get_id(ASTImpl *impl);
 
 struct Impl {
   Nullable<Type> trait_type;

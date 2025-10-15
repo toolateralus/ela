@@ -14,7 +14,6 @@
 
 extern size_t lambda_unique_id;
 extern jstl::Arena ast_arena;
-struct VisitorBase;
 extern std::unordered_map<InternedString, Scope *> import_scopes;
 extern std::unordered_set<InternedString> include_set;
 
@@ -57,7 +56,7 @@ enum ASTNodeType {
   AST_NODE_METHOD_CALL,
   AST_NODE_ARGUMENTS,
 
-  AST_NODE_DOT_EXPR,
+  AST_NODE_MEMBER_ACCESS,
   AST_NODE_INDEX,
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_SIZE_OF,
@@ -128,10 +127,9 @@ struct ASTNode {
   // CLEANUP: eventually this shouldn't exist, we will go directly from AST -> THIR
   Type *resolved_type = Type::INVALID_TYPE;
 
-  THIR* thir; // cached resolved THIR for this node.
+  THIR *thir;  // cached resolved THIR for this node.
 
   virtual ~ASTNode() = default;
-  virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
   bool is_expr();
 };
@@ -177,7 +175,6 @@ struct ASTStatement : ASTNode {
 
 struct ASTStatementList : ASTStatement {
   std::vector<ASTNode *> statements;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_STATEMENT_LIST; }
 };
 
@@ -198,7 +195,6 @@ struct ASTModule : ASTStatement {
   std::vector<ASTNode *> statements;
   Scope *scope;
   ASTNodeType get_node_type() const override { return AST_NODE_MODULE; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTPath;
@@ -310,7 +306,6 @@ struct ASTImport : ASTStatement {
   };
   Group root_group;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPORT; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTBlock : ASTStatement {
@@ -321,7 +316,6 @@ struct ASTBlock : ASTStatement {
   size_t temp_iden_idx = 0;
   Scope *scope;
   std::vector<ASTNode *> statements;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BLOCK; }
 };
 
@@ -329,7 +323,6 @@ struct ASTProgram : ASTNode {
   size_t end_of_bootstrap_index = -1;
   std::vector<ASTNode *> statements;
   Scope *scope;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
@@ -451,7 +444,6 @@ struct ASTPath : ASTExpr {
 
   ASTNodeType get_node_type() const override { return AST_NODE_PATH; }
 
-  void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
   inline void push_segment(ASTType *expression, std::vector<ASTExpr *> generic_arguments = {}) {
@@ -472,7 +464,7 @@ struct ASTType : ASTExpr {
     FUNCTION,
     SELF,
     STRUCTURAL_DECLARATIVE_ASCRIPTION,  // something like ` x: struct { x: f32, y: f32 } `
-  } kind = NORMAL;
+  } tag = NORMAL;
 
   union {
     struct {
@@ -481,10 +473,13 @@ struct ASTType : ASTExpr {
     } normal;
     struct {
       std::vector<ASTType *> parameter_types;
-      Nullable<ASTType> return_type;
+      ASTType *return_type;
     } function;
     // special info for tuple types.
     std::vector<ASTType *> tuple_types;
+    // I assume this is for structural ascriptions, which has a horrible name,
+    // it's just an anonymous type shape. it's used for special bitcasting though
+    // so it gets a special designation i guess?
     ASTDeclaration *declaration;
   };
 
@@ -493,8 +488,8 @@ struct ASTType : ASTExpr {
   ASTType(const ASTType &other) {
     source_range = other.source_range;
     extensions = other.extensions;
-    kind = other.kind;
-    switch (kind) {
+    tag = other.tag;
+    switch (tag) {
       case NORMAL:
       case SELF:
         normal = decltype(normal)(other.normal);
@@ -518,12 +513,10 @@ struct ASTType : ASTExpr {
 
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void();
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_EXPR_STATEMENT; }
 };
 
@@ -545,7 +538,6 @@ struct ASTVariable : ASTStatement {
   bool is_bitfield = false;
   bool is_constant = false;
 
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
 };
 
@@ -554,7 +546,6 @@ struct ASTBinExpr : ASTExpr {
   ASTExpr *right;
   TType op;
   bool is_operator_overload = false;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
 
@@ -563,7 +554,6 @@ struct ASTUnaryExpr : ASTExpr {
   Mutability mutability = CONST;
   ASTExpr *operand;
   TType op;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
 
@@ -579,7 +569,6 @@ struct ASTLiteral : ASTExpr {
   } tag;
   bool is_c_string = false;
   InternedString value;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
 
@@ -604,13 +593,11 @@ struct ASTDestructure : ASTStatement {
   std::vector<DestructureElement> elements;
   ASTExpr *right;
   TType op;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DESTRUCTURE; }
 };
 
 struct ASTTuple : ASTExpr {
   std::vector<ASTExpr *> values;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_TUPLE; }
 };
 
@@ -707,14 +694,12 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   ASTType *return_type;
 
   signed context_push_count = 0;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_FUNCTION_DECLARATION; }
 };
 
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> values;
   std::vector<Type *> resolved_argument_types;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
 };
 
@@ -736,48 +721,39 @@ struct ASTCall : ASTExpr {
     return nullptr;
   }
 
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
 
-struct ASTDotExpr : ASTExpr {
+struct ASTMemberAccess : ASTExpr {
   ASTExpr *base;
   /* Generic arguments are stored in the segment. */
   ASTPath::Segment member;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_DOT_EXPR; }
+  ASTNodeType get_node_type() const override { return AST_NODE_MEMBER_ACCESS; }
 };
 
 struct ASTMethodCall : ASTExpr {
-  ASTDotExpr *callee;
-
-  ASTNode
-      *resolved_callee;  // the function that this method is calling. could be a variable, or a function declaration.
-
+  ASTMemberAccess *callee;
+  // the function that this method is calling. could be a variable, or a function declaration.
+  ASTNode *resolved_callee;
   ASTArguments *arguments;
-
   struct {
     InternedString dyn_method_name;
     bool inserted_dyn_arg = false;
   };
 
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
 };
 
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RETURN; }
 };
 
 struct ASTBreak : ASTStatement {
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BREAK; }
 };
 
 struct ASTContinue : ASTStatement {
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CONTINUE; }
 };
 
@@ -796,7 +772,6 @@ struct ASTRange : ASTExpr {
   Nullable<ASTExpr> left;
   Nullable<ASTExpr> right;
   bool inclusive;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
 
@@ -832,7 +807,6 @@ struct ASTFor : ASTStatement {
   ASTExpr *right;
   ASTBlock *block;
 
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_FOR; }
   ASTFor() {}
   ~ASTFor() {}
@@ -862,21 +836,18 @@ struct ASTIf : ASTExpr {
   ASTExpr *condition;
   ASTBlock *block;
   Nullable<ASTElse> _else;  // just an else.
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IF; }
 };
 
 struct ASTElse : ASTStatement {
   Nullable<ASTIf> _if;  // conditional else.
   Nullable<ASTBlock> block;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ELSE; }
 };
 
 struct ASTWhile : ASTStatement {
   Nullable<ASTExpr> condition;
   ASTBlock *block;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_WHILE; }
 };
 
@@ -885,7 +856,6 @@ struct ASTIndex : ASTExpr {
   bool is_pointer_subscript = false;
   ASTExpr *base;
   ASTExpr *index;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_INDEX; }
 };
 
@@ -915,27 +885,23 @@ struct ASTStructDeclaration : ASTDeclaration {
   std::vector<ASTStructDeclaration *> subtypes;  // only for struct { ... } anonymous subtypes.
   std::vector<ASTStructMember> members;
 
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };
 
 struct ASTSize_Of : ASTExpr {
   ASTType *target_type;
   ASTNodeType get_node_type() const override { return AST_NODE_SIZE_OF; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTDyn_Of : ASTExpr {
   ASTType *trait_type;
   ASTExpr *object;
   ASTNodeType get_node_type() const override { return AST_NODE_DYN_OF; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTType_Of : ASTExpr {
   ASTType *target_type;
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTEnumDeclaration : ASTStatement {
@@ -944,7 +910,6 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTType *underlying_type_ast;
   InternedString name;
   std::vector<std::pair<InternedString, ASTExpr *>> enumerations;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
@@ -966,7 +931,6 @@ struct ASTChoiceDeclaration : ASTDeclaration {
   bool is_forward_declared = false;
   bool destroy_glue_compiler_implementation_needed = false;
   std::vector<ASTChoiceVariant> variants;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CHOICE_DECLARATION; }
 };
 
@@ -1000,7 +964,6 @@ struct ASTInitializerList : ASTExpr {
   } tag;
 
   Nullable<ASTType> target_type;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
 
@@ -1016,13 +979,11 @@ struct ASTSwitch : ASTExpr {
   ASTExpr *expression;
   Nullable<ASTBlock> default_branch;
   std::vector<SwitchBranch> branches;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
 };
 
 struct ASTNoop : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_NOOP; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTAlias : ASTStatement {  // TODO: Implement where clauses for generic aliases?
@@ -1031,7 +992,6 @@ struct ASTAlias : ASTStatement {  // TODO: Implement where clauses for generic a
   std::vector<ASTExpr *> generic_arguments;
   std::vector<ASTGenericParameter> generic_parameters;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTImpl : ASTDeclaration {
@@ -1052,20 +1012,17 @@ struct ASTImpl : ASTDeclaration {
   std::vector<ASTVariable *> constants;
 
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTDefer : ASTStatement {
   ASTNode *statement;
   ASTNodeType get_node_type() const override { return AST_NODE_DEFER; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTCast : ASTExpr {
   ASTExpr *expression;
   ASTType *target_type;
   ASTNodeType get_node_type() const override { return AST_NODE_CAST; }
-  void accept(VisitorBase *visitor) override;
 };
 
 // These do not support closures!!
@@ -1075,14 +1032,12 @@ struct ASTLambda : ASTExpr {
   ASTType *return_type;
   ASTBlock *block;
   ASTNodeType get_node_type() const override { return AST_NODE_LAMBDA; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTUnpack : ASTExpr {
   // the source of the unpack, such as a variable, function result, literal, etc.
   ASTExpr *expression;
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTUnpackElement : ASTExpr {
@@ -1097,14 +1052,12 @@ struct ASTUnpackElement : ASTExpr {
   ASTLiteral *range_literal_value;
 
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK_ELEMENT; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTUnpackExpr : ASTExpr {
   // the source of the unpack, such as a variable, function result, literal, etc.
   ASTExpr *expression;
   ASTNodeType get_node_type() const override { return AST_NODE_UNPACK; }
-  void accept(VisitorBase *visitor) override;
 };
 
 // The first value is the target type.
@@ -1118,7 +1071,6 @@ struct ASTWhere : ASTExpr {
   */
   std::vector<Constraint> constraints;
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTTraitDeclaration : ASTDeclaration {
@@ -1129,7 +1081,6 @@ struct ASTTraitDeclaration : ASTDeclaration {
   std::vector<Constraint> trait_bounds;
   bool is_forward_declared = false;
   ASTNodeType get_node_type() const override { return AST_NODE_TRAIT_DECLARATION; }
-  void accept(VisitorBase *visitor) override;
 };
 
 enum PatternMatchPointerSemantic { PATTERN_MATCH_PTR_NONE, PATTERN_MATCH_PTR_MUT, PATTERN_MATCH_PTR_CONST };
@@ -1227,7 +1178,6 @@ struct ASTPatternMatch : ASTExpr {
   ASTBlock *target_block;
 
   ASTNodeType get_node_type() const override { return AST_NODE_PATTERN_MATCH; }
-  void accept(VisitorBase *visitor) override;
 };
 
 struct WhereBranch;
@@ -1254,7 +1204,6 @@ struct ASTWhereStatement : ASTStatement {
 
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE_STATEMENT; }
 
-  virtual void accept(VisitorBase *visitor) override;
 };
 
 struct WhereBranch {
@@ -1267,7 +1216,6 @@ struct WhereBranch {
 struct ASTRun : ASTExpr {
   bool replace_prev_parent = true;
   ASTNode *node_to_run;
-  void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RUN; }
 };
 
@@ -1412,7 +1360,6 @@ struct Parser {
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
   Parser(const std::string &filename, Context &context);
-  ~Parser();
 };
 
 template <class T>

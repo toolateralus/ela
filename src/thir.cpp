@@ -9,7 +9,6 @@
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
-#include "visitor.hpp"
 
 // This is for nodes that don't return, instead just push right into their parent. there's a few funamental ones, so
 // this is very important.
@@ -271,7 +270,7 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   return visit_node(resolved_ast);
 }
 
-THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
+THIR *THIRGen::visit_dot_expr(ASTMemberAccess *ast) {
   THIR_ALLOC(THIRMemberAccess, thir, ast);
   thir->base = visit_node(ast->base);
 
@@ -1991,8 +1990,8 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
       return visit_call((ASTCall *)ast);
     case AST_NODE_METHOD_CALL:
       return visit_method_call((ASTMethodCall *)ast);
-    case AST_NODE_DOT_EXPR:
-      return visit_dot_expr((ASTDotExpr *)ast);
+    case AST_NODE_MEMBER_ACCESS:
+      return visit_dot_expr((ASTMemberAccess *)ast);
     case AST_NODE_INDEX:
       return visit_index((ASTIndex *)ast);
     case AST_NODE_INITIALIZER_LIST:

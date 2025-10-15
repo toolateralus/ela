@@ -96,7 +96,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
   auto new_node = make_copy(node);
   new_node->resolved_type = node->resolved_type;
 
-  switch (new_node->kind) {
+  switch (new_node->tag) {
     case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
       new_node->declaration = node->declaration;
     } break;
@@ -196,7 +196,7 @@ ASTWhile *ASTCopier::copy_while(ASTWhile *node) {
   return new_node;
 }
 
-ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
+ASTMemberAccess *ASTCopier::copy_dot_expr(ASTMemberAccess *node) {
   auto new_node = make_copy(node);
   new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
   new_node->member.generic_arguments.clear();
@@ -479,8 +479,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_while(static_cast<ASTWhile *>(node));
     case AST_NODE_STRUCT_DECLARATION:
       return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
-    case AST_NODE_DOT_EXPR:
-      return copy_dot_expr(static_cast<ASTDotExpr *>(node));
+    case AST_NODE_MEMBER_ACCESS:
+      return copy_dot_expr(static_cast<ASTMemberAccess *>(node));
     case AST_NODE_INDEX:
       return copy_subscript(static_cast<ASTIndex *>(node));
     case AST_NODE_INITIALIZER_LIST:
@@ -683,7 +683,7 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
 
 ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   auto new_node = make_copy(node);
-  new_node->callee = (ASTDotExpr *)copy_node(node->callee);
+  new_node->callee = (ASTMemberAccess *)copy_node(node->callee);
   new_node->arguments = (ASTArguments *)copy_node(node->arguments);
   return new_node;
 }

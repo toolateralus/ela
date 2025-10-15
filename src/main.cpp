@@ -35,7 +35,7 @@ jstl::Arena value_arena(MB(10));
 jstl::Arena binding_arena(MB(10));
 
 std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
-
+size_t impl_uid_base;
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
@@ -149,9 +149,15 @@ void Scope::insert(const InternedString &name, Type *type, Mutability mutability
   sym->type = type;
   sym->mutability = mutability;
   sym->name = name;
-  sym->ast = ast;
-  ast->symbol = sym;
+  if (ast) {
+    sym->ast = ast;
+    ast->symbol = sym;
+  }
   sym->thir = nullptr;
   sym->value = nullptr;
   symbols.insert_or_assign(Key::from(name, generics, is_generic_template), sym);
 }
+
+
+size_t temporary_variable_index = 0;
+std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }

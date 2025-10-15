@@ -1,3 +1,117 @@
+struct Typer : VisitorBase {
+  Nullable<ASTType> type_context = nullptr;
+  Type *expected_type = Type::INVALID_TYPE;
+  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
+  Typer(Context &context) : ctx(context) {}
+  Context &ctx;
+
+  // This is strictly for unpack expressions right now,
+  // collection initializers  '.[...tuple] '
+  // other tuples             '(...tuple) '
+  // arguments                'fn_call(...tuple)'
+  Nullable<std::vector<ASTExpr *>> current_expression_list;
+
+  std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
+
+  void implement_destroy_glue_for_choice_type(ASTChoiceDeclaration *choice, const bool generic_instantiation,
+                                              const std::vector<Type *> generic_args = {});
+
+  void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
+                          const SourceRange &range);
+
+  Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
+                             const SourceRange &source_range);
+
+  void visit_path(ASTPath *node, bool from_call = false);
+
+  void visit(ASTWhereStatement *node) override;
+  void visit(ASTMethodCall *node) override;
+  void visit(ASTPatternMatch *node) override;
+  void visit(ASTPath *node) override;
+  void visit(ASTDyn_Of *node) override;
+  void visit(ASTModule *node) override;
+  void visit(ASTStructDeclaration *node) override;
+  void visit(ASTProgram *node) override;
+  void visit(ASTImport *node) override;
+  void visit(ASTFunctionDeclaration *node) override;
+  void visit(ASTBlock *node) override;
+  void visit(ASTVariable *node) override;
+  void visit(ASTExprStatement *node) override;
+  void visit(ASTBinExpr *node) override;
+  void visit(ASTUnaryExpr *node) override;
+  void visit(ASTLiteral *node) override;
+  void visit(ASTCast *node) override;
+  void visit(ASTType *node) override;
+  void visit(ASTTraitDeclaration *node) override;
+  void visit(ASTSize_Of *node) override;
+  void visit(ASTType_Of *node) override;
+  void visit(ASTUnpackElement *node) override;
+  void visit(ASTRun *) override;
+
+  std::vector<Type *> get_generic_arg_types(const std::vector<ASTExpr *> &args);
+
+  // For generics.
+  void visit_function_header(ASTFunctionDeclaration *node, bool visit_where_clause, bool generic_instantiation,
+                             std::vector<Type *> generic_args);
+
+  void visit_structural_type_declaration(ASTStructDeclaration *node);
+
+  void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+                                std::vector<Type *> generic_args = {});
+  void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
+                                std::vector<Type *> generic_args = {});
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args = {});
+  void visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
+                               std::vector<Type *> generic_args = {});
+  void visit_function_body(ASTFunctionDeclaration *node, bool macro_expansion);
+
+  void expand_macro(ASTFunctionDeclaration *macro, ASTCall *originator);
+
+  Type *get_self_type();
+
+  void type_check_args_from_params(ASTArguments *node, const ParameterList &parameters, ASTFunctionDeclaration *function,
+                                   Nullable<ASTExpr> self, bool is_deinit_call);
+  void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
+                                                        std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
+                                                        SourceRange range);
+
+  void compiler_mock_method_call_visit_impl(Type *type, const InternedString &method_name);
+  void compiler_mock_associated_function_call_visit_impl(Type *left_type, const InternedString &method_name);
+
+  void visit(ASTCall *node) override;
+  void visit(ASTArguments *node) override;
+  void visit(ASTReturn *node) override;
+  void visit(ASTContinue *node) override;
+  void visit(ASTBreak *node) override;
+
+  void visit(ASTFor *node) override;
+  void visit(ASTIf *node) override;
+  void visit(ASTElse *node) override;
+  void visit(ASTWhile *node) override;
+  void visit(ASTMemberAccess *node) override;
+  void visit(ASTIndex *node) override;
+  void visit(ASTInitializerList *node) override;
+  void visit(ASTEnumDeclaration *node) override;
+  void visit(ASTRange *node) override;
+  void visit(ASTSwitch *node) override;
+  void visit(ASTTuple *node) override;
+  void visit(ASTDestructure *node) override;
+  void visit(ASTAlias *node) override;
+  void visit(ASTImpl *node) override;
+  void visit(ASTDefer *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
+  void visit(ASTLambda *node) override;
+  void visit(ASTWhere *node) override;
+  void visit(ASTUnpack *node) override;
+
+  bool visit_where_predicate(Type *type, ASTExpr *node);
+  bool visit_where_predicate_throws(Type *type, ASTExpr *node);
+
+  InternedString type_name(ASTExpr *node);
+};
+
+
 #include <algorithm>
 #include <cassert>
 #include <csetjmp>
@@ -313,7 +427,7 @@ bool is_const_pointer(ASTNode *node) {
 
   if (auto index = dynamic_cast<ASTIndex *>(node)) {
     return is_const_pointer(index->base);
-  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
+  } else if (auto dot = dynamic_cast<ASTMemberAccess *>(node)) {
     return is_const_pointer(dot->base);
   }
 
@@ -1083,7 +1197,7 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
   });
 
   // .method
-  ASTDotExpr dot;
+  ASTMemberAccess dot;
   dot.base = &path;
   dot.member = ASTPath::Segment::Identifier(method_name);
 
@@ -1287,7 +1401,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
   if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
     if (arguments->values.empty() && func->generic_parameters.size() == 1) {
-      if (func->return_type->kind == ASTType::NORMAL && type_is_valid(expected_type)) {
+      if (func->return_type->tag == ASTType::NORMAL && type_is_valid(expected_type)) {
         auto return_ty_path = func->return_type->normal.path;
         /*
           TODO: we need to do a better job of checking whether the return type name
@@ -2240,7 +2354,7 @@ void Typer::visit(ASTType *node) {
 
   TypeExtensions extensions = accept_extensions(node->extensions);
 
-  switch (node->kind) {
+  switch (node->tag) {
     case ASTType::NORMAL: {
       auto &normal_ty = node->normal;
       normal_ty.path->accept(this);
@@ -2381,8 +2495,8 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("cannot index-assign into an immutable variable!", node->source_range);
       }
 
-    } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
-      auto dot = (ASTDotExpr *)node->left;
+    } else if (node->left->get_node_type() == AST_NODE_MEMBER_ACCESS) {
+      auto dot = (ASTMemberAccess *)node->left;
 
       auto symbol = ctx.get_symbol(dot->base);
       auto left_ty = dot->base->resolved_type;
@@ -2398,8 +2512,8 @@ void Typer::visit(ASTBinExpr *node) {
       /*
         We have to check all the way down the left of the dot expression.
       */
-      while (dot->base->get_node_type() == AST_NODE_DOT_EXPR) {
-        dot = (ASTDotExpr *)dot->base;
+      while (dot->base->get_node_type() == AST_NODE_MEMBER_ACCESS) {
+        dot = (ASTMemberAccess *)dot->base;
         auto left_ty = dot->base->resolved_type;
         if (left_ty->is_const_pointer()) {
           throw_error("cannot dot-assign into an immutable pointer!", dot->base->source_range);
@@ -2579,7 +2693,7 @@ void Typer::visit(ASTLiteral *node) {
   }
 }
 
-void Typer::visit(ASTDotExpr *node) {
+void Typer::visit(ASTMemberAccess *node) {
   node->base->accept(this);
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = base_ty_id;
@@ -3407,7 +3521,7 @@ Type *Scope::find_or_instantiate_dyn_type(Type *trait_type, SourceRange range, T
       }
     }
 
-    if (declaration->return_type->kind == ASTType::SELF) {
+    if (declaration->return_type->tag == ASTType::SELF) {
       throw_error(
           "just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
           "because we would have to return it as a type erased *const void. return the concrete type.",
@@ -3483,7 +3597,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_TYPE: {
       auto type_node = static_cast<ASTType *>(node);
-      if (type_node->kind != ASTType::NORMAL) {
+      if (type_node->tag != ASTType::NORMAL) {
         return nullptr;
       }
       return get_symbol(type_node->normal.path);
@@ -3542,8 +3656,8 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         index++;
       }
     } break;
-    case AST_NODE_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
+    case AST_NODE_MEMBER_ACCESS: {
+      auto dotnode = static_cast<ASTMemberAccess *>(node);
       auto type = dotnode->base->resolved_type;
 
       if (dotnode->member.tag != ASTPath::Segment::IDENTIFIER) {
@@ -3669,7 +3783,7 @@ void Typer::visit(ASTMethodCall *node) {
 
     if (obj_type->is_kind(TYPE_DYN) && !node->inserted_dyn_arg) {
       auto &args = node->arguments->values;
-      auto dot = ast_alloc<ASTDotExpr>();
+      auto dot = ast_alloc<ASTMemberAccess>();
       dot->base = object;
       dot->member = ASTPath::Segment::Identifier(DYN_INSTANCE_KEY);
       dot->resolved_type = global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}});

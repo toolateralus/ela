@@ -306,7 +306,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
             path->push_segment("util");
             path->push_segment("Flags");
             NODE_ALLOC(ASTType, type, range2, defer2, parser);
-            type->kind=ASTType::NORMAL;
+            type->tag=ASTType::NORMAL;
             type->normal.is_dyn = false;
             type->normal.path = path;
             impl->trait = type;
@@ -316,7 +316,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
             NODE_ALLOC(ASTType, type, range, defer, parser);
             NODE_ALLOC(ASTPath, path, range1, defer1, parser);
             path->push_segment(enum_decl->name);
-            type->kind = ASTType::NORMAL;
+            type->tag = ASTType::NORMAL;
             type->normal.is_dyn = false;
             type->normal.path = path;
             impl->target = type;
@@ -949,7 +949,7 @@ ASTExpr *Parser::parse_postfix() {
       call->arguments = parse_arguments();
       left = call;
     } else if (peek().type == TType::Dot) {
-      NODE_ALLOC(ASTDotExpr, dot, range, _, this)
+      NODE_ALLOC(ASTMemberAccess, dot, range, _, this)
       eat();
       dot->base = left;
       if (peek().type == TType::Integer) {
@@ -1416,7 +1416,7 @@ ASTType *Parser::parse_type() {
   switch (next_type) {
     case TType::Union:
     case TType::Struct: {
-      node->kind = ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION;
+      node->tag = ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION;
       node->declaration = parse_struct_declaration();
     } break;
     case TType::Enum: {
@@ -1454,7 +1454,7 @@ ASTType *Parser::parse_type() {
     auto type = parse_type();
     expect(TType::RBrace);
     auto slice = ast_alloc<ASTType>();
-    slice->kind = ASTType::NORMAL;
+    slice->tag = ASTType::NORMAL;
     slice->normal.path = ast_alloc<ASTPath>();
     slice->normal.path->push_segment("SliceMut", {type});
     return slice;
@@ -1477,7 +1477,7 @@ ASTType *Parser::parse_type() {
     } else {
       expect(TType::RBrace);
       auto slice = ast_alloc<ASTType>();
-      slice->kind = ASTType::NORMAL;
+      slice->tag = ASTType::NORMAL;
       slice->normal.path = ast_alloc<ASTPath>();
       slice->normal.path->push_segment("Slice", std::vector<ASTExpr *>{type});
       return slice;
@@ -1492,7 +1492,7 @@ ASTType *Parser::parse_type() {
 
   if (next_type == TType::LParen) {
     node->resolved_type = Type::INVALID_TYPE;
-    node->kind = ASTType::TUPLE;
+    node->tag = ASTType::TUPLE;
     eat();
     while (peek().type != TType::RParen) {
       node->tuple_types.push_back(parse_type());
@@ -1504,17 +1504,17 @@ ASTType *Parser::parse_type() {
 
   if (next_type == TType::Self) {
     eat();
-    node->kind = ASTType::SELF;
+    node->tag = ASTType::SELF;
   }
 
-  if (node->kind == ASTType::NORMAL && !node->normal.path) {
+  if (node->tag == ASTType::NORMAL && !node->normal.path) {
     node->normal.path = parse_path();
     node->normal.path->source_range = range;
   }
 
   end_node(node, range);
 
-  if (node->kind == ASTType::NORMAL && node->normal.path && node->normal.path->segments.empty()) {
+  if (node->tag == ASTType::NORMAL && node->normal.path && node->normal.path->segments.empty()) {
     throw_error("INTERNAL PARSER ERROR: parsed an empty path for a type", range);
   }
 
@@ -1765,7 +1765,7 @@ ASTStatement *Parser::parse_using_stmt() {
     path->push_segment(variable->name);
 
     // .destroy()
-    NODE_ALLOC(ASTDotExpr, dot, range2, defer2, this);
+    NODE_ALLOC(ASTMemberAccess, dot, range2, defer2, this);
     dot->base = path;
     dot->member = ASTPath::Segment::Identifier("destroy");
     method_call->callee = dot;
@@ -2808,7 +2808,7 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
         condition = (ASTExpr *)binexpr;
       }
       NODE_ALLOC(ASTType, self_type, range, defer, this);
-      self_type->kind = ASTType::SELF;
+      self_type->tag = ASTType::SELF;
       return {self_type, condition};
     };
     constraints.push_back(parse_constraint());
@@ -2980,7 +2980,7 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
     } else if (peek().type == TType::LParen) {
       variant.kind = ASTChoiceVariant::TUPLE_VARIANT;
       variant.tuple = parse_type();
-      assert(variant.tuple->kind == ASTType::TUPLE);
+      assert(variant.tuple->tag == ASTType::TUPLE);
     } else {
       end_node(node, range);
       throw_error("Unexpected token in choice type declaration", node->source_range);
@@ -3081,7 +3081,7 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
 ASTType *Parser::parse_function_type() {
   NODE_ALLOC(ASTType, output_type, range, _, this)
   expect(TType::Fn);
-  output_type->kind = ASTType::FUNCTION;
+  output_type->tag = ASTType::FUNCTION;
 
   if (peek().type == TType::Mul) {
     eat();
@@ -3099,7 +3099,7 @@ ASTType *Parser::parse_function_type() {
     eat();
     output_type->function.return_type = parse_type();
   } else {
-    output_type->function.return_type = nullptr;
+    output_type->function.return_type = ASTType::get_void();
   }
   return output_type;
 }
@@ -3179,7 +3179,7 @@ static Precedence get_operator_precedence(Token token) {
 ASTType *ASTType::get_void() {
   static ASTType *type = [] {
     ASTType *type = ast_alloc<ASTType>();
-    type->kind = ASTType::NORMAL;
+    type->tag = ASTType::NORMAL;
     auto path = ast_alloc<ASTPath>();
     path->push_segment("void");
     type->normal.path = path;
@@ -3325,7 +3325,7 @@ bool ASTNode::is_expr() {
     case AST_NODE_TUPLE:
     case AST_NODE_CALL:
     case AST_NODE_ARGUMENTS:
-    case AST_NODE_DOT_EXPR:
+    case AST_NODE_MEMBER_ACCESS:
     case AST_NODE_INDEX:
     case AST_NODE_INITIALIZER_LIST:
     case AST_NODE_CAST:
@@ -3350,7 +3350,7 @@ ASTPath *Parser::context_identifier() {
 ASTType *Parser::context_trait_ast_type() {
   static NODE_ALLOC(ASTType, type, _, defer, this);
   if (!type->normal.path) {
-    type->kind = ASTType::NORMAL;
+    type->tag = ASTType::NORMAL;
     type->extensions = {};
     NODE_ALLOC(ASTPath, path, path_range, path_defer, this)
     path->push_segment("compiler");

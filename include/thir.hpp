@@ -7,7 +7,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include "ast.hpp"
-#include "visitor.hpp"
 #include <map>
 #include <unordered_map>
 #include <vector>
@@ -423,7 +422,7 @@ struct THIRGen {
 
   THIR *visit_call(ASTCall *node);
   THIR *visit_return(ASTReturn *node);
-  THIR *visit_dot_expr(ASTDotExpr *node);
+  THIR *visit_dot_expr(ASTMemberAccess *node);
   THIR *visit_index(ASTIndex *node);
   THIR *visit_initializer_list(ASTInitializerList *node);
   THIR *visit_range(ASTRange *node);

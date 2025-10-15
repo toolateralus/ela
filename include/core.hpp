@@ -72,6 +72,7 @@ struct CompilationMetric {
 struct SourceRange;
 struct CompileCommand {
   CompilationMetric parse;
+  CompilationMetric typing;
   CompilationMetric lower;
   CompilationMetric cpp;
 
@@ -231,13 +232,13 @@ struct Key {
   // allow implicit construction from an InternedString (and optional generics / template flag)
   Key() = default;
   Key(const std::string &n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
-    : name(n), generics(g), is_generic_template(is_generic_template_) {}
+      : name(n), generics(g), is_generic_template(is_generic_template_) {}
 
   Key(std::string &&n, std::vector<Type *> &&g = {}, bool is_generic_template_ = false)
-    : name(std::move(n)), generics(std::move(g)), is_generic_template(is_generic_template_) {}
+      : name(std::move(n)), generics(std::move(g)), is_generic_template(is_generic_template_) {}
 
   Key(const char *n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
-    : name(n), generics(g), is_generic_template(is_generic_template_) {}
+      : name(n), generics(g), is_generic_template(is_generic_template_) {}
   Key(const InternedString &n, const std::vector<Type *> &g = {}, bool is_generic_template_ = false)
       : name(n), generics(g), is_generic_template(is_generic_template_) {}
   Key(InternedString &&n, std::vector<Type *> &&g = {}, bool is_generic_template_ = false)
@@ -263,3 +264,50 @@ struct Key {
     return {name, generics, is_generic_template};
   }
 };
+
+struct ASTVariable;
+struct ASTFunctionDeclaration;
+struct ASTStructDeclaration;
+struct ASTChoiceDeclaration;
+
+// TODO remove the g_List dependency, that should be a user lib, not in core.
+extern ASTStructDeclaration *g_List_declaration, *g_InitList_declaration, *g_Slice_declaration, *g_SliceMut_declaration;
+// choice Option!<T>, used extensively in iterators so we need it.
+extern ASTChoiceDeclaration *g_Option_declaration;
+// A '[Test]' slice of all tests,
+extern ASTVariable *g_testing_tests_declaration;
+// the actual test runner.
+extern ASTFunctionDeclaration *g_testing_runner_declaration;
+// the 'struct Test {}' type.
+extern Type *g_testing_Test_type;
+// reflection dependencies. struct Method {}, struct Field {}, struct Type {}
+extern Type *g_refl_Method_type, *g_refl_Field_type, *g_refl_Type_type;
+// struct str {} and struct String {}.
+extern Type *g_str_type, *g_String_type;
+// iterator dependencies.
+extern Type *g_Init_trait_type, *g_Iterable_trait_type, *g_Iterator_trait_type;
+// trait Destroy, for using statements, and choice type destroy glue.
+extern Type *g_Destroy_trait_type;
+
+// why dafuq are these here.
+// should be in the THIR or sum sh**
+enum DeferBlockType {
+  DEFER_BLOCK_TYPE_OTHER,
+  DEFER_BLOCK_TYPE_FUNC,
+  DEFER_BLOCK_TYPE_LOOP,
+};
+
+struct ASTDefer;
+struct DeferBlock {
+  std::vector<ASTDefer *> defers;
+  DeferBlockType type;
+};
+
+#include <csetjmp>
+struct GenericInstantiationErrorUserData {
+  std::string message = "";
+  SourceRange definition_range = {};
+  jmp_buf save_state;
+};
+
+std::string get_temporary_variable();

@@ -26,13 +26,15 @@ int CompileCommand::compile() {
     return root;
   });
 
-  lower.run<void>("typing & lowering to C", [&] {
+  typing.run<void>("typing", [&] {
     Typisting typer{};
     typer.run(program);
-    THIRGen thir_gen {};
-    Emitter emitter;
-    Resolver resolver(emitter);
+  });
 
+  lower.run<void>("\"lowering\" to C :D", [&] {
+    THIRGen thir_gen = {};
+    Emitter emitter = {};
+    Resolver resolver(emitter);
     resolver.visit_node(thir_gen.visit_program(program));
 
     std::filesystem::current_path(compile_command.original_path);
@@ -51,7 +53,7 @@ int CompileCommand::compile() {
 
     output << emitter.code.str();
 
-    { // emit global initializer function that's called in main
+    {  // emit global initializer function that's called by CRT
       emitter.code.clear();
       THIRFunction *global_ini = thir_gen.global_initializer_function;
       emitter.emitting_global_initializer = true;
@@ -64,7 +66,7 @@ int CompileCommand::compile() {
     // Emit our main last always
     {
       THIRFunction *ep = thir_gen.emit_runtime_entry_point();
-      if (ep) { // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
+      if (ep) {  // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
         emitter.emit_function(ep);
       }
       output << emitter.code.str();
@@ -231,9 +233,8 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
 }
 void CompileCommand::request_compile_time_code_execution(const SourceRange &range) {
   if (has_flag("ctfe-validate")) {
-
     std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString()
-          << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
+              << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
 
     char response;
     std::cin >> response;

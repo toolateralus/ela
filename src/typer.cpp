@@ -96,9 +96,11 @@ void Typisting::collect_symbols(ASTNode *node) {
       ASTFunctionDeclaration *decl = (ASTFunctionDeclaration *)node;
       node->declaring_scope->insert(decl->name, nullptr, CONST, node, {}, decl->generic_parameters.size());
     } break;
-    case AST_NODE_IMPL:
-      impls.push_back((ASTImpl *)(node));
-      break;
+    case AST_NODE_IMPL: {
+      ASTImpl *impl = (ASTImpl *)(node);
+      make_impl_unique_get_id(impl);
+      impls.push_back(impl);
+    } break;
     case AST_NODE_PROGRAM: {
       auto *program = (ASTProgram *)(node);
       for (auto *stmt : program->statements) {
@@ -194,15 +196,69 @@ void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
 
   // Scope *scope = node->declaring_scope;
   switch (node->get_node_type()) {
-    case AST_NODE_PATH: {
-    } break;
     case AST_NODE_TYPE: {
+      ASTType *type = (ASTType *)node;
+      Task *task = create_task_bind_to_node_create_edge_to_consumer(node, consumer);
+      switch (type->tag) {
+        case ASTType::NORMAL: {
+          try_generate_tasks_for_node(type->normal.path, task);
+        } break;
+        case ASTType::TUPLE: {
+          for (auto &type : type->tuple_types) {
+            try_generate_tasks_for_node(type, task);
+          }
+        } break;
+        case ASTType::FUNCTION: {
+          for (auto &type : type->function.parameter_types) {
+            try_generate_tasks_for_node(type, task);
+          }
+          try_generate_tasks_for_node(type->function.return_type, task);
+        } break;
+        case ASTType::SELF:
+          break;  // TODO: how are we going to manage self types out of order?
+        case ASTType::STRUCTURAL_DECLARATIVE_ASCRIPTION: {
+          try_generate_tasks_for_node(type->declaration, task);
+        } break;
+      }
+    } break;
+    case AST_NODE_PATH: {
+      ASTPath *path = (ASTPath *)node;
+      for (auto &segment : path->segments) {
+        switch (segment.tag) {
+          case ASTPath::Segment::TYPE: {
+            try_generate_tasks_for_node(segment.get_type(), consumer);
+          } break;
+          case ASTPath::Segment::IDENTIFIER: {
+            // we can't really do anything here cause nothings resolved yet.
+          } break;
+          case ASTPath::Segment::INVALID:
+            throw_error("INTERNAL COMPILER ERROR: path had invalid segment", node->source_range);
+            break;
+        }
+      }
     } break;
     case AST_NODE_CALL: {
+      ASTCall *call = (ASTCall *)node;
+      // Generate tasks for the callee and arguments
+      try_generate_tasks_for_node(call->callee, consumer);
+      if (call->arguments) {
+        try_generate_tasks_for_node(call->arguments, consumer);
+      }
     } break;
-    case AST_NODE_DOT_EXPR: {
+    case AST_NODE_MEMBER_ACCESS: {
+      ASTMemberAccess *dot = (ASTMemberAccess *)node;
+      // Generate tasks for the base and member
+      try_generate_tasks_for_node(dot->base, consumer);
+      // dot->member is usually an identifier, which doesn't need further processing here
     } break;
     case AST_NODE_METHOD_CALL: {
+      ASTMethodCall *method_call = (ASTMethodCall *)node;
+      // generate dependencies for the dot expression.
+      try_generate_tasks_for_node(method_call->callee, consumer);
+
+      if (method_call->arguments) {
+        try_generate_tasks_for_node(method_call->arguments, consumer);
+      }
     } break;
 
     case AST_NODE_STATEMENT_LIST: {
@@ -288,7 +344,7 @@ void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
       Task *task = create_task_bind_to_node_create_edge_to_consumer(decl, consumer);
       for (const auto &[_, enumeration_value] : decl->enumerations) {
         (void)_;  // -.-
-        try_generate_tasks_for_node(decl, task);
+        try_generate_tasks_for_node(enumeration_value, task);
       }
     } break;
     case AST_NODE_ALIAS: {
@@ -566,115 +622,302 @@ void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
 
 void Typisting::run(ASTProgram *node) {
   collect_symbols(node);
+
   try_generate_tasks_for_node(node, nullptr);
+
+  std::deque<Task *> ready;
+
+  for (auto &[ast, task] : tasks) {
+    (void)ast;
+    if (task->indegree == 0) {
+      ready.push_back(task);
+    }
+  }
+
+  while (!ready.empty()) {
+    Task *t = ready.front();
+    ready.pop_front();
+
+    Phase phase = t->phase;
+    if (phase < PH_SOLVED) {
+      try_solve_task(t);
+    }
+  }
+
+  size_t unsolved = 0;
+  for (auto &[ast, task] : tasks) {
+    (void)ast;
+    if (task->phase != PH_SOLVED) {
+      unsolved++;
+    }
+  }
+  if (unsolved) {
+    throw_error(std::format("type scheduler deadlock: {} task(s) remain unsolved", unsolved), node->source_range);
+  }
 }
 
-void Typisting::visit_block(ASTBlock *) {}
-void Typisting::visit_alias(ASTAlias *) {}
-void Typisting::visit_impl(ASTImpl *) {}
-void Typisting::visit_import(ASTImport *) {}
-void Typisting::visit_module(ASTModule *) {}
-void Typisting::visit_return(ASTReturn *) {}
-void Typisting::visit_continue(ASTContinue *) {}
-void Typisting::visit_break(ASTBreak *) {}
-void Typisting::visit_for(ASTFor *) {}
-void Typisting::visit_if(ASTIf *) {}
-void Typisting::visit_else(ASTElse *) {}
-void Typisting::visit_while(ASTWhile *) {}
+// void visit_enum_declaration(ASTEnumDeclaration *node, Phase phase) {
+//   Scope *scope = node->declaring_scope;
 
-void Typisting::visit_enum_declaration(ASTEnumDeclaration *node) {
-  Scope *scope = node->declaring_scope;
+//   if (scope->find_type(node->name, {}, false, {}) != Type::INVALID_TYPE) {
+//     throw_error("Redefinition of enum " + node->name.str(), node->source_range);
+//   }
 
-  if (scope->find_type(node->name, {}, false, {}) != Type::INVALID_TYPE) {
-    throw_error("Redefinition of enum " + node->name.str(), node->source_range);
+//   auto underlying_type = Type::INVALID_TYPE;
+
+//   if (node->underlying_type_ast) {
+//     visit_node(node->underlying_type_ast, phase);
+//     underlying_type = node->underlying_type_ast->resolved_type;
+//   }
+
+//   auto enum_type = scope->create_enum_type(node->name, node->is_flags, node);
+//   enum_type->declaring_node = node;
+//   auto info = enum_type->info->as<EnumTypeInfo>();
+
+//   for (auto &[key, value] : node->enumerations) {
+//     visit_node(value, phase);
+//     Type *node_ty = value->resolved_type;
+
+//     Value *evaluated = interpret_from_ast(value);
+//     size_t evaluated_integer = evaluated->as<IntValue>()->value;
+
+//     constexpr uint64_t u32_max = 0xFFFFFFFFULL;
+//     constexpr int64_t s32_max = 0x7FFFFFFF;
+//     constexpr int64_t s32_min = -0x80000000;
+
+//     // ! BUG
+//     // Why would we change the sign only if it reaches greater than s32, default should be u8 -> u16 -> u32
+//     // based on the number of enumerations / their value
+//     // we should dynamically promote the unsigned integer from u8 to u64 if need be.
+//     if (evaluated_integer > s32_max || evaluated_integer < s32_min) {
+//       if (evaluated_integer <= u32_max) {
+//         underlying_type = u32_type();
+//       } else {
+//         underlying_type = u64_type();
+//       }
+//     }
+
+//     TypeMember member = {.name = key, .type = node_ty, .default_value = value};
+
+//     info->members.push_back(member);
+
+//     if (underlying_type == Type::INVALID_TYPE) {
+//       underlying_type = node_ty;
+//     } else {
+//       assert_types_can_cast_or_are_equal(value, underlying_type, node->source_range,
+//                                          "inconsistent types in enum declaration.");
+//     }
+//   }
+
+//   if (underlying_type == void_type()) {
+//     throw_error("Invalid enum declaration: got void for underlying type", node->source_range);
+//   }
+
+//   node->underlying_type = underlying_type;
+//   info->underlying_type = underlying_type;
+//   node->resolved_type = enum_type;
+// }
+
+Task *Typisting::create_task_bind_to_node_create_edge_to_consumer(ASTNode *node, Task *consumer,
+                                                                  Phase required_phase_to_progress) {
+  Task *task = new (task_arena.allocate(sizeof(Task))) Task();
+  task->node = node;
+  if (consumer) {
+    try_add_edge(consumer, task, required_phase_to_progress);
+  }
+  tasks[node] = task;
+  return task;
+}
+
+void Typisting::try_add_edge(Task *consumer, Task *provider, Phase required_phase_to_progress) {
+  if (!consumer || !provider) {
+    return;
+  }
+  if (consumer == provider) {
+    return;
   }
 
-  auto underlying_type = Type::INVALID_TYPE;
-
-  if (node->underlying_type_ast) {
-    visit_node(node->underlying_type_ast);
-    underlying_type = node->underlying_type_ast->resolved_type;
+  for (const Dep &d : consumer->depends_on) {
+    if (d.provider == provider && d.need == required_phase_to_progress) {
+      return;
+    }
   }
 
-  auto enum_type = scope->create_enum_type(node->name, node->is_flags, node);
-  enum_type->declaring_node = node;
-  auto info = enum_type->info->as<EnumTypeInfo>();
+  consumer->depends_on.push_back(Dep{provider, required_phase_to_progress, false});
+  provider->dependents.push_back(consumer);
 
-  for (auto &[key, value] : node->enumerations) {
-    visit_node(value);
-    Type *node_ty = value->resolved_type;
+  if (provider->phase < required_phase_to_progress) {
+    consumer->indegree++;
+  }
+}
 
-    Value *evaluated = interpret_from_ast(value);
-    size_t evaluated_integer = evaluated->as<IntValue>()->value;
-
-    constexpr uint64_t u32_max = 0xFFFFFFFFULL;
-    constexpr int64_t s32_max = 0x7FFFFFFF;
-    constexpr int64_t s32_min = -0x80000000;
-
-    // ! BUG
-    // Why would we change the sign only if it reaches greater than s32, default should be u8 -> u16 -> u32
-    // based on the number of enumerations / their value
-    // we should dynamically promote the unsigned integer from u8 to u64 if need be.
-    if (evaluated_integer > s32_max || evaluated_integer < s32_min) {
-      if (evaluated_integer <= u32_max) {
-        underlying_type = u32_type();
-      } else {
-        underlying_type = u64_type();
+void Typisting::task_advance_phase(Task *provider, Phase phase_reached, std::deque<Task *> &ready) {
+  for (Task *consumer : provider->dependents) {
+    bool became_ready = false;
+    for (Dep &dep : consumer->depends_on) {
+      if (!dep.satisfied && dep.provider == provider && dep.need <= phase_reached) {
+        dep.satisfied = true;
+        if (consumer->indegree > 0) {
+          consumer->indegree--;
+        }
+        if (consumer->indegree == 0) {
+          became_ready = true;
+        }
       }
     }
-
-    TypeMember member = {.name = key, .type = node_ty, .default_value = value};
-
-    info->members.push_back(member);
-
-    if (underlying_type == Type::INVALID_TYPE) {
-      underlying_type = node_ty;
-    } else {
-      assert_types_can_cast_or_are_equal(value, underlying_type, node->source_range,
-                                         "inconsistent types in enum declaration.");
+    if (became_ready) {
+      ready.push_back(consumer);
     }
   }
-
-  if (underlying_type == void_type()) {
-    throw_error("Invalid enum declaration: got void for underlying type", node->source_range);
-  }
-
-  node->underlying_type = underlying_type;
-  info->underlying_type = underlying_type;
-  node->resolved_type = enum_type;
 }
 
-void Typisting::visit_function_declaration(ASTFunctionDeclaration *) {}
-void Typisting::visit_struct_declaration(ASTStructDeclaration *) {}
-void Typisting::visit_choice_declaration(ASTChoiceDeclaration *) {}
-void Typisting::visit_trait_declaration(ASTTraitDeclaration *) {}
-void Typisting::visit_variable(ASTVariable *) {}
-void Typisting::visit_expr_statement(ASTExprStatement *) {}
-void Typisting::visit_bin_expr(ASTBinExpr *) {}
-void Typisting::visit_unary_expr(ASTUnaryExpr *) {}
-void Typisting::visit_literal(ASTLiteral *) {}
-void Typisting::visit_path(ASTPath *) {}
-void Typisting::visit_type(ASTType *) {}
-void Typisting::visit_tuple(ASTTuple *) {}
-void Typisting::visit_call(ASTCall *) {}
-void Typisting::visit_method_call(ASTMethodCall *) {}
-void Typisting::visit_arguments(ASTArguments *) {}
-void Typisting::visit_dot_expr(ASTDotExpr *) {}
-void Typisting::visit_index(ASTIndex *) {}
-void Typisting::visit_initializer_list(ASTInitializerList *) {}
-void Typisting::visit_size_of(ASTSize_Of *) {}
-void Typisting::visit_type_of(ASTType_Of *) {}
-void Typisting::visit_dyn_of(ASTDyn_Of *) {}
-void Typisting::visit_defer(ASTDefer *) {}
-void Typisting::visit_cast(ASTCast *) {}
-void Typisting::visit_lambda(ASTLambda *) {}
-void Typisting::visit_unpack(ASTUnpack *) {}
-void Typisting::visit_unpack_element(ASTUnpackElement *) {}
-void Typisting::visit_range(ASTRange *) {}
-void Typisting::visit_switch(ASTSwitch *) {}
-void Typisting::visit_destructure(ASTDestructure *) {}
-void Typisting::visit_where(ASTWhere *) {}
-void Typisting::visit_pattern_match(ASTPatternMatch *) {}
-void Typisting::visit_statement_list(ASTStatementList *) {}
-void Typisting::visit_where_statement(ASTWhereStatement *) {}
-void Typisting::visit_run(ASTRun *) {}
+Typisting::Task_Result Typisting::try_solve_task(Task *task) {
+  auto &node = task->node;
+  auto &phase = task->phase;
+  switch (node->get_node_type()) {
+    case AST_NODE_BLOCK:
+      return try_visit_block(task, (ASTBlock *)node, phase);
+      break;
+    case AST_NODE_FUNCTION_DECLARATION:
+      return try_visit_function_declaration(task, (ASTFunctionDeclaration *)node, phase);
+      break;
+    case AST_NODE_ALIAS:
+      return try_visit_alias(task, (ASTAlias *)node, phase);
+      break;
+    case AST_NODE_IMPL:
+      return try_visit_impl(task, (ASTImpl *)node, phase);
+      break;
+    case AST_NODE_IMPORT:
+      return try_visit_import(task, (ASTImport *)node, phase);
+      break;
+    case AST_NODE_MODULE:
+      return try_visit_module(task, (ASTModule *)node, phase);
+      break;
+    case AST_NODE_RETURN:
+      return try_visit_return(task, (ASTReturn *)node, phase);
+      break;
+    case AST_NODE_CONTINUE:
+      return try_visit_continue(task, (ASTContinue *)node, phase);
+      break;
+    case AST_NODE_BREAK:
+      return try_visit_break(task, (ASTBreak *)node, phase);
+      break;
+    case AST_NODE_FOR:
+      return try_visit_for(task, (ASTFor *)node, phase);
+      break;
+    case AST_NODE_IF:
+      return try_visit_if(task, (ASTIf *)node, phase);
+      break;
+    case AST_NODE_ELSE:
+      return try_visit_else(task, (ASTElse *)node, phase);
+      break;
+    case AST_NODE_WHILE:
+      return try_visit_while(task, (ASTWhile *)node, phase);
+      break;
+    case AST_NODE_STRUCT_DECLARATION:
+      return try_visit_struct_declaration(task, (ASTStructDeclaration *)node, phase);
+      break;
+    case AST_NODE_ENUM_DECLARATION:
+      return try_visit_enum_declaration(task, (ASTEnumDeclaration *)node, phase);
+      break;
+    case AST_NODE_CHOICE_DECLARATION:
+      return try_visit_choice_declaration(task, (ASTChoiceDeclaration *)node, phase);
+      break;
+    case AST_NODE_TRAIT_DECLARATION:
+      return try_visit_trait_declaration(task, (ASTTraitDeclaration *)node, phase);
+      break;
+    case AST_NODE_VARIABLE:
+      return try_visit_variable(task, (ASTVariable *)node, phase);
+      break;
+    case AST_NODE_EXPR_STATEMENT:
+      return try_visit_expr_statement(task, (ASTExprStatement *)node, phase);
+      break;
+    case AST_NODE_BIN_EXPR:
+      return try_visit_bin_expr(task, (ASTBinExpr *)node, phase);
+      break;
+    case AST_NODE_UNARY_EXPR:
+      return try_visit_unary_expr(task, (ASTUnaryExpr *)node, phase);
+      break;
+    case AST_NODE_LITERAL:
+      return try_visit_literal(task, (ASTLiteral *)node, phase);
+      break;
+    case AST_NODE_PATH:
+      return try_visit_path(task, (ASTPath *)node, phase);
+      break;
+    case AST_NODE_TYPE:
+      return try_visit_type(task, (ASTType *)node, phase);
+      break;
+    case AST_NODE_TUPLE:
+      return try_visit_tuple(task, (ASTTuple *)node, phase);
+      break;
+    case AST_NODE_CALL:
+      return try_visit_call(task, (ASTCall *)node, phase);
+      break;
+    case AST_NODE_METHOD_CALL:
+      return try_visit_method_call(task, (ASTMethodCall *)node, phase);
+      break;
+    case AST_NODE_ARGUMENTS:
+      return try_visit_arguments(task, (ASTArguments *)node, phase);
+      break;
+    case AST_NODE_MEMBER_ACCESS:
+      return try_visit_dot_expr(task, (ASTMemberAccess *)node, phase);
+      break;
+    case AST_NODE_INDEX:
+      return try_visit_index(task, (ASTIndex *)node, phase);
+      break;
+    case AST_NODE_INITIALIZER_LIST:
+      return try_visit_initializer_list(task, (ASTInitializerList *)node, phase);
+      break;
+    case AST_NODE_SIZE_OF:
+      return try_visit_size_of(task, (ASTSize_Of *)node, phase);
+      break;
+    case AST_NODE_TYPE_OF:
+      return try_visit_type_of(task, (ASTType_Of *)node, phase);
+      break;
+    case AST_NODE_DYN_OF:
+      return try_visit_dyn_of(task, (ASTDyn_Of *)node, phase);
+      break;
+    case AST_NODE_DEFER:
+      return try_visit_defer(task, (ASTDefer *)node, phase);
+      break;
+    case AST_NODE_CAST:
+      return try_visit_cast(task, (ASTCast *)node, phase);
+      break;
+    case AST_NODE_LAMBDA:
+      return try_visit_lambda(task, (ASTLambda *)node, phase);
+      break;
+    case AST_NODE_UNPACK:
+      return try_visit_unpack(task, (ASTUnpack *)node, phase);
+      break;
+    case AST_NODE_UNPACK_ELEMENT:
+      return try_visit_unpack_element(task, (ASTUnpackElement *)node, phase);
+      break;
+    case AST_NODE_RANGE:
+      return try_visit_range(task, (ASTRange *)node, phase);
+      break;
+    case AST_NODE_SWITCH:
+      return try_visit_switch(task, (ASTSwitch *)node, phase);
+      break;
+    case AST_NODE_DESTRUCTURE:
+      return try_visit_destructure(task, (ASTDestructure *)node, phase);
+      break;
+    case AST_NODE_WHERE:
+      return try_visit_where(task, (ASTWhere *)node, phase);
+      break;
+    case AST_NODE_PATTERN_MATCH:
+      return try_visit_pattern_match(task, (ASTPatternMatch *)node, phase);
+      break;
+    case AST_NODE_STATEMENT_LIST:
+      return try_visit_statement_list(task, (ASTStatementList *)node, phase);
+      break;
+    case AST_NODE_WHERE_STATEMENT:
+      return try_visit_where_statement(task, (ASTWhereStatement *)node, phase);
+      break;
+    case AST_NODE_RUN:
+      return try_visit_run(task, (ASTRun *)node, phase);
+      break;
+    case AST_NODE_PROGRAM:
+    case AST_NODE_NOOP:
+      return TASK_RESULT_COMPLETE;
+  }
+}
