@@ -407,7 +407,7 @@ struct THIRGen {
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
 
-  THIR *make_structural_typing_bitcast(Type *to, const THIR *expr);
+  THIR *make_structural_typing_bitcast(Type *to, THIR *expr);
 
   THIR *visit_dyn_of(ASTDyn_Of *node);
   THIR *visit_type_of(ASTType_Of *node);
@@ -451,7 +451,7 @@ struct THIRGen {
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
   THIR *visit_expr_statement(ASTExprStatement *node);
 
-  THIR *take_address_of(const THIR *node, ASTNode *ast);
+  THIR *take_address_of(THIR *node, ASTNode *ast);
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
   THIR *make_cast(THIR *operand, Type *type);
   THIR *make_str(const InternedString &value, const SourceRange &src_range);

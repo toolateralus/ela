@@ -1362,13 +1362,15 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
   return thir;
 }
 
-THIR *THIRGen::take_address_of(const THIR *operand, ASTNode *ast) {
+THIR *THIRGen::take_address_of(THIR *operand, ASTNode *ast) {
   THIR_ALLOC_NO_SRC_RANGE(THIRUnaryExpr, thir);
+  thir->is_statement = false;
   if (ast) {
     thir->source_range = ast->source_range;
   }
   thir->op = TType::And;
   thir->type = operand->type->take_pointer_to(true);
+  operand->is_statement = false;
   thir->operand = (THIR *)operand;
   return thir;
 }
@@ -1968,7 +1970,6 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   ReflectionInfo &info = reflected_upon_types[type];
   info.created = true;
   info.definition = make_variable(get_temporary_variable(), initialize({}, type_type, {}), nullptr);
-
   info.definition->is_global = true;
   info.definition->is_statement = true;
   info.reference = (THIRUnaryExpr *)take_address_of(info.definition, nullptr);
@@ -1976,6 +1977,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
   reflected_upon_types[type] = info;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
+  thir->is_statement = false;
   thir->type = type_type;
   info.definition->value = thir;
 
@@ -2025,15 +2027,17 @@ THIR *THIRGen::to_reflection_type_struct(Type *type) {
     if so, reference it.
   */
   ReflectionInfo &reflection_info = reflected_upon_types[type];
+
   if (reflection_info.has_been_created()) {
-    return reflection_info.reference;
+    return (THIRUnaryExpr *)take_address_of(reflection_info.definition, nullptr);
   }
 
   reflection_info = create_reflection_type_struct(type);
-  return reflection_info.reference;
+
+  return (THIRUnaryExpr *)take_address_of(reflection_info.definition, nullptr);
 }
 
-THIR *THIRGen::make_structural_typing_bitcast(Type *to, const THIR *expr) {
+THIR *THIRGen::make_structural_typing_bitcast(Type *to, THIR *expr) {
   THIR_ALLOC_NO_SRC_RANGE(THIRCast, ptr_cast);
   ptr_cast->source_range = expr->source_range;
   ptr_cast->type = to->take_pointer_to(true);
