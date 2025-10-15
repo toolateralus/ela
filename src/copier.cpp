@@ -114,9 +114,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
       }
       break;
     case ASTType::FUNCTION:
-      if (node->function.return_type) {
-        new_node->function.return_type = static_cast<ASTType *>(copy_node(node->function.return_type.get()));
-      }
+      new_node->function.return_type = static_cast<ASTType *>(copy_node(node->function.return_type));
       new_node->function.parameter_types.clear();
       for (auto param_ty : node->function.parameter_types) {
         new_node->function.parameter_types.push_back(static_cast<ASTType *>(copy_node(param_ty)));

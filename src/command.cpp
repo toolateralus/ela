@@ -7,8 +7,8 @@
 #include "ast.hpp"
 #include <cstdlib>
 #include <filesystem>
-#include "thir_emit.hpp"
-#include "thir_resolver.hpp"
+#include "emit.hpp"
+#include "resolver.hpp"
 
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);

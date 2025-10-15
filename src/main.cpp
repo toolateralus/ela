@@ -12,16 +12,15 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+using std::string;
+using std::vector;
 /*
   #########################
-  ### PROVIDING EXTERNS ###
+  ### FULFILL  EXTERNS  ###
   #########################
 */
 
-using std::string;
-using std::vector;
-
-size_t global_num_symbols_declared; // used to key symbols.
+size_t global_num_symbols_declared{};  // used to key symbols.
 
 // CLEANUP: cut these sizes down, i don't think its gaining us anything since
 // we have a linked list style arena these days.
@@ -34,43 +33,45 @@ jstl::Arena value_arena(MB(10));
 jstl::Arena binding_arena(MB(10));
 
 std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
-size_t impl_uid_base;
+size_t impl_uid_base{};
 std::vector<Type *> type_table{};
 std::vector<Type *> structural_type_table{};
 std::vector<Type *> function_type_table{};
 std::unordered_map<std::string, void *> loaded_ffi_extern_functions{};
 
-size_t lambda_unique_id = 0;
-
-void *error_user_data;
-
-PanicHandler panic_handler = get_default_panic_handler();
-
-CompileCommand compile_command;
+size_t lambda_unique_id{};
+void *error_user_data{nullptr};
+PanicHandler panic_handler{get_default_panic_handler()};
+CompileCommand compile_command{};
 
 std::unordered_map<InternedString, Scope *> import_scopes;
 std::unordered_set<InternedString> include_set;
 
-Type *g_refl_Field_type = nullptr;
-Type *g_refl_Method_type = nullptr;
-Type *g_refl_Type_type = nullptr;
-Type *g_testing_Test_type = nullptr;
-Type *g_Destroy_trait_type = nullptr;
-Type *g_str_type = nullptr;
-Type *g_String_type = nullptr;
+Type *g_refl_Field_type{};
+Type *g_refl_Method_type{};
+Type *g_refl_Type_type{};
+Type *g_testing_Test_type{};
+Type *g_Destroy_trait_type{};
+Type *g_str_type{};
+Type *g_String_type{};
 
-ASTVariable *g_testing_tests_declaration = nullptr;
-ASTFunctionDeclaration *g_testing_runner_declaration = nullptr;
+ASTVariable *g_testing_tests_declaration{};
+ASTFunctionDeclaration *g_testing_runner_declaration{};
 
-ASTStructDeclaration *g_List_declaration = nullptr;
-ASTStructDeclaration *g_InitList_declaration = nullptr;
-ASTStructDeclaration *g_Slice_declaration = nullptr;
-ASTStructDeclaration *g_SliceMut_declaration = nullptr;
-ASTChoiceDeclaration *g_Option_type = nullptr;
+ASTStructDeclaration *g_List_declaration{};
+ASTStructDeclaration *g_InitList_declaration{};
+ASTStructDeclaration *g_Slice_declaration{};
+ASTStructDeclaration *g_SliceMut_declaration{};
+ASTChoiceDeclaration *g_Option_type{};
 
-Type *g_Init_trait_type = nullptr, *g_Iterable_trait_type = nullptr, *g_Iterator_trait_type = nullptr;
-int ignored_warnings = 0;
-bool run_on_finished = false;
+Type *g_Init_trait_type{}, *g_Iterable_trait_type{}, *g_Iterator_trait_type{};
+int ignored_warnings{};
+bool run_on_finished{};
+/*
+  ###############################
+  ### END  FULFILL  EXTERNS   ###
+  ###############################
+*/
 
 #include <string>
 
@@ -139,4 +140,3 @@ int main(int argc, char *argv[]) {
 
   return result != 0;
 }
-
