@@ -299,6 +299,7 @@ struct DeferFrame {
 };
 
 struct THIRGen {
+  void format_and_print_deprecated_warning(ASTNode *,const Attribute &attr);
   THIRGen(Context &ctx, bool for_emitter = true);
 
   std::vector<THIR *> *current_expression_list;

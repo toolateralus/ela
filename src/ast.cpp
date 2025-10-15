@@ -1771,6 +1771,8 @@ int attribute_tag_takes_arguments(AttributeTag tag) {
     case ATTRIBUTE_IMPL:
     case ATTRIBUTE_COMPILER_FEATURE:
       return -1;
+    case ATTRIBUTE_DEPRECATED:
+      return 2;
     case ATTRIBUTE_INLINE:
     case ATTRIBUTE_ENTRY:
     case ATTRIBUTE_CONST:
@@ -1797,6 +1799,8 @@ bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *t
     *tag = ATTRIBUTE_INLINE;
   } else if (ident == "compiler_feature") {
     *tag = ATTRIBUTE_COMPILER_FEATURE;
+  } else if (ident == "deprecated") {
+    *tag = ATTRIBUTE_DEPRECATED;
   } else {
     return false;
   }

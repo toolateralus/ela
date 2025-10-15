@@ -2,6 +2,7 @@
 #include <deque>
 #include <string>
 #include "ast.hpp"
+#include "error.hpp"
 #include "thir_interpreter.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
@@ -2068,7 +2069,87 @@ THIR *THIRGen::visit_run(ASTRun *ast) {
   }
 }
 
+void THIRGen::format_and_print_deprecated_warning(ASTNode *node, const Attribute &attr) {
+  Typer typer{ctx};
+  // we have to do this since this may refer to out of order code, and that's why we process this so late
+  attr.arguments[1]->accept(&typer);
+  auto symbol = ctx.get_symbol(attr.arguments[1]).get();
+
+  SourceRange range = attr.arguments[1]->source_range;
+  if (symbol->is_variable) {
+    range = symbol->variable.declaration.get()->source_range;
+  } else if (symbol->is_function) {
+    range = symbol->function.declaration->source_range;
+  } else if (symbol->is_module) {
+    range = symbol->module.declaration->source_range;
+  } else if (symbol->is_type) {
+    range = symbol->type.declaration.get()->source_range;
+  }
+
+  switch (node->get_node_type()) {
+    case AST_NODE_VARIABLE: {
+      auto var = static_cast<ASTVariable *>(node);
+      range = var->source_range;
+      fprintf(stderr, "Deprecated variable: %s\n", var->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_FUNCTION_DECLARATION: {
+      auto func = static_cast<ASTFunctionDeclaration *>(node);
+      range = func->source_range;
+      fprintf(stderr, "Deprecated function: %s\n", func->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_STRUCT_DECLARATION: {
+      auto s = static_cast<ASTStructDeclaration *>(node);
+      range = s->source_range;
+      fprintf(stderr, "Deprecated struct: %s\n", s->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_ENUM_DECLARATION: {
+      auto e = static_cast<ASTEnumDeclaration *>(node);
+      range = e->source_range;
+      fprintf(stderr, "Deprecated enum: %s\n", e->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_CHOICE_DECLARATION: {
+      auto c = static_cast<ASTChoiceDeclaration *>(node);
+      range = c->source_range;
+      fprintf(stderr, "Deprecated choice: %s\n", c->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_ALIAS: {
+      auto a = static_cast<ASTAlias *>(node);
+      range = a->source_range;
+      fprintf(stderr, "Deprecated alias: %s\n", a->name.get_str().c_str());
+      break;
+    }
+    case AST_NODE_TRAIT_DECLARATION: {
+      auto t = static_cast<ASTTraitDeclaration *>(node);
+      range = t->source_range;
+      fprintf(stderr, "Deprecated trait: %s\n", t->name.get_str().c_str());
+      break;
+    }
+    default:
+      fprintf(stderr, "Deprecated symbol\n");
+      break;
+  }
+
+  auto string_literal = (ASTLiteral *)(attr.arguments[0]);
+
+  printf("\n %s --- instead, use: ---\n", string_literal->value.get_str().c_str());
+  auto sl = format_source_location(range, ERROR_WARNING, 5);
+  printf("%s\n", sl.c_str());
+}
+
 THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
+  if (!ast->attributes.empty()) {
+    for (auto attr : ast->attributes) {
+      if (attr.tag == ATTRIBUTE_DEPRECATED) {
+        format_and_print_deprecated_warning(ast, attr);
+      }
+    }
+  }
+
   if (ast->is_expr() && instantiate_conversions) {
     const ASTExpr *expr = (ASTExpr *)ast;
     THIR *result = visit_node(ast, false);
@@ -2279,7 +2360,6 @@ void THIRGen::setup__all_tests() {
         {"data", static_variable},
         {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
 
-    
     auto &statements = global_initializer_function->block->statements;
     statements.insert(statements.begin(), static_variable);
 

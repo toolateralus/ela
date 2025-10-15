@@ -95,7 +95,43 @@ struct ControlFlow {
 
 struct ASTBlock;
 
+enum AttributeTag {
+  //  / @[inline]                           : inlined function
+  ATTRIBUTE_INLINE,
+  // @[entry]                               : program entry point
+  ATTRIBUTE_ENTRY,
+  // @[impl(Clone, Format, ...)]            : auto implement trait on type declaration
+  ATTRIBUTE_IMPL,
+  // @[const]                               : make a function/struct compile-time-compatible
+  ATTRIBUTE_CONST,
+  // @[pub]                                 : make a symbol publicly visible to all importing modules
+  ATTRIBUTE_PUB,
+  // @[no_mangle]                           : don't mangle a symbols name ever.
+  ATTRIBUTE_NO_MANGLE,
+  // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this
+  // function will never return control flow back to the caller, when called.
+  ATTRIBUTE_NO_RETURN,
+  // @[deprecated("reason", some::alternative)]
+  ATTRIBUTE_DEPRECATED,
+  // @[compiler_feature(some_identifier)] defines a type, function, variable, etc that fufills a dependency for the
+  // compiler.
+  // Specifically one that is absolutely neccesary for normal compilation to continue,
+  // such as the 'str' literal type, Range!<s32> for '0..10', Iterator traits, Slice!<T>, testing dependencies, etc.
+  ATTRIBUTE_COMPILER_FEATURE,
+};
+
+bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *tag);
+// returns either a fixed number of arguments (usually 0)
+// or returns -1 meaning can take an arbitrary number of arguments.
+int attribute_tag_takes_arguments(AttributeTag);
+
+struct Attribute {
+  AttributeTag tag;
+  std::vector<ASTExpr *> arguments;
+};
+
 struct ASTNode {
+  std::vector<Attribute> attributes = {};
   bool is_insert_node = false;
   bool is_temporary_value() const {
     switch (get_node_type()) {
@@ -129,42 +165,9 @@ struct ASTNode {
   bool is_expr();
 };
 
-enum AttributeTag {
-  //  / @[inline]                           : inlined function
-  ATTRIBUTE_INLINE,
-  // @[entry]                               : program entry point
-  ATTRIBUTE_ENTRY,
-  // @[impl(Clone, Format, ...)]            : auto implement trait on type declaration
-  ATTRIBUTE_IMPL,
-  // @[const]                               : make a function/struct compile-time-compatible
-  ATTRIBUTE_CONST,
-  // @[pub]                                 : make a symbol publicly visible to all importing modules
-  ATTRIBUTE_PUB,
-  // @[no_mangle]                           : don't mangle a symbols name ever.
-  ATTRIBUTE_NO_MANGLE,
-  // @[no_return],                          : don't throw errors when control flow analyzer isnt satisfied. i.e, this
-  // function will never return control flow back to the caller, when called.
-  ATTRIBUTE_NO_RETURN,
 
-  // @[compiler_feature(some_identifier)] defines a type, function, variable, etc that fufills a dependency for the
-  // compiler.
-  // Specifically one that is absolutely neccesary for normal compilation to continue,
-  // such as the 'str' literal type, Range!<s32> for '0..10', Iterator traits, Slice!<T>, testing dependencies, etc.
-  ATTRIBUTE_COMPILER_FEATURE,
-};
-
-bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *tag);
-// returns either a fixed number of arguments (usually 0)
-// or returns -1 meaning can take an arbitrary number of arguments.
-int attribute_tag_takes_arguments(AttributeTag);
-
-struct Attribute {
-  AttributeTag tag;
-  std::vector<ASTExpr *> arguments;
-};
 
 struct ASTStatement : ASTNode {
-  std::vector<Attribute> attributes = {};
   virtual ASTNodeType get_node_type() const override = 0;
   virtual void accept_typed_replacement(ASTNode *) override {
     printf("a node was passed for replacement but no accept_replacement(*node) definition was provided\n");
