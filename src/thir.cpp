@@ -259,7 +259,6 @@ THIR *THIRGen::visit_method_call(ASTMethodCall *ast) {
   return thir;
 }
 
-// !REFACTOR just a quick and dirty hack, dunno if this is sufficient.
 Symbol *THIRGen::get_symbol(ASTNode *node) { return node->symbol.get(); }
 
 THIR *THIRGen::visit_path(ASTPath *ast) {

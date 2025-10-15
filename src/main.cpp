@@ -23,7 +23,6 @@ using std::vector;
 
 size_t global_num_symbols_declared; // used to key symbols.
 
-
 // CLEANUP: cut these sizes down, i don't think its gaining us anything since
 // we have a linked list style arena these days.
 jstl::Arena symbol_arena{MB(10)};
@@ -70,9 +69,7 @@ ASTStructDeclaration *g_SliceMut_declaration = nullptr;
 ASTChoiceDeclaration *g_Option_type = nullptr;
 
 Type *g_Init_trait_type = nullptr, *g_Iterable_trait_type = nullptr, *g_Iterator_trait_type = nullptr;
-
 int ignored_warnings = 0;
-
 bool run_on_finished = false;
 
 #include <string>
@@ -142,22 +139,4 @@ int main(int argc, char *argv[]) {
 
   return result != 0;
 }
-void Scope::insert(const InternedString &name, Type *type, Mutability mutability, ASTNode *ast,
-                   const std::vector<Type *> &generics, bool is_generic_template) {
-  Symbol *sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol();
-  sym->parent_scope = this;
-  sym->type = type;
-  sym->mutability = mutability;
-  sym->name = name;
-  if (ast) {
-    sym->ast = ast;
-    ast->symbol = sym;
-  }
-  sym->thir = nullptr;
-  sym->value = nullptr;
-  symbols.insert_or_assign(Key::from(name, generics, is_generic_template), sym);
-}
 
-
-size_t temporary_variable_index = 0;
-std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }

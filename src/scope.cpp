@@ -80,3 +80,22 @@ Context::Context() {
     scope->create_type_alias(type->basename, type, nullptr, type->generic_args, false);
   }
 }
+
+void Scope::insert(const InternedString &name, Type *type, Mutability mutability, ASTNode *ast,
+                   const std::vector<Type *> &generics, bool is_generic_template) {
+  Symbol *sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol();
+  sym->parent_scope = this;
+  sym->type = type;
+  sym->mutability = mutability;
+  sym->name = name;
+  if (ast) {
+    sym->ast = ast;
+    ast->symbol = sym;
+  }
+  sym->thir = nullptr;
+  sym->value = nullptr;
+  symbols.insert_or_assign(Key::from(name, generics, is_generic_template), sym);
+}
+
+size_t temporary_variable_index = 0;
+std::string get_temporary_variable() { return "$" + std::to_string(temporary_variable_index++); }
