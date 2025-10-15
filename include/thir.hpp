@@ -486,4 +486,5 @@ struct THIRGen {
   THIRFunction *emit_runtime_entry_point();
 
   void make_global_initializer(const Type *, THIRVariable *thir, Nullable<ASTExpr> value);
+  void setup__all_tests();
 };

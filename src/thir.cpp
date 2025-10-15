@@ -1355,6 +1355,10 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
     }
   }
 
+  // set the initializer for _all_tests before we finish writing this out (main is compiled after this already has been
+  // written out to a string)
+  setup__all_tests();
+
   return thir;
 }
 
@@ -1876,13 +1880,6 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
       length_literal,
   });
 
-  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
-  // complete wrong collection for this, we need built-in slices like Rust.
-  thir->key_values.push_back({
-      "capacity",
-      length_literal,
-  });
-
   return thir;
 }
 
@@ -1905,12 +1902,6 @@ THIR *THIRGen::get_methods_list(Type *type) {
   thir->key_values.push_back({"data", collection});
   thir->key_values.push_back({
       "length",
-      length_literal,
-  });
-  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
-  // complete wrong collection for this, we need built-in slices like Rust.
-  thir->key_values.push_back({
-      "capacity",
       length_literal,
   });
   return thir;
@@ -1937,12 +1928,6 @@ THIR *THIRGen::get_traits_list(Type *type) {
       "length",
       length_literal,
   });
-  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
-  // complete wrong collection for this, we need built-in slices like Rust.
-  thir->key_values.push_back({
-      "capacity",
-      length_literal,
-  });
   return thir;
 }
 
@@ -1966,13 +1951,6 @@ THIR *THIRGen::get_generic_args_list(Type *type) {
   thir->key_values.push_back({"data", collection});
   thir->key_values.push_back({
       "length",
-      length_literal,
-  });
-
-  // this isn't really neccesary, but just to be correct I do it. wasteful on memory, in reality, List!<T> is the
-  // complete wrong collection for this, we need built-in slices like Rust.
-  thir->key_values.push_back({
-      "capacity",
       length_literal,
   });
   return thir;
@@ -2253,6 +2231,47 @@ THIR *THIRGen::make_cast(THIR *operand, Type *type) {
   return cast;
 }
 
+void THIRGen::setup__all_tests() {
+  const bool is_testing = compile_command.has_flag("test");
+  if (is_testing) {
+    Type *test_struct_type;
+    THIRVariable *all_tests_slice_thir;
+    ASTPath test_path;
+    test_struct_type = g_testing_Test_type;
+    all_tests_slice_thir = (THIRVariable *)visit_node(g_testing_tests_declaration);
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, slice_data);
+    slice_data->is_variable_length_array = true;
+    slice_data->type = g_testing_Test_type->make_array_of(test_functions.size());
+
+    for (const auto &function : test_functions) {
+      auto fn_ptr = take_address_of(function, {});
+      auto function_name = function->name.get_str();
+
+      // Replace all occurrences of '$' with "::", so the tests match what the user typed.
+      size_t pos = 0;
+      while ((pos = function_name.find('$', pos)) != std::string::npos) {
+        function_name.replace(pos, 1, "::");
+        pos += 2;
+      }
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_struct_init);
+      test_struct_init->key_values = {{"function", fn_ptr}, {"name", make_str(function_name, function->source_range)}};
+      test_struct_init->type = test_struct_type;
+      slice_data->values.push_back(test_struct_init);
+    }
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, ini);
+    ini->is_statement = false;
+    ini->type = all_tests_slice_thir->type;
+    ini->key_values = {
+        {"data", slice_data},
+        {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
+
+    all_tests_slice_thir->global_initializer_assignment->right = ini;
+  }
+}
+
 THIRFunction *THIRGen::emit_runtime_entry_point() {
   // TODO: implement global static initializers in the emitter.
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { global_ini->name = "ela_run_global_initializers"; }
@@ -2328,55 +2347,6 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
       }
 
       if (is_testing) {
-        ASTVariable *all_tests_list_ast;
-        // List!<Test> and Test type fetching
-        ASTFunctionDeclaration *push_function;
-        Type *test_struct_type;
-        {
-          ASTPath test_path;
-          test_path.push_segment("testing");
-          test_path.push_segment("Test");
-
-          auto test_struct_sym = get_symbol(&test_path);
-          test_struct_type = test_struct_sym->resolved_type;
-
-          ASTPath all_tests_list_path;
-          all_tests_list_path.push_segment("testing");
-          all_tests_list_path.push_segment(ALL_TESTS_LIST_GLOBAL_VARIABLE_NAME);
-
-          auto all_tests_list = get_symbol(&all_tests_list_path);
-          all_tests_list_ast = (ASTVariable *)all_tests_list->variable.declaration.get();
-
-          push_function =
-              all_tests_list_ast->type->resolved_type->info->scope->local_lookup("push")->function.declaration;
-        }
-
-        const auto list_ptr = take_address_of(get_thir(all_tests_list_ast), all_tests_list_ast);
-
-        for (const auto &function : test_functions) {
-          THIR_ALLOC_NO_SRC_RANGE(THIRCall, push_call)
-          push_call->callee = visit_node(push_function);
-          push_call->is_statement = true;
-          push_call->type = void_type();
-          block->statements.push_back(push_call);
-
-          THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_init);
-          auto fn_ptr = take_address_of(function, all_tests_list_ast);
-          auto function_name = function->name.get_str();
-
-          // Replace all occurrences of '$' with "::", so the tests match what the user typed.
-          size_t pos = 0;
-          while ((pos = function_name.find('$', pos)) != std::string::npos) {
-            function_name.replace(pos, 1, "::");
-            pos += 2;
-          }
-
-          test_init->key_values = {{"function", fn_ptr}, {"name", make_str(function_name, function->source_range)}};
-          test_init->type = test_struct_type;
-
-          push_call->arguments = {list_ptr, test_init};
-        }
-
         THIR_ALLOC_NO_SRC_RANGE(THIRCall, _run_all_tests_call) {
           ASTPath run_all_tests;
           run_all_tests.push_segment("testing");
@@ -2506,20 +2476,29 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
     Type *method_ty = g_refl_Method_type;
     Type *field_ty = g_refl_Field_type;
 
-    const ASTDeclaration *list_decl = g_List_declaration;
+    const ASTDeclaration *slice_decl = g_Slice_declaration;
 
-    const ASTDeclaration *list_instance = find_generic_instance(list_decl->generic_instantiations, {type_ptr_ty});
-    const ASTDeclaration *method_instance = find_generic_instance(list_decl->generic_instantiations, {method_ty});
-    const ASTDeclaration *field_instance = find_generic_instance(list_decl->generic_instantiations, {field_ty});
+    const ASTDeclaration *list_instance = find_generic_instance(slice_decl->generic_instantiations, {type_ptr_ty});
+    const ASTDeclaration *method_instance = find_generic_instance(slice_decl->generic_instantiations, {method_ty});
+    const ASTDeclaration *field_instance = find_generic_instance(slice_decl->generic_instantiations, {field_ty});
 
     if (!list_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<*Type> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find [*Type] for reflection. if you're compiling with nostdlib, make "
+          "sure you satisfy the compiler dependencies you use.",
+          {});
     }
     if (!method_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Method> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find [Method] for reflection. if you're compiling with nostdlib, make "
+          "sure you satisfy the compiler dependencies you use.",
+          {});
     }
     if (!field_instance) {
-      throw_error("INTERNAL COMPILER ERROR: unable to find List!<Field> for reflection. if you're compiling with nostdlib, make sure you satisfy the compiler dependencies you use.", {});
+      throw_error(
+          "INTERNAL COMPILER ERROR: unable to find [Field] for reflection. if you're compiling with nostdlib, make "
+          "sure you satisfy the compiler dependencies you use.",
+          {});
     }
 
     type_ptr_list = list_instance->resolved_type;

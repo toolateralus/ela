@@ -20,7 +20,6 @@ constexpr const char *COMPILER_FEATURE_DESTROY_KEY = "Destroy";
 constexpr const char *COMPILER_FEATURE_STR_KEY = "str";
 constexpr const char *COMPILER_FEATURE_STRING_KEY = "String";
 constexpr const char *COMPILER_FEATURE_INITLIST_KEY = "InitList";
-constexpr const char *COMPILER_FEATURE_LIST_KEY = "List";
 constexpr const char *COMPILER_FEATURE_SLICE_KEY = "Slice";
 constexpr const char *COMPILER_FEATURE_SLICEMUT_KEY = "SliceMut";
 constexpr const char *COMPILER_FEATURE_OPTION_KEY = "Option";
@@ -41,7 +40,6 @@ constexpr const char * COMPILER_FEATURES[] = {
   COMPILER_FEATURE_STR_KEY,
   COMPILER_FEATURE_STRING_KEY,
   COMPILER_FEATURE_INITLIST_KEY,
-  COMPILER_FEATURE_LIST_KEY,
   COMPILER_FEATURE_SLICE_KEY,
   COMPILER_FEATURE_SLICEMUT_KEY,
   COMPILER_FEATURE_OPTION_KEY,

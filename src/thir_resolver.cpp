@@ -112,11 +112,13 @@ void Resolver::emit_type_definition(Type *type) {
 }
 
 void Resolver::visit_program(const THIRProgram *thir) {
+  
   for (const auto &stmt : thir->statements) {
     if (stmt) {
       visit_node(stmt);
     }
   }
+  declare_or_define_type(g_testing_Test_type);
 }
 void Resolver::visit_bin_expr(const THIRBinExpr *thir) {
   visit_node(thir->left);

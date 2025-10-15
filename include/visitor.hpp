@@ -78,7 +78,6 @@ extern ASTVariable *g_testing_tests_declaration;
 extern ASTFunctionDeclaration *g_testing_runner_declaration;
 extern Type *g_testing_Test_type;
 
-extern ASTStructDeclaration *g_List_declaration;
 extern ASTStructDeclaration *g_InitList_declaration;
 extern ASTStructDeclaration *g_Slice_declaration;
 extern ASTStructDeclaration *g_SliceMut_declaration;

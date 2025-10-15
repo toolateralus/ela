@@ -274,9 +274,6 @@ void fetch_compiler_features_for_struct_declaration_generic(ASTStructDeclaration
       if (feature == COMPILER_FEATURE_INITLIST_KEY) {
         g_InitList_declaration = node;
         break;
-      } else if (feature == COMPILER_FEATURE_LIST_KEY && !g_List_declaration) {
-        g_List_declaration = node;
-        break;
       } else if (feature == COMPILER_FEATURE_SLICE_KEY) {
         g_Slice_declaration = node;
         break;
