@@ -1773,6 +1773,8 @@ int attribute_tag_takes_arguments(AttributeTag tag) {
       return -1;
     case ATTRIBUTE_DEPRECATED:
       return 2;
+    case ATTRIBUTE_CONSTRUCTOR:
+      return 1;
     case ATTRIBUTE_INLINE:
     case ATTRIBUTE_ENTRY:
     case ATTRIBUTE_CONST:
@@ -1801,6 +1803,8 @@ bool try_get_attribute_tag_from_string(const std::string &ident, AttributeTag *t
     *tag = ATTRIBUTE_COMPILER_FEATURE;
   } else if (ident == "deprecated") {
     *tag = ATTRIBUTE_DEPRECATED;
+  } else if (ident == "constructor") {
+    *tag = ATTRIBUTE_CONSTRUCTOR;
   } else {
     return false;
   }
@@ -1833,7 +1837,7 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
       }
       attribute.tag = tag;
       int argument_count = attribute_tag_takes_arguments(tag);
-      
+
       if (argument_count != 0 && peek().type == TType::LParen) {
         eat();
         argument_count = argument_count == -1 ? INT_MAX : argument_count;
@@ -1847,8 +1851,6 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
         }
         expect(TType::RParen);
       }
-
-
     }
     if (peek().type != TType::RBrace) {
       expect(TType::Comma);

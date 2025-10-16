@@ -55,6 +55,17 @@ int CompileCommand::compile() {
       emitter.code.clear();
       THIRFunction *global_ini = thir_gen.global_initializer_function;
       emitter.emitting_global_initializer = true;
+
+      for (const auto &constructor: thir_gen.constructors) {
+        if (constructor->constructor_index == 1) {
+          THIR_ALLOC_NO_SRC_RANGE(THIRCall, call);
+          call->callee = constructor;
+          call->arguments = {};
+          call->is_statement = true;
+          global_ini->block->statements.push_back(call);
+        }
+      }
+
       resolver.visit_function(global_ini);
       emitter.emitting_global_initializer = false;
       output << emitter.code.str();

@@ -157,6 +157,13 @@ struct THIRFunction : THIR {
   bool is_no_mangle : 1 = false;
   bool is_macro : 1 = false;
 
+  /* 
+    0 == not a constructor.
+    1 == run in the global initializer function, after all globals have run. 
+    2 == use clang __attribute__(constructor) (or an equivalent)
+  */
+  uint8_t constructor_index : 2;
+
   InternedString name;
   std::vector<THIRParameter> parameters;
 
@@ -304,12 +311,16 @@ struct DeferFrame {
 struct THIRGen {
   void check_for_deprecation(THIR *thir);
   void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
+  void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
+  
   THIRGen(Context &ctx, bool for_emitter = true);
-
   std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
   Context &ctx;
+
+  std::vector<THIRFunction *> constructors;
   std::vector<THIRFunction *> test_functions;
+
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;
 

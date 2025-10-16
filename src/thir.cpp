@@ -148,8 +148,8 @@ THIR *THIRGen::visit_expr_statement(ASTExprStatement *ast) {
   return thir;
 }
 
-void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
-                                                 std::vector<THIR *> &out_args, Nullable<THIR> self) {
+void THIRGen::extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args, std::vector<THIR *> &out_args,
+                                                 Nullable<THIR> self) {
   auto old_list = current_expression_list;
   Defer _([&] { current_expression_list = old_list; });
   current_expression_list = &out_args;
@@ -312,8 +312,7 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
         } else if (segment.tag == ASTPath::Segment::TYPE) {
           type = segment.get_type()->resolved_type;
         } else {
-          throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier",
-                      node->source_range);
+          throw_error("INTERNAL COMPILER ERROR: path segment was neither expression nor identifier", node->source_range);
           return nullptr;
         }
 
@@ -331,9 +330,8 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
               throw_error("Cannot apply generic arguments to that type", node->source_range);
             }
 
-            auto instantiation =
-                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      segment.get_resolved_generics());
+            auto instantiation = find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                                       segment.get_resolved_generics());
             auto type = instantiation->resolved_type;
             scope = type->info->scope;
           } else {
@@ -389,8 +387,7 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   auto symbol = get_symbol(ast);
 
   if (!symbol) {
-    throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it",
-                ast->source_range);
+    throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it", ast->source_range);
   }
 
   if (symbol_map.contains(symbol)) {
@@ -457,8 +454,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         THIR_ALLOC(THIRVariable, var, ast)
         var->name = part.var_name;
         var->type = part.resolved_type;
-        var->value =
-            make_member_access(ast->source_range, variant_member_access, {{part.resolved_type, part.field_name}});
+        var->value = make_member_access(ast->source_range, variant_member_access, {{part.resolved_type, part.field_name}});
         if (part.semantic == PATTERN_MATCH_PTR_MUT || part.semantic == PATTERN_MATCH_PTR_CONST) {
           var->value = take_address_of(var->value, ast);
         }
@@ -480,8 +476,8 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         THIR_ALLOC(THIRVariable, var, ast)
         var->name = part.var_name;
         var->type = part.resolved_type;
-        var->value = make_member_access(ast->source_range, variant_member_access,
-                                        {{part.resolved_type, "$" + std::to_string(index++)}});
+        var->value =
+            make_member_access(ast->source_range, variant_member_access, {{part.resolved_type, "$" + std::to_string(index++)}});
         if (part.semantic == PATTERN_MATCH_PTR_MUT || part.semantic == PATTERN_MATCH_PTR_CONST) {
           var->value = take_address_of(var->value, ast);
         }
@@ -546,8 +542,8 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     auto scope = ast->left->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-        ast->left, visit_node(ast->left), symbol->function.declaration->requires_self_ptr()));
+    overload_call->arguments.push_back(
+        try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left), symbol->function.declaration->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
@@ -564,8 +560,8 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     auto scope = ast->operand->resolved_type->info->scope;
     auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
     overload_call->callee = visit_node(symbol->function.declaration);
-    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-        ast->operand, visit_node(ast->operand), symbol->function.declaration->requires_self_ptr()));
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(ast->operand, visit_node(ast->operand),
+                                                                          symbol->function.declaration->requires_self_ptr()));
 
     if (symbol->name == "deref") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
@@ -592,8 +588,8 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
     overload_call->callee = visit_node(symbol->function.declaration);
 
-    auto self = try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base),
-                                                   symbol->function.declaration->requires_self_ptr());
+    auto self =
+        try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base), symbol->function.declaration->requires_self_ptr());
 
     overload_call->arguments.push_back(self);
     overload_call->arguments.push_back(visit_node(ast->index));
@@ -946,9 +942,26 @@ static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDec
   reciever->is_macro = function->is_macro;
 }
 
-static inline void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
+void THIRGen::convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
   for (const auto &attr : attrs) {
     switch (attr.tag) {
+      case ATTRIBUTE_CONSTRUCTOR:
+        if (attr.arguments.size() != 1) {
+          throw_error(
+              "@[constructor($degree)] attribute expects exactly one argument, true or false, which determines "
+              "whether this will run before or after global initializers. 'false' is not reccomended, as accessing global "
+              "data is undefined behaviour from within them, since it runs at an indeterminate time, possibly before "
+              "global initializers. 'true' is absolutely reccomended, as it runs after global initializers with certainty.",
+              reciever->source_range);
+        }
+        // see THIRFunction::constructor_index for info on what the value means.
+        reciever->constructor_index = 1 + (((ASTLiteral *)attr.arguments[0])->value == "false");
+        constructors.push_back(reciever);
+        if (reciever->parameters.size()) {
+          throw_error("@[constructor] functions cannot take parameters, as they're called by the runtime automatically.",
+                      reciever->source_range);
+        }
+        break;
       case ATTRIBUTE_DEPRECATED:
         reciever->deprecated_attr = attr;
         reciever->deprecated = true;
@@ -1073,9 +1086,9 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
   bind(ast, thir);
 
   ENTER_SCOPE(ast->scope);
+  convert_parameters(ast, thir);
   convert_function_flags(thir, ast);
   convert_function_attributes(thir, ast->attributes);
-  convert_parameters(ast, thir);
 
   mangle_function_name_for_thir(ast, thir);
 
@@ -1194,7 +1207,6 @@ void THIRGen::extract_thir_values_for_type_members(Type *type) {
 }
 
 THIR *THIRGen::visit_struct_declaration(ASTStructDeclaration *ast) {
-  
   if (ast->generic_parameters.size()) {
     return nullptr;
   }
@@ -1314,8 +1326,8 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
         auto scope = left->type->info->scope;
         auto symbol = scope->local_lookup(get_operator_overload_name(TType::EQ, OPERATION_BINARY));
         overload_call->callee = visit_node(symbol->function.declaration);
-        overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(
-            branch.expression, left, symbol->function.declaration->requires_self_ptr()));
+        overload_call->arguments.push_back(
+            try_deref_or_take_ptr_to_if_needed(branch.expression, left, symbol->function.declaration->requires_self_ptr()));
         overload_call->arguments.push_back(visit_node(ast->branches[index].expression));
         return overload_call;
       }
@@ -1429,8 +1441,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   if (iterable_var->type->implements(iterable_trait())) {
     auto iter_symbol = iterable_var->type->info->scope->local_lookup("iter");
     bool expects_ptr = iter_symbol && iter_symbol->function.declaration->params->params[0]->self.is_pointer;
-    THIR *iter_arg =
-        (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast) : iterable_var;
+    THIR *iter_arg = (expects_ptr && !iterable_var->type->is_pointer()) ? take_address_of(iterable_var, ast) : iterable_var;
 
     THIR_ALLOC(THIRCall, iter_call, ast);
     iter_call->callee = visit_node(iter_symbol->function.declaration);
@@ -1448,8 +1459,8 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   // Call next() on the iterator
   auto next_symbol = iterator_var->type->info->scope->local_lookup("next");
 
-  auto next_arg = try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var,
-                                                     next_symbol->function.declaration->requires_self_ptr());
+  auto next_arg =
+      try_deref_or_take_ptr_to_if_needed(ast->right, iterator_var, next_symbol->function.declaration->requires_self_ptr());
 
   THIR_ALLOC(THIRCall, next_call, ast);
   next_call->callee = visit_node(next_symbol->function.declaration);
@@ -1473,8 +1484,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   member_access->member = DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
-  THIR *discriminant_literal =
-      make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);
+  THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);
 
   condition->left = member_access;
   condition->op = TType::EQ;
@@ -1762,13 +1772,12 @@ THIR *THIRGen::make_str(const InternedString &value, const SourceRange &src_rang
   thir->source_range = src_range;
   thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type(), ASTLiteral::String)});
-  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())),
-                                                     src_range, u64_type(), ASTLiteral::Integer)});
+  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())), src_range,
+                                                     u64_type(), ASTLiteral::Integer)});
   return thir;
 }
 
-THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type,
-                            ASTLiteral::Tag tag) {
+THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag) {
   THIR_ALLOC_NO_SRC_RANGE(THIRLiteral, thir);
   thir->tag = tag;
   thir->source_range = src_range;
@@ -1777,8 +1786,7 @@ THIR *THIRGen::make_literal(const InternedString &value, const SourceRange &src_
   return thir;
 }
 
-THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base,
-                                  std::deque<std::pair<Type *, InternedString>> parts) {
+THIR *THIRGen::make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts) {
   THIR_ALLOC_NO_SRC_RANGE(THIRMemberAccess, thir)
   thir->source_range = range;
   thir->base = base;
@@ -1870,8 +1878,7 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
   } else if (parent_type->is_kind(TYPE_CHOICE)) {
     const auto info = parent_type->info->as<ChoiceTypeInfo>();
     const auto discriminant = info->get_variant_discriminant(name);
-    thir->key_values.push_back(
-        {"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
+    thir->key_values.push_back({"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
   } else if (parent_type->has_no_extensions()) {
     thir->key_values.push_back({
         "offset",
@@ -2095,6 +2102,17 @@ void THIRGen::format_and_print_deprecated_warning(THIR *node, const Attribute &a
     return;
   }
   Typer typer{ctx};
+
+  if (attr.arguments.size() < 2) {
+    throw_error(
+        std::format("@[deprecated] attribute expects at least 2 arguments, but got {}. "
+                    "the first argument should be the deprecation message, the second should be the symbol to highlight as a"
+                    "replacement, or a string describing a replacement if it's not accessible in the scope of the "
+                    "deprecated declaration",
+                    attr.arguments.size()),
+        node ? node->source_range : SourceRange{});
+  }
+
   // we have to do this since this may refer to out of order code, and that's why we process this so late
   attr.arguments[1]->accept(&typer);
   auto old_scope = ctx.scope;
@@ -2352,9 +2370,8 @@ void THIRGen::setup__all_tests() {
     THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, ini);
     ini->is_statement = false;
     ini->type = all_tests_slice_thir->type;
-    ini->key_values = {
-        {"data", static_variable},
-        {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
+    ini->key_values = {{"data", static_variable},
+                       {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
 
     auto &statements = global_initializer_function->block->statements;
     statements.insert(statements.begin(), static_variable);
@@ -2523,8 +2540,8 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
       memcpy_call->arguments = {
           thir, temp,
-          make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {},
-                       u64_type(), ASTLiteral::Integer)};
+          make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {}, u64_type(),
+                       ASTLiteral::Integer)};
       memcpy_call->is_statement = true;
 
       // This just wont work with compile time, which is annoying

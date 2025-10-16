@@ -485,7 +485,7 @@ void Emitter::emit_dyn_dispatch_object_struct(Type *type) {
 void Emitter::emit_function(const THIRFunction *thir, bool forward_declaration) {
   auto info = thir->type->info->as<FunctionTypeInfo>();
 
-  if (emitting_global_initializer && thir->name == "ela_run_global_initializers") {
+  if ((emitting_global_initializer && thir->name == "ela_run_global_initializers") || thir->constructor_index == 2) {
     code << "__attribute__((constructor))\n";
   }
 

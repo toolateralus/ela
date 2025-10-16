@@ -113,6 +113,26 @@ enum AttributeTag {
   ATTRIBUTE_NO_RETURN,
   // @[deprecated("reason", some::alternative)]
   ATTRIBUTE_DEPRECATED,
+
+  /*
+    CONSTRUCTOR is used to declare that a function should automatically run before main.
+
+    @[constructor(true)]
+       will always place this code after the global initializers have run.
+       this is absolutely the reccomended way to use this attribute.
+       accessing global variables is completely safe here
+       (remember, external library code could be using globals too, we have no idea at this point what is safe or not).
+
+    @[constructor(false)]
+       means that it will run as soon as C decides to run it, in no specified order.
+
+    ** IMPORTANT:
+      a function declared as @[constructor(false)] is very likely to run before global initializers.
+      Reading global variables at this point is completely undefined behaviour.
+      Only use this when you absolutely have to, for some reason.
+  */
+  ATTRIBUTE_CONSTRUCTOR,
+
   // @[compiler_feature(some_identifier)] defines a type, function, variable, etc that fufills a dependency for the
   // compiler.
   // Specifically one that is absolutely neccesary for normal compilation to continue,
@@ -164,8 +184,6 @@ struct ASTNode {
   }
   bool is_expr();
 };
-
-
 
 struct ASTStatement : ASTNode {
   virtual ASTNodeType get_node_type() const override = 0;
@@ -1288,9 +1306,6 @@ struct Typer;
   Defer $scope_defer([&] { ctx.scope = $old_scope; }); \
   ctx.scope = $scope;
 
-
-
-
 struct Parser {
   Typer *typer;
   Context &ctx;
@@ -1314,7 +1329,7 @@ struct Parser {
   void parse_destructure_element_value_semantic(DestructureElement &destruct);
   ASTImport::Group parse_import_group(ASTPath *base_path = nullptr);
   ASTStatement *parse_using_stmt();
-  
+
   std::vector<Attribute> parse_statement_attributes();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
