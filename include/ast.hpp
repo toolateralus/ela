@@ -567,6 +567,7 @@ struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   TType op;
+  ASTFunctionDeclaration *resolved_operator_overload;
   bool is_operator_overload = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
@@ -577,6 +578,7 @@ struct ASTUnaryExpr : ASTExpr {
   Mutability mutability = CONST;
   ASTExpr *operand;
   TType op;
+  ASTFunctionDeclaration *resolved_operator_overload;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
@@ -871,6 +873,7 @@ struct ASTWhile : ASTStatement {
 struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
   bool is_pointer_subscript = false;
+  ASTFunctionDeclaration *resolved_operator_overload;
   ASTExpr *base;
   ASTExpr *index;
   void accept(VisitorBase *visitor) override;

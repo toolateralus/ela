@@ -164,7 +164,7 @@ struct TypeInfo {
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
   bool is_forward_declared = false;
-  
+
   // Zero size type.
   size_t size_in_bytes() const override { return 0; }
 };
@@ -296,6 +296,7 @@ Type *char_ptr_type();
 Type *char_type();
 
 Type *is_fn_trait();
+Type *is_range_trait();
 
 Type *is_fn_ptr_trait();
 Type *is_tuple_trait();
@@ -322,8 +323,7 @@ void assess_and_try_add_blittable_trait(Type *type);
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
-Type *global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
-                         Type * = nullptr);
+Type *global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {}, Type * = nullptr);
 
 Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Type *> generic_args = {});
 
@@ -404,9 +404,7 @@ struct Type {
     return false;
   }
 
-  inline bool is_pointer() const {
-    return back_ext_type() == TYPE_EXT_POINTER_CONST || back_ext_type() == TYPE_EXT_POINTER_MUT;
-  }
+  inline bool is_pointer() const { return back_ext_type() == TYPE_EXT_POINTER_CONST || back_ext_type() == TYPE_EXT_POINTER_MUT; }
 
   // this returns the number of pointers at the BACK of the extensions,
   // so *List!<*int> would return 1;
@@ -514,9 +512,7 @@ struct Type {
   size_t offset_in_bytes(const InternedString &field) const;
 };
 
-static inline constexpr bool type_is_valid(Type *type) {
-  return type != Type::UNRESOLVED_GENERIC && type != Type::INVALID_TYPE;
-}
+static inline constexpr bool type_is_valid(Type *type) { return type != Type::UNRESOLVED_GENERIC && type != Type::INVALID_TYPE; }
 
 struct ASTFunctionDeclaration;
 
@@ -529,9 +525,11 @@ enum OperationKind {
   OPERATION_BINARY,
   OPERATION_UNARY,
   OPERATION_INDEX,
+  OPERATION_SLICE_INDEX,
 };
 
-Type *find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
+struct Symbol;
+Symbol *find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
 
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
@@ -568,8 +566,7 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {
     case TYPE_SCALAR: {
-      auto sint =
-          type == s32_type() || type == s8_type() || type == s16_type() || type == s32_type() || type == s64_type();
+      auto sint = type == s32_type() || type == s8_type() || type == s16_type() || type == s32_type() || type == s64_type();
       auto uint = type == u8_type() || type == u16_type() || type == u32_type() || type == u64_type();
       auto floating_pt = type == f32_type() || type == f64_type();
       if (sint) {

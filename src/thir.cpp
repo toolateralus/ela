@@ -70,7 +70,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto discriminant = info->get_variant_discriminant(variant_name);
   auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer);
-  thir->key_values.push_back({DISCRIMINANT_KEY, literal});
+  thir->key_values.push_back({OPTION_DISCRIMINANT_KEY, literal});
   return thir;
 }
 
@@ -495,7 +495,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
 THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant) {
   THIR_ALLOC(THIRMemberAccess, discriminant_access, ast)
   discriminant_access->base = cached_object;
-  discriminant_access->member = DISCRIMINANT_KEY;
+  discriminant_access->member = OPTION_DISCRIMINANT_KEY;
   discriminant_access->type = u64_type();
   THIR_ALLOC(THIRBinExpr, thir, ast);
   thir->left = discriminant_access;
@@ -539,11 +539,9 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     return binexpr;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->left->resolved_type->info->scope;
-    auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_BINARY));
-    overload_call->callee = visit_node(symbol->function.declaration);
+    overload_call->callee = visit_node(ast->resolved_operator_overload);
     overload_call->arguments.push_back(
-        try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left), symbol->function.declaration->requires_self_ptr()));
+        try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left), ast->resolved_operator_overload->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
@@ -557,13 +555,12 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     return unary;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->operand->resolved_type->info->scope;
-    auto symbol = scope->local_lookup(get_operator_overload_name(ast->op, OPERATION_UNARY));
-    overload_call->callee = visit_node(symbol->function.declaration);
+    overload_call->callee = visit_node(ast->resolved_operator_overload);
+    overload_call->callee = visit_node(ast->resolved_operator_overload);
     overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(ast->operand, visit_node(ast->operand),
-                                                                          symbol->function.declaration->requires_self_ptr()));
+                                                                          ast->resolved_operator_overload->requires_self_ptr()));
 
-    if (symbol->name == "deref") {
+    if (ast->resolved_operator_overload->name == "deref") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
       deref->op = TType::Mul;
       deref->operand = overload_call;
@@ -584,23 +581,27 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     return index;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
-    auto scope = ast->base->resolved_type->info->scope;
-    auto symbol = scope->local_lookup(get_operator_overload_name(TType::LBrace, OPERATION_INDEX));
-    overload_call->callee = visit_node(symbol->function.declaration);
+    auto index = visit_node(ast->index);
+    overload_call->callee = visit_node(ast->resolved_operator_overload);
 
     auto self =
-        try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base), symbol->function.declaration->requires_self_ptr());
+        try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base), ast->resolved_operator_overload->requires_self_ptr());
 
     overload_call->arguments.push_back(self);
-    overload_call->arguments.push_back(visit_node(ast->index));
+    overload_call->arguments.push_back(index);
 
-    // We always dereference index operator overLOADs
-    THIR_ALLOC(THIRUnaryExpr, deref, ast);
-    deref->type = ast->resolved_type;
-    deref->op = TType::Mul;
-    deref->operand = overload_call;
+    // We always dereference index operator overLOADs, unless it's slice_index
 
-    return deref;
+    const InternedString name = ast->resolved_operator_overload->name;
+    if (name != "slice_index" && name != "slice_index_mut") {
+      THIR_ALLOC(THIRUnaryExpr, deref, ast);
+      deref->type = ast->resolved_type;
+      deref->op = TType::Mul;
+      deref->operand = overload_call;
+  
+      return deref;
+    }
+    return overload_call;
   }
 }
 
@@ -668,10 +669,29 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   return dynof;
 }
 
+THIR *THIRGen::option_some(THIR *value, Type *interior_type) {
+  ASTDeclaration *option = find_generic_instance(g_Option_type->generic_instantiations, {interior_type});
+  auto type = option->resolved_type;
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, init);
+  init->type = type;
+  init->is_statement = false;
+  init->key_values = {
+    {
+      OPTION_DISCRIMINANT_KEY,
+      make_literal(OPTION_SOME_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
+    },
+    {
+      "Some",
+      value,
+    }
+  };
+  return init;
+}
+
 THIR *THIRGen::visit_range(ASTRange *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
-  thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, visit_node(ast->left)});
-  thir->key_values.push_back({RANGE_TYPE_END_KEY, visit_node(ast->right)});
+  thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, option_some(visit_node(ast->left), ast->left->resolved_type)});
+  thir->key_values.push_back({RANGE_TYPE_END_KEY, option_some(visit_node(ast->right), ast->right->resolved_type)});
   return thir;
 }
 
@@ -1303,7 +1323,7 @@ THIR *THIRGen::visit_switch(ASTSwitch *ast) {
       auto left = cached_expr;
 
       auto &branch = ast->branches[index];
-      if (operator_overload_ty == Type::INVALID_TYPE) {  // normal equality comparison.
+      if (!operator_overload_ty) {  // normal equality comparison.
         THIR *condition;
 
         if (branch.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
@@ -1481,7 +1501,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRBinExpr, condition, ast);
   THIR_ALLOC(THIRMemberAccess, member_access, ast);
   member_access->base = next_var;
-  member_access->member = DISCRIMINANT_KEY;
+  member_access->member = OPTION_DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
   THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->source_range, u32_type(), ASTLiteral::Integer);

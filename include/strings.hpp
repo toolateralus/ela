@@ -76,7 +76,7 @@ constexpr size_t TYPE_FLAGS_FLAGS_ENUM = 1 << 15;
 
 constexpr auto REFL_TY_FORMAT_STRING = "refl_ty${}";
 constexpr std::string ANONYMOUS_TYPE_PREFIX = "__anon_D";
-constexpr const char *DISCRIMINANT_KEY = "$discriminant";
+constexpr const char *OPTION_DISCRIMINANT_KEY = "$discriminant";
 constexpr const char *DYN_INSTANCE_KEY = "instance";
 
 constexpr const char *OPTION_NONE_DISCRIMINANT_VALUE = "1";

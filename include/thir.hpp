@@ -309,6 +309,7 @@ struct DeferFrame {
 };
 
 struct THIRGen {
+  THIR *option_some(THIR *value, Type *interior_type);
   void check_for_deprecation(THIR *thir);
   void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
   void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);

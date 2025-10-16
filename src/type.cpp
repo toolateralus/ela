@@ -481,6 +481,17 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
   }
+
+  if (name == "Slice") {
+    type->traits.push_back(is_slice_trait());
+  } else if (name == "SliceMut") {
+    type->traits.push_back(is_slice_mut_trait());
+  }
+
+  if (name == "RangeBase") {
+    type->traits.push_back(is_range_trait());
+  }
+
   type->set_base(base);
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
@@ -569,12 +580,6 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     if (base_type->is_kind(TYPE_FUNCTION)) {
       type->traits.push_back(is_fn_ptr_trait());
     }
-  }
-
-  if (name == "Slice") {
-    type->traits.push_back(is_slice_trait());
-  } else if (name == "SliceMut") {
-    type->traits.push_back(is_slice_mut_trait());
   }
 
   if (!info->scope) {
@@ -823,6 +828,11 @@ Type *Type::take_pointer_to(bool is_mutable) const {
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
+
+  if (kind == OPERATION_SLICE_INDEX) {
+    return "slice_index";
+  }
+
   switch (op) {
     case TType::LBrace:
       // TODO: This needs to be 'index'/'index_mut'
@@ -894,13 +904,13 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   return output;
 }
 
-Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind kind) {
+Symbol *find_operator_overload(int mutability, Type *type, TType op, OperationKind kind) {
   if (!type) {
-    return Type::INVALID_TYPE;
+    return nullptr;
   }
   std::string op_str = get_operator_overload_name(op, kind);
   if (op_str.empty()) {
-    return Type::INVALID_TYPE;
+    return nullptr;
   }
 
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
@@ -909,17 +919,21 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
     op_str = "index_mut";
   }
 
+  if (op_str == "slice_index" && (type->is_mut_pointer() || mutability == MUT)) {
+    op_str = "slice_index_mut";
+  }
+
   auto scope = type->info->scope;
 
-  if (!scope) return Type::INVALID_TYPE;
+  if (!scope) return nullptr;
 
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function && type_is_valid(symbol->resolved_type)) {
-      return symbol->resolved_type;
+      return symbol;
     }
   }
 
-  return Type::INVALID_TYPE;
+  return nullptr;
 }
 
 /*
@@ -953,6 +967,11 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
     i++;
   }
   return s;
+}
+
+Type *is_range_trait() {
+  static Type *id = global_create_trait_type("IsRange", create_child(nullptr), {});
+  return id;
 }
 
 Type *is_fn_ptr_trait() {
@@ -1382,3 +1401,4 @@ bool Type::has_dependencies() const {
     break;
   }
 }
+

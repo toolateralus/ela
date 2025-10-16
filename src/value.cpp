@@ -299,7 +299,7 @@ Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
   // 0 is always the invalid out of bounds discriminant for choice types.
   // for interpreted choice types, we will just ignore initializing variants, only one can exist,
   // so only one shall exist ever.
-  object->values[DISCRIMINANT_KEY] = 0;
+  object->values[OPTION_DISCRIMINANT_KEY] = 0;
   return object;
 }
 
