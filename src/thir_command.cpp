@@ -20,6 +20,10 @@ int CompileCommand::compile() {
   Context context{};
   original_path = std::filesystem::current_path();
 
+  if (compile_command.has_flag("release")) {
+    compile_command.flags["nl"] = true;
+  }
+
   auto program = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();

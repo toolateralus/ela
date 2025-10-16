@@ -105,7 +105,7 @@ Available 'init' args:
 
 Available flags:
   --release          Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
-  --no-compile       Transpile to C++ but don't invoke the clang++ compiler automatically.
+  --no-compile       Transpile to C but don't invoke the clang compiler automatically.
   --nl               Compile in debug mode, but with no 'line info'. this, often paired with --s, will allow you to debug the output C code.
   --freestanding     Compile without the C Standard Library. equivalent to '--nostdlib & --ffreestanding' for GCC/Clang.
   --nostdlib         Compile without Ela's standard library. Note, this includes many types such as List!<T>,Slice!<T>,str/String, etc. We don't have a "Core" seperated from the stdlib.

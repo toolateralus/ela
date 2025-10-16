@@ -40,6 +40,14 @@ Context::Context() {
   scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
+// TODO: we need a more formal way to do release mode.
+// we used to have a --release and --debug
+  if (compile_command.has_flag("release")) {
+    scope->defines().insert("RELEASE");
+  } else {
+    scope->defines().insert("DEBUG");
+  }
+
   get_varargs_handlers(this);
 
   if (compile_command.has_flag("freestanding")) Scope::defines().insert("FREESTANDING");
