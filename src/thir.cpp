@@ -2097,7 +2097,10 @@ void THIRGen::format_and_print_deprecated_warning(THIR *node, const Attribute &a
   Typer typer{ctx};
   // we have to do this since this may refer to out of order code, and that's why we process this so late
   attr.arguments[1]->accept(&typer);
+  auto old_scope = ctx.scope;
+  ctx.scope = attr.arguments[1]->declaring_scope;
   auto symbol = ctx.get_symbol(attr.arguments[1]).get();
+  ctx.scope = old_scope;
 
   SourceRange range = attr.arguments[1]->source_range;
 
