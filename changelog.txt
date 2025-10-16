@@ -46,3 +46,67 @@
 - Added back explicit casting any pointer type to any other pointer type. this is needed for many low level memory reinterpretations,
   and casting to *void or *u8 just to cast back out is insanely clunky and makes worse code, not safer.
 --------------------------------------------------------------------------------------------------------------------
+
+
+-------- (toolateralus) 10/16/2025, 11:13:48 AM ----------------------------------------------------------------------
+# I keep forgetting to update this changelog, so many things are probably missing. I need to remember!
+# I have been working A LOT on the compiler lately, and there are giant changes in other branches I've also been experimenting with (which are far from being close to compiling a hello world)
+  that should seriously improve the developer experience in many ways, and improve the future outlook of the compiler from a maintainability ans stability standpoint.
+  These experiments should become realistic to expect in the next few months, I hope.
+  -- some of the experiments consist of: (out of order compilation, recoverable errors, overhauled impl and trait system, improved generics)
+  Once these changes are complete (which may take up to 6 months i'd imagine) we can finally start working on a real LSP, rewrite the entire stdlib to be sane,
+  and really get some awesome free and expressive code going :D
+
+- The compiler now has a compile time interpreter, where #run directives can be used to run arbitrary code at compile time.
+    This currently is ultra restricted, and basically only works for extern C functions, and memory allocation is still dodgy
+    so containers like List!<T> are unusable.
+
+    If you choose to start using this feature, do not be surprised when stuff goes awry. It also has some very strange bugs
+    regarding changing the default values of variables and things it touches at compile time, and it does not get reverted.
+    this is not something you are likely to encounter, but beware that it is possible to change the meaning of your program in 
+    unintended ways when running runtime code at compile time.
+
+    However, it's a fairly good start, and you can in fact make syscalls at compile time. A fun exercise to witness this,
+    is using a for loop in a run directive, and using `std::c::printf("%d\n"c, i);` within the loop. Neat!
+
+    This will eventually get a total overhaul, fixing the odd state leaking and fully supporting every single operation that's 
+    possible at runtime. there are just a few hurdles preventing this, it's closer than it seems when using it.
+
+    use 'ela init' with an updated version of the compiler, and it contains a tiny '#run' example.
+
+- added '@[deprecated("Reason", Alternative)]' and '@[constructor(run_after_global_init: bool)]' attributes, 
+    as well as implemented a nicer signal handler in the standard library for a stack trace on segfaults.
+    as of right now, the 'signal' lib must be imported (that's all) to get this signal handler.
+
+- improved range literals. now, we have inclusive ranges, and you can use ranges with a minimum of one operand. as such:
+    ..10      => 0 -> 10, exclusive (ends at 9, length=10)
+    1..       => 0 -> s32::max_value(), exclusive
+    0..=10    => 0 -> 10, inclusive (ends at 10, length=11)
+
+    and so on, with various combinations.
+
+- added the 'Slice_Index' trait and operators, so you can implement an index operator that takes a range
+    and returns a Slice. such as:
+
+    list: List!<s32> = .[ 0, 1 ];
+    list[0..2] => [s32] { 0, 1 }
+
+    a note to implementors of this trait: 
+      it's ultimately up to you, how to handle when the slice is missing one of its operands. such as the user
+      passes ..10 or 10.. etc.
+
+      However, it's strongly reccomended, that when there is no 'end' operand, you use .length as your end,
+      and when there is no begin, you use 0 as the default.
+
+      range does now have get_begin_or_default() and get_end_or_default() methods, but there's a caveat -- 
+      get_end_or_default() (where T is a numeric type) will return Number::max_value(), which is obviouisly not
+      realistic for any container type.
+
+      For now, Slice_Index!<T> is limited to only taking Range!<s32>, but in the future, with symbol table improvements
+      and the allowance of generic operator overloads, and better trait bounds composition, 
+      this will change to become more flexible.
+
+I know i'm forgetting loads of things. the commit history is a nightmare so beware, that may not be a good source of info here.
+I will try my best to remember to maintain this log from here on out.
+
+--------------------------------------------------------------------------------------------------------------------

@@ -2838,30 +2838,51 @@ void Typer::visit(ASTInitializerList *node) {
 }
 
 void Typer::visit(ASTRange *node) {
-  node->left->accept(this);
-  node->right->accept(this);
-  auto left = node->left->resolved_type;
-  auto right = node->right->resolved_type;
 
-  auto conversion_rule_left_to_right = type_conversion_rule(left, right);
-  auto conversion_rule_right_to_left = type_conversion_rule(right, left);
-
-  // Alwyas cast to the left? or should we upcast to the largest number type?
-  if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
-    implicit_cast(node->right, right = left);
-  } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED || conversion_rule_right_to_left == CONVERT_IMPLICIT) {
-    implicit_cast(node->left, left = right);
-  } else {
-    throw_error(
-        "Can only use ranges when both types are implicitly castable to each other. Range will always take the "
-        "left side's type",
-        node->source_range);
+  if (node->left) {
+    node->left->accept(this);
   }
 
-  node->resolved_type = find_generic_type_of("RangeBase", {left}, node->source_range);
+  if (node->right) {
+    node->right->accept(this);
+  }
+
+  if (node->left && node->right) {
+    auto left = node->left->resolved_type;
+    auto right = node->right->resolved_type;
+  
+    auto conversion_rule_left_to_right = type_conversion_rule(left, right);
+    auto conversion_rule_right_to_left = type_conversion_rule(right, left);
+  
+    // Alwyas cast to the left? or should we upcast to the largest number type?
+    if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
+      implicit_cast(node->right, right = left);
+    } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED || conversion_rule_right_to_left == CONVERT_IMPLICIT) {
+      implicit_cast(node->left, left = right);
+    } else {
+      throw_error(
+          "Can only use ranges when both types are implicitly castable to each other. Range will always take the "
+          "left side's type",
+          node->source_range);
+    }
+  }
+
+  Type *type;
+  if (!node->left && !node->right) {
+    throw_error("ranges must have at least one value, on either the left or right, or both", node->source_range);
+  }
+
+  if (node->left) {
+    type = node->left->resolved_type;
+  } else {
+    type = node->right->resolved_type;
+  }
+
+
+  node->resolved_type = find_generic_type_of("RangeBase", {type}, node->source_range);
 
   if (node->resolved_type == Type::INVALID_TYPE) {
-    throw_error(std::format("Unable to find range type for `{}..{}`", left->to_string(), right->to_string()), node->source_range);
+    throw_error(std::format("Unable to find range type for `{}..{}`", type->to_string(), type->to_string()), node->source_range);
   }
 }
 

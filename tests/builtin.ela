@@ -15,14 +15,53 @@ import assertion::*;
 
 #test fn test_range_var() {
   r : Range = 0..10;
-  assert(r.begin == 0 && r.end == 10, "range variable failed");
+  assert_eq(r.begin.unwrap(), 0, "range begin failed");
+  assert_eq(r.end.unwrap(), 10, "range end failed");
 
   i: s32;
   for z in r {
-    assert(i == z, "range iteration failed");
+    assert_eq(i, z, "range iteration failed");
     i++;
   }
+
+  // ..10 should be equivalent to Range { begin: None, end: Some(10), is_inclusive: false }
+  r1 : Range = ..10;
+  assert(r1.begin.is_none(), "..10 begin should be None");
+  assert_eq(r1.end.unwrap(), 10, "..10 end should be 10");
+  assert(!r1.is_inclusive, "..10 should not be inclusive");
+
+  // 1..=10 should be Range { begin: Some(1), end: Some(10), is_inclusive: true }
+  r2 : Range = 1..=10;
+  assert_eq(r2.begin.unwrap(), 1, "1..=10 begin should be 1");
+  assert_eq(r2.end.unwrap(), 10, "1..=10 end should be 10");
+  assert(r2.is_inclusive, "1..=10 should be inclusive");
+
+  // 1.. should be Range { begin: Some(1), end: None, is_inclusive: false }
+  r3 : Range = 1..;
+  assert_eq(r3.begin.unwrap(), 1, "1.. begin should be 1");
+  assert(r3.end.is_none(), "1.. end should be None");
+  assert(!r3.is_inclusive, "1.. should not be inclusive");
+
+  assert_eq(r.length(), 10, "range length failed");
+  assert_eq(r.get_begin_or_default(), 0, "get_begin_or_default failed");
+  assert_eq(r.get_end_or_default(), 10, "get_end_or_default failed");
+
+  // ..10: begin is None, end is Some(10)
+  assert_eq(r1.length(), 10, "..10 length failed");
+  assert_eq(r1.get_begin_or_default(), 0, "..10 get_begin_or_default failed");
+  assert_eq(r1.get_end_or_default(), 10, "..10 get_end_or_default failed");
+
+  // 1..=10: begin is Some(1), end is Some(10), inclusive
+  assert_eq(r2.length(), 10, "1..=10 length failed");
+  assert_eq(r2.get_begin_or_default(), 1, "1..=10 get_begin_or_default failed");
+  assert_eq(r2.get_end_or_default(), 10, "1..=10 get_end_or_default failed");
+
+  // 1..: begin is Some(1), end is None
+  assert_eq(r3.length(), s32::max_value() - 1, "1.. length failed (should be max_value()-begin for open-ended)");
+  assert_eq(r3.get_begin_or_default(), 1, "1.. get_begin_or_default failed");
+  assert_eq(r3.get_end_or_default(), s32::max_value(), "1.. get_end_or_default failed (should default to max_value())");
 }
+
 
 #test fn test_multidimensional_arrays() {
   array: [[s32; 5]; 5];

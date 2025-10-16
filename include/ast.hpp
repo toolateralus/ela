@@ -786,6 +786,7 @@ struct ASTContinue : ASTStatement {
 struct ASTRange : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
+  bool inclusive = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
@@ -1278,6 +1279,7 @@ struct DirectiveRoutine {
 // VERIFY(Josh) 10/5/2024, 10:33:32 AM
 // make sure that this precedence scheme makes sense.
 enum Precedence {
+  PRECEDENCE_INVALID_OPERATOR = -1,
   PRECEDENCE_LOWEST,
   PRECEDENCE_ASSIGNMENT,     // =, :=
   PRECEDENCE_LOGICALOR,      // ||

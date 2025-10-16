@@ -40,8 +40,7 @@ static void remove_body(Parser *parser) {
 }
 
 static void remove_preproc(Parser *parser) {
-  if (parser->peek().type == TType::If ||
-      (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") ||
+  if (parser->peek().type == TType::If || (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") ||
       (parser->peek().type == TType::Identifier && parser->peek().value == "ifndef")) {
     while (parser->peek().type != TType::LCurly) {
       parser->eat();
@@ -674,8 +673,7 @@ ASTProgram *Parser::parse_program() {
 
     if (states.empty()) {
       end_node(program, range);
-      throw_error("INTERNAL_COMPILER_ERROR: somehow the lexer state stack was empty after including the bootstrap lib.",
-                  range);
+      throw_error("INTERNAL_COMPILER_ERROR: somehow the lexer state stack was empty after including the bootstrap lib.", range);
       return nullptr;
     }
 
@@ -830,6 +828,10 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 
     Precedence token_precedence = get_operator_precedence(peek());
 
+    if (token_precedence == PRECEDENCE_INVALID_OPERATOR) {
+      return left;
+    }
+
     if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GT) {
       token_precedence = PRECEDENCE_SHIFT;
     }
@@ -869,9 +871,9 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 ASTExpr *Parser::parse_unary() {
   // bitwise not is a unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
-  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot ||
-      peek().type == TType::Not || peek().type == TType::Increment || peek().type == TType::Decrement ||
-      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::Not) {
+  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot || peek().type == TType::Not ||
+      peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Mul ||
+      peek().type == TType::And || peek().type == TType::Not) {
     NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
     auto op = eat();
 
@@ -920,9 +922,9 @@ ASTPath::Segment Parser::parse_path_segment() {
 ASTPath *Parser::parse_path(bool parsing_import_group) {
   NODE_ALLOC(ASTPath, path, range, defer, this);
   // If we find a double colon, then we continue.
-  while (!parsing_import_group || (peek().type != TType::LCurly &&
-                                   peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
-                                                                  // place to simplify parsing of import groups.
+  while (!parsing_import_group ||
+         (peek().type != TType::LCurly && peek().type != TType::Mul)) {  // this condition may seem strange, but it's purely in
+                                                                         // place to simplify parsing of import groups.
 
     auto segment = parse_path_segment();
     path->segments.push_back(segment);
@@ -1034,7 +1036,22 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::Range) {
       NODE_ALLOC(ASTRange, node, range, _, this)
       eat();
-      node->right = parse_expr();
+      if (peek().type == TType::Assign) {
+        eat();
+        node->inclusive = true;
+      }
+
+      auto peeked = peek();
+
+      // TODO: im sure theres plenty of cases ive missed here, just trying to guess whether what's ahead is
+      // an expression or not.
+      Precedence peeked_prec = get_operator_precedence(peeked);
+
+      if (peeked.type == TType::Integer || peeked.type == TType::Identifier || peeked.type == TType::Mul ||
+          peeked.type == TType::LParen || peeked.type == TType::Size_Of || peeked.type == TType::Dyn_Of || peeked.type == TType::Type_Of || peeked_prec != Precedence::PRECEDENCE_INVALID_OPERATOR) {
+        node->right = parse_expr();
+      }
+
       node->left = left;
       return node;
     } else if (peek().type == TType::As) {
@@ -1097,6 +1114,16 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Range: {
+      NODE_ALLOC(ASTRange, range, src_range, defer, this);
+      eat();
+      if (peek().type == TType::Assign) {
+        eat();
+        range->inclusive = true;
+      }
+      range->right = parse_expr();
+      return range;
+    }
     case TType::Varargs: {
       NODE_ALLOC(ASTUnpack, node, range, defer, this)
       eat();
@@ -1369,9 +1396,8 @@ ASTExpr *Parser::parse_primary() {
       return parse_path();
     default: {
       auto error_range = begin_node();
-      throw_error(
-          std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
-          error_range);
+      throw_error(std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
+                  error_range);
       return nullptr;
     }
   }
@@ -1550,13 +1576,12 @@ ASTModule *Parser::parse_module() {
     eat();
     expected_delimiter = TType::RCurly;
   } else {
-    throw_error(std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'",
-                            peek().value.get_str()),
-                mod->source_range);
+    throw_error(
+        std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'", peek().value.get_str()),
+        mod->source_range);
   }
 
-  if (expected_delimiter == TType::Eof &&
-      (current_func_decl || current_impl_decl || current_struct_decl || current_trait_decl)) {
+  if (expected_delimiter == TType::Eof && (current_func_decl || current_impl_decl || current_struct_decl || current_trait_decl)) {
     throw_error("file-scoped modules can only be declared at the top-level", mod->source_range);
   }
 
@@ -2064,8 +2089,7 @@ ASTStatement *Parser::parse_statement() {
         auto expr = parse_expr();
         node->right = expr;
       } else {
-        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in iterable || for *elem in iterable'",
-                    range);
+        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in iterable || for *elem in iterable'", range);
       }
 
       node->block = parse_block();
@@ -2097,14 +2121,12 @@ ASTStatement *Parser::parse_statement() {
     const bool is_simple_const_destructure = tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma;
 
     const bool is_simple_mut_destructure =
-        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
-         lookahead_buf()[2].type == TType::Comma) ||
-        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul &&
-         lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
+        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::Comma) ||
+        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
+         lookahead_buf()[3].type == TType::Comma);
 
-    const bool is_simple_const_referential_destructure = tok.type == TType::And &&
-                                                         lookahead_buf()[1].type == TType::Identifier &&
-                                                         lookahead_buf()[2].type == TType::Comma;
+    const bool is_simple_const_referential_destructure =
+        tok.type == TType::And && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::Comma;
 
     const bool is_complex_referential_destructure =
         tok.type == TType::And && (lookahead_buf()[1].type == TType::Const || lookahead_buf()[1].type == TType::Mut) &&
@@ -2115,8 +2137,8 @@ ASTStatement *Parser::parse_statement() {
       return parse_destructure();
     }
 
-    bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
-                                                                      lookahead_buf()[1].type == TType::ColonEquals);
+    bool is_colon_or_colon_equals = tok.type == TType::Identifier &&
+                                    (lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals);
 
     bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
                        (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
@@ -2183,8 +2205,8 @@ ASTStatement *Parser::parse_statement() {
     const bool is_special_case = tok.type == TType::LParen ||  // possible parenthesized dereference or something.
                                  tok.type == TType::Switch;
 
-    if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
-        is_deref || is_special_case) {
+    if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound || is_deref ||
+        is_special_case) {
       NODE_ALLOC(ASTExprStatement, statement, range, _, this)
       statement->expression = parse_expr();
       if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
@@ -2282,10 +2304,9 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     auto result = process_directive(DIRECTIVE_KIND_STATEMENT, ident.value);
     if (result.is_null() || result.get()->get_node_type() != AST_NODE_BLOCK) {
       end_node(block, range);
-      throw_error(
-          std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't",
-                      ident.value),
-          range);
+      throw_error(std::format("directive {} is incompatible with block declarations, it must return a block, which it doesn't",
+                              ident.value),
+                  range);
     }
     return (ASTBlock *)result.get();
   }
@@ -3021,8 +3042,7 @@ std::vector<ASTType *> Parser::parse_parameter_types() {
   return param_types;
 }
 
-ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations,
-                                      const std::vector<Type *> &gen_args) {
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args) {
   for (auto &instantiation : instantiations) {
     if (instantiation.arguments == gen_args) {
       return instantiation.declaration;
@@ -3125,7 +3145,7 @@ static Precedence get_operator_precedence(Token token) {
     case TType::Modulo:
       return PRECEDENCE_MULTIPLICATIVE;
     default:
-      return PRECEDENCE_LOWEST;
+      return PRECEDENCE_INVALID_OPERATOR;
   }
 }
 
@@ -3155,8 +3175,7 @@ inline Token Parser::expect(TType type) {
   fill_buffer_if_needed(states.back());
   if (peek().type != type) {
     SourceRange range = peek().location;
-    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
-                range);
+    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value), range);
   }
   return eat();
 }
@@ -3238,8 +3257,7 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
   }
 }
 
-Parser::Parser(const std::string &filename, Context &context)
-    : ctx(context), states({Lexer::State::from_file(filename)}) {
+Parser::Parser(const std::string &filename, Context &context) : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed(states.back());
   typer = new Typer(context);
 }

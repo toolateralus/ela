@@ -309,27 +309,30 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  THIR *option_some(THIR *value, Type *interior_type);
-  void check_for_deprecation(THIR *thir);
-  void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
-  void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
   
   THIRGen(Context &ctx, bool for_emitter = true);
   std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
   Context &ctx;
-
+  
   std::vector<THIRFunction *> constructors;
   std::vector<THIRFunction *> test_functions;
-
+  
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;
-
+  
   std::vector<DeferFrame> defer_stack;
-
+  
   void enter_defer_boundary(DeferBoundary boundary);
   void exit_defer_boundary();
 
+  THIR *option_some(THIR *value, Type *interior_type);
+  THIR *option_none(Type *interior_type);
+
+  void check_for_deprecation(THIR *thir);
+  void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
+  void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
+  
   Symbol *get_symbol(ASTNode *);
 
   // remove frames up to `boundary` and return defers in execution order

@@ -310,8 +310,12 @@ ASTTraitDeclaration *ASTCopier::copy_trait_declaration(ASTTraitDeclaration *node
 
 ASTRange *ASTCopier::copy_range(ASTRange *node) {
   auto new_node = make_copy(node);
-  new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
-  new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
+  if (node->left) {
+    new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
+  }
+  if (node->right) {
+    new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
+  }
   return new_node;
 }
 

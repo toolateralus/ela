@@ -540,8 +540,8 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
     overload_call->callee = visit_node(ast->resolved_operator_overload);
-    overload_call->arguments.push_back(
-        try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left), ast->resolved_operator_overload->requires_self_ptr()));
+    overload_call->arguments.push_back(try_deref_or_take_ptr_to_if_needed(ast->left, visit_node(ast->left),
+                                                                          ast->resolved_operator_overload->requires_self_ptr()));
     overload_call->arguments.push_back(visit_node(ast->right));
     return overload_call;
   }
@@ -584,8 +584,8 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     auto index = visit_node(ast->index);
     overload_call->callee = visit_node(ast->resolved_operator_overload);
 
-    auto self =
-        try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base), ast->resolved_operator_overload->requires_self_ptr());
+    auto self = try_deref_or_take_ptr_to_if_needed(ast->base, visit_node(ast->base),
+                                                   ast->resolved_operator_overload->requires_self_ptr());
 
     overload_call->arguments.push_back(self);
     overload_call->arguments.push_back(index);
@@ -598,7 +598,7 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
       deref->type = ast->resolved_type;
       deref->op = TType::Mul;
       deref->operand = overload_call;
-  
+
       return deref;
     }
     return overload_call;
@@ -675,23 +675,47 @@ THIR *THIRGen::option_some(THIR *value, Type *interior_type) {
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, init);
   init->type = type;
   init->is_statement = false;
-  init->key_values = {
-    {
+  init->key_values = {{
+                          OPTION_DISCRIMINANT_KEY,
+                          make_literal(OPTION_SOME_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
+                      },
+                      {
+                          "Some",
+                          value,
+                      }};
+  return init;
+}
+
+THIR *THIRGen::option_none(Type *interior_type) {
+  ASTDeclaration *option = find_generic_instance(g_Option_type->generic_instantiations, {interior_type});
+  auto type = option->resolved_type;
+  THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, init);
+  init->type = type;
+  init->is_statement = false;
+  init->key_values = {{
       OPTION_DISCRIMINANT_KEY,
-      make_literal(OPTION_SOME_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
-    },
-    {
-      "Some",
-      value,
-    }
-  };
+      make_literal(OPTION_NONE_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
+  }};
   return init;
 }
 
 THIR *THIRGen::visit_range(ASTRange *ast) {
   THIR_ALLOC(THIRAggregateInitializer, thir, ast);
-  thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, option_some(visit_node(ast->left), ast->left->resolved_type)});
-  thir->key_values.push_back({RANGE_TYPE_END_KEY, option_some(visit_node(ast->right), ast->right->resolved_type)});
+
+  auto element_type = ast->resolved_type->generic_args[0];
+
+  if (ast->left) {
+    thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, option_some(visit_node(ast->left), element_type)});
+  } else {
+    thir->key_values.push_back({RANGE_TYPE_BEGIN_KEY, option_none(element_type)});
+  }
+  if (ast->right) {
+    thir->key_values.push_back({RANGE_TYPE_END_KEY, option_some(visit_node(ast->right), element_type)});
+  } else {
+    thir->key_values.push_back({RANGE_TYPE_END_KEY, option_none(element_type)});
+  }
+  thir->key_values.push_back(
+      {RANGE_TYPE_IS_INCLUSIVE_KEY, make_literal(ast->inclusive ? "true" : "false", {}, bool_type(), ASTLiteral::Bool)});
   return thir;
 }
 

@@ -88,6 +88,7 @@ constexpr const char *COMPILER_VERSION = "v0.0.0";
 // We should probably not rely on this since RangeBase is defined in the stdlib.
 constexpr const char *RANGE_TYPE_BEGIN_KEY = "begin";
 constexpr const char *RANGE_TYPE_END_KEY = "end";
+constexpr const char *RANGE_TYPE_IS_INCLUSIVE_KEY = "is_inclusive";
 
 constexpr auto HELP_STRING = R"_(
 compile a file: `ela <filename.ela>` | 'ela' (compiles main.ela in current directory by default)
