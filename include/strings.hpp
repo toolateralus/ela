@@ -24,7 +24,6 @@ constexpr const char *COMPILER_FEATURE_LIST_KEY = "List";
 constexpr const char *COMPILER_FEATURE_SLICE_KEY = "Slice";
 constexpr const char *COMPILER_FEATURE_SLICEMUT_KEY = "SliceMut";
 constexpr const char *COMPILER_FEATURE_OPTION_KEY = "Option";
-
 constexpr const char *COMPILER_FEATURE_ITERATOR_KEY = "Iterator";
 constexpr const char *COMPILER_FEATURE_ITERABLE_KEY = "Iterable";
 constexpr const char *COMPILER_FEATURE_INIT_KEY = "Init";

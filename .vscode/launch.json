@@ -60,7 +60,7 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug ela_source/main",
-      "program": "${workspaceFolder}/bin/ela",
+      "program": "/usr/local/bin/ela",
       "args": [
         "main.ela",
         "--s",

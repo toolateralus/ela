@@ -1,14 +1,17 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "strings.hpp"
-#include "thir.hpp"
 #include "type.hpp"
 #include "typer.hpp"
 #include "ast.hpp"
 #include <cstdlib>
 #include <filesystem>
+
+#if 0
+#include "thir.hpp"
 #include "emit.hpp"
 #include "resolver.hpp"
+#endif 
 
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
@@ -27,9 +30,13 @@ int CompileCommand::compile() {
   });
 
   typing.run<void>("typing", [&] {
-    Typisting typer{};
+    Typer typer{};
     typer.run(program);
   });
+
+#if 1
+  return 0;
+#else
 
   lower.run<void>("\"lowering\" to C :D", [&] {
     THIRGen thir_gen = {};
@@ -109,6 +116,7 @@ int CompileCommand::compile() {
   }
 
   return result;
+#endif
 }
 
 void CompileCommand::add_c_flag(const std::string &flags) {

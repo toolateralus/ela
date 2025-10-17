@@ -5,7 +5,9 @@
 #include "interpreter.hpp"
 #include "type.hpp"
 
-void Typisting::collect_symbols(ASTNode *node) {
+#define TYPER_LOGF(msg, ...) fprintf(stdout, "[TYPER]: " msg VA_OPT(, ) __VA_ARGS__)
+
+void Typer::collect_symbols(ASTNode *node) {
   if (!node) {
     return;
   }
@@ -183,7 +185,7 @@ void Typisting::collect_symbols(ASTNode *node) {
   }
 }
 
-void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
+void Typer::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
   if (!node) {
     return;
   }
@@ -222,16 +224,52 @@ void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
         } break;
       }
     } break;
+    // ...existing code...
     case AST_NODE_PATH: {
       ASTPath *path = (ASTPath *)node;
+
+      // Give the path its own task so it can stall/progress independently
+      Task *task = create_task_bind_to_node_create_edge_to_consumer(path, consumer);
+
+      Scope *scope = path->declaring_scope;
+
       for (auto &segment : path->segments) {
         switch (segment.tag) {
           case ASTPath::Segment::TYPE: {
-            try_generate_tasks_for_node(segment.get_type(), consumer);
+            // Type segments are explicit ASTType nodes; generate their tasks.
+            try_generate_tasks_for_node(segment.get_type(), task);
           } break;
+
           case ASTPath::Segment::IDENTIFIER: {
-            // we can't really do anything here cause nothings resolved yet.
+            const InternedString name = segment.get_identifier();
+            if (!segment.generic_arguments.empty()) {
+              for (ASTExpr *arg : segment.generic_arguments) {
+                try_generate_tasks_for_node(arg, task);
+              }
+            }
+
+            if (Type *t = scope->find_type(name, {}, segment.generic_arguments.size(), {})) {
+              if (t && t->declaring_node) {
+                try_generate_tasks_for_node(t->declaring_node.get(), task);
+              }
+            }
+
+            if (Symbol *sym = scope->find(name)) {
+              if (sym->ast) {
+                ASTNode *decl = sym->ast.get();
+                if (decl->get_node_type() == AST_NODE_VARIABLE) {
+                  auto *v = static_cast<ASTVariable *>(decl);
+                  if (!v->is_local) {
+                    try_generate_tasks_for_node(decl, task);
+                  }
+                } else {
+                  // module, function, const, etc.
+                  try_generate_tasks_for_node(decl, task);
+                }
+              }
+            }
           } break;
+
           case ASTPath::Segment::INVALID:
             throw_error("INTERNAL COMPILER ERROR: path had invalid segment", node->source_range);
             break;
@@ -620,7 +658,7 @@ void Typisting::try_generate_tasks_for_node(ASTNode *node, Task *consumer) {
   }
 }
 
-void Typisting::enqueue_if_ready(Task *task) {
+void Typer::enqueue_if_ready(Task *task) {
   if (!task || task->phase == PH_SOLVED || task->indegree != 0 || task->queued) {
     return;
   }
@@ -628,8 +666,8 @@ void Typisting::enqueue_if_ready(Task *task) {
   ready_queue.push_back(task);
 }
 
-Task *Typisting::create_task_bind_to_node_create_edge_to_consumer(ASTNode *node, Task *consumer,
-                                                                  Phase required_phase_to_progress) {
+Task *Typer::create_task_bind_to_node_create_edge_to_consumer(ASTNode *node, Task *consumer,
+                                                              Phase required_phase_to_progress) {
   Task *task = new (task_arena.allocate(sizeof(Task))) Task();
   task->node = node;
   tasks[node] = task;
@@ -642,7 +680,7 @@ Task *Typisting::create_task_bind_to_node_create_edge_to_consumer(ASTNode *node,
   return task;
 }
 
-void Typisting::try_add_edge(Task *consumer, Task *provider, Phase required_phase_to_progress) {
+void Typer::try_add_edge(Task *consumer, Task *provider, Phase required_phase_to_progress) {
   if (!consumer || !provider || consumer == provider) return;
 
   for (Dep &d : consumer->depends_on) {
@@ -662,7 +700,7 @@ void Typisting::try_add_edge(Task *consumer, Task *provider, Phase required_phas
   if (!dep.satisfied) consumer->indegree++;
 }
 
-void Typisting::run(ASTProgram *node) {
+void Typer::run(ASTProgram *node) {
   collect_symbols(node);
   try_generate_tasks_for_node(node, nullptr);
 
@@ -713,7 +751,7 @@ void Typisting::run(ASTProgram *node) {
   }
 }
 
-void Typisting::task_advance_phase(Task *provider, Phase phase_reached, std::deque<Task *> &ready) {
+void Typer::task_advance_phase(Task *provider, Phase phase_reached, std::deque<Task *> &ready) {
   for (Task *consumer : provider->dependents) {
     bool became_ready = false;
     for (Dep &dep : consumer->depends_on) {
@@ -733,7 +771,7 @@ void Typisting::task_advance_phase(Task *provider, Phase phase_reached, std::deq
   }
 }
 
-Task_Result Typisting::try_solve_task(Task *task) {
+Task_Result Typer::try_solve_task(Task *task) {
   auto &node = task->node;
   switch (node->get_node_type()) {
     case AST_NODE_BLOCK:
@@ -883,29 +921,98 @@ Task_Result Typisting::try_solve_task(Task *task) {
   }
 }
 
-Task_Result Typisting::try_visit_block(ASTBlock *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_function_declaration(ASTFunctionDeclaration *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_alias(ASTAlias *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_impl(ASTImpl *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_import(ASTImport *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_module(ASTModule *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_return(ASTReturn *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_continue(ASTContinue *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_break(ASTBreak *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_for(ASTFor *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_if(ASTIf *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_else(ASTElse *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_while(ASTWhile *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_struct_declaration(ASTStructDeclaration *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_enum_declaration(ASTEnumDeclaration *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_choice_declaration(ASTChoiceDeclaration *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_trait_declaration(ASTTraitDeclaration *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_variable(ASTVariable *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_expr_statement(ASTExprStatement *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_bin_expr(ASTBinExpr *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_unary_expr(ASTUnaryExpr *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_literal(ASTLiteral *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_path(ASTPath *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_path(ASTPath *path) {
+  if (!path) return TASK_RESULT_ERROR;
+
+  Scope *scope = path->declaring_scope;
+  if (!scope) {
+    throw_error("INTERNAL: path without declaring scope", path->source_range);
+  }
+
+  Type *current_type = nullptr;
+  const size_t n_segments = path->segments.size();
+
+  for (size_t i = 0; i < n_segments; ++i) {
+    auto &seg = path->segments[i];
+    switch (seg.tag) {
+      case ASTPath::Segment::TYPE: {
+        ASTType *seg_ty = seg.get_type();
+        if (!seg_ty) return TASK_RESULT_ERROR;
+        if (!is_done(seg_ty)) return TASK_RESULT_STALLED;
+
+        Type *t = seg_ty->resolved_type;
+        if (!type_is_valid(t)) {
+          throw_error("invalid type in path segment", seg_ty->source_range);
+        }
+        seg.resolved_type = t;
+        current_type = t;
+      } break;
+
+      case ASTPath::Segment::IDENTIFIER: {
+        const InternedString name = seg.get_identifier();
+
+        // Stall until generic args on this segment are ready
+        for (Type *g : seg.get_resolved_generics()) {
+          if (!type_is_valid(g)) return TASK_RESULT_STALLED;
+        }
+
+        // Try a type name in the current lexical scope (with generics)
+        if (Type *t = scope->find_type(name, seg.get_resolved_generics(), /*is_generic=*/false, {})) {
+          if (type_is_valid(t)) {
+            seg.resolved_type = t;
+            current_type = t;
+            if (i + 1 == n_segments) {
+              path->resolved_type = t;
+              path->resolved_ast = t->declaring_node.get();
+            }
+            break;
+          }
+        }
+
+        // Otherwise resolve a symbol
+        Symbol *sym = scope->find(name);
+        if (!sym) {
+          throw_error(std::format("use of undeclared identifier '{}'", name), path->source_range);
+        }
+
+        // If this is a module and not terminal, descend into the module scope
+        if (i + 1 != n_segments) {
+          ASTNode *sym_ast = sym->ast.get();
+          if (sym_ast && sym_ast->get_node_type() == AST_NODE_MODULE) {
+            ASTModule *mod = static_cast<ASTModule *>(sym_ast);
+            if (!mod->scope) {
+              throw_error("INTERNAL: module without scope", sym_ast->source_range);
+            }
+            scope = mod->scope;
+            current_type = nullptr;
+            break;  // continue with next segment
+          }
+          // Values/functions cannot be qualified further
+          throw_error("invalid qualified path: value in middle of path", path->source_range);
+        }
+
+        // Terminal value/function/const
+        seg.resolved_type = sym->type;
+        path->resolved_type = sym->type;
+        path->resolved_ast = sym->ast.get();
+        path->symbol = sym;
+        current_type = nullptr;
+      } break;
+
+      default:
+        throw_error("INTERNAL: invalid path segment", path->source_range);
+    }
+  }
+
+  if (!path->resolved_type && current_type) {
+    path->resolved_type = current_type;
+    if (current_type->declaring_node) {
+      path->resolved_ast = current_type->declaring_node.get();
+    }
+  }
+
+  return TASK_RESULT_COMPLETE;
+}
 
 std::vector<TypeExtension> accept_extensions(const std::vector<ASTTypeExtension> &ast_extensions) {
   std::vector<TypeExtension> extensions;
@@ -923,7 +1030,7 @@ std::vector<TypeExtension> accept_extensions(const std::vector<ASTTypeExtension>
   return extensions;
 }
 
-Task_Result Typisting::try_visit_type(ASTType *ast) {
+Task_Result Typer::try_visit_type(ASTType *ast) {
   switch (ast->tag) {
     case ASTType::NORMAL: {
       if (is_done(ast->normal.path)) {
@@ -942,37 +1049,60 @@ Task_Result Typisting::try_visit_type(ASTType *ast) {
   }
   return TASK_RESULT_ERROR;
 }
-Task_Result Typisting::try_visit_tuple(ASTTuple *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_call(ASTCall *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_method_call(ASTMethodCall *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_arguments(ASTArguments *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_dot_expr(ASTMemberAccess *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_index(ASTIndex *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_initializer_list(ASTInitializerList *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_size_of(ASTSize_Of *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_type_of(ASTType_Of *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_dyn_of(ASTDyn_Of *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_defer(ASTDefer *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_cast(ASTCast *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_lambda(ASTLambda *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_unpack(ASTUnpack *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_unpack_element(ASTUnpackElement *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_range(ASTRange *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_switch(ASTSwitch *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_destructure(ASTDestructure *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_where(ASTWhere *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_pattern_match(ASTPatternMatch *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_statement_list(ASTStatementList *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_where_statement(ASTWhereStatement *) { return TASK_RESULT_COMPLETE; }
-Task_Result Typisting::try_visit_run(ASTRun *) { return TASK_RESULT_COMPLETE; }
+
+Task_Result Typer::try_visit_block(ASTBlock *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_function_declaration(ASTFunctionDeclaration *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_alias(ASTAlias *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_impl(ASTImpl *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_import(ASTImport *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_module(ASTModule *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_return(ASTReturn *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_continue(ASTContinue *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_break(ASTBreak *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_for(ASTFor *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_if(ASTIf *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_else(ASTElse *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_while(ASTWhile *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_struct_declaration(ASTStructDeclaration *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_enum_declaration(ASTEnumDeclaration *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_choice_declaration(ASTChoiceDeclaration *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_trait_declaration(ASTTraitDeclaration *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_variable(ASTVariable *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_expr_statement(ASTExprStatement *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_bin_expr(ASTBinExpr *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_unary_expr(ASTUnaryExpr *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_literal(ASTLiteral *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_tuple(ASTTuple *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_call(ASTCall *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_method_call(ASTMethodCall *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_arguments(ASTArguments *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_dot_expr(ASTMemberAccess *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_index(ASTIndex *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_initializer_list(ASTInitializerList *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_size_of(ASTSize_Of *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_type_of(ASTType_Of *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_dyn_of(ASTDyn_Of *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_defer(ASTDefer *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_cast(ASTCast *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_lambda(ASTLambda *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_unpack(ASTUnpack *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_unpack_element(ASTUnpackElement *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_range(ASTRange *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_switch(ASTSwitch *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_destructure(ASTDestructure *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_where(ASTWhere *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_pattern_match(ASTPatternMatch *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_statement_list(ASTStatementList *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_where_statement(ASTWhereStatement *) { return TASK_RESULT_COMPLETE; }
+Task_Result Typer::try_visit_run(ASTRun *) { return TASK_RESULT_COMPLETE; }
 
 /*
   void visit_enum_declaration(ASTEnumDeclaration *node, Phase phase) {
     Scope *scope = node->declaring_scope;
-    if (scope->find_type(node->name, {}, false, {}) != Type::INVALID_TYPE) {
+    if (type_is_valid(scope->find_type(node->name, {}, false, {}))) {
       throw_error("Redefinition of enum " + node->name.str(), node->source_range);
     }
-    auto underlying_type = Type::INVALID_TYPE;
+    auto underlying_type = nullptr;
     if (node->underlying_type_ast) {
       visit_node(node->underlying_type_ast, phase);
       underlying_type = node->underlying_type_ast->resolved_type;

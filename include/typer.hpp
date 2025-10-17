@@ -32,7 +32,7 @@ enum Task_Result {
   TASK_RESULT_COMPLETE,
 };
 
-struct Typisting {
+struct Typer {
   std::vector<ASTImpl *> impls;
   std::vector<ASTWhereStatement *> where_statements;
   jstl::Arena task_arena{MB(10)};
