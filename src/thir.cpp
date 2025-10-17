@@ -3,7 +3,7 @@
 #include <string>
 #include "ast.hpp"
 #include "error.hpp"
-#include "thir_interpreter.hpp"
+#include "interpreter.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"

@@ -3,7 +3,7 @@
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "libffi.hpp"
-#include "thir_interpreter.hpp"
+#include "interpreter.hpp"
 #include "thir.hpp"
 #include "type.hpp"
 #include "value.hpp"
