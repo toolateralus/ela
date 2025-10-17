@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <optional>
 #include <stack>
 #include <unordered_map>
 #include <vector>
@@ -9,7 +10,6 @@
 #include "lex.hpp"
 #include "thir.hpp"
 #include "type.hpp"
-#include "value.hpp"
 
 /*
   We should've been namespacing things this entire time but oh well.
@@ -17,13 +17,6 @@
   and self contained.
 */
 namespace Mir {
-struct Global_Variable {
-  Span span;
-  InternedString name;
-  Type *type;
-  Value *value;
-};
-
 enum Op_Code : uint8_t {
   OP_NOOP,  // no operands or destination.
 
@@ -82,6 +75,61 @@ enum Op_Code : uint8_t {
 
 struct Basic_Block;
 
+struct Constant {
+  union {
+    InternedString string_lit;
+    uint64_t int_lit;
+    double float_lit;
+    bool bool_lit;
+    uint16_t char_lit;
+  };
+  enum : uint8_t {
+    CONST_INVALID,
+    CONST_INT,
+    CONST_STRING,
+    CONST_FLOAT,
+    CONST_BOOL,
+    CONST_CHAR,
+  } tag = CONST_INVALID;
+
+  static Constant Int(uint64_t value) {
+    Constant c;
+    c.int_lit = value;
+    c.tag = CONST_INT;
+    return c;
+  }
+
+  static Constant Char(uint16_t value) {
+    Constant c;
+    c.int_lit = value;
+    c.tag = CONST_CHAR;
+    return c;
+  }
+
+  static Constant String(InternedString value) {
+    Constant c;
+    c.string_lit = value;
+    c.tag = CONST_STRING;
+    return c;
+  }
+
+  static Constant Float(double value) {
+    Constant c;
+    c.float_lit = value;
+    c.tag = CONST_FLOAT;
+    return c;
+  }
+
+  static Constant Bool(bool value) {
+    Constant c;
+    c.bool_lit = value;
+    c.tag = CONST_BOOL;
+    return c;
+  }
+
+  void print(FILE *f) const;
+};
+
 struct Operand {
   Type *type = nullptr;
 
@@ -92,11 +140,11 @@ struct Operand {
     OPERAND_IMMEDIATE_VALUE,  // union.immediate    || immediate value.
     OPERAND_BASIC_BLOCK,      // union.bb           || basic block target for jumps.
     OPERAND_TYPE,             // this->type         || a type reference, mainly for casting and alloca.
-  } tag = OPERAND_TEMP;
+  } tag = OPERAND_NULL;
 
   union {
-    Value *constant;
-    Value *immediate;
+    Constant constant;
+    Constant immediate;
     Basic_Block *bb;
     uint32_t temp = 0;
   };
@@ -118,17 +166,17 @@ struct Operand {
     return o;
   }
 
-  static Operand Const(Value *v, Type *t) {
+  static Operand Const(Constant c, Type *t) {
     Operand o;
-    o.constant = v;
+    o.constant = c;
     o.type = t;
     o.tag = OPERAND_CONSTANT;
     return o;
   }
 
-  static Operand Imm(Value *v, Type *t) {
+  static Operand Imm(Constant i, Type *t) {
     Operand o;
-    o.immediate = v;
+    o.immediate = i;
     o.type = t;
     o.tag = OPERAND_IMMEDIATE_VALUE;
     return o;
@@ -153,6 +201,7 @@ struct Instruction {
 #ifdef DEBUG
   Span span;
 #endif
+  void print(FILE *f) const;
 };
 
 struct Basic_Block {
@@ -168,14 +217,16 @@ struct Basic_Block {
     return code.back();
   }
   inline Op_Code back_opcode() const { return back().opcode; }
+  void print(FILE *f) const;
 };
 
 extern jstl::Arena mir_arena;
 
 static inline InternedString generate_temp_identifier(size_t index) { return std::format("t{}", index); }
 
+// local variable handle.
 struct Temporary {
-  InternedString label;
+  InternedString name;
   Type *type;
 };
 
@@ -206,20 +257,6 @@ struct Function {
 
   uint8_t flags = FUNCTION_FLAGS_NONE;
 
-  inline Operand create_temporary(Type *type, InternedString label = {nullptr}) {
-    assert(type);
-    size_t idx = temps.size();
-    if (label.str_ptr == nullptr) {
-      label = generate_temp_identifier(idx);
-    }
-    temps.push_back(Temporary{
-        .label = label,
-        .type = type,
-    });
-    stack_size_needed_in_bytes += type->size_in_bytes();
-    return Operand::Temp(idx, type);
-  }
-
   inline Basic_Block *entry_block() const {
     assert(basic_blocks.size());
     return basic_blocks[0];
@@ -240,16 +277,41 @@ struct Function {
     assert(basic_blocks.size() && "no basic blocks");
     return basic_blocks.back();
   }
+  void print(FILE *f) const;
 };
 
 struct Module {
   std::vector<Function *> functions;
-  std::vector<Global_Variable *> globals;
   std::unordered_map<InternedString, Function *> function_table;
+
+  std::unordered_set<Type *> used_types;
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
+
+
+  inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
+    Function *f = current_function;
+    assert(type && f);
+    size_t idx = f->temps.size();
+
+    if (label == std::nullopt) {
+      label = generate_temp_identifier(idx);
+    }
+
+    f->temps.push_back(Temporary{
+        .name = *label,
+        .type = type,
+    });
+
+    f->stack_size_needed_in_bytes += type->size_in_bytes();
+
+    used_types.insert(type);
+    
+    return Operand::Temp(idx, type);
+  }
+
 
   inline Function *get_function(InternedString name) {
     const auto it = function_table.find(name);
@@ -267,7 +329,7 @@ struct Module {
     for (size_t i = 0; i < f->type_info->params_len; ++i) {
       Type *ty = f->type_info->parameter_types[i];
       f->temps.push_back({
-          .label = generate_temp_identifier(i),
+          .name = generate_temp_identifier(i),
           .type = ty,
       });
     }
@@ -300,9 +362,10 @@ struct Module {
     assert(current_function && "no current function");
     return current_function->basic_blocks.back();
   }
+
+  void print(FILE *f) const;
 };
 
-void generate_program(const THIRProgram *node, Module &m);
 void generate_block(const THIRBlock *node, Module &m);
 void generate_variable(const THIRVariable *node, Module &m);
 Operand generate_function(const THIRFunction *node, Module &m);
@@ -332,9 +395,6 @@ Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m);
 
 static inline void generate(const THIR *node, Module &m) {
   switch (node->get_node_type()) {
-    case THIRNodeType::Program:
-      generate_program((THIRProgram *)node, m);
-      break;
     case THIRNodeType::Block:
       generate_block((THIRBlock *)node, m);
       break;
@@ -398,6 +458,7 @@ static inline void generate(const THIR *node, Module &m) {
     // TODO: verify we want to ignore these.
     case THIRNodeType::Type:
     case THIRNodeType::Noop:
+    case THIRNodeType::Program:
       break;
   }
 }

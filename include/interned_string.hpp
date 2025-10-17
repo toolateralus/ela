@@ -36,6 +36,7 @@ struct InternedString {
 
   inline InternedString(const std::string &value) { insert_or_set(value); }
   inline InternedString(const char *str) { insert_or_set(std::string{str}); }
+  inline InternedString(std::nullptr_t) {}
 
   inline bool operator==(const InternedString &other) const { return str_ptr == other.str_ptr; }
   inline bool operator!=(const InternedString &other) const { return str_ptr != other.str_ptr; }

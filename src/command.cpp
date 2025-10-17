@@ -9,6 +9,8 @@
 #include <filesystem>
 #include "emit.hpp"
 #include "resolver.hpp"
+#include "mir.hpp"
+
 
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
@@ -37,52 +39,64 @@ int CompileCommand::compile() {
     Emitter emitter;
     Resolver resolver(emitter);
 
-    resolver.visit_node(thir_gen.visit_program(program));
+    auto thir_program = thir_gen.visit_program(program);
 
-    std::filesystem::current_path(compile_command.original_path);
-    std::ofstream output(compile_command.output_path);
-
-    std::string program;
-    if (compile_command.has_flag("test")) {
-      output << "#define TESTING\n";
-    }
-
-    output << BOILERPLATE_C_CODE << '\n';
-
-    if (thir_gen.reflected_upon_types.size()) {
-      output << emitter.reflection_prelude(thir_gen.reflected_upon_types);
-    }
-
-    output << emitter.code.str();
-
-    { // emit global initializer function that's called in main
-      emitter.code.clear();
-      THIRFunction *global_ini = thir_gen.global_initializer_function;
-      emitter.emitting_global_initializer = true;
-
-      for (const auto &constructor: thir_gen.constructors) {
-        if (constructor->constructor_index == 1) {
-          THIR_ALLOC_NO_SRC_RANGE(THIRCall, call);
-          call->callee = constructor;
-          call->arguments = {};
-          call->is_statement = true;
-          global_ini->block->statements.push_back(call);
-        }
-      }
-
-      resolver.visit_function(global_ini);
-      emitter.emitting_global_initializer = false;
-      output << emitter.code.str();
-      emitter.code.clear();
-    }
-
-    // Emit our main last always
+    // THIR C emitter.
     {
-      THIRFunction *ep = thir_gen.emit_runtime_entry_point();
-      if (ep) { // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
-        emitter.emit_function(ep);
+      resolver.visit_node(thir_program);
+
+      std::filesystem::current_path(compile_command.original_path);
+      std::ofstream output(compile_command.output_path);
+
+      std::string program;
+      if (compile_command.has_flag("test")) {
+        output << "#define TESTING\n";
       }
+
+      output << BOILERPLATE_C_CODE << '\n';
+
+      if (thir_gen.reflected_upon_types.size()) {
+        output << emitter.reflection_prelude(thir_gen.reflected_upon_types);
+      }
+
       output << emitter.code.str();
+
+      {  // emit global initializer function that's called in main
+        emitter.code.clear();
+        THIRFunction *global_ini = thir_gen.global_initializer_function;
+        emitter.emitting_global_initializer = true;
+
+        for (const auto &constructor : thir_gen.constructors) {
+          if (constructor->constructor_index == 1) {
+            THIR_ALLOC_NO_SRC_RANGE(THIRCall, call);
+            call->callee = constructor;
+            call->arguments = {};
+            call->is_statement = true;
+            global_ini->block->statements.push_back(call);
+          }
+        }
+
+        resolver.visit_function(global_ini);
+        emitter.emitting_global_initializer = false;
+        output << emitter.code.str();
+        emitter.code.clear();
+      }
+
+      // Emit our main last always
+      {
+        THIRFunction *ep = thir_gen.emit_runtime_entry_point();
+        if (ep) {  // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
+          emitter.emit_function(ep);
+        }
+        output << emitter.code.str();
+      }
+    }
+
+    // MIR generator.
+    {
+      Mir::Module m;
+      Mir::generate(thir_gen.entry_point, m);
+      m.print(stdout);
     }
   });
 
@@ -205,8 +219,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
 
   std::filesystem::path parent_path = input_fs_path.parent_path();
   if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
-    printf("%s\n",
-           std::format("\033[31mError: Parent directory '{}' does not exist.\033[0m", parent_path.string()).c_str());
+    printf("%s\n", std::format("\033[31mError: Parent directory '{}' does not exist.\033[0m", parent_path.string()).c_str());
     exit(1);
   }
 
@@ -246,9 +259,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
 }
 void CompileCommand::request_compile_time_code_execution(const Span &range) {
   if (has_flag("ctfe-validate")) {
-
-    std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString()
-          << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
+    std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString() << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
 
     char response;
     std::cin >> response;
