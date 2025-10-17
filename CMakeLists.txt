@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20.0)
 
-project(ela LANGUAGES CXX)
+project(ela LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_COMPILER clang++)
@@ -29,7 +29,18 @@ file(MAKE_DIRECTORY ${BIN_DIR})
 # Executable
 add_executable(ela ${SRCS})
 
-# Link against libffi
+
+find_package(LLVM REQUIRED CONFIG)
+
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "LLVM Include Dir: ${LLVM_INCLUDE_DIRS}")
+message(STATUS "LLVM Libraries: ${LLVM_LIBRARIES}")
+
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+target_link_libraries(ela PRIVATE LLVM)
+
 find_library(FFI_LIBRARY ffi)
 if(FFI_LIBRARY)
     target_link_libraries(ela PRIVATE ${FFI_LIBRARY})

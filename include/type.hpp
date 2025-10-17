@@ -146,6 +146,8 @@ struct TypeInfo {
     return static_cast<T *>(this);
   }
 
+
+
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 
@@ -207,6 +209,18 @@ struct ScalarTypeInfo : TypeInfo {
   size_t size = 0;
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
+
+  inline bool is_signed() const {
+    switch (scalar_type) {
+      case TYPE_S8:
+      case TYPE_S16:
+      case TYPE_S32:
+      case TYPE_S64:
+        return true;
+      default:
+        return false;
+    }
+  }
 
   size_t size_in_bytes() const override {
     // TODO: why do we even use 'size' when we switch over this anyway?
