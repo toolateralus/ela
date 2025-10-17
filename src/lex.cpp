@@ -84,7 +84,7 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
-    SourceRange location{state.line, state.col, state.file_idx};
+    Span location{state.line, state.col, state.file_idx};
 
     if (c == '\'') {
       pos++;  // move past '

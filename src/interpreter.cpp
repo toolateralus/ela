@@ -93,7 +93,7 @@ LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
 
   if (base->get_value_type() != ValueType::OBJECT) {
     throw_error("cannot use '.' expression on a non-object at compile time. this is likely a compiler bug.",
-                node->source_range);
+                node->span);
   }
 
   ObjectValue *object = (ObjectValue *)base;
@@ -104,7 +104,7 @@ LValue *Interpreter::get_member_access_lvalue(THIRMemberAccess *node) {
     throw_error(std::format("A member access expression during compile time read a property that doesnt exist."
                             " member: '{}'",
                             node->member),
-                node->source_range);
+                node->span);
     return null_lvalue();
   }
 }
@@ -136,7 +136,7 @@ LValue *Interpreter::get_index_lvalue(THIRIndex *node) {
     Value **p = &pv->ptr[index];
     return new_lvalue(p);
   } else if (base->get_value_type() != ValueType::ARRAY) {
-    throw_error("cannot index-- operator overloading not implemented at compile time", node->source_range);
+    throw_error("cannot index-- operator overloading not implemented at compile time", node->span);
   }
 
   ArrayValue *array = (ArrayValue *)base;
@@ -155,7 +155,7 @@ LValue *Interpreter::get_unary_lvalue(THIRUnaryExpr *node) {
           std::format(
               "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
               (int)operand->get_value_type()),
-          node->source_range);
+          node->span);
     }
 
     if (is_pointer) {
@@ -191,8 +191,8 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
 
   if (!left || !right) {
     bool left_null = !left, right_null = !right;
-    std::println("left={}, right={}", node->left->source_range.ToString(), node->right->source_range.ToString());
-    throw_error(std::format("[INTERPRETER] INTERNAL COMPILER ERROR: one or both binary operands null in expression left null?={}, right null?={}", left_null, right_null), node->source_range);
+    std::println("left={}, right={}", node->left->span.ToString(), node->right->span.ToString());
+    throw_error(std::format("[INTERPRETER] INTERNAL COMPILER ERROR: one or both binary operands null in expression left null?={}, right null?={}", left_null, right_null), node->span);
   }
 
   const auto vt = [](Value *v) { return v->get_value_type(); };
@@ -278,7 +278,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
     case TType::Div: {
       if (!is_number(left) || !is_number(right)) return null_value();
       if ((is_int(right) && to_int(right) == 0) || (is_float(right) && to_double(right) == 0.0)) {
-        throw_error("division by zero in compile-time evaluation", node->source_range);
+        throw_error("division by zero in compile-time evaluation", node->span);
       }
       return numeric_bin([](long long a, long long b) { return (b == 0 ? 0 : a / b); },
                          [](double a, double b) { return a / b; });
@@ -288,7 +288,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
       if (!is_int(left) || !is_int(right)) return null_value();
       long long b = to_int(right);
       if (b == 0) {
-        throw_error("modulo by zero in compile-time evaluation", node->source_range);
+        throw_error("modulo by zero in compile-time evaluation", node->span);
       }
       long long a = to_int(left);
       return new_int((size_t)(a % b));
@@ -520,7 +520,7 @@ Value *Interpreter::visit_unary_expr(THIRUnaryExpr *node) {
             std::format(
                 "cannot dereference a non-pointer, somehow the compile time interpreter got this mixed up, got a {}",
                 (int)operand->get_value_type()),
-            node->source_range);
+            node->span);
       }
 
       if (is_pointer) {
@@ -606,7 +606,7 @@ Value *Interpreter::visit_call(THIRCall *node) {
   } else if (function->get_value_type() == ValueType::FUNCTION) {
     return function->as<FunctionValue>()->call(this, evaluated_args);
   } else {
-    throw_error("Unable to call non-function symbol", node->source_range);
+    throw_error("Unable to call non-function symbol", node->span);
   }
 
   return null_value();
@@ -631,7 +631,7 @@ Value *Interpreter::visit_cast(THIRCast *node) {
     if (lvalue->managed) {
       return *lvalue->managed;
     } else {
-      throw_error("unmanaged casts not implemented", node->source_range);
+      throw_error("unmanaged casts not implemented", node->span);
     }
   }
 

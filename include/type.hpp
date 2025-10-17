@@ -334,7 +334,7 @@ Type *global_create_enum_type(const InternedString &, Scope *, bool = false, Typ
 
 Type *global_create_tuple_type(const std::vector<Type *> &types);
 
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span & = {});
 
 Type *global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions);

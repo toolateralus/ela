@@ -46,8 +46,8 @@ struct Emitter {
       return;
     }
 
-    code << "\n#line " << std::to_string(thir->source_range.line) << " \""
-         << thir->source_range.files()[thir->source_range.file] << "\";\n";
+    code << "\n#line " << std::to_string(thir->span.line) << " \""
+         << thir->span.files()[thir->span.file] << "\";\n";
   }
 
   void emit_node(const THIR *thir);

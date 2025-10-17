@@ -153,7 +153,7 @@ void Emitter::emit_bin_expr(const THIRBinExpr *thir) {
   EXPR_BEGIN(thir);
   code << '(';
   emit_expr(thir->left);
-  code << ' ' << ttype_get_operator_string(thir->op, thir->source_range) << ' ';
+  code << ' ' << ttype_get_operator_string(thir->op, thir->span) << ' ';
   emit_expr(thir->right);
   code << ')';
   EXPR_TERMINATE(thir);
@@ -173,11 +173,11 @@ void Emitter::emit_unary_expr(const THIRUnaryExpr *thir) {
              thir->op == TType::Decrement) {  // ++ and -- are ALWAYS posfix in this language.
     code << '(';
     emit_expr(thir->operand);
-    code << ttype_get_operator_string(thir->op, thir->source_range);
+    code << ttype_get_operator_string(thir->op, thir->span);
     code << ")";
   } else {
     code << '(';
-    code << ttype_get_operator_string(thir->op, thir->source_range);
+    code << ttype_get_operator_string(thir->op, thir->span);
     code << '(';
     emit_expr(thir->operand);
     code << "))";

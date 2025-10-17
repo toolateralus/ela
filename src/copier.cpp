@@ -704,7 +704,7 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
     } else if (part.tag == ASTPath::Segment::IDENTIFIER) {
       new_node->push_segment(part.get_identifier(), new_generic_args);
     } else {
-      throw_error("Invalid path segment, was neither identifier nor expression", node->source_range);
+      throw_error("Invalid path segment, was neither identifier nor expression", node->span);
     }
   }
   return new_node;

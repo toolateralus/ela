@@ -247,9 +247,9 @@ enum struct TFamily {
   Identifier,
 };
 
-struct SourceRange {
-  SourceRange() {}
-  SourceRange(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
+struct Span {
+  Span() {}
+  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
   size_t line = 0, column = 0;
   size_t file = 0;
   static std::vector<std::string> &files() {
@@ -284,14 +284,14 @@ static inline bool ttype_is_comp_assign(TType type) {
 struct Token {
   Token() {}
 
-  Token(SourceRange location, InternedString value, TType type, TFamily family)
+  Token(Span location, InternedString value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family), location(location) {}
   InternedString value;
   TType type;
   TFamily family;
-  SourceRange location;
+  Span location;
   static Token &Eof() {
-    static Token eof = Token(SourceRange(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
+    static Token eof = Token(Span(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
     return eof;
   }
 
@@ -397,9 +397,9 @@ static std::unordered_map<std::string, TType> operators{
     {"![", TType::PtrSubscript},
 };
 
-void throw_error(const std::string &message, const SourceRange &source_range);
+void throw_error(const std::string &message, const Span &span);
 
-static inline std::string ttype_get_operator_string(TType type, const SourceRange &range) {
+static inline std::string ttype_get_operator_string(TType type, const Span &range) {
   for (const auto &op : operators) {
     if (op.second == type) {
       return op.first;
@@ -452,7 +452,7 @@ struct Lexer {
 
       bool found = false;
       size_t file_idx = 0;
-      for (const auto &file : SourceRange::files()) {
+      for (const auto &file : Span::files()) {
         if (file == path) {
           found = 1;
         } else {
@@ -460,7 +460,7 @@ struct Lexer {
         }
       }
       if (!found) {
-        SourceRange::files().push_back(path);
+        Span::files().push_back(path);
       }
       return State(input, file_idx, input.length(), canonical);
     }

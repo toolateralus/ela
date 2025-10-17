@@ -64,7 +64,7 @@ struct Interpreter {
   Value *visit_node(THIR *node) {
     switch (node->get_node_type()) {
       case THIRNodeType::Program:
-        throw_error("compile time interpreter got a program node.. this is certainly a bug.", node->source_range);
+        throw_error("compile time interpreter got a program node.. this is certainly a bug.", node->span);
         return nullptr;
       case THIRNodeType::Block:
         return visit_block(static_cast<THIRBlock *>(node));

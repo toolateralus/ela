@@ -230,7 +230,7 @@ StructuralTypingRule get_structural_typing_rule(const Type *from, const Type *to
   return StructuralTypingRule::Applicable(to_is_structural ? CONVERT_IMPLICIT : CONVERT_EXPLICIT);
 }
 
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &range) {
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span &range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
     throw_error("internal compiler error: type was null when checking type conversion rules", range);

@@ -69,7 +69,7 @@ struct CompilationMetric {
   }
 };
 
-struct SourceRange;
+struct Span;
 struct CompileCommand {
   CompilationMetric parse;
   CompilationMetric lower;
@@ -96,12 +96,12 @@ struct CompileCommand {
     std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
   }
 
-  void request_compile_time_code_execution(const SourceRange &range);
+  void request_compile_time_code_execution(const Span &range);
 };
 
 extern CompileCommand compile_command;
 
-static inline std::string get_source_filename(const SourceRange &range) { return SourceRange::files()[range.file]; }
+static inline std::string get_source_filename(const Span &range) { return Span::files()[range.file]; }
 
 struct Defer {
   const std::function<void()> func;
@@ -214,7 +214,5 @@ static inline size_t calculate_strings_actual_length(const std::string_view &str
   const auto $old_scope_ = ctx.scope; \
   ctx.scope = $new_scope;             \
   const Defer $scope_defer([&] { ctx.scope = $old_scope_; });
-
-
 
 #define SOURCE_LOCATION() (std::format("{}:{}", __FILE__, __LINE__))

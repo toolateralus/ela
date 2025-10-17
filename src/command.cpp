@@ -244,7 +244,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     }
   }
 }
-void CompileCommand::request_compile_time_code_execution(const SourceRange &range) {
+void CompileCommand::request_compile_time_code_execution(const Span &range) {
   if (has_flag("ctfe-validate")) {
 
     std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString()

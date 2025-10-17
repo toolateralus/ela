@@ -56,13 +56,13 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
-static inline std::string get_text_representation_of_source_range(const SourceRange &source_range,
+static inline std::string get_text_representation_of_source_range(const Span &span,
                                                                   size_t num_lines_of_source_to_show) {
   std::stringstream ss;
   if (num_lines_of_source_to_show > 0) {
     ss << '\n';
-    auto first = source_range;
-    std::ifstream src_file(SourceRange::files()[first.file]);
+    auto first = span;
+    std::ifstream src_file(Span::files()[first.file]);
 
     if (!src_file.is_open()) {
       return "Error: Unable to open source file\n";
@@ -97,7 +97,7 @@ static inline std::string get_text_representation_of_source_range(const SourceRa
   return ss.str();
 }
 
-static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity,
+static std::string format_source_location(const Span &span, ErrorSeverity severity,
                                           int num_lines_of_source_to_show = 5) {
   const char *color = "";
 
@@ -116,8 +116,8 @@ static std::string format_source_location(const SourceRange &source_range, Error
   }
 
   std::stringstream ss;
-  ss << color << source_range.ToString() << (terminal_supports_color ? "\033[0m" : "");
-  ss << get_text_representation_of_source_range(source_range, num_lines_of_source_to_show);
+  ss << color << span.ToString() << (terminal_supports_color ? "\033[0m" : "");
+  ss << get_text_representation_of_source_range(span, num_lines_of_source_to_show);
 
   if (terminal_supports_color) ss << "\033[0m";
 
@@ -148,12 +148,12 @@ const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
 
 extern int ignored_warnings;
 
-using PanicHandler = void (*)(const std::string &, const SourceRange &, void *);
+using PanicHandler = void (*)(const std::string &, const Span &, void *);
 
 extern PanicHandler panic_handler;
 
 static PanicHandler get_default_panic_handler() {
-  return [] [[noreturn]] (auto message, auto source_range, [[gnu::unused]] auto unused) {
+  return [] [[noreturn]] (auto message, auto span, [[gnu::unused]] auto unused) {
     std::stringstream ss;
 
     std::string lower_message = message;
@@ -167,7 +167,7 @@ static PanicHandler get_default_panic_handler() {
     }
 
     ss << message;
-    ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
+    ss << "\n\tat: " << format_source_location(span, ERROR_FAILURE);
     const auto err = ss.str();
     printf("%s\n", err.c_str());
     exit(1);
@@ -178,7 +178,7 @@ static inline void set_panic_handler(PanicHandler handler) { panic_handler = han
 
 static inline void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
-static inline void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
+static inline void throw_warning(const WarningFlags id, const std::string message, const Span &span) {
   if ((ignored_warnings & id) != 0 || (ignored_warnings & WARNING_IGNORE_ALL) != 0) {
     return;
   }
@@ -187,7 +187,7 @@ static inline void throw_warning(const WarningFlags id, const std::string messag
   ss << "(ignore with --" << WARNING_FLAG_STRINGS[id] << ")\n";
   ss << "Warning:\n\t" << message;
   if (terminal_supports_color) ss << "\033[0m\n";
-  ss << format_source_location(source_range, ERROR_WARNING);
+  ss << format_source_location(span, ERROR_WARNING);
   const auto token_str = ss.str();
   std::cerr << token_str << std::endl;
 }
@@ -202,9 +202,9 @@ T *get_error_user_data_as() {
   return (T *)error_user_data;
 }
 
-inline void throw_error(const std::string &message, const SourceRange &source_range) {
+inline void throw_error(const std::string &message, const Span &span) {
   if (!panic_handler) {
-    get_default_panic_handler()(message, source_range, error_user_data);
+    get_default_panic_handler()(message, span, error_user_data);
   }
-  panic_handler(message, source_range, error_user_data);
+  panic_handler(message, span, error_user_data);
 }

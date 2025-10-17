@@ -173,7 +173,7 @@ struct ASTNode {
 
   Nullable<ASTBlock> declaring_block;  // TODO: remove this, it's unused
   Scope *declaring_scope;
-  SourceRange source_range{};
+  Span span{};
   Type *resolved_type = Type::INVALID_TYPE;
   bool is_emitted = false;
   virtual ~ASTNode() = default;
@@ -503,7 +503,7 @@ struct ASTType : ASTExpr {
   ASTType() {}
 
   ASTType(const ASTType &other) {
-    source_range = other.source_range;
+    span = other.span;
     extensions = other.extensions;
     kind = other.kind;
     switch (kind) {
@@ -828,7 +828,7 @@ struct ASTFor : ASTStatement {
   ASTFor() {}
   ~ASTFor() {}
   ASTFor(const ASTFor &other) {
-    source_range = other.source_range;
+    span = other.span;
     iteration_kind = other.iteration_kind;
     iterable_type = other.iterable_type;
     iterator_type = other.iterator_type;
@@ -966,7 +966,7 @@ struct ASTInitializerList : ASTExpr {
   ASTInitializerList() {}
   ~ASTInitializerList() {}
   ASTInitializerList(const ASTInitializerList &other) {
-    source_range = other.source_range;
+    span = other.span;
     tag = other.tag;
     switch (tag) {
       case INIT_LIST_NAMED:
@@ -1166,7 +1166,7 @@ struct ASTPatternMatch : ASTExpr {
   ~ASTPatternMatch() {}
   ASTPatternMatch() {}
   ASTPatternMatch(const ASTPatternMatch &other) {
-    source_range = other.source_range;
+    span = other.span;
     object = other.object;
     target_type_path = other.target_type_path;
     pattern_tag = other.pattern_tag;
@@ -1345,7 +1345,7 @@ struct Parser {
   ASTProgram *parse_program();
 
   ASTTraitDeclaration *parse_trait_declaration();
-  ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node);
+  ASTStructDeclaration *parse_struct_body(InternedString name, Span range, ASTStructDeclaration *node);
   ASTStructDeclaration *parse_struct_declaration();
   ASTFunctionDeclaration *parse_function_declaration();
   ASTChoiceDeclaration *parse_choice_declaration();
@@ -1397,8 +1397,8 @@ struct Parser {
   Token peek() const;
   void fill_buffer_if_needed(Lexer::State &state);
 
-  SourceRange begin_node();
-  void end_node(ASTNode *node, SourceRange &range);
+  Span begin_node();
+  void end_node(ASTNode *node, Span &range);
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }

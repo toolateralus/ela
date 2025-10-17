@@ -243,7 +243,7 @@ struct Scope {
     }
     return global_find_type_id(symbol->resolved_type, ext);
   }
-  Type *find_or_create_dyn_type_of(Type *trait, SourceRange range, Typer *typer);
+  Type *find_or_create_dyn_type_of(Type *trait, Span range, Typer *typer);
   // get the count of non-function variables in this scope.
   inline size_t fields_count() const {
     auto fields = 0;

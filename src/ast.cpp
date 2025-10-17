@@ -240,7 +240,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) {
         auto location = parser->peek().location;
-        auto formatted = std::format("{}:{}:{}", SourceRange::files()[location.file], location.line, location.column);
+        auto formatted = std::format("{}:{}:{}", Span::files()[location.file], location.line, location.column);
         auto literal = ast_alloc<ASTLiteral>();
         literal->tag = ASTLiteral::String;
         literal->value = formatted;
@@ -258,10 +258,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) {
         auto error = parser->parse_primary();
         if (error->get_node_type() != AST_NODE_LITERAL) {
-          throw_error("Can only throw a literal as a error", error->source_range);
+          throw_error("Can only throw a literal as a error", error->span);
         }
         auto literal = static_cast<ASTLiteral *>(error);
-        throw_error(literal->value.get_str(), error->source_range);
+        throw_error(literal->value.get_str(), error->span);
         return nullptr;
     }},
 
@@ -374,7 +374,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (auto decl = dynamic_cast<ASTVariable *>(statement)) {
           decl->is_static = true;
         } else {
-          throw_error("static is only valid for variables, global or local.", statement->source_range);
+          throw_error("static is only valid for variables, global or local.", statement->span);
         }
         return statement;
     }},
@@ -452,7 +452,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         ASTExpr *object = parser->parse_expr(); // Context.{} or whatever.
 
         if (parser->current_func_decl.is_null()) {
-          throw_error("Can only use #push_context within a function", object->source_range);
+          throw_error("Can only use #push_context within a function", object->span);
         }
 
         ASTFunctionDeclaration* function = parser->current_func_decl.get();
@@ -515,7 +515,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         
         function->context_push_count--;
         if (function->context_push_count < 0) {
-          throw_error("context stack underflow, no contexts to pop.", function->source_range);
+          throw_error("context stack underflow, no contexts to pop.", function->span);
         }
         
         NODE_ALLOC(ASTPath, path, path_range, path_defer, parser)
@@ -725,7 +725,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_STATEMENT_LIST:
         break;
       default:
-        throw_error("Statement not allowed at the top-level of a program", statement->source_range);
+        throw_error("Statement not allowed at the top-level of a program", statement->span);
     }
 
     program->statements.push_back(statement);
@@ -857,7 +857,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     }
 
     ASTBinExpr *binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->source_range = left->source_range;
+    binexpr->span = left->span;
     auto right = parse_expr(token_precedence);
 
     binexpr->left = left;
@@ -969,7 +969,7 @@ ASTExpr *Parser::parse_postfix() {
           throw_error(
               "can only use an initializer list on a path or type, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, "
               "etc.",
-              left->source_range);
+              left->span);
         }
         if (peek().type == TType::LCurly) {
           eat();  // eat {
@@ -1510,7 +1510,7 @@ ASTType *Parser::parse_type() {
 
   if (node->kind == ASTType::NORMAL && !node->normal.path) {
     node->normal.path = parse_path();
-    node->normal.path->source_range = range;
+    node->normal.path->span = range;
   }
 
   end_node(node, range);
@@ -1539,7 +1539,7 @@ ASTIf *Parser::parse_if() {
     auto statement = parse_statement();
     node->block->statements = {statement};
     if (statement->get_node_type() == AST_NODE_VARIABLE) {
-      throw_warning(WARNING_INACCESSIBLE_DECLARATION, "Inaccesible declared variable", statement->source_range);
+      throw_warning(WARNING_INACCESSIBLE_DECLARATION, "Inaccesible declared variable", statement->span);
     }
     node->block->scope = ctx.exit_scope();
   } else {
@@ -1578,11 +1578,11 @@ ASTModule *Parser::parse_module() {
   } else {
     throw_error(
         std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'", peek().value.get_str()),
-        mod->source_range);
+        mod->span);
   }
 
   if (expected_delimiter == TType::Eof && (current_func_decl || current_impl_decl || current_struct_decl || current_trait_decl)) {
-    throw_error("file-scoped modules can only be declared at the top-level", mod->source_range);
+    throw_error("file-scoped modules can only be declared at the top-level", mod->span);
   }
 
   mod->scope = create_child(ctx.scope);
@@ -2080,7 +2080,7 @@ ASTStatement *Parser::parse_statement() {
           throw_error(
               "you can only take the elements of a tuple destructure as a pointer, 'for *v in ...' is "
               "redundant. just use the correct iterator, such as '.iter_mut()'",
-              node->source_range);
+              node->span);
         }
       }
 
@@ -2335,7 +2335,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
       if (current_func_decl.get()) {
         current_func_decl.get()->has_defer = true;
       } else {
-        throw_error("You can only use defer within a function scope", statement->source_range);
+        throw_error("You can only use defer within a function scope", statement->span);
       }
       block->has_defer = true;
       block->defer_count++;
@@ -2446,7 +2446,7 @@ ASTParamsDecl *Parser::parse_parameters() {
 
     if (peek().type == TType::Assign) {
       if (param->tag == ASTParamDecl::Self) {
-        throw_error("self parameters cannot have a default value.", param->source_range);
+        throw_error("self parameters cannot have a default value.", param->span);
       }
       eat();
       param->normal.default_value = parse_expr();
@@ -2572,7 +2572,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
       value = parse_expr();
       auto evaluated_value = interpret_from_ast(value, this->ctx);
       if (evaluated_value->value_type != ValueType::INTEGER) {
-        throw_error("Enums can only have integers", value->source_range);
+        throw_error("Enums can only have integers", value->span);
       }
       last_value = evaluated_value->as<IntValue>()->value;
     } else {
@@ -2595,7 +2595,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
   std::set<InternedString> keys_set;
   for (const auto &[key, value] : node->key_values) {
     if (keys_set.find(key) != keys_set.end()) {
-      throw_error(std::format("redefinition of enum variant: {}", key), node->source_range);
+      throw_error(std::format("redefinition of enum variant: {}", key), node->span);
     }
     keys.push_back(key);
     keys_set.insert(key);
@@ -2654,7 +2654,7 @@ ASTImpl *Parser::parse_impl() {
       auto variable = (ASTVariable *)statement;
       node->constants.push_back(variable);
     } else {
-      throw_error("invalid statement: only methods and aliases are allowed in 'impl's", statement->source_range);
+      throw_error("invalid statement: only methods and aliases are allowed in 'impl's", statement->span);
     }
   }
   return node;
@@ -2805,7 +2805,7 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
   return node;
 }
 
-ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node) {
+ASTStructDeclaration *Parser::parse_struct_body(InternedString name, Span range, ASTStructDeclaration *node) {
   auto old_struct_decl_state = current_struct_decl;
 
   node->name = name;
@@ -2858,7 +2858,7 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
               "right now, `#bitfield(n_bits) name: type` definitions are the "
               "only directive statements allowed in structs. this is slotted to change, as well as many directives "
               "formalized into keywords.",
-              node->source_range);
+              node->span);
         }
       } else if (peek().type == TType::Identifier) {
         ASTStructMember member{};
@@ -2957,7 +2957,7 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration() {
       assert(variant.tuple->kind == ASTType::TUPLE);
     } else {
       end_node(node, range);
-      throw_error("Unexpected token in choice type declaration", node->source_range);
+      throw_error("Unexpected token in choice type declaration", node->span);
     }
     node->variants.push_back(variant);
     if (peek().type != TType::RCurly) expect(TType::Comma);
@@ -3174,7 +3174,7 @@ inline Token Parser::eat() {
 inline Token Parser::expect(TType type) {
   fill_buffer_if_needed(states.back());
   if (peek().type != type) {
-    SourceRange range = peek().location;
+    Span range = peek().location;
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value), range);
   }
   return eat();
@@ -3246,14 +3246,14 @@ bool Parser::try_import(InternedString name, Scope **scope) {
   return true;
 }
 
-SourceRange Parser::begin_node() {
+Span Parser::begin_node() {
   auto location = peek().location;
   return location;
 }
 
-void Parser::end_node(ASTNode *node, SourceRange &range) {
+void Parser::end_node(ASTNode *node, Span &range) {
   if (node) {
-    node->source_range = range;
+    node->span = range;
   }
 }
 

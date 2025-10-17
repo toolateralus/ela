@@ -90,7 +90,7 @@ extern Type *g_Init_trait_type, *g_Iterable_trait_type, *g_Iterator_trait_type, 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
   Type *expected_type = Type::INVALID_TYPE;
-  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, SourceRange source_range);
+  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> &args, Span span);
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
 
@@ -106,10 +106,10 @@ struct Typer : VisitorBase {
                                               const std::vector<Type *> generic_args = {});
 
   void visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
-                          const SourceRange &range);
+                          const Span &range);
 
   Type *find_generic_type_of(const InternedString &base, std::vector<Type *> generic_args,
-                             const SourceRange &source_range);
+                             const Span &span);
 
   void visit_path(ASTPath *node, bool from_call = false);
 
@@ -165,7 +165,7 @@ struct Typer : VisitorBase {
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
                                                         std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
-                                                        SourceRange range);
+                                                        Span range);
 
   void compiler_mock_method_call_visit_impl(Type *type, const InternedString &method_name);
   void compiler_mock_associated_function_call_visit_impl(Type *left_type, const InternedString &method_name);
@@ -215,7 +215,7 @@ struct DeferBlock {
 
 struct GenericInstantiationErrorUserData {
   std::string message = "";
-  SourceRange definition_range = {};
+  Span definition_range = {};
   jmp_buf save_state;
 };
 

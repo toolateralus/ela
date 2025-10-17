@@ -57,7 +57,7 @@ struct THIR {
   // We default this to void so we never get any bad reads; full confidence this field cannot be null.
   // statements are considered void nodeessions anyway in the THIR.
   Type *type = void_type();
-  SourceRange source_range;
+  Span span;
 
   virtual ~THIR() {}
   virtual THIRNodeType get_node_type() const = 0;
@@ -277,7 +277,7 @@ static inline T *thir_alloc() {
 #define THIR_ALLOC(__type, __name, ast)                                                \
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();                                               \
-  __name->source_range = ast->source_range;                                            \
+  __name->span = ast->span;                                            \
   __name->type = ast->resolved_type;
 
 #define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                        \
@@ -329,8 +329,8 @@ struct THIRGen {
   THIR *option_some(THIR *value, Type *interior_type);
   THIR *option_none(Type *interior_type);
 
-  void check_for_deprecation(SourceRange call_site, THIR *thir);
-  void format_and_print_deprecated_warning(SourceRange call_site, THIR *thir, const Attribute &attr);
+  void check_for_deprecation(Span call_site, THIR *thir);
+  void format_and_print_deprecated_warning(Span call_site, THIR *thir, const Attribute &attr);
   void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
   
   Symbol *get_symbol(ASTNode *);
@@ -343,10 +343,10 @@ struct THIRGen {
 
   inline void bind(ASTNode *ast, THIR *thir) {
     if (!ast) {
-      throw_error("Bound a null AST to a thir", thir->source_range);
+      throw_error("Bound a null AST to a thir", thir->span);
     }
     if (!thir) {
-      throw_error("Bound a null thir to an AST", ast->source_range);
+      throw_error("Bound a null thir to an AST", ast->span);
     }
     ast_map[ast] = thir;
   }
@@ -356,7 +356,7 @@ struct THIRGen {
       throw_error("Bound a null thir to a symbol", {});
     }
     if (!sym) {
-      throw_error("Bound a null symbol to a thir", thir->source_range);
+      throw_error("Bound a null symbol to a thir", thir->span);
     }
 
     symbol_map[sym] = thir;
@@ -453,7 +453,7 @@ struct THIRGen {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-  THIR *initialize(const SourceRange &source_range, Type *type,
+  THIR *initialize(const Span &span, Type *type,
                    std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);
 
@@ -474,10 +474,10 @@ struct THIRGen {
   THIR *take_address_of(THIR *node, ASTNode *ast);
   THIRVariable *make_variable(const InternedString &name, THIR *value, ASTNode *ast, bool is_global = false);
   THIR *make_cast(THIR *operand, Type *type);
-  THIR *make_str(const InternedString &value, const SourceRange &src_range);
-  THIR *make_literal(const InternedString &value, const SourceRange &src_range, Type *type, ASTLiteral::Tag tag);
+  THIR *make_str(const InternedString &value, const Span &src_range);
+  THIR *make_literal(const InternedString &value, const Span &src_range, Type *type, ASTLiteral::Tag tag);
 
-  THIR *make_member_access(const SourceRange &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
+  THIR *make_member_access(const Span &range, THIR *base, std::deque<std::pair<Type *, InternedString>> parts);
 
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);
