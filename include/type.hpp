@@ -159,6 +159,15 @@ struct TypeInfo {
     }
     return nullptr;
   }
+
+  inline int index_of_member(const InternedString &name) const {
+    for (size_t i = 0; i < members.size(); ++i) {
+      if (members[i].name == name) {
+        return static_cast<int>(i);
+      }
+    }
+    return -1;
+  }
 };
 
 struct TraitTypeInfo : TypeInfo {
@@ -492,7 +501,8 @@ struct Type {
   Type *get_element_type() const;
 
   // take a mut/const pointer to this type.
-  Type *take_pointer_to(bool) const;
+  // false == immutable.
+  Type *take_pointer_to(bool = false) const;
 
   Type *make_array_of(size_t size) const {
     return global_find_type_id((Type *)this, {{.type = TYPE_EXT_ARRAY, .array_size = size}});

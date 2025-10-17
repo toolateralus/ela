@@ -28,6 +28,10 @@ jstl::Arena thir_arena(MB(10));
 jstl::Arena value_arena(MB(10));
 jstl::Arena binding_arena(MB(10));
 
+namespace Mir {
+  jstl::Arena mir_arena = {MB(10)};
+}
+
 std::vector<std::string> DYNAMIC_LIBRARY_LOAD_PATH{};
 
 std::vector<Type *> type_table{};

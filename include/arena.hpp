@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstddef>
+#include <utility>
 
 namespace jstl {
 struct Arena final {
@@ -28,6 +29,13 @@ struct Arena final {
   inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
   inline ~Arena() { delete[] data; delete next; }
+
+  // allocate size of type and use placement new for proper initialization,
+  // works fine with types with vtables.
+  template<class T, class... Args>
+  inline T *construct(Args&&... args) {
+    return new (allocate(sizeof(T))) T(std::forward<Args>(args)...);
+  }
 
   inline char *allocate(size_t size_in_bytes) {
     constexpr size_t MAX_ALIGN = alignof(std::max_align_t);
