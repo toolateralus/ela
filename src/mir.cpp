@@ -1107,11 +1107,6 @@ void Function::print(FILE *f) const {
     fprintf(f, " {\n");
   }
 
-  // for (const auto &temp : temps) {
-  //   fprintf(f, "  %s: ", temp.name.get_str().c_str());
-  //   fprintf(f, "%s\n", format_type_ref(temp.type).c_str());
-  // }
-
   for (const auto &bb : basic_blocks) {
     bb->print(f);
   }
