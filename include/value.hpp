@@ -134,9 +134,10 @@ const static NullValue* SHARED_NULL_VALUE = new NullValue();
 const static ReturnValue* SHARED_RETURN_VOID_VALUE = new ReturnValue();
 
 struct ObjectValue : Value {
+  std::string created_at;
   Type* type = nullptr;
   std::map<InternedString, Value*> values{};
-  ObjectValue(Type* t = nullptr) : Value(ValueType::OBJECT) { type = t; }
+  ObjectValue(Type* t) : Value(ValueType::OBJECT) { type = t; }
 
   bool is_truthy() const override;
 
@@ -238,7 +239,7 @@ StringValue* new_string(const std::string& str);
 CharValue* new_char(char val);
 NullValue* null_value();
 LValue* null_lvalue();
-ObjectValue* new_object(Type* type);
+ObjectValue* new_object(Type* type, const std::string &loc);
 FunctionValue* new_function();
 ArrayValue* new_array(Type* type, const std::vector<Value*>& arr);
 ArrayValue* new_array(Type* type);

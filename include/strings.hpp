@@ -158,9 +158,12 @@ fn main () {
 )__";
 
 constexpr auto HELLO_WORLD_INIT_CODE = R"__(
-import fmt::*;
+import io;
+import collections;
 
 fn main() {
+  #run std::c::printf("Hello, [ at compile time ? ]\n"c);
+
   using hellos := List!<str>::init(.[
     "Hello, World!",
     "Привет, Мир!",
@@ -181,7 +184,7 @@ fn main() {
   // defer hellos.destroy();
 
   for hello in hellos {
-    println(hello);
+    io::println(hello);
   }
 }
 )__";

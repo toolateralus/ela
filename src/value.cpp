@@ -1,6 +1,7 @@
 #include "value.hpp"
 #include <cstring>
 #include "ast.hpp"
+#include "core.hpp"
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
@@ -47,7 +48,14 @@ LValue* null_lvalue() {
   static LValue* null_lval = new_lvalue(&null_val);
   return null_lval;
 }
-ObjectValue* new_object(Type* type) { return value_arena_alloc<ObjectValue>(type); }
+
+ObjectValue* new_object(Type* type, const std::string &loc) {
+  assert(type && "type in 'new_object' was null");
+  auto object = value_arena_alloc<ObjectValue>(type);
+  object->created_at = loc;
+  return object;
+}
+
 FunctionValue* new_function() { return value_arena_alloc<FunctionValue>(); }
 ReturnValue* return_value(Value* value) { return value_arena_alloc<ReturnValue>(value); }
 ReturnValue* return_value() { return (ReturnValue*)SHARED_RETURN_VOID_VALUE; }
@@ -274,7 +282,7 @@ Value* default_value_of_fixed_array_of_t(Type* base_type, size_t size, Interpret
 }
 
 Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, Interpreter* interpreter) {
-  auto object = new_object(type);
+  auto object = new_object(type, SOURCE_LOCATION());
   for (const auto& member : info->members) {
     if (member.thir_value.is_not_null()) {
       object->values[member.name] = interpreter->visit_node(member.thir_value.get());
@@ -286,7 +294,7 @@ Value* default_value_of_struct_t(Type* type, StructTypeInfo* info, Interpreter* 
 }
 
 Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, Interpreter* interpreter) {
-  auto object = new_object(type);
+  auto object = new_object(type, SOURCE_LOCATION());
   for (size_t i = 0; i < info->types.size(); ++i) {
     Type* type = info->types[i];
     object->values[std::format("${}", i)] = default_value_of_t(type, interpreter);
@@ -294,17 +302,20 @@ Value* default_value_of_tuple_t(Type* type, TupleTypeInfo* info, Interpreter* in
   return object;
 }
 
-Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo*) {
-  auto object = new_object(type);
+Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo* info, Interpreter* interpreter) {
+  auto object = new_object(type, SOURCE_LOCATION());
   // 0 is always the invalid out of bounds discriminant for choice types.
   // for interpreted choice types, we will just ignore initializing variants, only one can exist,
   // so only one shall exist ever.
-  object->values[OPTION_DISCRIMINANT_KEY] = 0;
+  object->values[OPTION_DISCRIMINANT_KEY] = new_int(0);
+  for (auto member : info->members) {
+    object->values[member.name] = default_value_of_t(member.type, interpreter);
+  }
   return object;
 }
 
 Value* default_value_of_dyn_t(Type* type, DynTypeInfo* info) {
-  auto object = new_object(type);
+  auto object = new_object(type, SOURCE_LOCATION());
   object->values["instance"] = null_value();
   for (const auto& [name, _] : info->methods) {
     object->values[name] = null_value();
@@ -333,7 +344,7 @@ Value* default_value_of_t(Type* t, Interpreter* interpreter) {
     case TYPE_ENUM:
       return default_value_of_scalar_t(TYPE_S64);
     case TYPE_CHOICE:
-      return default_value_of_choice_t(t, t->info->as<ChoiceTypeInfo>());
+      return default_value_of_choice_t(t, t->info->as<ChoiceTypeInfo>(), interpreter);
     case TYPE_DYN:
       return default_value_of_dyn_t(t, t->info->as<DynTypeInfo>());
     case TYPE_FUNCTION:
@@ -489,26 +500,27 @@ void RawPointerValue::assign_from(Value* v) {
 
 FunctionValue::FunctionValue() : Value(ValueType::FUNCTION) {}
 
-Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interpreter* interpreter,
-                                   std::vector<Value*> arguments) {
-  Value *arg0 = arguments[0];
+Value* FunctionValue::dyn_dispatch(const InternedString& method_name, Interpreter* interpreter, std::vector<Value*> arguments) {
+  Value* arg0 = arguments[0];
 
   if (arg0->is(ValueType::POINTER)) {
     arg0 = *arg0->as<PointerValue>()->ptr;
   }
 
   if (!arg0->is(ValueType::OBJECT)) {
-    throw_error(std::format("'dyn' object was ({}), so a dynamic dispatch failed at compile time for method: {}", arg0->to_string(), method_name), {});
+    throw_error(std::format("'dyn' object was ({}), so a dynamic dispatch failed at compile time for method: {}",
+                            arg0->to_string(), method_name),
+                {});
   }
 
-  ObjectValue *self = arg0->as<ObjectValue>();
-  PointerValue *function_pointer = self->values[method_name]->as<PointerValue>();
+  ObjectValue* self = arg0->as<ObjectValue>();
+  PointerValue* function_pointer = self->values[method_name]->as<PointerValue>();
 
   if (function_pointer->pointee_value_type != ValueType::FUNCTION) {
     throw_error("cannot call a non-pointer function with dyn dispatch at compile time. this is likely a bug", {});
   }
 
-  FunctionValue *function = (*function_pointer->ptr)->as<FunctionValue>();
+  FunctionValue* function = (*function_pointer->ptr)->as<FunctionValue>();
 
   return function->call(interpreter, arguments);
 }

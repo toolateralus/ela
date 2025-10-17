@@ -223,7 +223,7 @@ THIR *THIRGen::visit_call(ASTCall *ast) {
     return THIRNoop::shared();
   }
 
-  check_for_deprecation(thir->callee);
+  check_for_deprecation(ast->source_range, thir->callee);
 
   extract_arguments_desugar_defaults(thir->callee, ast->arguments, thir->arguments);
   return thir;
@@ -661,8 +661,8 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   for (auto &[name, method_type] : dyn_info->methods) {
     auto symbol = scope->local_lookup(name);
     dynof->key_values.push_back({
-        name,
-        get_function_pointer(symbol->function.declaration),
+      name,
+      get_function_pointer(symbol->function.declaration),
     });
   }
 
@@ -2141,7 +2141,7 @@ THIR *THIRGen::visit_run(ASTRun *ast) {
   }
 }
 
-void THIRGen::format_and_print_deprecated_warning(THIR *node, const Attribute &attr) {
+void THIRGen::format_and_print_deprecated_warning(SourceRange call_site, THIR *node, const Attribute &attr) {
   if (attr.tag != ATTRIBUTE_DEPRECATED) {
     return;
   }
@@ -2201,6 +2201,8 @@ void THIRGen::format_and_print_deprecated_warning(THIR *node, const Attribute &a
   }
 
   auto string_literal = (ASTLiteral *)(attr.arguments[0]);
+
+  printf("from: %s\n", call_site.ToString().c_str());
 
   printf("\n %s --- instead, use: ---\n", string_literal->value.get_str().c_str());
   auto sl = format_source_location(range, ERROR_WARNING, 5);
@@ -2677,8 +2679,8 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
   global_ini_call->arguments = {};
 }
 
-void THIRGen::check_for_deprecation(THIR *thir) {
+void THIRGen::check_for_deprecation(SourceRange call_site, THIR *thir) {
   if (thir->deprecated) {
-    format_and_print_deprecated_warning(thir, thir->deprecated_attr);
+    format_and_print_deprecated_warning(call_site,thir, thir->deprecated_attr);
   }
 }

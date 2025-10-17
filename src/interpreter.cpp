@@ -1,3 +1,4 @@
+#include <print>
 #include "ast.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -72,7 +73,8 @@ LValue *Interpreter::get_variable_lvalue(THIRVariable *node) {
     node->compile_time_value = visit_node(node->value);
   }
 
-  node->use_compile_time_value_at_emit_time = true;
+  // nocheckin
+  // node->use_compile_time_value_at_emit_time = true;
 
   // printf("reading: %s, from %s\n", node->compile_time_value->to_string().c_str(), node->name.get_str().c_str());
 
@@ -171,7 +173,7 @@ LValue *Interpreter::get_unary_lvalue(THIRUnaryExpr *node) {
 Value *Interpreter::visit_block(THIRBlock *node) {
   for (const auto &stmt : node->statements) {
     auto result = visit_node(stmt);
-    if (result->value_type == ValueType::RETURN) {
+    if (result && result->value_type == ValueType::RETURN) {
       auto value = result->as<ReturnValue>()->value;
       if (value) {
         // Propagate returns to function
@@ -186,6 +188,12 @@ Value *Interpreter::visit_block(THIRBlock *node) {
 Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
   Value *left = visit_node(node->left);
   Value *right = visit_node(node->right);
+
+  if (!left || !right) {
+    bool left_null = !left, right_null = !right;
+    std::println("left={}, right={}", node->left->source_range.ToString(), node->right->source_range.ToString());
+    throw_error(std::format("[INTERPRETER] INTERNAL COMPILER ERROR: one or both binary operands null in expression left null?={}, right null?={}", left_null, right_null), node->source_range);
+  }
 
   const auto vt = [](Value *v) { return v->get_value_type(); };
   const auto is_int = [&](Value *v) { return vt(v) == ValueType::INTEGER; };
@@ -616,7 +624,18 @@ Value *Interpreter::visit_index(THIRIndex *node) {
 
 Value *Interpreter::visit_cast(THIRCast *node) {
   // TODO: do we even have to do any casting here? probably float<->int and other scalars just to make sense?
-  return visit_node(node->operand);
+  auto result =  visit_node(node->operand);
+
+  if (result->get_value_type() == ValueType::LVALUE) {
+    auto lvalue = (LValue*)result;
+    if (lvalue->managed) {
+      return *lvalue->managed;
+    } else {
+      throw_error("unmanaged casts not implemented", node->source_range);
+    }
+  }
+
+  return result;
 }
 
 Value *Interpreter::visit_variable(THIRVariable *node) {
@@ -692,7 +711,8 @@ Value *Interpreter::visit_aggregate_initializer(THIRAggregateInitializer *node) 
     if (is_dyn && key == "instance") {
       continue;
     }
-    object->values[key] = visit_node(value);
+    auto v = visit_node(value);
+    object->values[key] = v;
   }
 
   if (is_dyn) {
@@ -714,10 +734,9 @@ Value *Interpreter::visit_collection_initializer(THIRCollectionInitializer *node
 void Interpreter::write_to_lvalue(THIR *left, Value *right) {
   if (left->get_node_type() == THIRNodeType::Variable) {
     auto var = (THIRVariable *)left;
-    if (var->global_initializer_assignment) {  // we have to update this, unfortunately.
-      var->global_initializer_assignment->right = right->to_thir();
+    if (var->global_initializer_assignment) {
+      // var->global_initializer_assignment->right = right->to_thir();
     }
     var->compile_time_value = right;
-    // printf("writing %s to %s\n", right->to_string().c_str(), var->name.get_str().c_str());
   }
 }

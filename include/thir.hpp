@@ -329,8 +329,8 @@ struct THIRGen {
   THIR *option_some(THIR *value, Type *interior_type);
   THIR *option_none(Type *interior_type);
 
-  void check_for_deprecation(THIR *thir);
-  void format_and_print_deprecated_warning(THIR *thir, const Attribute &attr);
+  void check_for_deprecation(SourceRange call_site, THIR *thir);
+  void format_and_print_deprecated_warning(SourceRange call_site, THIR *thir, const Attribute &attr);
   void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
   
   Symbol *get_symbol(ASTNode *);
