@@ -96,7 +96,10 @@ int CompileCommand::compile() {
     {
       Mir::Module m;
       Mir::generate(thir_gen.entry_point, m);
-      m.print(stdout);
+      FILE *f = fopen("./output.ir", "w");
+      m.print(f);
+      fflush(f);
+      fclose(f);
     }
   });
 

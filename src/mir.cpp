@@ -6,8 +6,14 @@ namespace Mir {
 void generate_module(const THIRFunction *entry_point, Module &m) { generate_function(entry_point, m); }
 
 Operand generate_function(const THIRFunction *node, Module &m) {
+  auto it = m.function_table.find(node->name);
+
+  if (it != m.function_table.end()) {
+    return Operand::Temp(it->second->index, it->second->type);
+  }
+
   uint32_t index;
-  Function *f = m.create_function(node->name, node->type, index);
+  Function *f = m.create_function(node, index);
   m.enter_function(f);
   generate_block(node->block, m);
   Basic_Block *insert_block = f->get_insert_block();
@@ -369,9 +375,244 @@ void generate_if(const THIRIf *, Module &) {}
 void generate_while(const THIRWhile *, Module &) {}
 void generate_noop(const THIRNoop *, Module &) {}
 
+const Type *get_base_type(const Type *t) {
+  while (t->has_extensions()) {
+    t = t->base_type;
+  }
+  return t;
+}
+
+std::string format_type_ref(const Type *t) {
+  // If this type has pointer/array extensions, print a compact reference
+  // that encodes the base type uid and the extension. Examples:
+  //   pointer -> [*<base_uid>]
+  //   pointer depth 2 -> [**<base_uid>]
+  //   fixed array -> <[<base_uid>]; <size>>
+  if (t->has_extensions()) {
+    if (type_extensions_is_back_array(t->extensions)) {
+      auto ext = t->extensions.back();
+      const Type *base = get_base_type(t);
+      return "<[" + std::to_string(base->uid) + "]; " + std::to_string(ext.array_size) + ">";
+    }
+
+    // pointer(s) at the back
+    int depth = t->pointer_depth();
+    if (depth > 0) {
+      const Type *base = get_base_type(t);
+      std::string stars(depth, '*');
+      return "[" + stars + std::to_string(base->uid) + "]";
+    }
+  }
+  return "[" + std::to_string(t->uid) + "]";
+}
+
+void collect_dependencies(const Type *t, std::unordered_set<const Type *> &visited, std::vector<const Type *> &ordered_types) {
+  if (visited.count(t)) {
+    return;
+  }
+  visited.insert(t);
+
+  if (t->has_extensions() && t->kind != TYPE_FUNCTION &&
+          (type_extensions_is_back_pointer(t->extensions) || type_extensions_is_back_array(t->extensions))) {
+    const Type *base = get_base_type(t);
+    collect_dependencies(base, visited, ordered_types);
+    return;
+  }
+  switch (t->kind) {
+    case TYPE_SCALAR:
+      break;
+    case TYPE_FUNCTION: {
+      auto info = t->info->as<FunctionTypeInfo>();
+      for (size_t i = 0; i < info->params_len; ++i) {
+        collect_dependencies(info->parameter_types[i], visited, ordered_types);
+      }
+      if (info->return_type && info->return_type != void_type()) {
+        collect_dependencies(info->return_type, visited, ordered_types);
+      }
+      break;
+    }
+    case TYPE_DYN: {
+      auto info = t->info->as<DynTypeInfo>();
+      for (const auto &method : info->methods) {
+        collect_dependencies(method.second, visited, ordered_types);
+      }
+      break;
+    }
+    case TYPE_STRUCT: {
+      for (const auto &member : t->info->members) {
+        collect_dependencies(member.type, visited, ordered_types);
+      }
+      break;
+    }
+    case TYPE_ENUM: {
+      auto info = t->info->as<EnumTypeInfo>();
+      collect_dependencies(info->underlying_type, visited, ordered_types);
+      break;
+    }
+    case TYPE_TUPLE: {
+      auto info = t->info->as<TupleTypeInfo>();
+      for (size_t i = 0; i < info->types.size(); ++i) {
+        collect_dependencies(info->types[i], visited, ordered_types);
+      }
+      break;
+    }
+    case TYPE_CHOICE: {
+      for (const auto &variant : t->info->members) {
+        if (variant.type != void_type()) {
+          collect_dependencies(variant.type, visited, ordered_types);
+        }
+      }
+      break;
+    }
+    case TYPE_TRAIT:
+      // Traits should not be emitted directly
+      break;
+  }
+  ordered_types.push_back(t);
+}
+
+void print_type(FILE *f, const Type *t, int indent = 0) {
+  auto print_indent = [f, indent]() {
+    for (int i = 0; i < indent; ++i) fprintf(f, " ");
+  };
+
+  switch (t->kind) {
+    case TYPE_SCALAR:
+      print_indent();
+      fprintf(f, "[%zu]: %s\n", t->uid, t->to_string().c_str());
+      break;
+    case TYPE_FUNCTION: {
+      auto info = t->info->as<FunctionTypeInfo>();
+      print_indent();
+      fprintf(f, "[%zu]: fn (", t->uid);
+      for (size_t i = 0; i < info->params_len; ++i) {
+        fprintf(f, "%s", format_type_ref(info->parameter_types[i]).c_str());
+        if (i + 1 < info->params_len) fprintf(f, ", ");
+      }
+      fprintf(f, ")");
+      if (info->return_type && info->return_type != void_type()) {
+        fprintf(f, " -> %s", format_type_ref(info->return_type).c_str());
+      }
+      fprintf(f, "\n");
+      break;
+    }
+    case TYPE_DYN: {
+      auto info = t->info->as<DynTypeInfo>();
+      print_indent();
+      fprintf(f, "[%zu]: struct dyn %s {\n", t->uid, info->trait_type->basename.get_str().c_str());
+
+      for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
+      fprintf(f, "instance: ptr\n");
+
+      for (const auto &method : info->methods) {
+        for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
+        fprintf(f, "%s: %s\n", method.first.get_str().c_str(), format_type_ref(method.second).c_str());
+      }
+
+      print_indent();
+      fprintf(f, "}\n");
+      break;
+    }
+    case TYPE_STRUCT: {
+      auto info = t->info->as<StructTypeInfo>();
+      print_indent();
+      fprintf(f, "[%zu]: %sstruct %s {\n", t->uid, info->is_union ? "union " : "", t->basename.get_str().c_str());
+      for (const auto &member : t->info->members) {
+        for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
+        fprintf(f, "%s: %s\n", member.name.get_str().c_str(), format_type_ref(member.type).c_str());
+      }
+      print_indent();
+      fprintf(f, "}\n");
+      break;
+    }
+    case TYPE_ENUM: {
+      auto info = t->info->as<EnumTypeInfo>();
+      print_indent();
+      fprintf(f, "[%zu]: enum %s : %s {\n", t->uid, t->basename.get_str().c_str(),
+              format_type_ref(info->underlying_type).c_str());
+      for (const auto &member : t->info->members) {
+        for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
+        fprintf(f, "%s\n", member.name.get_str().c_str());
+      }
+      print_indent();
+      fprintf(f, "}\n");
+      break;
+    }
+    case TYPE_TUPLE: {
+      auto info = t->info->as<TupleTypeInfo>();
+      print_indent();
+      fprintf(f, "[%zu]: tuple (", t->uid);
+      for (size_t i = 0; i < info->types.size(); ++i) {
+        fprintf(f, "%s", format_type_ref(info->types[i]).c_str());
+        if (i + 1 < info->types.size()) fprintf(f, ", ");
+      }
+      fprintf(f, ")\n");
+      break;
+    }
+    case TYPE_CHOICE: {
+      print_indent();
+      fprintf(f, "[%zu]: choice %s {\n", t->uid, t->basename.get_str().c_str());
+      for (size_t i = 0; i < t->info->members.size(); ++i) {
+        const auto &variant = t->info->members[i];
+        for (int j = 0; j < indent + 2; ++j) fprintf(f, " ");
+        fprintf(f, "[%zu] %s", i, variant.name.get_str().c_str());
+
+        if (variant.type == void_type()) {
+          fprintf(f, ",\n");
+        } else if (variant.type->is_kind(TYPE_TUPLE)) {
+          auto tuple_info = variant.type->info->as<TupleTypeInfo>();
+          if (tuple_info->types.size() == 1) {
+            fprintf(f, "(%s),\n", format_type_ref(tuple_info->types[0]).c_str());
+          } else {
+            fprintf(f, "(");
+            for (size_t j = 0; j < tuple_info->types.size(); ++j) {
+              fprintf(f, "%s", format_type_ref(tuple_info->types[j]).c_str());
+              if (j + 1 < tuple_info->types.size()) fprintf(f, ", ");
+            }
+            fprintf(f, "),\n");
+          }
+        } else if (variant.type->is_kind(TYPE_STRUCT)) {
+          fprintf(f, " {\n");
+          for (const auto &member : variant.type->info->members) {
+            for (int k = 0; k < indent + 4; ++k) fprintf(f, " ");
+            fprintf(f, "%s: %s,\n", member.name.get_str().c_str(), format_type_ref(member.type).c_str());
+          }
+          for (int k = 0; k < indent + 2; ++k) fprintf(f, " ");
+          fprintf(f, "},\n");
+        } else {
+          fprintf(f, ": %s,\n", format_type_ref(variant.type).c_str());
+        }
+      }
+      print_indent();
+      fprintf(f, "}\n");
+      break;
+    }
+    case TYPE_TRAIT:
+      assert(false && "somehow we tried to emit a trait type");
+      break;
+  }
+}
+
 void Module::print(FILE *f) const {
-  for (size_t i = 0; i < functions.size(); ++i) {
-    functions[i]->print(f);
+  fprintf(f, "Types: {\n");
+
+  // Collect all dependencies in proper order
+  std::unordered_set<const Type *> visited;
+  std::vector<const Type *> ordered_types;
+
+  for (const auto *t : used_types) {
+    collect_dependencies(t, visited, ordered_types);
+  }
+
+  // Print types in dependency order
+  for (const auto *t : ordered_types) {
+    print_type(f, t, 2);
+  }
+
+  fprintf(f, "}\n");
+
+  for (const auto &fn : functions) {
+    fn->print(f);
   }
 }
 
@@ -457,13 +698,13 @@ void Function::print(FILE *f) const {
     fprintf(f, "  %s: %s\n", temp.name.get_str().c_str(), temp.type->to_string().c_str());
   }
 
-  fprintf(f, "\n");
-
   for (const auto &bb : basic_blocks) {
     bb->print(f);
-    fprintf(f, "\n");
+    if (bb != basic_blocks.back()) {
+      fprintf(f, "\n");
+    }
   }
-  
+
   fprintf(f, "}\n");
 }
 

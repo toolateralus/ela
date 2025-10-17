@@ -231,6 +231,8 @@ struct Temporary {
 };
 
 struct Function {
+  uint32_t index;  // how to refer to this function.
+
   InternedString name;
   Span span;
 
@@ -290,7 +292,6 @@ struct Module {
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
 
-
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
     assert(type && f);
@@ -308,10 +309,9 @@ struct Module {
     f->stack_size_needed_in_bytes += type->size_in_bytes();
 
     used_types.insert(type);
-    
+
     return Operand::Temp(idx, type);
   }
-
 
   inline Function *get_function(InternedString name) {
     const auto it = function_table.find(name);
@@ -319,23 +319,25 @@ struct Module {
     return it->second;
   }
 
-  inline Function *create_function(InternedString name, Type *function_type, uint32_t &index) {
+  inline Function *create_function(const THIRFunction *node, uint32_t &index) {
     Function *f = mir_arena.construct<Function>();
     index = (uint32_t)functions.size();
-    f->name = name;
-    f->type_info = function_type->info->as<FunctionTypeInfo>();
-    f->type = function_type;
+    f->name = node->name;
+    f->type_info = node->type->info->as<FunctionTypeInfo>();
+    f->type = node->type;
 
-    for (size_t i = 0; i < f->type_info->params_len; ++i) {
-      Type *ty = f->type_info->parameter_types[i];
+    size_t param_idx = 0;
+    for (const auto &param : node->parameters) {
       f->temps.push_back({
-          .name = generate_temp_identifier(i),
-          .type = ty,
+          .name = generate_temp_identifier(param_idx),
+          .type = param.associated_variable->type,
       });
+      variables[param.associated_variable] = Operand::Temp(param_idx, param.associated_variable->type);
+      param_idx++;
     }
 
     functions.push_back(f);
-    function_table[name] = f;
+    function_table[node->name] = f;
     return f;
   }
 

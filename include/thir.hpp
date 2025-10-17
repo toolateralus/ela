@@ -142,7 +142,7 @@ struct THIRBlock : THIR {
 struct THIRParameter {
   InternedString name;
   THIR *default_value;
-  THIR *associated_variable;
+  THIRVariable *associated_variable;
 };
 
 struct THIRFunction : THIR {
