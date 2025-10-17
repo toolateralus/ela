@@ -49,11 +49,13 @@ enum Op_Code : uint8_t {
     temporaries are assumed to always we a pointer to stack memory, just like LLVM.
     load/store always take a pointer operand, and alloca always returns a pointer operand.
   */
-  OP_LOAD,          // dest=result, left=ptr (tag determines const/imm/register)
-  OP_STORE,         // left=ptr,   right=value
-  OP_ALLOCA,        // dest=result, left=type_index (type->uid) (stack allocate),
-  OP_LOAD_GLOBAL,   // dest=value, right=g_idx
-  OP_STORE_GLOBAL,  // dest=g_idx, right=value
+  OP_LOAD,             // dest=result, left=ptr (tag determines const/imm/register)
+  OP_STORE,            // left=ptr,   right=value
+  OP_ALLOCA,           // dest=result, left=type_index (type->uid) (stack allocate),
+  OP_LOAD_GLOBAL,      // dest=value, right=g_idx
+  OP_STORE_GLOBAL,     // dest=g_idx, right=value
+  OP_LOAD_GLOBAL_PTR,  // dest=ptr, right=g_idx
+  OP_LOAD_FN_PTR,      // dest=ptr, right=fn_idx,
 
   // see Instruction for info on bb.
   OP_JMP,        // left=bb
@@ -76,6 +78,7 @@ enum Op_Code : uint8_t {
 struct Basic_Block;
 
 struct Constant {
+  Type *type;
   union {
     InternedString string_lit;
     uint64_t int_lit;
@@ -92,31 +95,35 @@ struct Constant {
     CONST_CHAR,
   } tag = CONST_INVALID;
 
-  static Constant Int(uint64_t value) {
+  static Constant Int(uint64_t value, Type *t = s32_type()) {
     Constant c;
     c.int_lit = value;
     c.tag = CONST_INT;
+    c.type = t;
     return c;
   }
 
-  static Constant Char(uint16_t value) {
+  static Constant Char(uint16_t value, Type *t = u32_type()) {
     Constant c;
     c.int_lit = value;
     c.tag = CONST_CHAR;
+    c.type = t;
     return c;
   }
 
-  static Constant String(InternedString value) {
+  static Constant String(InternedString value, Type *t = u8_ptr_type()) {
     Constant c;
     c.string_lit = value;
     c.tag = CONST_STRING;
+    c.type = t;
     return c;
   }
 
-  static Constant Float(double value) {
+  static Constant Float(double value, Type *t = f32_type()) {
     Constant c;
     c.float_lit = value;
     c.tag = CONST_FLOAT;
+    c.type = t;
     return c;
   }
 
@@ -124,10 +131,10 @@ struct Constant {
     Constant c;
     c.bool_lit = value;
     c.tag = CONST_BOOL;
+    c.type = bool_type();
     return c;
   }
-
-  void print(FILE *f) const;
+  void print(FILE *) const;
 };
 
 struct Operand {
@@ -188,6 +195,7 @@ struct Operand {
     o.tag = OPERAND_BASIC_BLOCK;
     return o;
   }
+  void print(FILE *) const;
 };
 
 // This is more so an TMIR, (typed mid level intermediate representation)
@@ -201,7 +209,7 @@ struct Instruction {
 #ifdef DEBUG
   Span span;
 #endif
-  void print(FILE *f) const;
+void print(FILE *) const;
 };
 
 struct Basic_Block {
@@ -217,7 +225,7 @@ struct Basic_Block {
     return code.back();
   }
   inline Op_Code back_opcode() const { return back().opcode; }
-  void print(FILE *f) const;
+  void print(FILE *) const;
 };
 
 extern jstl::Arena mir_arena;
@@ -264,28 +272,50 @@ struct Function {
     return basic_blocks[0];
   }
 
-  static inline InternedString generate_default_bb_label() {
-    static size_t index = 0;
-    return std::format("bb{}", index++);
-  }
+  static inline InternedString generate_default_bb_label(size_t index) { return std::format("bb{}", index); }
 
-  inline Basic_Block *enter_bb(InternedString label = generate_default_bb_label()) {
-    Basic_Block *block = mir_arena.construct<Basic_Block>(label);
+  inline Basic_Block *enter_bb(std::optional<InternedString> label = std::nullopt) {
+    if (label == std::nullopt) {
+      label = generate_default_bb_label(this->basic_blocks.size());
+    }
+    Basic_Block *block = mir_arena.construct<Basic_Block>(*label);
     basic_blocks.push_back(block);
     return block;
+  }
+
+  inline void finalize() {
+    stack_size_needed_in_bytes = 0;
+    for (const auto &temp : temps) {
+      if (temp.type && temp.type->size_in_bytes() > 0) {
+        size_t align = temp.type->alignment_in_bytes();
+        if (align && stack_size_needed_in_bytes % align != 0) {
+          stack_size_needed_in_bytes += align - (stack_size_needed_in_bytes % align);
+        }
+        stack_size_needed_in_bytes += temp.type->size_in_bytes();
+      }
+    }
+    if (stack_size_needed_in_bytes % 16 != 0) {
+      stack_size_needed_in_bytes += 16 - (stack_size_needed_in_bytes % 16);
+    }
   }
 
   inline Basic_Block *get_insert_block() {
     assert(basic_blocks.size() && "no basic blocks");
     return basic_blocks.back();
   }
-  void print(FILE *f) const;
+  void print(FILE *) const;
+};
+
+struct Global_Variable {
+  InternedString name;
+  Type *type;
+  uint32_t idx;
 };
 
 struct Module {
   std::vector<Function *> functions;
   std::unordered_map<InternedString, Function *> function_table;
-
+  std::unordered_map<THIRVariable const *, Global_Variable> global_variables;
   std::unordered_set<Type *> used_types;
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
@@ -305,8 +335,6 @@ struct Module {
         .name = *label,
         .type = type,
     });
-
-    f->stack_size_needed_in_bytes += type->size_in_bytes();
 
     used_types.insert(type);
 
@@ -355,7 +383,7 @@ struct Module {
   }
 
   // small helper to insert and enter a basic block in the current function
-  inline Basic_Block *create_basic_block(InternedString label = Function::generate_default_bb_label()) {
+  inline Basic_Block *create_basic_block(std::optional<InternedString> label = std::nullopt) {
     assert(current_function);
     return current_function->enter_bb(label);
   }
@@ -364,8 +392,12 @@ struct Module {
     assert(current_function && "no current function");
     return current_function->basic_blocks.back();
   }
-
-  void print(FILE *f) const;
+  inline void finalize() {  // compute stack sizes after all code has compiled.
+    for (const auto &f : functions) {
+      f->finalize();
+    }
+  }
+  void print(FILE *) const;
 };
 
 void generate_block(const THIRBlock *node, Module &m);
@@ -498,32 +530,66 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
   }
 }
 
-#define EMIT_OP(OP) m.current_function->get_insert_block()->push(Instruction{OP})
-#define EMIT_NULLARY(OP, DEST) m.current_function->get_insert_block()->push(Instruction{OP, DEST})
-#define EMIT_UNARY(OP, DEST, LEFT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT})
-#define EMIT_BINARY(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT})
-#define EMIT_BINOP(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT})
-#define EMIT_UNOP(OP, DEST, LEFT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT})
-#define EMIT_CALL(DEST, FN_IDX, N_ARGS) m.current_function->get_insert_block()->push(Instruction{OP_CALL, DEST, FN_IDX, N_ARGS})
-#define EMIT_RET(VAL) m.current_function->get_insert_block()->push(Instruction{OP_RET, Operand(), VAL})
-#define EMIT_RET_VOID() m.current_function->get_insert_block()->push(Instruction{OP_RET_VOID})
-#define EMIT_LOAD(DEST, PTR) m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, PTR})
-#define EMIT_STORE(PTR, VAL) m.current_function->get_insert_block()->push(Instruction{OP_STORE, Operand(), PTR, VAL})
+#define EMIT_OP(OP) m.current_function->get_insert_block()->push(Instruction{OP, .span = node->span})
+#define EMIT_NULLARY(OP, DEST) m.current_function->get_insert_block()->push(Instruction{OP, DEST, .span = node->span})
+#define EMIT_UNARY(OP, DEST, LEFT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, .span = node->span})
+#define EMIT_BINARY(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
+#define EMIT_BINOP(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
+
+// OP_CALL: dest=result, left=fn_idx, right=n_args
+#define EMIT_CALL(DEST, FN_IDX, N_ARGS) m.current_function->get_insert_block()->push(Instruction{OP_CALL, DEST, FN_IDX, N_ARGS, .span = node->span})
+
+// OP_RET: left=value
+#define EMIT_RET(VAL) m.current_function->get_insert_block()->push(Instruction{OP_RET, Operand(), VAL, .span = node->span})
+#define EMIT_RET_VOID() m.current_function->get_insert_block()->push(Instruction{OP_RET_VOID, .span = node->span})
+
+// OP_LOAD: dest=result, left=ptr
+#define EMIT_LOAD(DEST, PTR) m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, PTR, .span = node->span})
+
+// OP_STORE: left=ptr, right=value
+#define EMIT_STORE(PTR, VAL) m.current_function->get_insert_block()->push(Instruction{OP_STORE, Operand(), PTR, VAL, .span = node->span})
+
+// OP_ALLOCA: dest=result, left=type_index
 #define EMIT_ALLOCA(DEST, TYPE_INDEX_UID) \
-  m.current_function->get_insert_block()->push(Instruction{OP_ALLOCA, DEST, TYPE_INDEX_UID})
-#define EMIT_PUSH_ARG(ARG) m.current_function->get_insert_block()->push(Instruction{OP_PUSH_ARG, Operand(), ARG})
-#define EMIT_CAST(DEST, VAL, TYPE_IDX) m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX})
+  m.current_function->get_insert_block()->push(Instruction{OP_ALLOCA, DEST, TYPE_INDEX_UID, .span = node->span})
+
+// OP_PUSH_ARG: left=value
+#define EMIT_PUSH_ARG(ARG) m.current_function->get_insert_block()->push(Instruction{OP_PUSH_ARG, Operand(), ARG, .span = node->span})
+
+// OP_CAST / OP_BITCAST: dest=result, left=value, right=type_index
+#define EMIT_CAST(DEST, VAL, TYPE_IDX) m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX, .span = node->span})
 #define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
-  m.current_function->get_insert_block()->push(Instruction{OP_BITCAST, DEST, VAL, TYPE_IDX})
-#define EMIT_GEP(DEST, BASE, INDEX) m.current_function->get_insert_block()->push(Instruction{OP_GEP, DEST, BASE, INDEX})
+  m.current_function->get_insert_block()->push(Instruction{OP_BITCAST, DEST, VAL, TYPE_IDX, .span = node->span})
+
+// OP_GEP: dest=ptr, left=base, right=index
+#define EMIT_GEP(DEST, BASE, INDEX) m.current_function->get_insert_block()->push(Instruction{OP_GEP, DEST, BASE, INDEX, .span = node->span})
+
+// OP_LOAD_GLOBAL: dest=value, right=g_idx (left unused)
 #define EMIT_LOAD_GLOBAL(DEST, G_IDX) \
-  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_GLOBAL, DEST, Operand(), G_IDX})
+  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_GLOBAL, DEST, Operand(), G_IDX, .span = node->span})
+
+// OP_LOAD_GLOBAL_PTR: dest=ptr, right=g_idx (left unused)
+#define EMIT_LOAD_GLOBAL_PTR(DEST, G_IDX) \
+  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_GLOBAL_PTR, DEST, Operand(), G_IDX, .span = node->span})
+
+// OP_LOAD_FN_PTR: dest=ptr, right=fn_idx (left unused)
+#define EMIT_LOAD_FN_PTR(DEST, FN_IDX) \
+  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_FN_PTR, DEST, Operand(), FN_IDX, .span = node->span})
+
+// OP_STORE_GLOBAL: dest=g_idx, right=value (left unused)
 #define EMIT_STORE_GLOBAL(G_IDX, VAL) \
-  m.current_function->get_insert_block()->push(Instruction{OP_STORE_GLOBAL, Operand(), G_IDX, VAL})
+  m.current_function->get_insert_block()->push(Instruction{OP_STORE_GLOBAL, G_IDX, Operand(), VAL, .span = node->span})
+
+// Jump macros (OP_JMP, OP_JMP_TRUE, OP_JMP_FALSE)
+// OP_JMP: left=bb
+#define EMIT_JUMP(TARGET_BB) m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::BB(TARGET_BB), .span = node->span})
+
+// OP_JMP_TRUE: left=bb, right=condition
 #define EMIT_JUMP_TRUE(TARGET_BB, COND) \
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP_TRUE, Operand(), Operand::BB(TARGET_BB), COND})
+  m.current_function->get_insert_block()->push(Instruction{OP_JMP_TRUE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
+
+// OP_JMP_FALSE: left=bb, right=condition
 #define EMIT_JUMP_FALSE(TARGET_BB, COND) \
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP_FALSE, Operand(), Operand::BB(TARGET_BB), COND})
-#define EMIT_JUMP(TARGET_BB) m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::BB(TARGET_BB)})
+  m.current_function->get_insert_block()->push(Instruction{OP_JMP_FALSE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
 
 }  // namespace Mir

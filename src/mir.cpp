@@ -1,9 +1,62 @@
 #include "mir.hpp"
+#include "core.hpp"
+#include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
 
 namespace Mir {
+
+static std::vector<Basic_Block *> g_break_targets;
+static std::vector<Basic_Block *> g_continue_targets;
+
+static void set_insert_block(Function *f, Basic_Block *b) {
+  auto &v = f->basic_blocks;
+  for (size_t i = 0; i < v.size(); ++i) {
+    if (v[i] == b) {
+      if (i == v.size() - 1) return;
+      std::swap(v[i], v.back());
+      return;
+    }
+  }
+  v.push_back(b);
+}
+
+static bool block_only_contains_noop(const THIRBlock *b) {
+  size_t count = 0;
+  for (const auto *stmt : b->statements) {
+    if (stmt->get_node_type() == THIRNodeType::Noop) {
+      count += 1;
+    } else {
+      break;
+    }
+  }
+  return count == b->statements.size();
+}
+
 void generate_module(const THIRFunction *entry_point, Module &m) { generate_function(entry_point, m); }
+
+void convert_function_flags(const THIRFunction *t, Function *f) {
+  uint8_t flags = Function::FUNCTION_FLAGS_NONE;
+  if (t->is_inline) {
+    flags |= Function::FUNCTION_FLAGS_IS_INLINE;
+  }
+  if (t->is_varargs) {
+    flags |= Function::FUNCTION_FLAGS_IS_VAR_ARGS;
+  }
+  if (t->is_extern) {
+    flags |= Function::FUNCTION_FLAGS_IS_EXTERN;
+  }
+  if (t->is_entry) {
+    flags |= Function::FUNCTION_FLAGS_IS_ENTRY_POINT;
+  }
+  if (t->is_exported) {
+    flags |= Function::FUNCTION_FLAGS_IS_EXPORTED;
+  }
+  if (t->is_test) {
+    flags |= Function::FUNCTION_FLAGS_IS_TEST;
+  }
+  f->flags = flags;
+}
 
 Operand generate_function(const THIRFunction *node, Module &m) {
   auto it = m.function_table.find(node->name);
@@ -14,7 +67,16 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 
   uint32_t index;
   Function *f = m.create_function(node, index);
+
+  convert_function_flags(node, f);
+
+  // TODO: figure out how we're going to do externs.
+  // probably just need an extern section
+  if (node->is_extern) {
+    return Operand::Temp(index, node->type);
+  }
   m.enter_function(f);
+
   generate_block(node->block, m);
   Basic_Block *insert_block = f->get_insert_block();
   if (f->type_info->return_type == void_type() && (!insert_block->code.size() || insert_block->back_opcode() != OP_RET_VOID)) {
@@ -25,6 +87,9 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 }
 
 void generate_block(const THIRBlock *node, Module &m) {
+  if (node->statements.empty() || block_only_contains_noop(node)) {
+    return;
+  }
   m.create_basic_block();
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
@@ -32,15 +97,42 @@ void generate_block(const THIRBlock *node, Module &m) {
 }
 
 Operand load_variable(const THIRVariable *node, Module &m) {
-  auto it = m.variables.find(node);
-  assert(it != m.variables.end() && "variable not declared");
   Operand result = m.create_temporary(node->type);
+
+  if (node->is_global) {
+    auto var = m.global_variables[node];
+    EMIT_LOAD_GLOBAL(result, Operand::Imm(Constant::Int(var.idx), node->type));
+    return result;
+  }
+
+  auto it = m.variables.find(node);
+  if (it == m.variables.end()) {
+    throw_error(std::format("variable '{}' not declared", node->name.get_str()), node->span);
+  }
   EMIT_LOAD(result, it->second);
   return result;
 }
 
 void generate_variable(const THIRVariable *node, Module &m) {
-  // TODO: setup the global variable
+  if (node->is_global) {
+    uint32_t idx = (uint32_t)m.global_variables.size();
+
+    if (!type_is_valid(node->type)) {
+      throw_error("invalid type in global var\n", node->span);
+    }
+
+    m.global_variables[node] = Global_Variable{.name = node->name, .type = node->type, .idx = idx};
+
+    if (node->value && node->value != THIRNoop::shared()) {
+      if (m.current_function) {
+        Operand init_val = generate_expr(node->value, m);
+        Operand gidx = Operand::Imm(Constant::Int(idx), u32_type());
+        EMIT_STORE_GLOBAL(gidx, init_val);
+      }
+    }
+    return;
+  }
+
   Operand dest = m.create_temporary(node->type);
   EMIT_ALLOCA(dest, Operand::Ty(node->type));
   EMIT_STORE(dest, generate_expr(node->value, m));
@@ -51,9 +143,31 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
   switch (node->get_node_type()) {
     case THIRNodeType::Variable: {
       const THIRVariable *var = (const THIRVariable *)node;
+
+      if (var->is_global) {
+        auto it = m.global_variables.find(var);
+        if (it == m.global_variables.end()) {
+          // lazily visit global variables.
+          generate_variable(var, m);
+          it = m.global_variables.find(var);
+          if (it == m.global_variables.end()) {
+            throw_error(std::format("global variable '{}' failed to lazy init", var->name.get_str()), var->span);
+          }
+        }
+        Operand result = m.create_temporary(var->type->take_pointer_to());
+        Operand gidx = Operand::Imm(Constant::Int(it->second.idx), u32_type());
+        EMIT_LOAD_GLOBAL_PTR(result, gidx);
+        // TODO: we actually have to take the address of the global here.
+        // globals aren't stored with an "alloca" per-se, so we'll probably need a
+        // REF_GLOBAL or something like that, or need to fix the GLOBAL_LOAD/STORE stuff
+        // to not be so stupid.
+        return result;
+      }
       auto it = m.variables.find(var);
-      assert(it != m.variables.end() && "variable not declared");
-      return it->second;  // This is already the address (from alloca)
+      if (it == m.variables.end()) {
+        throw_error(std::format("variable '{}' not declared", var->name.get_str()), var->span);
+      }
+      return it->second;
     }
     case THIRNodeType::MemberAccess: {
       return generate_member_access_addr((const THIRMemberAccess *)node, m);
@@ -67,8 +181,15 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
         return generate_expr(unary->operand, m);
       }
     }
+    case THIRNodeType::Function: {
+      // we have to assume this is a function pointer, otherwise it wouldn't have made it here.
+      Operand temp = m.create_temporary(node->type->take_pointer_to());
+      Operand fn_index = generate_function((THIRFunction *)node, m);
+      EMIT_LOAD_FN_PTR(temp, fn_index);
+      return temp;
+    }
     default:
-      assert(false && "not an lvalue");
+      throw_error(std::format("not an lvalue (node type {})", node_type_to_string(node->get_node_type())), node->span);
       return Operand::Null();
   }
 }
@@ -78,7 +199,14 @@ Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
   Operand result = m.create_temporary(node->type->take_pointer_to());
   Type *base = node->base->type;
 
-  uint32_t index = base->info->index_of_member(node->member);
+  size_t index = 0;
+
+  if (node->member != CHOICE_TYPE_DISCRIMINANT_KEY) {
+    if (!base->try_get_index_of_member(node->member, index)) {
+      throw_error(std::format("unable to find index of member: {}", node->member.get_str()), node->span);
+    }
+  }
+
   Operand field_index = Operand::Imm(Constant::Int(index), u32_type());
 
   EMIT_GEP(result, base_addr, field_index);
@@ -141,7 +269,8 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
           op = OP_SHR;
           break;
         default:
-          assert(false && "unknown compound assignment");
+          throw_error(std::format("unknown compound assignment operator {}", (int)node->op), node->span);
+          exit(1);
       }
 
       EMIT_BINOP(op, result, current_val, rvalue);
@@ -211,7 +340,8 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
       op = OP_GE;
       break;
     default:
-      assert(false && "unknown binary operator");
+      throw_error(std::format("unknown binary operator {}", (int)node->op), node->span);
+      return Operand::Null();
   }
 
   EMIT_BINOP(op, result, left, right);
@@ -240,12 +370,13 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
       return result;
     }
     default:
-      assert(false && "unknown unary operator");
+      throw_error(std::format("unknown unary operator {}", (int)node->op), node->span);
+      return Operand::Null();
   }
 
   Operand operand = generate_expr(node->operand, m);
   Operand result = m.create_temporary(node->type);
-  EMIT_UNOP(op, result, operand);
+  EMIT_UNARY(op, result, operand);
   return result;
 }
 
@@ -275,8 +406,8 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
     case ASTLiteral::MultiLineString:
       value = Constant::String(node->value);
       break;
-    default:
-      assert(false && "invalid literal");
+    case ASTLiteral::Null:
+      value = Constant::Int(0);
       break;
   }
   return Operand::Imm(value, node->type);
@@ -323,15 +454,20 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   Operand dest = m.create_temporary(node->type);
   EMIT_ALLOCA(dest, Operand::Ty(node->type));
 
-  for (const auto &kv : node->key_values) {
+  for (const auto &[key, value] : node->key_values) {
     Type *base = node->type;
-    uint32_t field_index = base->info->index_of_member(kv.first);
+    size_t field_index = 0;
+    if (key != CHOICE_TYPE_DISCRIMINANT_KEY) {
+      if (!base->try_get_index_of_member(key, field_index)) {
+        throw_error(std::format("unable to find index of member: {}", key.get_str()), node->span);
+      }
+    }
 
-    Operand field_addr = m.create_temporary(kv.second->type->take_pointer_to());
+    Operand field_addr = m.create_temporary(value->type->take_pointer_to());
     Operand field_index_op = Operand::Imm(Constant::Int(field_index), u32_type());
     EMIT_GEP(field_addr, dest, field_index_op);
 
-    Operand field_value = generate_expr(kv.second, m);
+    Operand field_value = generate_expr(value, m);
     EMIT_STORE(field_addr, field_value);
   }
 
@@ -367,13 +503,123 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
   return result;
 }
 
-void generate_return(const THIRReturn *, Module &) {}
-void generate_break(const THIRBreak *, Module &) {}
-void generate_continue(const THIRContinue *, Module &) {}
-void generate_for(const THIRFor *, Module &) {}
-void generate_if(const THIRIf *, Module &) {}
-void generate_while(const THIRWhile *, Module &) {}
-void generate_noop(const THIRNoop *, Module &) {}
+void generate_return(const THIRReturn *node, Module &m) {
+  if (!node->expression || node->expression == THIRNoop::shared()) {
+    EMIT_RET_VOID();
+    return;
+  }
+  Operand val = generate_expr(node->expression, m);
+  EMIT_RET(val);
+}
+
+void generate_break(const THIRBreak *node, Module &m) {
+  if (g_break_targets.empty()) {
+    throw_error("break used outside of loop", node->span);
+  }
+  Basic_Block *target = g_break_targets.back();
+  m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand ::BB(target), .span = node->span});
+}
+
+void generate_continue(const THIRContinue *node, Module &m) {
+  if (g_continue_targets.empty()) {
+    throw_error("continue used outside of loop", node->span);
+  }
+  Basic_Block *target = g_continue_targets.back();
+  EMIT_JUMP(target);
+}
+
+void generate_for(const THIRFor *node, Module &m) {
+  if (node->initialization) generate(node->initialization, m);
+
+  // remember the block where initialization finished
+  Basic_Block *orig_bb = m.get_insert_block();
+
+  Basic_Block *cond_bb = m.create_basic_block();
+  Basic_Block *body_bb = m.create_basic_block();
+  Basic_Block *incr_bb = m.create_basic_block();
+  Basic_Block *after_bb = m.create_basic_block();
+
+  // jump from original to cond
+  set_insert_block(m.current_function, orig_bb);
+  EMIT_JUMP(cond_bb);
+
+  // cond
+  set_insert_block(m.current_function, cond_bb);
+  Operand cond = node->condition ? generate_expr(node->condition, m) : Operand::Imm(Constant::Bool(true), bool_type());
+  EMIT_JUMP_TRUE(body_bb, cond);
+  EMIT_JUMP(after_bb);
+
+  // body
+  set_insert_block(m.current_function, body_bb);
+  g_break_targets.push_back(after_bb);
+  g_continue_targets.push_back(incr_bb);
+  if (node->block) generate(node->block, m);
+  g_break_targets.pop_back();
+  g_continue_targets.pop_back();
+  EMIT_JUMP(incr_bb);
+
+  // incr
+  set_insert_block(m.current_function, incr_bb);
+  if (node->increment) generate(node->increment, m);
+  EMIT_JUMP(cond_bb);
+
+  // after
+  set_insert_block(m.current_function, after_bb);
+}
+
+void generate_if(const THIRIf *node, Module &m) {
+  Operand cond = generate_expr(node->condition, m);
+
+  Basic_Block *cond_bb = m.get_insert_block();
+  Basic_Block *then_bb = m.create_basic_block();
+  Basic_Block *after_bb = m.create_basic_block();
+  Basic_Block *else_bb = node->_else ? m.create_basic_block() : nullptr;
+
+  set_insert_block(m.current_function, cond_bb);
+  EMIT_JUMP_TRUE(then_bb, cond);
+  if (else_bb) {
+    EMIT_JUMP(else_bb);
+  } else {
+    EMIT_JUMP(after_bb);
+  }
+
+  set_insert_block(m.current_function, then_bb);
+  generate(node->block, m);
+  EMIT_JUMP(after_bb);
+
+  if (else_bb) {
+    set_insert_block(m.current_function, else_bb);
+    generate(node->_else, m);
+    EMIT_JUMP(after_bb);
+  }
+
+  set_insert_block(m.current_function, after_bb);
+}
+
+void generate_while(const THIRWhile *node, Module &m) {
+  Basic_Block *orig_bb = m.get_insert_block();
+  Basic_Block *cond_bb = m.create_basic_block();
+  Basic_Block *body_bb = m.create_basic_block();
+  Basic_Block *after_bb = m.create_basic_block();
+
+  set_insert_block(m.current_function, orig_bb);
+  EMIT_JUMP(cond_bb);
+
+  set_insert_block(m.current_function, cond_bb);
+  Operand cond = generate_expr(node->condition, m);
+  EMIT_JUMP_TRUE(body_bb, cond);
+  EMIT_JUMP(after_bb);
+
+  set_insert_block(m.current_function, body_bb);
+  g_break_targets.push_back(after_bb);
+  g_continue_targets.push_back(cond_bb);
+  generate(node->block, m);
+  g_break_targets.pop_back();
+  g_continue_targets.pop_back();
+  EMIT_JUMP(cond_bb);
+
+  set_insert_block(m.current_function, after_bb);
+}
 
 const Type *get_base_type(const Type *t) {
   while (t->has_extensions()) {
@@ -383,6 +629,11 @@ const Type *get_base_type(const Type *t) {
 }
 
 std::string format_type_ref(const Type *t) {
+  if (!t) {
+    fprintf(stderr, "got a null type in format_type_ref\n");
+    return "";
+  }
+
   // If this type has pointer/array extensions, print a compact reference
   // that encodes the base type uid and the extension. Examples:
   //   pointer -> [*<base_uid>]
@@ -413,7 +664,7 @@ void collect_dependencies(const Type *t, std::unordered_set<const Type *> &visit
   visited.insert(t);
 
   if (t->has_extensions() && t->kind != TYPE_FUNCTION &&
-          (type_extensions_is_back_pointer(t->extensions) || type_extensions_is_back_array(t->extensions))) {
+      (type_extensions_is_back_pointer(t->extensions) || type_extensions_is_back_array(t->extensions))) {
     const Type *base = get_base_type(t);
     collect_dependencies(base, visited, ordered_types);
     return;
@@ -588,7 +839,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
       break;
     }
     case TYPE_TRAIT:
-      assert(false && "somehow we tried to emit a trait type");
+      throw_error("somehow we tried to emit a trait type", {});
       break;
   }
 }
@@ -617,92 +868,252 @@ void Module::print(FILE *f) const {
 }
 
 void Instruction::print(FILE *f) const {
-  const char *opcode_names[] = {"NOOP",        "ADD",       "SUB",      "MUL",    "DIV",         "MOD",          "AND",
-                                "OR",          "XOR",       "SHL",      "SHR",    "NOT",         "LOGICAL_AND",  "LOGICAL_OR",
-                                "LOGICAL_NOT", "EQ",        "NE",       "LT",     "LE",          "GT",           "GE",
-                                "NEG",         "LOAD",      "STORE",    "ALLOCA", "LOAD_GLOBAL", "STORE_GLOBAL", "JMP",
-                                "JMP_TRUE",    "JMP_FALSE", "PUSH_ARG", "CALL",   "RET",         "RET_VOID",     "CAST",
-                                "BITCAST",     "GEP"};
+  const char *opcode_name;
 
-  fprintf(f, "  %s", opcode_names[opcode]);
+  switch (opcode) {
+    case OP_NOOP:
+      opcode_name = "NOP";
+      break;
+    case OP_ADD:
+      opcode_name = "ADD";
+      break;
+    case OP_SUB:
+      opcode_name = "SUB";
+      break;
+    case OP_MUL:
+      opcode_name = "MUL";
+      break;
+    case OP_DIV:
+      opcode_name = "DIV";
+      break;
+    case OP_MOD:
+      opcode_name = "MOD";
+      break;
+    case OP_AND:
+      opcode_name = "AND";
+      break;
+    case OP_OR:
+      opcode_name = "OR";
+      break;
+    case OP_XOR:
+      opcode_name = "XOR";
+      break;
+    case OP_SHL:
+      opcode_name = "SHL";
+      break;
+    case OP_SHR:
+      opcode_name = "SHR";
+      break;
+    case OP_EQ:
+      opcode_name = "EQ";
+      break;
+    case OP_NE:
+      opcode_name = "NE";
+      break;
+    case OP_LT:
+      opcode_name = "LT";
+      break;
+    case OP_LE:
+      opcode_name = "LE";
+      break;
+    case OP_GT:
+      opcode_name = "GT";
+      break;
+    case OP_GE:
+      opcode_name = "GE";
+      break;
+    case OP_LOGICAL_AND:
+      opcode_name = "LOGICAL_AND";
+      break;
+    case OP_LOGICAL_OR:
+      opcode_name = "LOGICAL_OR";
+      break;
+    case OP_NOT:
+      opcode_name = "NOT";
+      break;
+    case OP_LOGICAL_NOT:
+      opcode_name = "LOGICAL_NOT";
+      break;
+    case OP_NEG:
+      opcode_name = "NEG";
+      break;
+    case OP_LOAD:
+      opcode_name = "LOAD";
+      break;
+    case OP_STORE:
+      opcode_name = "STORE";
+      break;
+    case OP_ALLOCA:
+      opcode_name = "ALLOCA";
+      break;
+    case OP_GEP:
+      opcode_name = "GEP";
+      break;
+    case OP_CAST:
+      opcode_name = "CAST";
+      break;
+    case OP_LOAD_GLOBAL:
+      opcode_name = "LOAD_GLOBAL";
+      break;
+    case OP_STORE_GLOBAL:
+      opcode_name = "STORE_GLOBAL";
+      break;
+    case OP_LOAD_GLOBAL_PTR:
+      opcode_name = "LOAD_GLOBAL_PTR";
+      break;
+    case OP_LOAD_FN_PTR:
+      opcode_name = "LOAD_FN_PTR";
+      break;
+    case OP_PUSH_ARG:
+      opcode_name = "PUSH_ARG";
+      break;
+    case OP_CALL:
+      opcode_name = "CALL";
+      break;
+    case OP_RET:
+      opcode_name = "RET";
+      break;
+    case OP_RET_VOID:
+      opcode_name = "RET_VOID";
+      break;
+    case OP_JMP:
+      opcode_name = "JMP";
+      break;
+    case OP_JMP_TRUE:
+      opcode_name = "JMP_TRUE";
+      break;
+    case OP_JMP_FALSE:
+      opcode_name = "JMP_FALSE";
+      break;
+    case OP_BITCAST:
+      opcode_name = "BITCAST";
+      break;
+  }
 
-  auto print_operand = [f](const Operand &op) {
-    switch (op.tag) {
-      case Operand::OPERAND_NULL:
-        fprintf(f, "null");
-        break;
-      case Operand::OPERAND_TEMP:
-        fprintf(f, "t%u", op.temp);
-        break;
-      case Operand::OPERAND_CONSTANT:
-        fprintf(f, "const(");
-        op.constant.print(f);
-        fprintf(f, ")");
-        break;
-      case Operand::OPERAND_IMMEDIATE_VALUE:
-        fprintf(f, "imm(");
-        op.immediate.print(f);
-        fprintf(f, ")");
-        break;
-      case Operand::OPERAND_BASIC_BLOCK:
-        fprintf(f, "bb(%s)", op.bb->label.get_str().c_str());
-        break;
-      case Operand::OPERAND_TYPE:
-        fprintf(f, "type(%s)", op.type ? op.type->to_string().c_str() : "null");
-        break;
+  // Build the instruction text into a string so we can compute its length and pad.
+  std::string line;
+  line += opcode_name;
+
+  auto append_constant = [](const Constant &c) -> std::string {
+    switch (c.tag) {
+      case Constant::CONST_INVALID:
+        return "invalid";
+      case Constant::CONST_INT:
+        return std::to_string(c.int_lit);
+      case Constant::CONST_STRING:
+        return std::string("\"") + c.string_lit.get_str() + "\"";
+      case Constant::CONST_FLOAT:
+        return std::to_string(c.float_lit);
+      case Constant::CONST_BOOL:
+        return c.bool_lit ? "true" : "false";
+      case Constant::CONST_CHAR: {
+        char buf[8] = {'\'', (char)c.char_lit, '\'', 0};
+        return std::string(buf);
+      }
     }
+    return "";
   };
 
-  if (dest.tag != Operand::OPERAND_NULL) {
-    fprintf(f, " ");
-    print_operand(dest);
-    fprintf(f, " =");
+  auto print_operand_to_string = [&append_constant](const Operand &op) -> std::string {
+    switch (op.tag) {
+      case Operand::OPERAND_NULL:
+        return "null";
+      case Operand::OPERAND_TEMP: {
+        std::string s = "t" + std::to_string(op.temp);
+        s += " ";
+        s += format_type_ref(op.type);
+        return s;
+      }
+      case Operand::OPERAND_CONSTANT: {
+        std::string s = "const(";
+        s += append_constant(op.constant);
+        s += ", ";
+        s += format_type_ref(op.constant.type);
+        s += ")";
+        return s;
+      }
+      case Operand::OPERAND_IMMEDIATE_VALUE: {
+        std::string s = "imm(";
+        s += append_constant(op.immediate);
+        s += ", ";
+        s += format_type_ref(op.type);
+        s += ")";
+        return s;
+      }
+      case Operand::OPERAND_BASIC_BLOCK:
+        return std::string("bb(") + op.bb->label.get_str() + ")";
+      case Operand::OPERAND_TYPE:
+        return format_type_ref(op.type);
+    }
+    return "";
+  };
+
+  std::vector<const Operand *> ops;
+  if (dest.tag != Operand::OPERAND_NULL) ops.push_back(&dest);
+  if (left.tag != Operand::OPERAND_NULL) ops.push_back(&left);
+  if (right.tag != Operand::OPERAND_NULL) ops.push_back(&right);
+
+  if (!ops.empty()) {
+    line += " ";
+    for (size_t i = 0; i < ops.size(); ++i) {
+      if (i) line += ", ";
+      line += print_operand_to_string(*ops[i]);
+    }
   }
 
-  if (left.tag != Operand::OPERAND_NULL) {
-    fprintf(f, " ");
-    print_operand(left);
-  }
-
-  if (right.tag != Operand::OPERAND_NULL) {
-    fprintf(f, ", ");
-    print_operand(right);
-  }
-
-  fprintf(f, "\n");
+#ifdef DEBUG
+  const int DEBUG_COMMENT_COLUMN = 80;
+  int printed_len = 2 + (int)line.size();
+  int pad = DEBUG_COMMENT_COLUMN - printed_len;
+  if (pad < 1) pad = 1;
+  fprintf(f, "  %s", line.c_str());
+  for (int i = 0; i < pad; ++i) fputc(' ', f);
+  fprintf(f, "; '%s'\n", span.ToString().c_str());
+#else
+  fprintf(f, "  %s\n", line.c_str());
+#endif
 }
 
 void Basic_Block::print(FILE *f) const {
-  fprintf(f, "%s:\n", label.get_str().c_str());
+  fprintf(f, "%s:", label.get_str().c_str());
+  fprintf(f, "\n");
   for (const auto &instruction : code) {
     instruction.print(f);
   }
 }
 
 void Function::print(FILE *f) const {
+  if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
+    fprintf(f, "extern ");
+  }
   fprintf(f, "fn %s(", name.get_str().c_str());
   for (size_t i = 0; i < type_info->params_len; ++i) {
-    fprintf(f, "%s", type_info->parameter_types[i]->to_string().c_str());
+    fprintf(f, "%s", format_type_ref(type_info->parameter_types[i]).c_str());
     if (i + 1 < type_info->params_len) {
       fprintf(f, ", ");
     }
   }
   fprintf(f, ")");
   if (type_info->return_type && type_info->return_type != void_type()) {
-    fprintf(f, " -> %s", type_info->return_type->to_string().c_str());
+    fprintf(f, " -> %s", format_type_ref(type_info->return_type).c_str());
   }
 
-  fprintf(f, " :: [flags: 0x%02x, stack: %zu bytes] {\n", flags, stack_size_needed_in_bytes);
-
-  for (const auto &temp : temps) {
-    fprintf(f, "  %s: %s\n", temp.name.get_str().c_str(), temp.type->to_string().c_str());
+  if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
+    fprintf(f, " :: [flags: 0x%02x]", flags);
+    fprintf(f, ";\n");
+    return;
+  } else {
+    fprintf(f, " :: [flags: 0x%02x, stack: %zu bytes]", flags, stack_size_needed_in_bytes);
+    fprintf(f, " {\n");
   }
+
+  // for (const auto &temp : temps) {
+  //   fprintf(f, "  %s: ", temp.name.get_str().c_str());
+  //   fprintf(f, "%s\n", format_type_ref(temp.type).c_str());
+  // }
 
   for (const auto &bb : basic_blocks) {
     bb->print(f);
-    if (bb != basic_blocks.back()) {
-      fprintf(f, "\n");
-    }
   }
 
   fprintf(f, "}\n");

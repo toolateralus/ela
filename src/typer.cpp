@@ -3391,6 +3391,11 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, Span range, Typer *typ
 
   ty->traits.push_back(is_dyn_trait());
 
+  dyn_info->members.push_back({
+    .name = "instance",
+    .type = void_type()->take_pointer_to(true)
+  });
+
   dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}}), nullptr, MUT);
 
   ty->info->as<DynTypeInfo>()->trait_type = trait_type;
@@ -3453,6 +3458,10 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, Span range, Typer *typ
     type_info.return_type = return_type;
 
     auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
+    dyn_info->members.push_back({
+      .name = name,
+      .type = function_type->take_pointer_to(),
+    });
     dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
   };

@@ -255,7 +255,7 @@ void Emitter::emit_empty_initializer(const THIREmptyInitializer *thir) {
   if (thir->type->is_kind(TYPE_ENUM)) {
     code << "0";
   } else if (thir->type->is_kind(TYPE_CHOICE) && thir->type->has_no_extensions()) {
-    code << "(" << c_type_string(thir->type) << "){ . " << std::string{OPTION_DISCRIMINANT_KEY} << " = 0 }";
+    code << "(" << c_type_string(thir->type) << "){ . " << std::string{CHOICE_TYPE_DISCRIMINANT_KEY} << " = 0 }";
   } else if (thir->type->is_fixed_sized_array()) {
     code << "{}";
   } else {
@@ -382,7 +382,7 @@ void Emitter::emit_choice(Type *type) {
   // Emit the main choice struct
   code << "typedef struct " << choice_type_name << " {\n";
   indent_level++;
-  indentedf("%s %s;\n", "int", OPTION_DISCRIMINANT_KEY);  // Discriminant, TODO: optimize for different discriminant sizes
+  indentedf("%s %s;\n", "int", CHOICE_TYPE_DISCRIMINANT_KEY);  // Discriminant, TODO: optimize for different discriminant sizes
   indented("union {\n");
   indent_level++;
   for (const auto &variant : info->members) {

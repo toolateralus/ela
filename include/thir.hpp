@@ -45,6 +45,41 @@ enum struct THIRNodeType : unsigned char {
   Noop,  // Some things just return nothing, but need to return something
 };
 
+
+#define THIR_NODE_TYPE_LIST \
+  X(Program) \
+  X(Block) \
+  X(Variable) \
+  X(Function) \
+  X(Type) \
+  X(ExpressionBlock) \
+  X(BinExpr) \
+  X(UnaryExpr) \
+  X(Literal) \
+  X(Call) \
+  X(MemberAccess) \
+  X(Cast) \
+  X(Index) \
+  X(AggregateInitializer) \
+  X(CollectionInitializer) \
+  X(EmptyInitializer) \
+  X(Return) \
+  X(Break) \
+  X(Continue) \
+  X(For) \
+  X(If) \
+  X(While) \
+  X(Noop)
+
+inline const char* node_type_to_string(THIRNodeType type) {
+  switch (type) {
+#define X(name) case THIRNodeType::name: return #name;
+    THIR_NODE_TYPE_LIST
+#undef X
+    default: return "<unknown>";
+  }
+}
+
 struct THIR {
   // This is purely used to handle putting semicolons after expression statements, without needing an 'expression
   // statement' node This is surely irrelevant to anything but a C backend, but I can't think of an easier nor cheaper

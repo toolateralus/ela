@@ -160,13 +160,14 @@ struct TypeInfo {
     return nullptr;
   }
 
-  inline int index_of_member(const InternedString &name) const {
+  inline bool try_get_index_of_member(const InternedString &name, size_t &index) const {
     for (size_t i = 0; i < members.size(); ++i) {
       if (members[i].name == name) {
-        return static_cast<int>(i);
+        index = i;
+        return true;
       }
     }
-    return -1;
+    return false;
   }
 };
 
@@ -400,6 +401,21 @@ struct Type {
     } else {
       return extensions.back().type;
     }
+  }
+
+  inline bool try_get_index_of_member(const InternedString &name, size_t &index) {
+    Type *t = this;
+    while (t && t->has_extensions()) {
+      if (t->info->try_get_index_of_member(name, index)) {
+        return true;
+      }
+      t = t->base_type;
+    }
+    if (t && t->info->try_get_index_of_member(name, index)) {
+      return true;
+    }
+    index = -1;
+    return false;
   }
 
   inline bool is_fixed_sized_array() const { return back_ext_type() == TYPE_EXT_ARRAY; }

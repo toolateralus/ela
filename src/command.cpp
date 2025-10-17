@@ -11,7 +11,6 @@
 #include "resolver.hpp"
 #include "mir.hpp"
 
-
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
   return it != flags.end() && it->second;
@@ -96,10 +95,13 @@ int CompileCommand::compile() {
     {
       Mir::Module m;
       Mir::generate(thir_gen.entry_point, m);
-      FILE *f = fopen("./output.ir", "w");
-      m.print(f);
-      fflush(f);
-      fclose(f);
+      m.finalize();
+      {
+        FILE *f = fopen("./output.ir", "w");
+        m.print(f);
+        fflush(f);
+        fclose(f);
+      }
     }
   });
 

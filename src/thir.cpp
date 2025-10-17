@@ -70,7 +70,7 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   const auto info = type->info->as<ChoiceTypeInfo>();
   const auto discriminant = info->get_variant_discriminant(variant_name);
   auto literal = thirgen->make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer);
-  thir->key_values.push_back({OPTION_DISCRIMINANT_KEY, literal});
+  thir->key_values.push_back({CHOICE_TYPE_DISCRIMINANT_KEY, literal});
   return thir;
 }
 
@@ -495,7 +495,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
 THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant) {
   THIR_ALLOC(THIRMemberAccess, discriminant_access, ast)
   discriminant_access->base = cached_object;
-  discriminant_access->member = OPTION_DISCRIMINANT_KEY;
+  discriminant_access->member = CHOICE_TYPE_DISCRIMINANT_KEY;
   discriminant_access->type = u64_type();
   THIR_ALLOC(THIRBinExpr, thir, ast);
   thir->left = discriminant_access;
@@ -676,7 +676,7 @@ THIR *THIRGen::option_some(THIR *value, Type *interior_type) {
   init->type = type;
   init->is_statement = false;
   init->key_values = {{
-                          OPTION_DISCRIMINANT_KEY,
+                          CHOICE_TYPE_DISCRIMINANT_KEY,
                           make_literal(OPTION_SOME_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
                       },
                       {
@@ -693,7 +693,7 @@ THIR *THIRGen::option_none(Type *interior_type) {
   init->type = type;
   init->is_statement = false;
   init->key_values = {{
-      OPTION_DISCRIMINANT_KEY,
+      CHOICE_TYPE_DISCRIMINANT_KEY,
       make_literal(OPTION_NONE_DISCRIMINANT_VALUE, {}, u32_type(), ASTLiteral::Integer),
   }};
   return init;
@@ -1525,7 +1525,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   THIR_ALLOC(THIRBinExpr, condition, ast);
   THIR_ALLOC(THIRMemberAccess, member_access, ast);
   member_access->base = next_var;
-  member_access->member = OPTION_DISCRIMINANT_KEY;
+  member_access->member = CHOICE_TYPE_DISCRIMINANT_KEY;
   member_access->type = u32_type();
 
   THIR *discriminant_literal = make_literal(OPTION_SOME_DISCRIMINANT_VALUE, ast->span, u32_type(), ASTLiteral::Integer);
@@ -1533,7 +1533,9 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   condition->left = member_access;
   condition->op = TType::EQ;
   condition->right = discriminant_literal;
+  condition->type = bool_type();
   thir->condition = condition;
+
 
   // Increment: $next = next($iterator)
   THIR_ALLOC(THIRBinExpr, increment, ast);

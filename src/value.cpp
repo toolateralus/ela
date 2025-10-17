@@ -307,7 +307,7 @@ Value* default_value_of_choice_t(Type* type, ChoiceTypeInfo* info, Interpreter* 
   // 0 is always the invalid out of bounds discriminant for choice types.
   // for interpreted choice types, we will just ignore initializing variants, only one can exist,
   // so only one shall exist ever.
-  object->values[OPTION_DISCRIMINANT_KEY] = new_int(0);
+  object->values[CHOICE_TYPE_DISCRIMINANT_KEY] = new_int(0);
   for (auto member : info->members) {
     object->values[member.name] = default_value_of_t(member.type, interpreter);
   }
