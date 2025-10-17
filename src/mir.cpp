@@ -423,7 +423,12 @@ Operand generate_call(const THIRCall *node, Module &m) {
   Operand fn_operand = generate_expr(node->callee, m);
   Operand arg_count = Operand::Imm(Constant::Int(node->arguments.size()), u32_type());
 
-  EMIT_CALL(result, fn_operand, arg_count);
+  if (node->callee->type->is_pointer()) {
+    EMIT_CALL_PTR(result, fn_operand, arg_count);
+  } else {
+    EMIT_CALL(result, fn_operand, arg_count);
+  }
+
   return result;
 }
 
@@ -643,7 +648,7 @@ std::string format_type_ref(const Type *t) {
     if (type_extensions_is_back_array(t->extensions)) {
       auto ext = t->extensions.back();
       const Type *base = get_base_type(t);
-      return "<[" + std::to_string(base->uid) + "]; " + std::to_string(ext.array_size) + ">";
+      return "<" + std::to_string(base->uid) + "; " + std::to_string(ext.array_size) + ">";
     }
 
     // pointer(s) at the back
@@ -651,10 +656,10 @@ std::string format_type_ref(const Type *t) {
     if (depth > 0) {
       const Type *base = get_base_type(t);
       std::string stars(depth, '*');
-      return "[" + stars + std::to_string(base->uid) + "]";
+      return "(" + stars + std::to_string(base->uid) + ")";
     }
   }
-  return "[" + std::to_string(t->uid) + "]";
+  return "(" + std::to_string(t->uid) + ")";
 }
 
 void collect_dependencies(const Type *t, std::unordered_set<const Type *> &visited, std::vector<const Type *> &ordered_types) {
@@ -730,12 +735,12 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
   switch (t->kind) {
     case TYPE_SCALAR:
       print_indent();
-      fprintf(f, "[%zu]: %s\n", t->uid, t->to_string().c_str());
+      fprintf(f, "(%zu): %s\n", t->uid, t->to_string().c_str());
       break;
     case TYPE_FUNCTION: {
       auto info = t->info->as<FunctionTypeInfo>();
       print_indent();
-      fprintf(f, "[%zu]: fn (", t->uid);
+      fprintf(f, "(%zu): fn (", t->uid);
       for (size_t i = 0; i < info->params_len; ++i) {
         fprintf(f, "%s", format_type_ref(info->parameter_types[i]).c_str());
         if (i + 1 < info->params_len) fprintf(f, ", ");
@@ -750,10 +755,11 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_DYN: {
       auto info = t->info->as<DynTypeInfo>();
       print_indent();
-      fprintf(f, "[%zu]: struct dyn %s {\n", t->uid, info->trait_type->basename.get_str().c_str());
+      fprintf(f, "(%zu): struct dyn %s {\n", t->uid, info->trait_type->basename.get_str().c_str());
 
       for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
-      fprintf(f, "instance: ptr\n");
+      fprintf(f, "instance: %s\n", format_type_ref(void_type()->take_pointer_to()).c_str());
+      
 
       for (const auto &method : info->methods) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
@@ -767,7 +773,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_STRUCT: {
       auto info = t->info->as<StructTypeInfo>();
       print_indent();
-      fprintf(f, "[%zu]: %sstruct %s {\n", t->uid, info->is_union ? "union " : "", t->basename.get_str().c_str());
+      fprintf(f, "(%zu): %sstruct %s {\n", t->uid, info->is_union ? "union " : "", t->basename.get_str().c_str());
       for (const auto &member : t->info->members) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
         fprintf(f, "%s: %s\n", member.name.get_str().c_str(), format_type_ref(member.type).c_str());
@@ -779,7 +785,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_ENUM: {
       auto info = t->info->as<EnumTypeInfo>();
       print_indent();
-      fprintf(f, "[%zu]: enum %s : %s {\n", t->uid, t->basename.get_str().c_str(),
+      fprintf(f, "(%zu): enum %s : %s {\n", t->uid, t->basename.get_str().c_str(),
               format_type_ref(info->underlying_type).c_str());
       for (const auto &member : t->info->members) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
@@ -792,7 +798,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_TUPLE: {
       auto info = t->info->as<TupleTypeInfo>();
       print_indent();
-      fprintf(f, "[%zu]: tuple (", t->uid);
+      fprintf(f, "(%zu): tuple (", t->uid);
       for (size_t i = 0; i < info->types.size(); ++i) {
         fprintf(f, "%s", format_type_ref(info->types[i]).c_str());
         if (i + 1 < info->types.size()) fprintf(f, ", ");
@@ -802,11 +808,11 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     }
     case TYPE_CHOICE: {
       print_indent();
-      fprintf(f, "[%zu]: choice %s {\n", t->uid, t->basename.get_str().c_str());
+      fprintf(f, "(%zu): choice %s {\n", t->uid, t->basename.get_str().c_str());
       for (size_t i = 0; i < t->info->members.size(); ++i) {
         const auto &variant = t->info->members[i];
         for (int j = 0; j < indent + 2; ++j) fprintf(f, " ");
-        fprintf(f, "[%zu] %s", i, variant.name.get_str().c_str());
+        fprintf(f, "%s: %zu", variant.name.get_str().c_str(), i);
 
         if (variant.type == void_type()) {
           fprintf(f, ",\n");
@@ -988,11 +994,13 @@ void Instruction::print(FILE *f) const {
     case OP_BITCAST:
       opcode_name = "BITCAST";
       break;
+    case OP_CALL_PTR:
+      opcode_name = "CALL_PTR";
+      break;
   }
 
   // Build the instruction text into a string so we can compute its length and pad.
   std::string line;
-  line += opcode_name;
 
   auto append_constant = [](const Constant &c) -> std::string {
     switch (c.tag) {
@@ -1014,14 +1022,20 @@ void Instruction::print(FILE *f) const {
     return "";
   };
 
-  auto print_operand_to_string = [&append_constant](const Operand &op) -> std::string {
+  auto print_operand_to_string = [&append_constant](const Operand &op, bool is_destination = false) -> std::string {
     switch (op.tag) {
       case Operand::OPERAND_NULL:
         return "null";
       case Operand::OPERAND_TEMP: {
         std::string s = "t" + std::to_string(op.temp);
-        s += " ";
-        s += format_type_ref(op.type);
+        // we don't double print the type of temps because 
+        // it clutters the format and it's already known by the consumer
+        // of the IR what type that local is (via its declaration)
+        if (is_destination) {
+          s += " ";
+          s += format_type_ref(op.type);
+          s += " = ";
+        }
         return s;
       }
       case Operand::OPERAND_CONSTANT: {
@@ -1049,7 +1063,13 @@ void Instruction::print(FILE *f) const {
   };
 
   std::vector<const Operand *> ops;
-  if (dest.tag != Operand::OPERAND_NULL) ops.push_back(&dest);
+
+  if (dest.tag != Operand::OPERAND_NULL) {
+    line += print_operand_to_string(dest, true);
+  }
+  
+  line += opcode_name;
+
   if (left.tag != Operand::OPERAND_NULL) ops.push_back(&left);
   if (right.tag != Operand::OPERAND_NULL) ops.push_back(&right);
 
@@ -1060,18 +1080,18 @@ void Instruction::print(FILE *f) const {
       line += print_operand_to_string(*ops[i]);
     }
   }
-
-#ifdef DEBUG
-  const int DEBUG_COMMENT_COLUMN = 80;
-  int printed_len = 2 + (int)line.size();
-  int pad = DEBUG_COMMENT_COLUMN - printed_len;
-  if (pad < 1) pad = 1;
-  fprintf(f, "  %s", line.c_str());
-  for (int i = 0; i < pad; ++i) fputc(' ', f);
-  fprintf(f, "; '%s'\n", span.ToString().c_str());
-#else
-  fprintf(f, "  %s\n", line.c_str());
-#endif
+  
+  if (!compile_command.has_flag("release")) {
+    const int DEBUG_COMMENT_COLUMN = 80;
+    int printed_len = 2 + (int)line.size();
+    int pad = DEBUG_COMMENT_COLUMN - printed_len;
+    if (pad < 1) pad = 1;
+    fprintf(f, "  %s", line.c_str());
+    for (int i = 0; i < pad; ++i) fputc(' ', f);
+    fprintf(f, "; '%s'\n", span.ToString().c_str());
+  } else {
+    fprintf(f, "  %s\n", line.c_str());
+  }
 }
 
 void Basic_Block::print(FILE *f) const {
@@ -1088,7 +1108,7 @@ void Function::print(FILE *f) const {
   }
   fprintf(f, "fn %s(", name.get_str().c_str());
   for (size_t i = 0; i < type_info->params_len; ++i) {
-    fprintf(f, "%s", format_type_ref(type_info->parameter_types[i]).c_str());
+    fprintf(f, "t%zu: %s", i, format_type_ref(type_info->parameter_types[i]).c_str());
     if (i + 1 < type_info->params_len) {
       fprintf(f, ", ");
     }

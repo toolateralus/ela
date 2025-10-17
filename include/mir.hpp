@@ -64,6 +64,7 @@ enum Op_Code : uint8_t {
 
   OP_PUSH_ARG,  // push argument to stack.   left=value
   OP_CALL,      // dest=result, left=fn_idx, right=n_args
+  OP_CALL_PTR,  // dest=result, left=fn_ptr, right=n_args
 
   OP_RET,       // left=value
   OP_RET_VOID,  // no operands.
@@ -78,7 +79,7 @@ enum Op_Code : uint8_t {
 struct Basic_Block;
 
 struct Constant {
-  Type *type;
+  Type *type; // TODO: remove this to optimize the size of these giant structs.
   union {
     InternedString string_lit;
     uint64_t int_lit;
@@ -201,15 +202,16 @@ struct Operand {
 // This is more so an TMIR, (typed mid level intermediate representation)
 // since we still carry type information for all operands and such for
 // the ability to serialize effectively
+
+// this is a giant struct, we should really have ANOTHER ir that's much lower level,
+// and optimized.
 struct Instruction {
   Op_Code opcode = OP_NOOP;
   Operand dest;
   Operand left;
   Operand right;
-#ifdef DEBUG
   Span span;
-#endif
-void print(FILE *) const;
+  void print(FILE *) const;
 };
 
 struct Basic_Block {
@@ -283,6 +285,8 @@ struct Function {
     return block;
   }
 
+  // TODO: find basic blocks that are empty and have no jump references and purge or merge when possible
+  // control flow ends up leaving a bunch of junk in the IR
   inline void finalize() {
     stack_size_needed_in_bytes = 0;
     for (const auto &temp : temps) {
@@ -533,11 +537,16 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_OP(OP) m.current_function->get_insert_block()->push(Instruction{OP, .span = node->span})
 #define EMIT_NULLARY(OP, DEST) m.current_function->get_insert_block()->push(Instruction{OP, DEST, .span = node->span})
 #define EMIT_UNARY(OP, DEST, LEFT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, .span = node->span})
-#define EMIT_BINARY(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
-#define EMIT_BINOP(OP, DEST, LEFT, RIGHT) m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
+#define EMIT_BINARY(OP, DEST, LEFT, RIGHT) \
+  m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
+#define EMIT_BINOP(OP, DEST, LEFT, RIGHT) \
+  m.current_function->get_insert_block()->push(Instruction{OP, DEST, LEFT, RIGHT, .span = node->span})
 
 // OP_CALL: dest=result, left=fn_idx, right=n_args
-#define EMIT_CALL(DEST, FN_IDX, N_ARGS) m.current_function->get_insert_block()->push(Instruction{OP_CALL, DEST, FN_IDX, N_ARGS, .span = node->span})
+#define EMIT_CALL(DEST, FN_IDX, N_ARGS) \
+  m.current_function->get_insert_block()->push(Instruction{OP_CALL, DEST, FN_IDX, N_ARGS, .span = node->span})
+#define EMIT_CALL_PTR(DEST, FN_IDX, N_ARGS) \
+  m.current_function->get_insert_block()->push(Instruction{OP_CALL_PTR, DEST, FN_IDX, N_ARGS, .span = node->span})
 
 // OP_RET: left=value
 #define EMIT_RET(VAL) m.current_function->get_insert_block()->push(Instruction{OP_RET, Operand(), VAL, .span = node->span})
@@ -547,22 +556,26 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_LOAD(DEST, PTR) m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, PTR, .span = node->span})
 
 // OP_STORE: left=ptr, right=value
-#define EMIT_STORE(PTR, VAL) m.current_function->get_insert_block()->push(Instruction{OP_STORE, Operand(), PTR, VAL, .span = node->span})
+#define EMIT_STORE(PTR, VAL) \
+  m.current_function->get_insert_block()->push(Instruction{OP_STORE, Operand(), PTR, VAL, .span = node->span})
 
 // OP_ALLOCA: dest=result, left=type_index
 #define EMIT_ALLOCA(DEST, TYPE_INDEX_UID) \
   m.current_function->get_insert_block()->push(Instruction{OP_ALLOCA, DEST, TYPE_INDEX_UID, .span = node->span})
 
 // OP_PUSH_ARG: left=value
-#define EMIT_PUSH_ARG(ARG) m.current_function->get_insert_block()->push(Instruction{OP_PUSH_ARG, Operand(), ARG, .span = node->span})
+#define EMIT_PUSH_ARG(ARG) \
+  m.current_function->get_insert_block()->push(Instruction{OP_PUSH_ARG, Operand(), ARG, .span = node->span})
 
 // OP_CAST / OP_BITCAST: dest=result, left=value, right=type_index
-#define EMIT_CAST(DEST, VAL, TYPE_IDX) m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX, .span = node->span})
+#define EMIT_CAST(DEST, VAL, TYPE_IDX) \
+  m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX, .span = node->span})
 #define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_BITCAST, DEST, VAL, TYPE_IDX, .span = node->span})
 
 // OP_GEP: dest=ptr, left=base, right=index
-#define EMIT_GEP(DEST, BASE, INDEX) m.current_function->get_insert_block()->push(Instruction{OP_GEP, DEST, BASE, INDEX, .span = node->span})
+#define EMIT_GEP(DEST, BASE, INDEX) \
+  m.current_function->get_insert_block()->push(Instruction{OP_GEP, DEST, BASE, INDEX, .span = node->span})
 
 // OP_LOAD_GLOBAL: dest=value, right=g_idx (left unused)
 #define EMIT_LOAD_GLOBAL(DEST, G_IDX) \
@@ -582,14 +595,17 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 
 // Jump macros (OP_JMP, OP_JMP_TRUE, OP_JMP_FALSE)
 // OP_JMP: left=bb
-#define EMIT_JUMP(TARGET_BB) m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::BB(TARGET_BB), .span = node->span})
+#define EMIT_JUMP(TARGET_BB) \
+  m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::BB(TARGET_BB), .span = node->span})
 
 // OP_JMP_TRUE: left=bb, right=condition
-#define EMIT_JUMP_TRUE(TARGET_BB, COND) \
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP_TRUE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
+#define EMIT_JUMP_TRUE(TARGET_BB, COND)         \
+  m.current_function->get_insert_block()->push( \
+      Instruction{OP_JMP_TRUE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
 
 // OP_JMP_FALSE: left=bb, right=condition
-#define EMIT_JUMP_FALSE(TARGET_BB, COND) \
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP_FALSE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
+#define EMIT_JUMP_FALSE(TARGET_BB, COND)        \
+  m.current_function->get_insert_block()->push( \
+      Instruction{OP_JMP_FALSE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
 
 }  // namespace Mir

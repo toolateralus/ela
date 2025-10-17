@@ -99,6 +99,7 @@ int CompileCommand::compile() {
       {
         FILE *f = fopen("./output.ir", "w");
         m.print(f);
+        // m.print(stdout);
         fflush(f);
         fclose(f);
       }
