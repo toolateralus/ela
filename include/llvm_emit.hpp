@@ -312,6 +312,8 @@ struct LLVM_Emitter {
         .is_memory = is_memory,
     };
 
+    assert(v != nullptr);
+
     if (is_memory && !allocation.type->is_pointer()) {
       assert(false && "insert_temp got an alloca that wasn't a pointer");
     }
