@@ -97,7 +97,6 @@ int CompileCommand::compile() {
     // MIR generator.
     {
       Mir::Module m;
-      Mir::generate(thir_gen.entry_point, m);
       Mir::generate(thir_gen.emit_runtime_entry_point(), m);
       m.finalize();
       {

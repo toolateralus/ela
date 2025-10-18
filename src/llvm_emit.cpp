@@ -593,7 +593,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
 
         llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
-        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call);
+        if (call->getType()->isVoidTy()) {
+          insert_temp(instr.dest.temp, f, false, call);
+        }
       } break;
 
       case Mir::OP_CALL_PTR: {
