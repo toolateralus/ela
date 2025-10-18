@@ -436,7 +436,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_LOAD: {
-        llvm::Value *val = visit_operand(instr.left, true); // the true passed here will perform the load.
+        llvm::Value *val = visit_operand(instr.left, true);  // the true passed here will perform the load.
         insert_temp(instr.dest.temp, f, false, val);
       } break;
 
@@ -574,53 +574,24 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_CALL: {
         Mir::Function *mir_fn = m.functions[instr.left.temp];
         llvm::Value *fnval = function_table[mir_fn];
-        uint32_t nargs = 0;
+        uint32_t nargs = (uint32_t)instr.right.immediate.int_lit;
 
-        if (instr.right.tag == Mir::Operand::OPERAND_IMMEDIATE_VALUE && instr.right.immediate.tag == Mir::Constant::CONST_INT) {
-          nargs = (uint32_t)instr.right.immediate.int_lit;
-        } else if (instr.right.tag == Mir::Operand::OPERAND_CONSTANT && instr.right.constant.tag == Mir::Constant::CONST_INT) {
-          nargs = (uint32_t)instr.right.constant.int_lit;
-        } else {
-          throw_error("CALL missing arg count", instr.span);
-        }
-
-        if (nargs > arg_stack.size()) throw_error("Not enough arguments on stack for CALL", instr.span);
-
-        std::vector<llvm::Value *> call_args;
-        call_args.reserve(nargs);
-        size_t start = arg_stack.size() - nargs;
-        for (size_t i = start; i < arg_stack.size(); ++i) call_args.push_back(arg_stack[i]);
-        arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
-
-        llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
-        if (call->getType()->isVoidTy()) {
+        auto start = arg_stack.end() - nargs;
+        std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
+        arg_stack.erase(start, arg_stack.end());
+        llvm::CallInst *call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args);
+        if (mir_fn->type_info->return_type != void_type()) {
           insert_temp(instr.dest.temp, f, false, call);
         }
       } break;
 
       case Mir::OP_CALL_PTR: {
         llvm::Value *fn = visit_operand(instr.left, true);
-        uint32_t nargs = 0;
-
-        if (instr.right.tag == Mir::Operand::OPERAND_IMMEDIATE_VALUE && instr.right.immediate.tag == Mir::Constant::CONST_INT) {
-          nargs = (uint32_t)instr.right.immediate.int_lit;
-        } else if (instr.right.tag == Mir::Operand::OPERAND_CONSTANT && instr.right.constant.tag == Mir::Constant::CONST_INT) {
-          nargs = (uint32_t)instr.right.constant.int_lit;
-        } else {
-          throw_error("CALL_PTR missing arg count", instr.span);
-        }
-
-        if (nargs > arg_stack.size()) {
-          throw_error("Not enough arguments on stack for CALL_PTR", instr.span);
-        }
-
-        std::vector<llvm::Value *> call_args;
-        call_args.reserve(nargs);
-        size_t start = arg_stack.size() - nargs;
-        for (size_t i = start; i < arg_stack.size(); ++i) call_args.push_back(arg_stack[i]);
-        arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
-
-        llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(instr.left.type), fn, call_args);
+        const uint32_t n_args = (uint32_t)instr.right.immediate.int_lit;
+        const auto start = arg_stack.end() - n_args;
+        const std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
+        arg_stack.erase(start, arg_stack.end());
+        llvm::CallInst *call = builder.CreateCall(llvm_fn_typeof(instr.left.type), fn, call_args);
         if (call && !call->getType()->isVoidTy()) {
           insert_temp(instr.dest.temp, f, false, call);
         }

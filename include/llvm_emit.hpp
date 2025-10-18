@@ -352,6 +352,8 @@ struct LLVM_Emitter {
   }
 
   using type_pair = std::pair<llvm::Type *, llvm::DIType *>;
+
+  inline llvm::FunctionType *llvm_fn_typeof(Type *type) { return llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(type)); }
   inline llvm::Type *llvm_typeof(Type *type) { return llvm_typeof_impl(type).first; }
   inline type_pair llvm_typeof_impl(Type *type) {
     static std::map<Type *, type_pair> memoized_types;
