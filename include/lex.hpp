@@ -249,14 +249,22 @@ enum struct TFamily {
 
 struct Span {
   Span() {}
-  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
+  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file), valid(true) { }
+
   size_t line = 0, column = 0;
   size_t file = 0;
+  bool valid = false;
+
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
     return files;
   }
-  std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
+  std::string ToString() const { 
+    if (!valid) {
+      return "<no src>";
+    }
+    return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); 
+  }
 };
 
 static inline bool ttype_is_relational(TType type) {
