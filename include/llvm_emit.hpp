@@ -305,7 +305,7 @@ struct LLVM_Emitter {
 
     inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
       if (is_memory && requires_load) {
-        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);
+        return builder.CreateLoad(emitter.llvm_typeof(type), value);
       } else {  // return the pointer or the SSA register
         return value;
       }

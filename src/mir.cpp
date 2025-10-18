@@ -1,5 +1,7 @@
 #include "mir.hpp"
+#include <cstdio>
 #include "core.hpp"
+#include "error.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -905,7 +907,7 @@ void Module::print(FILE *f) const {
   fprintf(f, "}\n");
 
   for (const auto &fn : functions) {
-    fn->print(f, (Module&)*this);
+    fn->print(f, (Module &)*this);
   }
 }
 
@@ -1130,10 +1132,21 @@ void Instruction::print(FILE *f, Module &m) const {
     const int DEBUG_COMMENT_COLUMN = 80;
     int printed_len = 2 + (int)line.size();
     int pad = DEBUG_COMMENT_COLUMN - printed_len;
-    if (pad < 1) pad = 1;
+    if (pad < 1) {
+      pad = 1;
+    }
+
     fprintf(f, "  %s", line.c_str());
-    for (int i = 0; i < pad; ++i) fputc(' ', f);
-    fprintf(f, "; '%s'\n", span.ToString().c_str());
+
+    
+    for (int i = 0; i < pad; ++i) {
+      fputc(' ', f);
+    }
+
+    fprintf(f, "; ");
+    std::string source = get_source_line_from_span(span);
+    fprintf(f, "\"%s\" :: '%s'\n", source.c_str(), span.ToString().c_str());
+
   } else {
     fprintf(f, "  %s\n", line.c_str());
   }

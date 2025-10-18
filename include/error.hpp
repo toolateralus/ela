@@ -56,6 +56,28 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
+static inline std::string get_source_line_from_span(const Span &span) {
+  std::ifstream src_file(Span::files()[span.file]);
+
+  if (!src_file.is_open()) {
+    return "<no src>";
+  }
+
+  std::string line;
+  size_t line_index = 0;
+
+  while (std::getline(src_file, line)) {
+    if (line_index == span.line - 1) {
+      src_file.close();
+      return line;
+    }
+    line_index++;
+  }
+
+  src_file.close();
+  return "<no src>";
+}
+
 static inline std::string get_text_representation_of_source_range(const Span &span,
                                                                   size_t num_lines_of_source_to_show) {
   std::stringstream ss;
