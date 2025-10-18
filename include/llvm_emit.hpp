@@ -17,6 +17,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Support/Casting.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/TargetSelect.h>
@@ -283,8 +284,6 @@ struct LLVM_Emitter {
 
   Mir::Module &m;
 
-  // this is per each function, is cleared on exit.
-  std::unordered_map<uint32_t, llvm::Value *> temps;
   std::unordered_map<Global_Variable *, llvm::GlobalVariable *> global_variables;
   std::unordered_map<Mir::Function *, llvm::Function *> function_table;
   std::unordered_map<Mir::Basic_Block *, llvm::BasicBlock *> bb_table;
@@ -294,13 +293,16 @@ struct LLVM_Emitter {
     Type *type;
     llvm::Value *value;
     bool is_memory = false;
-    inline void write(llvm::Value *v, llvm::IRBuilder<> &builder) {
+
+    inline void write(Type *t, llvm::Value *v, llvm::IRBuilder<> &builder) {
+      type = t;
       if (is_memory) {
         builder.CreateStore(v, value);
       } else {
         value = v;
       }
     }
+
     inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
       if (is_memory && requires_load) {
         return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);
@@ -309,6 +311,26 @@ struct LLVM_Emitter {
       }
     }
   };
+
+  // this is per each function, is cleared on exit.
+  std::unordered_map<uint32_t, Allocation> temps;
+
+  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_alloca, llvm::Value *v, llvm::IRBuilder<> &builder) {
+    Allocation allocation = {
+        .type = f->temps[idx].type,
+        .value = v,
+        .is_memory = is_alloca,
+    };
+
+    if (is_alloca) {
+      allocation.value = builder.CreateAlloca(llvm_typeof(allocation.type));
+      if (v) {
+        builder.CreateStore(v, allocation.value);
+      }
+    }
+
+    temps[idx] = allocation;
+  }
 
   inline LLVM_Emitter(Mir::Module &m)
       : llvm_ctx(),

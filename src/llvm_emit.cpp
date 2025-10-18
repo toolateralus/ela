@@ -212,7 +212,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   temps.reserve(f->temps.size());
   for (size_t i = 0; i < f->type_info->params_len; ++i) {
     llvm::Argument *llvm_param = ir_f->getArg(i);
-    temps[i] = llvm_param;
+    insert_temp(i, f, false, llvm_param, builder);
   }
 
   for (const auto &bb : f->basic_blocks) {
@@ -225,12 +225,12 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   dbg.pop_scope();
   builder.ClearInsertionPoint();
 }
-
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
   for (const auto &instr : bb->code) {
     switch (instr.opcode) {
       case Mir::OP_NOOP:
         continue;
+
       case Mir::OP_ADD:
       case Mir::OP_SUB:
       case Mir::OP_MUL:
@@ -254,7 +254,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
           llvm::Value *result = pointer_binary(left, right, instr);
-          builder.CreateStore(result, temps[instr.dest.temp]);
+          insert_temp(instr.dest.temp, f, false, result, builder);
           break;
         }
 
@@ -277,11 +277,10 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           return;
         }
 
-        builder.CreateStore(result, temps[instr.dest.temp]);
+        insert_temp(instr.dest.temp, f, false, result, builder);
       } break;
 
       case Mir::OP_LOGICAL_NOT: {
-        // dest = !left
         llvm::Value *v = visit_operand(instr.left, true);
         Type *bool_mir = bool_type();
         v = cast_scalar(v, instr.left.type, bool_mir);
@@ -291,16 +290,23 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         }
 
         llvm::Value *not_val = builder.CreateNot(v, "nottmp");
-        builder.CreateStore(not_val, temps[instr.dest.temp]);
+        insert_temp(instr.dest.temp, f, false, not_val, builder);
       } break;
 
       case Mir::OP_NOT: {
         llvm::Value *v = visit_operand(instr.left, true);
-        temps[instr.dest.temp] = builder.CreateNot(v, "bittmp");
+        auto info = instr.left.type->info->as<ScalarTypeInfo>();
+        if (!info->is_integral) {
+          throw_error("Bitwise NOT is not supported for non-integral types", instr.span);
+          break;
+        }
+        llvm::Value *res = builder.CreateNot(v, "nottmp");
+        insert_temp(instr.dest.temp, f, false, res, builder);
       } break;
 
       case Mir::OP_LOAD: {
-        temps[instr.dest.temp] = visit_operand(instr.left, true);
+        llvm::Value *val = visit_operand(instr.left, true);
+        insert_temp(instr.dest.temp, f, false, val, builder);
       } break;
 
       case Mir::OP_NEG: {
@@ -308,22 +314,16 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         if (instr.left.type->is_pointer()) {
           llvm::Value *res = pointer_unary(v, instr);
-          builder.CreateStore(res, temps[instr.dest.temp]);
+          insert_temp(instr.dest.temp, f, false, res, builder);
           break;
         }
 
         auto info = instr.left.type->info->as<ScalarTypeInfo>();
-        llvm::Value *res = nullptr;
-        if (info->is_float()) {
-          res = builder.CreateFNeg(v, "fnegtmp");
-        } else {
-          res = builder.CreateNeg(v, "negtmp");
-        }
-        builder.CreateStore(res, temps[instr.dest.temp]);
+        llvm::Value *res = info->is_float() ? builder.CreateFNeg(v, "fnegtmp") : builder.CreateNeg(v, "negtmp");
+        insert_temp(instr.dest.temp, f, false, res, builder);
       } break;
 
       case Mir::OP_STORE: {
-        // store right -> *left
         llvm::Value *ptr = visit_operand(instr.left, false);
         llvm::Value *val = visit_operand(instr.right, true);
         builder.CreateStore(val, ptr);
@@ -332,14 +332,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
         Temporary &temp = f->temps[index];
-        temps[index] = builder.CreateAlloca(llvm_typeof(temp.type), nullptr, temp.name.get_str());
+        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type), nullptr, temp.name.get_str());
+        insert_temp(index, f, true, ai, builder);
       } break;
 
       case Mir::OP_LOAD_GLOBAL: {
         Global_Variable *gvar = m.global_variables[instr.right.temp];
         llvm::Value *l_gvar = global_variables[gvar];
         llvm::Value *val = builder.CreateLoad(llvm_typeof(gvar->type), l_gvar, "loadglobaltmp");
-        builder.CreateStore(val, temps[instr.dest.temp]);
+        insert_temp(instr.dest.temp, f, false, val, builder);
       } break;
 
       case Mir::OP_STORE_GLOBAL: {
@@ -352,12 +353,12 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_LOAD_GLOBAL_PTR: {
         Global_Variable *gvar = m.global_variables[instr.right.temp];
         llvm::Value *l_gvar = global_variables[gvar];
-        builder.CreateStore(l_gvar, temps[instr.dest.temp]);
+        insert_temp(instr.dest.temp, f, false, l_gvar, builder);
       } break;
 
-      case Mir::OP_LOAD_FN_PTR: {  // this is a stupid instruction, get rid of it
+      case Mir::OP_LOAD_FN_PTR: {
         llvm::Value *fnptr = visit_operand(instr.right, false);
-        builder.CreateStore(fnptr, temps[instr.dest.temp]);
+        insert_temp(instr.dest.temp, f, false, fnptr, builder);
       } break;
 
       case Mir::OP_JMP: {
@@ -366,8 +367,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         if (it == bb_table.end()) {
           throw_error("Unknown target basic block", instr.span);
         }
-        llvm::BasicBlock *target_bb = it->second;
-        builder.CreateBr(target_bb);
+        builder.CreateBr(it->second);
       } break;
 
       case Mir::OP_JMP_TRUE: {
@@ -384,16 +384,13 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         if (it == bb_table.end()) throw_error("Unknown target basic block", instr.span);
         llvm::BasicBlock *target_bb = it->second;
 
-        // fallthrough block (next in function); create if missing
         llvm::BasicBlock *parent_bb = builder.GetInsertBlock();
         llvm::Function *cur_f = parent_bb->getParent();
         llvm::BasicBlock *fallthrough_bb = nullptr;
         for (auto itb = cur_f->begin(); itb != cur_f->end(); ++itb) {
           if (&*itb == parent_bb) {
             auto next = std::next(itb);
-            if (next != cur_f->end()) {
-              fallthrough_bb = &*next;
-            }
+            if (next != cur_f->end()) fallthrough_bb = &*next;
             break;
           }
         }
@@ -407,9 +404,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_JMP_FALSE: {
         Mir::Basic_Block *target_mb = instr.left.bb;
         llvm::Value *cond = visit_operand(instr.right, true);
-
         Type *bool_mir = bool_type();
         cond = cast_scalar(cond, instr.right.type, bool_mir);
+
         if (!cond->getType()->isIntegerTy(1)) {
           cond = builder.CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
         }
@@ -460,23 +457,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         std::vector<llvm::Value *> call_args;
         call_args.reserve(nargs);
         size_t start = arg_stack.size() - nargs;
-
-        for (size_t i = start; i < arg_stack.size(); ++i) {
-          call_args.push_back(arg_stack[i]);
-        }
-
+        for (size_t i = start; i < arg_stack.size(); ++i) call_args.push_back(arg_stack[i]);
         arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
 
-        llvm::CallInst *call = nullptr;
-        call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
-
-        if (call && !call->getType()->isVoidTy()) {
-          temps[instr.dest.temp] = call;
-        }
+        llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
+        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call, builder);
       } break;
 
       case Mir::OP_CALL_PTR: {
-        llvm::Value *f = temps[instr.left.temp];
+        llvm::Value *fn = visit_operand(instr.left, true);
         uint32_t nargs = 0;
         if (instr.right.tag == Mir::Operand::OPERAND_IMMEDIATE_VALUE && instr.right.immediate.tag == Mir::Constant::CONST_INT) {
           nargs = (uint32_t)instr.right.immediate.int_lit;
@@ -486,9 +475,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           throw_error("CALL_PTR missing arg count", instr.span);
         }
 
-        if (nargs > arg_stack.size()) {
-          throw_error("Not enough arguments on stack for CALL_PTR", instr.span);
-        }
+        if (nargs > arg_stack.size()) throw_error("Not enough arguments on stack for CALL_PTR", instr.span);
 
         std::vector<llvm::Value *> call_args;
         call_args.reserve(nargs);
@@ -496,15 +483,11 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         for (size_t i = start; i < arg_stack.size(); ++i) call_args.push_back(arg_stack[i]);
         arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
 
-        llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(instr.left.type), f, call_args);
-
-        if (call && !call->getType()->isVoidTy()) {
-          builder.CreateStore(call, temps[instr.dest.temp]);
-        }
+        llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(instr.left.type), fn, call_args);
+        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call, builder);
       } break;
 
       case Mir::OP_RET: {
-        // left = value
         llvm::Value *val = visit_operand(instr.left, true);
         builder.CreateRet(val);
       } break;
@@ -514,22 +497,20 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_CAST: {
-        // dest=result, left=value, right=type_index
         llvm::Value *v = visit_operand(instr.left, true);
         llvm::Value *casted = cast_scalar(v, instr.left.type, instr.right.type);
         if (!casted) {
           throw_error("Unsupported cast", instr.span);
           break;
         }
-        temps[instr.dest.temp] = casted;
+        insert_temp(instr.dest.temp, f, false, casted, builder);
       } break;
 
       case Mir::OP_BITCAST: {
-        // bitcast value to type (no reinterpretation of bits)
         llvm::Value *v = visit_operand(instr.left, true);
         llvm::Type *to_ty = llvm_typeof(instr.right.type);
         llvm::Value *bc = builder.CreateBitCast(v, to_ty, "bitcasttmp");
-        temps[instr.dest.temp] = bc;
+        insert_temp(instr.dest.temp, f, false, bc, builder);
       } break;
 
       case Mir::OP_GEP: {
@@ -537,7 +518,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         llvm::Value *index = visit_operand(instr.right, true);
         Temporary &temp = f->temps[instr.dest.temp];
         llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
-        temps[instr.dest.temp] = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
+        llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
+        insert_temp(instr.dest.temp, f, false, gep, builder);
       } break;
     }
   }
@@ -552,20 +534,15 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
-      if (o.temp >= temps.size() || temps[o.temp] == nullptr) {
-        throw_error(std::format("INTERNAL COMPILER ERROR: temp t{} not allocated", o.temp), {});
-        return nullptr;
-      }
-      // TODO: figure out why we're ever trying to load function pointers into non-pointer types
-      if (do_load) {
-        return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp]);
+      if (do_load && !temps[o.temp].is_memory) {
+      return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp].value);
       } else {
-        return temps[o.temp];
+      return temps[o.temp].value;
       }
     }
     case Mir::Operand::OPERAND_CONSTANT: {
       switch (o.constant.tag) {
-        case Mir::Constant::CONST_INT:
+      case Mir::Constant::CONST_INT:
           return llvm::ConstantInt::get(llvm_typeof(o.type), o.constant.int_lit);
         case Mir::Constant::CONST_FLOAT:
           return llvm::ConstantFP::get(llvm_typeof(o.type), o.constant.float_lit);
