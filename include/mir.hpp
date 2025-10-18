@@ -388,6 +388,7 @@ struct Module {
     f->name = node->name;
     f->type_info = node->type->info->as<FunctionTypeInfo>();
     f->type = node->type;
+    f->index = index;
 
     size_t param_idx = 0;
     for (const auto &param : node->parameters) {
