@@ -305,14 +305,14 @@ struct LLVM_Emitter {
   // this is per each function, is cleared on exit.
   std::unordered_map<uint32_t, Allocation> temps;
 
-  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_alloca, llvm::Value *v) {
+  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_memory, llvm::Value *v) {
     Allocation allocation = {
         .type = f->temps[idx].type,
         .value = v,
-        .is_memory = is_alloca,
+        .is_memory = is_memory,
     };
 
-    if (is_alloca && !allocation.type->is_pointer()) {
+    if (is_memory && !allocation.type->is_pointer()) {
       assert(false && "insert_temp got an alloca that wasn't a pointer");
     }
 

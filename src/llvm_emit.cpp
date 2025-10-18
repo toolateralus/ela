@@ -382,14 +382,6 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           insert_temp(instr.dest.temp, f, false, result);
           break;
         }
-        
-        // We shouldn't have to do this but for some reason GEP's are returning pointers
-        if (left->getType()->isPointerTy()) {
-          left = builder.CreateLoad(llvm_typeof(instr.left.type), left, "binleft_loadptr");
-        }
-        if (right->getType()->isPointerTy()) {
-          right = builder.CreateLoad(llvm_typeof(instr.right.type), right, "binleft_loadptr");
-        }
 
         ScalarTypeInfo *left_info = instr.left.type->info->as<ScalarTypeInfo>();
         ScalarTypeInfo *right_info = instr.right.type->info->as<ScalarTypeInfo>();
@@ -444,7 +436,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_LOAD: {
-        llvm::Value *val = visit_operand(instr.left, true);
+        llvm::Value *val = visit_operand(instr.left, true); // the true passed here will perform the load.
         insert_temp(instr.dest.temp, f, false, val);
       } break;
 
@@ -664,7 +656,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         Temporary &temp = f->temps[instr.dest.temp];
         llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
         llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
-        insert_temp(instr.dest.temp, f, false, gep);
+        insert_temp(instr.dest.temp, f, true, gep);
       } break;
     }
   }
