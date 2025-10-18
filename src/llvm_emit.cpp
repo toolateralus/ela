@@ -225,6 +225,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   dbg.pop_scope();
   builder.ClearInsertionPoint();
 }
+
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
   for (const auto &instr : bb->code) {
     switch (instr.opcode) {

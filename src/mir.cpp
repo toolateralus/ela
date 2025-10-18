@@ -75,10 +75,10 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 }
 
 void generate_block(const THIRBlock *node, Module &m) {
+  m.create_basic_block();
   if (node->statements.empty() || block_only_contains_noop(node)) {
     return;
   }
-  m.create_basic_block();
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
   }
