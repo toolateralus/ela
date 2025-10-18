@@ -444,6 +444,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         Mir::Function *mir_fn = m.functions[instr.left.temp];
         llvm::Value *fnval = function_table[mir_fn];
         uint32_t nargs = 0;
+
         if (instr.right.tag == Mir::Operand::OPERAND_IMMEDIATE_VALUE && instr.right.immediate.tag == Mir::Constant::CONST_INT) {
           nargs = (uint32_t)instr.right.immediate.int_lit;
         } else if (instr.right.tag == Mir::Operand::OPERAND_CONSTANT && instr.right.constant.tag == Mir::Constant::CONST_INT) {
@@ -467,6 +468,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_CALL_PTR: {
         llvm::Value *fn = visit_operand(instr.left, true);
         uint32_t nargs = 0;
+
         if (instr.right.tag == Mir::Operand::OPERAND_IMMEDIATE_VALUE && instr.right.immediate.tag == Mir::Constant::CONST_INT) {
           nargs = (uint32_t)instr.right.immediate.int_lit;
         } else if (instr.right.tag == Mir::Operand::OPERAND_CONSTANT && instr.right.constant.tag == Mir::Constant::CONST_INT) {
@@ -475,7 +477,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           throw_error("CALL_PTR missing arg count", instr.span);
         }
 
-        if (nargs > arg_stack.size()) throw_error("Not enough arguments on stack for CALL_PTR", instr.span);
+        if (nargs > arg_stack.size()) {
+          throw_error("Not enough arguments on stack for CALL_PTR", instr.span);
+        }
 
         std::vector<llvm::Value *> call_args;
         call_args.reserve(nargs);
@@ -484,7 +488,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
 
         llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(instr.left.type), fn, call_args);
-        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call, builder);
+        if (call && !call->getType()->isVoidTy()) {
+          insert_temp(instr.dest.temp, f, false, call, builder);
+        }
       } break;
 
       case Mir::OP_RET: {
@@ -534,15 +540,15 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
-      if (do_load && !temps[o.temp].is_memory) {
-      return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp].value);
+      if (do_load) {
+        return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp].value);
       } else {
-      return temps[o.temp].value;
+        return temps[o.temp].value;
       }
     }
     case Mir::Operand::OPERAND_CONSTANT: {
       switch (o.constant.tag) {
-      case Mir::Constant::CONST_INT:
+        case Mir::Constant::CONST_INT:
           return llvm::ConstantInt::get(llvm_typeof(o.type), o.constant.int_lit);
         case Mir::Constant::CONST_FLOAT:
           return llvm::ConstantFP::get(llvm_typeof(o.type), o.constant.float_lit);
