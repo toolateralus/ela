@@ -280,15 +280,35 @@ struct LLVM_Emitter {
   DIManager dbg;
 
   Nullable<llvm::Value> sret_destination = nullptr;
-  
+
   Mir::Module &m;
-  
+
   // this is per each function, is cleared on exit.
   std::unordered_map<uint32_t, llvm::Value *> temps;
   std::unordered_map<Global_Variable *, llvm::GlobalVariable *> global_variables;
   std::unordered_map<Mir::Function *, llvm::Function *> function_table;
-  std::unordered_map<Mir::Basic_Block*, llvm::BasicBlock*> bb_table;
+  std::unordered_map<Mir::Basic_Block *, llvm::BasicBlock *> bb_table;
   std::vector<llvm::Value *> arg_stack;
+
+  struct Allocation {
+    Type *type;
+    llvm::Value *value;
+    bool is_memory = false;
+    inline void write(llvm::Value *v, llvm::IRBuilder<> &builder) {
+      if (is_memory) {
+        builder.CreateStore(v, value);
+      } else {
+        value = v;
+      }
+    }
+    inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
+      if (is_memory && requires_load) {
+        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);
+      } else {  // return the pointer or the SSA register
+        return value;
+      }
+    }
+  };
 
   inline LLVM_Emitter(Mir::Module &m)
       : llvm_ctx(),

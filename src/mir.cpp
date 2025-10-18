@@ -9,18 +9,6 @@ namespace Mir {
 static std::vector<Basic_Block *> g_break_targets;
 static std::vector<Basic_Block *> g_continue_targets;
 
-static void set_insert_block(Function *f, Basic_Block *b) {
-  auto &v = f->basic_blocks;
-  for (size_t i = 0; i < v.size(); ++i) {
-    if (v[i] == b) {
-      if (i == v.size() - 1) return;
-      std::swap(v[i], v.back());
-      return;
-    }
-  }
-  v.push_back(b);
-}
-
 static bool block_only_contains_noop(const THIRBlock *b) {
   size_t count = 0;
   for (const auto *stmt : b->statements) {
@@ -121,7 +109,8 @@ void generate_variable(const THIRVariable *node, Module &m) {
       throw_error("invalid type in global var\n", node->span);
     }
 
-    Global_Variable *v = mir_arena.construct<Global_Variable>(Global_Variable{.name = node->name, .type = node->type, .idx = idx});
+    Global_Variable *v =
+        mir_arena.construct<Global_Variable>(Global_Variable{.name = node->name, .type = node->type, .idx = idx});
 
     m.global_variables.push_back(v);
     m.global_variable_table[node] = v;
@@ -384,6 +373,24 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
       EMIT_LOAD(result, ptr);
       return result;
     }
+    case TType::Increment: {
+      Operand addr = generate_lvalue_addr(node->operand, m);
+      Operand current_val = m.create_temporary(node->type);
+      EMIT_LOAD(current_val, addr);
+      Operand result = m.create_temporary(node->type);
+      EMIT_BINOP(OP_ADD, result, current_val, Operand::Imm(Constant::Int(1), node->type));
+      EMIT_STORE(addr, result);
+      return result;
+    }
+    case TType::Decrement: {
+      Operand addr = generate_lvalue_addr(node->operand, m);
+      Operand current_val = m.create_temporary(node->type);
+      EMIT_LOAD(current_val, addr);
+      Operand result = m.create_temporary(node->type);
+      EMIT_BINOP(OP_SUB, result, current_val, Operand::Imm(Constant::Int(1), node->type));
+      EMIT_STORE(addr, result);
+      return result;
+    }
     default:
       throw_error(std::format("unknown unary operator {}", (int)node->op), node->span);
       return Operand::Null();
@@ -561,7 +568,7 @@ void generate_continue(const THIRContinue *node, Module &m) {
 }
 
 void generate_for(const THIRFor *node, Module &m) {
-  if (node->initialization) generate(node->initialization, m);
+  generate(node->initialization, m);
 
   // remember the block where initialization finished
   Basic_Block *orig_bb = m.get_insert_block();
@@ -572,31 +579,34 @@ void generate_for(const THIRFor *node, Module &m) {
   Basic_Block *after_bb = m.create_basic_block();
 
   // jump from original to cond
-  set_insert_block(m.current_function, orig_bb);
+  m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
 
   // cond
-  set_insert_block(m.current_function, cond_bb);
+  m.current_function->set_insert_block(cond_bb);
   Operand cond = node->condition ? generate_expr(node->condition, m) : Operand::Imm(Constant::Bool(true), bool_type());
   EMIT_JUMP_TRUE(body_bb, cond);
   EMIT_JUMP(after_bb);
 
   // body
-  set_insert_block(m.current_function, body_bb);
+  m.current_function->set_insert_block(body_bb);
   g_break_targets.push_back(after_bb);
   g_continue_targets.push_back(incr_bb);
-  if (node->block) generate(node->block, m);
+
+  generate(node->block, m);
+
   g_break_targets.pop_back();
   g_continue_targets.pop_back();
   EMIT_JUMP(incr_bb);
 
   // incr
-  set_insert_block(m.current_function, incr_bb);
-  if (node->increment) generate(node->increment, m);
+  m.current_function->set_insert_block(incr_bb);
+  generate(node->increment, m);
+
   EMIT_JUMP(cond_bb);
 
   // after
-  set_insert_block(m.current_function, after_bb);
+  m.current_function->set_insert_block(after_bb);
 }
 
 void generate_if(const THIRIf *node, Module &m) {
@@ -607,7 +617,7 @@ void generate_if(const THIRIf *node, Module &m) {
   Basic_Block *after_bb = m.create_basic_block();
   Basic_Block *else_bb = node->_else ? m.create_basic_block() : nullptr;
 
-  set_insert_block(m.current_function, cond_bb);
+  m.current_function->set_insert_block(cond_bb);
   EMIT_JUMP_TRUE(then_bb, cond);
   if (else_bb) {
     EMIT_JUMP(else_bb);
@@ -615,17 +625,17 @@ void generate_if(const THIRIf *node, Module &m) {
     EMIT_JUMP(after_bb);
   }
 
-  set_insert_block(m.current_function, then_bb);
+  m.current_function->set_insert_block(then_bb);
   generate(node->block, m);
   EMIT_JUMP(after_bb);
 
   if (else_bb) {
-    set_insert_block(m.current_function, else_bb);
+    m.current_function->set_insert_block(else_bb);
     generate(node->_else, m);
     EMIT_JUMP(after_bb);
   }
 
-  set_insert_block(m.current_function, after_bb);
+  m.current_function->set_insert_block(after_bb);
 }
 
 void generate_while(const THIRWhile *node, Module &m) {
@@ -634,15 +644,15 @@ void generate_while(const THIRWhile *node, Module &m) {
   Basic_Block *body_bb = m.create_basic_block();
   Basic_Block *after_bb = m.create_basic_block();
 
-  set_insert_block(m.current_function, orig_bb);
+  m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
 
-  set_insert_block(m.current_function, cond_bb);
+  m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
   EMIT_JUMP_TRUE(body_bb, cond);
   EMIT_JUMP(after_bb);
 
-  set_insert_block(m.current_function, body_bb);
+  m.current_function->set_insert_block(body_bb);
   g_break_targets.push_back(after_bb);
   g_continue_targets.push_back(cond_bb);
   generate(node->block, m);
@@ -650,7 +660,7 @@ void generate_while(const THIRWhile *node, Module &m) {
   g_continue_targets.pop_back();
   EMIT_JUMP(cond_bb);
 
-  set_insert_block(m.current_function, after_bb);
+  m.current_function->set_insert_block(after_bb);
 }
 
 const Type *get_base_type(const Type *t) {
@@ -895,11 +905,11 @@ void Module::print(FILE *f) const {
   fprintf(f, "}\n");
 
   for (const auto &fn : functions) {
-    fn->print(f);
+    fn->print(f, (Module&)*this);
   }
 }
 
-void Instruction::print(FILE *f) const {
+void Instruction::print(FILE *f, Module &m) const {
   const char *opcode_name;
 
   switch (opcode) {
@@ -1096,8 +1106,17 @@ void Instruction::print(FILE *f) const {
 
   line += opcode_name;
 
-  if (left.tag != Operand::OPERAND_NULL) ops.push_back(&left);
-  if (right.tag != Operand::OPERAND_NULL) ops.push_back(&right);
+  if (left.tag != Operand::OPERAND_NULL) {
+    if (opcode == OP_CALL) {
+      line += " " + m.functions[left.temp]->name.get_str();
+    } else {
+      ops.push_back(&left);
+    }
+  }
+
+  if (right.tag != Operand::OPERAND_NULL) {
+    ops.push_back(&right);
+  }
 
   if (!ops.empty()) {
     line += " ";
@@ -1120,15 +1139,15 @@ void Instruction::print(FILE *f) const {
   }
 }
 
-void Basic_Block::print(FILE *f) const {
+void Basic_Block::print(FILE *f, Module &m) const {
   fprintf(f, "%s:", label.get_str().c_str());
   fprintf(f, "\n");
   for (const auto &instruction : code) {
-    instruction.print(f);
+    instruction.print(f, m);
   }
 }
 
-void Function::print(FILE *f) const {
+void Function::print(FILE *f, Module &m) const {
   if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
     fprintf(f, "extern ");
   }
@@ -1154,7 +1173,7 @@ void Function::print(FILE *f) const {
   }
 
   for (const auto &bb : basic_blocks) {
-    bb->print(f);
+    bb->print(f, m);
   }
 
   fprintf(f, "}\n");

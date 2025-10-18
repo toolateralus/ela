@@ -205,13 +205,14 @@ struct Operand {
 
 // this is a giant struct, we should really have ANOTHER ir that's much lower level,
 // and optimized.
+struct Module;
 struct Instruction {
   Op_Code opcode = OP_NOOP;
   Operand dest;
   Operand left;
   Operand right;
   Span span;
-  void print(FILE *) const;
+  void print(FILE *, Module &) const;
 };
 
 struct Basic_Block {
@@ -227,7 +228,7 @@ struct Basic_Block {
     return code.back();
   }
   inline Op_Code back_opcode() const { return back().opcode; }
-  void print(FILE *) const;
+  void print(FILE *, Module &) const;
 };
 
 extern jstl::Arena mir_arena;
@@ -247,6 +248,7 @@ struct Function {
   Span span;
 
   std::vector<Basic_Block *> basic_blocks;
+  Basic_Block *insert_block;
 
   // parameters are stored in here as the first locals, to simplifying indexing
   // in the MIR
@@ -282,6 +284,7 @@ struct Function {
     }
     Basic_Block *block = mir_arena.construct<Basic_Block>(*label);
     basic_blocks.push_back(block);
+    insert_block = block;
     return block;
   }
 
@@ -304,10 +307,19 @@ struct Function {
   }
 
   inline Basic_Block *get_insert_block() {
-    assert(basic_blocks.size() && "no basic blocks");
-    return basic_blocks.back();
+    return insert_block;
   }
-  void print(FILE *) const;
+
+  inline void reset_insert_block()  {
+    insert_block = basic_blocks.back();
+  }
+
+  inline void set_insert_block(Basic_Block *bb) {
+    insert_block = bb;
+  }
+
+
+  void print(FILE *, Module &) const;
 };
 
 struct Global_Variable {

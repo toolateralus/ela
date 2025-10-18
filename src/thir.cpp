@@ -476,8 +476,7 @@ void THIRGen::make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *obj
         THIR_ALLOC(THIRVariable, var, ast)
         var->name = part.var_name;
         var->type = part.resolved_type;
-        var->value =
-            make_member_access(ast->span, variant_member_access, {{part.resolved_type, "$" + std::to_string(index++)}});
+        var->value = make_member_access(ast->span, variant_member_access, {{part.resolved_type, "$" + std::to_string(index++)}});
         if (part.semantic == PATTERN_MATCH_PTR_MUT || part.semantic == PATTERN_MATCH_PTR_CONST) {
           var->value = take_address_of(var->value, ast);
         }
@@ -661,8 +660,8 @@ THIR *THIRGen::visit_dyn_of(ASTDyn_Of *ast) {
   for (auto &[name, method_type] : dyn_info->methods) {
     auto symbol = scope->local_lookup(name);
     dynof->key_values.push_back({
-      name,
-      get_function_pointer(symbol->function.declaration),
+        name,
+        get_function_pointer(symbol->function.declaration),
     });
   }
 
@@ -719,8 +718,7 @@ THIR *THIRGen::visit_range(ASTRange *ast) {
   return thir;
 }
 
-THIR *THIRGen::initialize(const Span &span, Type *type,
-                          std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
+THIR *THIRGen::initialize(const Span &span, Type *type, std::vector<std::pair<InternedString, ASTExpr *>> key_values) {
   const auto info = type->info;
 
   if (type->is_pointer() && key_values.empty()) {
@@ -856,8 +854,7 @@ THIR *THIRGen::visit_initializer_list(ASTInitializerList *ast) {
         THIR_ALLOC(THIRAggregateInitializer, thir, ast)
         thir->type = type;
         thir->key_values.push_back({"data", collection});
-        thir->key_values.push_back(
-            {"length", make_literal(std::to_string(length), ast->span, u64_type(), ASTLiteral::Integer)});
+        thir->key_values.push_back({"length", make_literal(std::to_string(length), ast->span, u64_type(), ASTLiteral::Integer)});
         return thir;
       }
 
@@ -1535,7 +1532,6 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   condition->right = discriminant_literal;
   condition->type = bool_type();
   thir->condition = condition;
-
 
   // Increment: $next = next($iterator)
   THIR_ALLOC(THIRBinExpr, increment, ast);
@@ -2434,6 +2430,16 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
   const bool is_testing = compile_command.has_flag("test");
   Type *const_u8_ptr_ptr_type = char_ptr_type()->take_pointer_to(false);  // u8 const* const*;
 
+  THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv_var);
+  argv_var->name = "argv";
+  argv_var->type = const_u8_ptr_ptr_type;
+  argv_var->is_global = false;
+
+  THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argc_var);
+  argc_var->name = "argc";
+  argc_var->type = s32_type();
+  argc_var->is_global = false;
+
   if (entry_point->get_node_type() == THIRNodeType::Function || is_testing) {
     THIR_ALLOC_NO_SRC_RANGE(THIRFunction, main) {  // setup main function, get type, parameters, etc.
       FunctionTypeInfo main_info{};
@@ -2447,7 +2453,9 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
       main->name = "main";
       main->type = main_type;
 
-      THIRParameter argv = {.name = "argv"}, argc = {.name = "argc"};
+      THIRParameter argv = {.name = "argv", .associated_variable = argv_var},
+                    argc = {.name = "argc", .associated_variable = argc_var};
+
       main->parameters.push_back(argc);
       main->parameters.push_back(argv);
     }
@@ -2466,19 +2474,8 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         initialize->callee = visit_node(env_initialize);
         initialize->type = env_initialize->return_type->resolved_type;
 
-        // Parameterize the damn call
-        THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv);
-        argv->name = "argv";
-        argv->is_global = false;
-        argv->type = const_u8_ptr_ptr_type;
-
-        THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argc);
-        argc->name = "argc";
-        argc->is_global = false;
-        argc->type = s32_type();
-
-        initialize->arguments.push_back(argc);
-        initialize->arguments.push_back(argv);
+        initialize->arguments.push_back(argc_var);
+        initialize->arguments.push_back(argv_var);
         initialize->is_statement = true;
         // Call the damn call
         block->statements.push_back(initialize);
@@ -2683,6 +2680,6 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
 
 void THIRGen::check_for_deprecation(Span call_site, THIR *thir) {
   if (thir->deprecated) {
-    format_and_print_deprecated_warning(call_site,thir, thir->deprecated_attr);
+    format_and_print_deprecated_warning(call_site, thir, thir->deprecated_attr);
   }
 }

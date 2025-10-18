@@ -208,6 +208,13 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
     bb_table[bb] = ir_bb;
   }
 
+  // Declare the parameters and store them in the temps
+  temps.reserve(f->temps.size());
+  for (size_t i = 0; i < f->type_info->params_len; ++i) {
+    llvm::Argument *llvm_param = ir_f->getArg(i);
+    temps[i] = llvm_param;
+  }
+
   for (const auto &bb : f->basic_blocks) {
     builder.SetInsertPoint(bb_table[bb]);
     emit_basic_block(bb, f);
@@ -289,15 +296,11 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_NOT: {
         llvm::Value *v = visit_operand(instr.left, true);
-        llvm::Value *not_val = builder.CreateNot(v, "bittmp");
-        builder.CreateStore(not_val, temps[instr.dest.temp]);
+        temps[instr.dest.temp] = builder.CreateNot(v, "bittmp");
       } break;
 
       case Mir::OP_LOAD: {
-        // dest = *left
-        llvm::Value *ptr = visit_operand(instr.left, true);
-        llvm::Value *val = builder.CreateLoad(llvm_typeof(instr.dest.type), ptr, "loadtmp");
-        builder.CreateStore(val, temps[instr.dest.temp]);
+        temps[instr.dest.temp] = visit_operand(instr.left, true);
       } break;
 
       case Mir::OP_NEG: {
@@ -468,7 +471,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
 
         if (call && !call->getType()->isVoidTy()) {
-          builder.CreateStore(call, temps[instr.dest.temp]);
+          temps[instr.dest.temp] = call;
         }
       } break;
 
@@ -518,7 +521,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           throw_error("Unsupported cast", instr.span);
           break;
         }
-        builder.CreateStore(casted, temps[instr.dest.temp]);
+        temps[instr.dest.temp] = casted;
       } break;
 
       case Mir::OP_BITCAST: {
@@ -526,24 +529,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         llvm::Value *v = visit_operand(instr.left, true);
         llvm::Type *to_ty = llvm_typeof(instr.right.type);
         llvm::Value *bc = builder.CreateBitCast(v, to_ty, "bitcasttmp");
-        builder.CreateStore(bc, temps[instr.dest.temp]);
+        temps[instr.dest.temp] = bc;
       } break;
 
       case Mir::OP_GEP: {
         llvm::Value *base = visit_operand(instr.left, false);
         llvm::Value *index = visit_operand(instr.right, true);
-        llvm::Type *pointee = nullptr;
-        if (instr.left.type && instr.left.type->is_pointer()) {
-          Type *pointee_type = instr.left.type->base_type;
-          if (!type_is_valid(pointee_type)) {
-            throw_error("GEP: pointer type missing pointee in MIR", instr.span);
-            break;
-          }
-          pointee = llvm_typeof(pointee_type);
-          llvm::Value *gep = builder.CreateGEP(pointee, base, index, "geptmp");
-          builder.CreateStore(gep, temps[instr.dest.temp]);
-          break;
-        }
+        Temporary &temp = f->temps[instr.dest.temp];
+        llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
+        temps[instr.dest.temp] = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
       } break;
     }
   }
@@ -558,6 +552,10 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
+      if (o.temp >= temps.size() || temps[o.temp] == nullptr) {
+        throw_error(std::format("INTERNAL COMPILER ERROR: temp t{} not allocated", o.temp), {});
+        return nullptr;
+      }
       // TODO: figure out why we're ever trying to load function pointers into non-pointer types
       if (do_load) {
         return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp]);
@@ -604,9 +602,9 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
   llvm::Value *result = nullptr;
   llvm::Type *elem_ty = nullptr;
   if (instr.left.type && instr.left.type->is_pointer()) {
-    elem_ty = llvm_typeof(instr.left.type->base_type);
+    elem_ty = llvm_typeof(instr.left.type->get_element_type());
   } else if (instr.right.type && instr.right.type->is_pointer()) {
-    elem_ty = llvm_typeof(instr.right.type->base_type);
+    elem_ty = llvm_typeof(instr.right.type->get_element_type());
   }
 
   if ((instr.opcode == Mir::OP_LOGICAL_NOT || instr.opcode == Mir::OP_NOT) && !right) {
