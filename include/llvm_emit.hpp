@@ -315,7 +315,7 @@ struct LLVM_Emitter {
   // this is per each function, is cleared on exit.
   std::unordered_map<uint32_t, Allocation> temps;
 
-  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_alloca, llvm::Value *v, llvm::IRBuilder<> &builder) {
+  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_alloca, llvm::Value *v) {
     Allocation allocation = {
         .type = f->temps[idx].type,
         .value = v,
@@ -323,14 +323,7 @@ struct LLVM_Emitter {
     };
 
     if (is_alloca && !allocation.type->is_pointer()) {
-      allocation.type = allocation.type->take_pointer_to(); 
-    }
-
-    if (is_alloca) {
-      allocation.value = builder.CreateAlloca(llvm_typeof(allocation.type));
-      if (v) {
-        builder.CreateStore(v, allocation.value);
-      }
+      assert(false && "insert_temp got an alloca that wasn't a pointer");
     }
 
     temps[idx] = allocation;
@@ -696,5 +689,5 @@ struct LLVM_Emitter {
   llvm::Value *binary_signed(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_fp(llvm::Value *left, llvm::Value *right, Op_Code op);
-  llvm::Value *cast_scalar(llvm::Value *value, Type *from, Type *to);
+  llvm::Value *cast_scalar(llvm::Value *value, Type *from, Type *to, Type **new_type);
 };

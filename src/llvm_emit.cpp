@@ -118,7 +118,7 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
   return nullptr;
 }
 
-llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to) {
+llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to, Type **new_type) {
   if (from == to) {
     return value;
   }
@@ -126,6 +126,8 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to)
   auto from_info = from->info->as<ScalarTypeInfo>();
   auto to_info = to->info->as<ScalarTypeInfo>();
   auto llvm_to = llvm_typeof(to);
+
+  *new_type = to;
 
   if (to->is_pointer()) {
     if (from->is_pointer()) {
@@ -212,7 +214,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   temps.reserve(f->temps.size());
   for (size_t i = 0; i < f->type_info->params_len; ++i) {
     llvm::Argument *llvm_param = ir_f->getArg(i);
-    insert_temp(i, f, false, llvm_param, builder);
+    insert_temp(i, f, false, llvm_param);
   }
 
   for (const auto &bb : f->basic_blocks) {
@@ -227,7 +229,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 }
 
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
-  for (const auto &instr : bb->code) {
+  for (auto &instr : bb->code) {
     switch (instr.opcode) {
       case Mir::OP_NOOP:
         continue;
@@ -255,15 +257,21 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
           llvm::Value *result = pointer_binary(left, right, instr);
-          insert_temp(instr.dest.temp, f, false, result, builder);
+          insert_temp(instr.dest.temp, f, false, result);
           break;
         }
 
         ScalarTypeInfo *left_info = instr.left.type->info->as<ScalarTypeInfo>();
-        ScalarTypeInfo *right_info = instr.left.type->info->as<ScalarTypeInfo>();
+        ScalarTypeInfo *right_info = instr.right.type->info->as<ScalarTypeInfo>();
         llvm::Value *result = nullptr;
 
-        right = cast_scalar(right, instr.right.type, instr.left.type);
+        Type *new_type = nullptr;
+        right = cast_scalar(right, instr.right.type, instr.left.type, &new_type);
+
+        if (new_type) {  // We performed a cast so now we have to update to the new type so the below logic is correct
+          instr.right.type = new_type;
+          right_info = new_type->info->as<ScalarTypeInfo>();
+        }
 
         if (left_info->is_signed() && right_info->is_signed()) {
           result = binary_signed(left, right, instr.opcode);
@@ -278,20 +286,20 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           return;
         }
 
-        insert_temp(instr.dest.temp, f, false, result, builder);
+        insert_temp(instr.dest.temp, f, false, result);
       } break;
 
       case Mir::OP_LOGICAL_NOT: {
         llvm::Value *v = visit_operand(instr.left, true);
-        Type *bool_mir = bool_type();
-        v = cast_scalar(v, instr.left.type, bool_mir);
+        Type *unused = nullptr;
+        v = cast_scalar(v, instr.left.type, bool_type(), &unused);
 
         if (!v->getType()->isIntegerTy(1)) {
           v = builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv");
         }
 
         llvm::Value *not_val = builder.CreateNot(v, "nottmp");
-        insert_temp(instr.dest.temp, f, false, not_val, builder);
+        insert_temp(instr.dest.temp, f, false, not_val);
       } break;
 
       case Mir::OP_NOT: {
@@ -302,12 +310,12 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           break;
         }
         llvm::Value *res = builder.CreateNot(v, "nottmp");
-        insert_temp(instr.dest.temp, f, false, res, builder);
+        insert_temp(instr.dest.temp, f, false, res);
       } break;
 
       case Mir::OP_LOAD: {
         llvm::Value *val = visit_operand(instr.left, true);
-        insert_temp(instr.dest.temp, f, false, val, builder);
+        insert_temp(instr.dest.temp, f, false, val);
       } break;
 
       case Mir::OP_NEG: {
@@ -315,13 +323,13 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         if (instr.left.type->is_pointer()) {
           llvm::Value *res = pointer_unary(v, instr);
-          insert_temp(instr.dest.temp, f, false, res, builder);
+          insert_temp(instr.dest.temp, f, false, res);
           break;
         }
 
         auto info = instr.left.type->info->as<ScalarTypeInfo>();
         llvm::Value *res = info->is_float() ? builder.CreateFNeg(v, "fnegtmp") : builder.CreateNeg(v, "negtmp");
-        insert_temp(instr.dest.temp, f, false, res, builder);
+        insert_temp(instr.dest.temp, f, false, res);
       } break;
 
       case Mir::OP_STORE: {
@@ -333,15 +341,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
         Temporary &temp = f->temps[index];
-        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type), nullptr, temp.name.get_str());
-        insert_temp(index, f, true, ai, builder);
+        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.get_str());
+        insert_temp(index, f, true, ai);
       } break;
 
       case Mir::OP_LOAD_GLOBAL: {
         Global_Variable *gvar = m.global_variables[instr.right.temp];
         llvm::Value *l_gvar = global_variables[gvar];
         llvm::Value *val = builder.CreateLoad(llvm_typeof(gvar->type), l_gvar, "loadglobaltmp");
-        insert_temp(instr.dest.temp, f, false, val, builder);
+        insert_temp(instr.dest.temp, f, false, val);
       } break;
 
       case Mir::OP_STORE_GLOBAL: {
@@ -354,12 +362,12 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_LOAD_GLOBAL_PTR: {
         Global_Variable *gvar = m.global_variables[instr.right.temp];
         llvm::Value *l_gvar = global_variables[gvar];
-        insert_temp(instr.dest.temp, f, false, l_gvar, builder);
+        insert_temp(instr.dest.temp, f, false, l_gvar);
       } break;
 
       case Mir::OP_LOAD_FN_PTR: {
         llvm::Value *fnptr = visit_operand(instr.right, false);
-        insert_temp(instr.dest.temp, f, false, fnptr, builder);
+        insert_temp(instr.dest.temp, f, false, fnptr);
       } break;
 
       case Mir::OP_JMP: {
@@ -374,8 +382,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_JMP_TRUE: {
         Mir::Basic_Block *target_mb = instr.left.bb;
         llvm::Value *cond = visit_operand(instr.right, true);
-        Type *bool_mir = bool_type();
-        cond = cast_scalar(cond, instr.right.type, bool_mir);
+        Type *unused = nullptr;
+        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
 
         if (!cond->getType()->isIntegerTy(1)) {
           cond = builder.CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
@@ -405,8 +413,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_JMP_FALSE: {
         Mir::Basic_Block *target_mb = instr.left.bb;
         llvm::Value *cond = visit_operand(instr.right, true);
-        Type *bool_mir = bool_type();
-        cond = cast_scalar(cond, instr.right.type, bool_mir);
+        Type *unused = nullptr;
+        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
 
         if (!cond->getType()->isIntegerTy(1)) {
           cond = builder.CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
@@ -463,7 +471,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         arg_stack.erase(arg_stack.begin() + start, arg_stack.end());
 
         llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(mir_fn->type), fnval, call_args);
-        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call, builder);
+        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, false, call);
       } break;
 
       case Mir::OP_CALL_PTR: {
@@ -490,7 +498,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         llvm::CallInst *call = builder.CreateCall((llvm::FunctionType *)llvm_typeof(instr.left.type), fn, call_args);
         if (call && !call->getType()->isVoidTy()) {
-          insert_temp(instr.dest.temp, f, false, call, builder);
+          insert_temp(instr.dest.temp, f, false, call);
         }
       } break;
 
@@ -505,19 +513,23 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_CAST: {
         llvm::Value *v = visit_operand(instr.left, true);
-        llvm::Value *casted = cast_scalar(v, instr.left.type, instr.right.type);
+        Type *new_type = nullptr;
+        llvm::Value *casted = cast_scalar(v, instr.left.type, instr.right.type, &new_type);
+        if (new_type) {
+          instr.right.type = new_type;
+        }
         if (!casted) {
           throw_error("Unsupported cast", instr.span);
           break;
         }
-        insert_temp(instr.dest.temp, f, false, casted, builder);
+        insert_temp(instr.dest.temp, f, false, casted);
       } break;
 
       case Mir::OP_BITCAST: {
         llvm::Value *v = visit_operand(instr.left, true);
         llvm::Type *to_ty = llvm_typeof(instr.right.type);
         llvm::Value *bc = builder.CreateBitCast(v, to_ty, "bitcasttmp");
-        insert_temp(instr.dest.temp, f, false, bc, builder);
+        insert_temp(instr.dest.temp, f, false, bc);
       } break;
 
       case Mir::OP_GEP: {
@@ -526,7 +538,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         Temporary &temp = f->temps[instr.dest.temp];
         llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
         llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
-        insert_temp(instr.dest.temp, f, false, gep, builder);
+        insert_temp(instr.dest.temp, f, false, gep);
       } break;
     }
   }
@@ -591,8 +603,8 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
   }
 
   if ((instr.opcode == Mir::OP_LOGICAL_NOT || instr.opcode == Mir::OP_NOT) && !right) {
-    Type *bool_mir = bool_type();
-    llvm::Value *v = cast_scalar(left, instr.left.type, bool_mir);
+    Type *unused = nullptr;
+    llvm::Value *v = cast_scalar(left, instr.left.type, bool_type(), &unused);
     if (!v) {
       throw_error("Pointer logical-not: failed to cast pointer to bool via MIR type system", instr.span);
       return nullptr;
@@ -658,8 +670,8 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
 
 llvm::Value *LLVM_Emitter::pointer_unary(llvm::Value *operand, const Instruction &instr) {
   if (instr.opcode == Mir::OP_LOGICAL_NOT) {
-    Type *bool_mir = bool_type();
-    llvm::Value *v = cast_scalar(operand, instr.left.type, bool_mir);
+    Type *unused = nullptr;
+    llvm::Value *v = cast_scalar(operand, instr.left.type, bool_type(), &unused);
     if (!v) {
       throw_error("Pointer logical-not: failed to cast pointer to bool via MIR type system", instr.span);
       return nullptr;
