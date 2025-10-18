@@ -293,16 +293,6 @@ struct LLVM_Emitter {
     Type *type;
     llvm::Value *value;
     bool is_memory = false;
-
-    inline void write(Type *t, llvm::Value *v, llvm::IRBuilder<> &builder) {
-      type = t;
-      if (is_memory) {
-        builder.CreateStore(v, value);
-      } else {
-        value = v;
-      }
-    }
-
     inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
       if (is_memory && requires_load) {
         return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);

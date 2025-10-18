@@ -467,7 +467,6 @@ Operand generate_cast(const THIRCast *node, Module &m) {
   Operand value = generate_expr(node->operand, m);
   Operand result = m.create_temporary(node->type);
   Operand type_operand = Operand::Ty(node->type);
-
   EMIT_CAST(result, value, type_operand);
   return result;
 }
