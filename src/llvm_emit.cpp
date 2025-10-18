@@ -4,6 +4,7 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 #include "mir.hpp"
@@ -312,12 +313,28 @@ void LLVM_Emitter::emit_module() {
     function_table[f] = llvm_f;
   }
 
+  for (const Global_Variable *gv: m.global_variables) {
+    llvm::Type *gv_type = llvm_typeof(gv->type);
+    llvm::Constant *initializer = nullptr;
+    llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(
+      *llvm_module,
+      gv_type,
+      false,
+      llvm::GlobalValue::InternalLinkage,
+      initializer,
+      gv->name.get_str()
+    );
+    global_variables[gv] = llvm_gv;
+  }
+
   for (const auto &f : m.functions) {
     if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_EXTERN)) {
       continue;
     }
     emit_function(f, function_table[f]);
   }
+
+
   dbg.pop_scope();
 }
 
@@ -374,8 +391,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_LE:
       case Mir::OP_GT:
       case Mir::OP_GE: {
-        llvm::Value *left = visit_operand(instr.left, true);
-        llvm::Value *right = visit_operand(instr.right, true);
+        llvm::Value *left = visit_operand(instr.left, true, instr.span);
+        llvm::Value *right = visit_operand(instr.right, true, instr.span);
 
         if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
           llvm::Value *result = pointer_binary(left, right, instr);
@@ -412,7 +429,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_LOGICAL_NOT: {
-        llvm::Value *v = visit_operand(instr.left, true);
+        llvm::Value *v = visit_operand(instr.left, true, instr.span);
         Type *unused = nullptr;
         v = cast_scalar(v, instr.left.type, bool_type(), &unused);
 
@@ -425,7 +442,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_NOT: {
-        llvm::Value *v = visit_operand(instr.left, true);
+        llvm::Value *v = visit_operand(instr.left, true, instr.span);
         auto info = instr.left.type->info->as<ScalarTypeInfo>();
         if (!info->is_integral) {
           throw_error("Bitwise NOT is not supported for non-integral types", instr.span);
@@ -436,12 +453,12 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_LOAD: {
-        llvm::Value *val = visit_operand(instr.left, true);  // the true passed here will perform the load.
+        llvm::Value *val = visit_operand(instr.left, true, instr.span);  // the true passed here will perform the load.
         insert_temp(instr.dest.temp, f, false, val);
       } break;
 
       case Mir::OP_NEG: {
-        llvm::Value *v = visit_operand(instr.left, true);
+        llvm::Value *v = visit_operand(instr.left, true, instr.span);
 
         if (instr.left.type->is_pointer()) {
           llvm::Value *res = pointer_unary(v, instr);
@@ -455,8 +472,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_STORE: {
-        llvm::Value *ptr = visit_operand(instr.left, false);
-        llvm::Value *val = visit_operand(instr.right, true);
+        llvm::Value *ptr = visit_operand(instr.left, false, instr.span);
+        llvm::Value *val = visit_operand(instr.right, true, instr.span);
         builder.CreateStore(val, ptr);
       } break;
 
@@ -467,28 +484,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         insert_temp(index, f, true, ai);
       } break;
 
-      case Mir::OP_LOAD_GLOBAL: {
-        Global_Variable *gvar = m.global_variables[instr.right.temp];
-        llvm::Value *l_gvar = global_variables[gvar];
-        llvm::Value *val = builder.CreateLoad(llvm_typeof(gvar->type), l_gvar, "loadglobaltmp");
-        insert_temp(instr.dest.temp, f, false, val);
-      } break;
-
-      case Mir::OP_STORE_GLOBAL: {
-        Global_Variable *gvar = m.global_variables[instr.right.temp];
-        llvm::Value *l_gvar = global_variables[gvar];
-        llvm::Value *val = visit_operand(instr.right, true);
-        builder.CreateStore(val, l_gvar);
-      } break;
-
-      case Mir::OP_LOAD_GLOBAL_PTR: {
-        Global_Variable *gvar = m.global_variables[instr.right.temp];
-        llvm::Value *l_gvar = global_variables[gvar];
-        insert_temp(instr.dest.temp, f, false, l_gvar);
-      } break;
-
       case Mir::OP_LOAD_FN_PTR: {
-        llvm::Value *fnptr = visit_operand(instr.right, false);
+        llvm::Value *fnptr = visit_operand(instr.right, false, instr.span);
         insert_temp(instr.dest.temp, f, false, fnptr);
       } break;
 
@@ -503,7 +500,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_JMP_TRUE: {
         Mir::Basic_Block *target_mb = instr.left.bb;
-        llvm::Value *cond = visit_operand(instr.right, true);
+        llvm::Value *cond = visit_operand(instr.right, true, instr.span);
         Type *unused = nullptr;
         cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
 
@@ -534,7 +531,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_JMP_FALSE: {
         Mir::Basic_Block *target_mb = instr.left.bb;
-        llvm::Value *cond = visit_operand(instr.right, true);
+        llvm::Value *cond = visit_operand(instr.right, true, instr.span);
         Type *unused = nullptr;
         cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
 
@@ -567,14 +564,14 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_PUSH_ARG: {
-        llvm::Value *arg = visit_operand(instr.left, true);
+        llvm::Value *arg = visit_operand(instr.left, true, instr.span);
         arg_stack.push_back(arg);
       } break;
 
       case Mir::OP_CALL: {
         Mir::Function *mir_fn = m.functions[instr.left.temp];
         llvm::Value *fnval = function_table[mir_fn];
-        uint32_t nargs = (uint32_t)instr.right.immediate.int_lit;
+        uint32_t nargs = (uint32_t)instr.right.imm.int_lit;
 
         auto start = arg_stack.end() - nargs;
         std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
@@ -586,8 +583,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_CALL_PTR: {
-        llvm::Value *fn = visit_operand(instr.left, true);
-        const uint32_t n_args = (uint32_t)instr.right.immediate.int_lit;
+        llvm::Value *fn = visit_operand(instr.left, true, instr.span);
+        const uint32_t n_args = (uint32_t)instr.right.imm.int_lit;
         const auto start = arg_stack.end() - n_args;
         const std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
         arg_stack.erase(start, arg_stack.end());
@@ -598,7 +595,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_RET: {
-        llvm::Value *val = visit_operand(instr.left, true);
+        llvm::Value *val = visit_operand(instr.left, true, instr.span);
         builder.CreateRet(val);
       } break;
 
@@ -607,7 +604,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_CAST: {
-        llvm::Value *v = visit_operand(instr.left, true);
+        llvm::Value *v = visit_operand(instr.left, true, instr.span);
         Type *new_type = nullptr;
         llvm::Value *casted = cast_scalar(v, instr.left.type, instr.right.type, &new_type);
         if (new_type) {
@@ -617,15 +614,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_BITCAST: {
-        llvm::Value *v = visit_operand(instr.left, true);
+        llvm::Value *v = visit_operand(instr.left, true, instr.span);
         llvm::Type *to_ty = llvm_typeof(instr.right.type);
         llvm::Value *bc = builder.CreateBitCast(v, to_ty, "bitcasttmp");
         insert_temp(instr.dest.temp, f, false, bc);
       } break;
 
       case Mir::OP_GEP: {
-        llvm::Value *base = visit_operand(instr.left, false);
-        llvm::Value *index = visit_operand(instr.right, true);
+        llvm::Value *base = visit_operand(instr.left, false, instr.span);
+        llvm::Value *index = visit_operand(instr.right, true, instr.span);
         Temporary &temp = f->temps[instr.dest.temp];
         llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
         llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
@@ -635,7 +632,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
   }
 }
 
-llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
+llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load, Span span) {
   switch (o.tag) {
     // ignored
     case Mir::Operand::OPERAND_BASIC_BLOCK:  // only for jumps.
@@ -644,39 +641,33 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
-      if (temps.size() < o.temp) {
-        throw_error("use of undeclared temp", {});
+      if (o.temp >= temps.size()) {
+        throw_error("use of undeclared temp", span);
       }
       return temps[o.temp].read(builder, *this, do_load);
     }
-    case Mir::Operand::OPERAND_CONSTANT: {
-      switch (o.constant.tag) {
-        case Mir::Constant::CONST_INT:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.constant.int_lit);
-        case Mir::Constant::CONST_FLOAT:
-          return llvm::ConstantFP::get(llvm_typeof(o.type), o.constant.float_lit);
-        case Mir::Constant::CONST_BOOL:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.constant.bool_lit);
-        case Mir::Constant::CONST_CHAR:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.constant.char_lit);
-        case Mir::Constant::CONST_STRING:
-          return builder.CreateGlobalString(o.constant.string_lit.get_str());
-        default:
-          return nullptr;
+    case Mir::Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE: {
+      llvm::GlobalVariable *gv = global_variables[o.gv];
+      if (!gv) {
+        throw_error("use of undeclared global variable", span);
       }
+      if (do_load) {
+        return builder.CreateLoad(llvm_typeof(o.type), gv, "loadtmp");
+      }
+      return gv;
     }
     case Mir::Operand::OPERAND_IMMEDIATE_VALUE:
-      switch (o.immediate.tag) {
+      switch (o.imm.tag) {
         case Mir::Constant::CONST_INT:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.immediate.int_lit);
+          return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.int_lit);
         case Mir::Constant::CONST_FLOAT:
-          return llvm::ConstantFP::get(llvm_typeof(o.type), o.immediate.float_lit);
+          return llvm::ConstantFP::get(llvm_typeof(o.type), o.imm.float_lit);
         case Mir::Constant::CONST_BOOL:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.immediate.bool_lit);
+          return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.bool_lit);
         case Mir::Constant::CONST_CHAR:
-          return llvm::ConstantInt::get(llvm_typeof(o.type), o.immediate.char_lit);
+          return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.char_lit);
         case Mir::Constant::CONST_STRING:
-          return builder.CreateGlobalString(o.immediate.string_lit.get_str());
+          return builder.CreateGlobalString(o.imm.string_lit.get_str());
         default:
           return nullptr;
       }

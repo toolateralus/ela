@@ -52,9 +52,6 @@ enum Op_Code : uint8_t {
   OP_LOAD,             // dest=result, left=ptr (tag determines const/imm/register)
   OP_STORE,            // left=ptr,   right=value
   OP_ALLOCA,           // dest=result, left=type_index (type->uid) (stack allocate),
-  OP_LOAD_GLOBAL,      // dest=value, right=g_idx
-  OP_STORE_GLOBAL,     // dest=g_idx, right=value
-  OP_LOAD_GLOBAL_PTR,  // dest=ptr, right=g_idx
   OP_LOAD_FN_PTR,      // dest=ptr, right=fn_idx,
 
   // see Instruction for info on bb.
@@ -138,35 +135,36 @@ struct Constant {
   void print(FILE *) const;
 };
 
+struct Global_Variable;
 struct Operand {
   Type *type = nullptr;
 
   enum : uint8_t {
     OPERAND_NULL,             // placeholder.       || shouldn't ever be used, but should be checked for (removed after initdevel)
     OPERAND_TEMP,             // union.temp         || local variable, temporary, "register", etc. parent->local[temp] = value.
-    OPERAND_CONSTANT,         // union.constant     || referencing a constant, data section
     OPERAND_IMMEDIATE_VALUE,  // union.immediate    || immediate value.
+    OPERAND_GLOBAL_VARIABLE_REFERENCE,
     OPERAND_BASIC_BLOCK,      // union.bb           || basic block target for jumps.
     OPERAND_TYPE,             // this->type         || a type reference, mainly for casting and alloca.
   } tag = OPERAND_NULL;
 
   union {
-    Constant constant;
-    Constant immediate;
+    Global_Variable *gv;
+    Constant imm;
     Basic_Block *bb;
     uint32_t temp = 0;
   };
 
-  static Operand Null() { return {.tag = OPERAND_NULL}; }
+  static Operand MakeNull() { return {.tag = OPERAND_NULL}; }
 
-  static Operand Ty(Type *t) {
+  static Operand Make_Ty(Type *t) {
     Operand o;
     o.type = t;
     o.tag = OPERAND_TYPE;
     return o;
   }
 
-  static Operand Temp(uint32_t i, Type *t) {
+  static Operand Make_Temp(uint32_t i, Type *t) {
     Operand o;
     o.temp = i;
     o.type = t;
@@ -174,28 +172,23 @@ struct Operand {
     return o;
   }
 
-  static Operand Const(Constant c, Type *t) {
-    Operand o;
-    o.constant = c;
-    o.type = t;
-    o.tag = OPERAND_CONSTANT;
-    return o;
-  }
+  static Operand Make_Global_Ref(Global_Variable *gv);
 
-  static Operand Imm(Constant i, Type *t) {
+  static Operand Make_Imm(Constant i, Type *t) {
     Operand o;
-    o.immediate = i;
+    o.imm = i;
     o.type = t;
     o.tag = OPERAND_IMMEDIATE_VALUE;
     return o;
   }
 
-  static Operand BB(Basic_Block *b) {
+  static Operand Make_BB(Basic_Block *b) {
     Operand o;
     o.bb = b;
     o.tag = OPERAND_BASIC_BLOCK;
     return o;
   }
+
   void print(FILE *) const;
 };
 
@@ -340,7 +333,7 @@ struct Function {
 struct Global_Variable {
   InternedString name;
   Type *type;
-  uint32_t idx;
+  bool has_external_linkage = true;
 };
 
 struct Module {
@@ -373,7 +366,7 @@ struct Module {
 
     used_types.insert(type);
 
-    return Operand::Temp(idx, type);
+    return Operand::Make_Temp(idx, type);
   }
 
   inline Function *get_function(InternedString name) {
@@ -396,7 +389,7 @@ struct Module {
           .name = generate_temp_identifier(param_idx),
           .type = param.associated_variable->type,
       });
-      variables[param.associated_variable] = Operand::Temp(param_idx, param.associated_variable->type);
+      variables[param.associated_variable] = Operand::Make_Temp(param_idx, param.associated_variable->type);
       param_idx++;
     }
 
@@ -609,35 +602,23 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_GEP(DEST, BASE, INDEX) \
   m.current_function->get_insert_block()->push(Instruction{OP_GEP, DEST, BASE, INDEX, .span = node->span})
 
-// OP_LOAD_GLOBAL: dest=value, right=g_idx (left unused)
-#define EMIT_LOAD_GLOBAL(DEST, G_IDX) \
-  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_GLOBAL, DEST, Operand(), G_IDX, .span = node->span})
-
-// OP_LOAD_GLOBAL_PTR: dest=ptr, right=g_idx (left unused)
-#define EMIT_LOAD_GLOBAL_PTR(DEST, G_IDX) \
-  m.current_function->get_insert_block()->push(Instruction{OP_LOAD_GLOBAL_PTR, DEST, Operand(), G_IDX, .span = node->span})
-
 // OP_LOAD_FN_PTR: dest=ptr, right=fn_idx (left unused)
 #define EMIT_LOAD_FN_PTR(DEST, FN_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_LOAD_FN_PTR, DEST, Operand(), FN_IDX, .span = node->span})
 
-// OP_STORE_GLOBAL: dest=g_idx, right=value (left unused)
-#define EMIT_STORE_GLOBAL(G_IDX, VAL) \
-  m.current_function->get_insert_block()->push(Instruction{OP_STORE_GLOBAL, G_IDX, Operand(), VAL, .span = node->span})
-
 // Jump macros (OP_JMP, OP_JMP_TRUE, OP_JMP_FALSE)
 // OP_JMP: left=bb
 #define EMIT_JUMP(TARGET_BB) \
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::BB(TARGET_BB), .span = node->span})
+  m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::Make_BB(TARGET_BB), .span = node->span})
 
 // OP_JMP_TRUE: left=bb, right=condition
 #define EMIT_JUMP_TRUE(TARGET_BB, COND)         \
   m.current_function->get_insert_block()->push( \
-      Instruction{OP_JMP_TRUE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
+      Instruction{OP_JMP_TRUE, Operand(), Operand::Make_BB(TARGET_BB), COND, .span = node->span})
 
 // OP_JMP_FALSE: left=bb, right=condition
 #define EMIT_JUMP_FALSE(TARGET_BB, COND)        \
   m.current_function->get_insert_block()->push( \
-      Instruction{OP_JMP_FALSE, Operand(), Operand::BB(TARGET_BB), COND, .span = node->span})
+      Instruction{OP_JMP_FALSE, Operand(), Operand::Make_BB(TARGET_BB), COND, .span = node->span})
 
 }  // namespace Mir

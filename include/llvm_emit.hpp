@@ -284,7 +284,7 @@ struct LLVM_Emitter {
 
   Mir::Module &m;
 
-  std::unordered_map<Global_Variable *, llvm::GlobalVariable *> global_variables;
+  std::unordered_map<const Global_Variable *, llvm::GlobalVariable *> global_variables;
   std::unordered_map<Mir::Function *, llvm::Function *> function_table;
   std::unordered_map<Mir::Basic_Block *, llvm::BasicBlock *> bb_table;
   std::vector<llvm::Value *> arg_stack;
@@ -678,7 +678,7 @@ struct LLVM_Emitter {
 
   llvm::Value *pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr);
   llvm::Value *pointer_unary(llvm::Value *operand, const Instruction &instr);
-  llvm::Value *visit_operand(Operand op, bool do_load);
+  llvm::Value *visit_operand(Operand op, bool do_load, Span span);
 
   llvm::Value *binary_signed(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op);
