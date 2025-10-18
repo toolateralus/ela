@@ -127,7 +127,7 @@ void generate_variable(const THIRVariable *node, Module &m) {
     return;
   }
 
-  Operand dest = m.create_temporary(node->type);
+  Operand dest = m.create_temporary(node->type->take_pointer_to());
   EMIT_ALLOCA(dest, Operand::Ty(node->type));
 
   Operand *old_alloca = m.current_alloca;
@@ -445,7 +445,6 @@ Operand generate_call(const THIRCall *node, Module &m) {
 
   Operand result = m.create_temporary(node->type);
   Operand fn_operand = generate_expr(node->callee, m);
-
   Operand arg_count = Operand::Imm(Constant::Int(node->arguments.size()), u32_type());
 
   if (node->callee->type->is_pointer()) {
@@ -484,7 +483,7 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   Operand dest = Operand::Null();
   bool used_pre_existing_alloca = false;
   if (!m.current_alloca) {
-    dest = m.create_temporary(node->type);
+    dest = m.create_temporary(node->type->take_pointer_to());
     EMIT_ALLOCA(dest, Operand::Ty(node->type));
   } else {
     // Reuse a variables alloca so we don't have to double allocate.
@@ -518,8 +517,15 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
 }
 
 Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m) {
-  Operand dest = m.create_temporary(node->type);
-  EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  Operand dest = Operand::Null();
+  bool used_pre_existing_alloca = false;
+  if (!m.current_alloca) {
+    dest = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  } else {
+    used_pre_existing_alloca = true;
+    dest = *m.current_alloca;
+  }
 
   for (size_t i = 0; i < node->values.size(); i++) {
     Operand element_addr = m.create_temporary(node->values[i]->type->take_pointer_to());
@@ -531,16 +537,31 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
   }
 
   Operand result = m.create_temporary(node->type);
-  EMIT_LOAD(result, dest);
+
+  if (!used_pre_existing_alloca) {
+    EMIT_LOAD(result, dest);
+  }
+
   return result;
 }
 
 Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) {
-  Operand dest = m.create_temporary(node->type);
-  EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  Operand dest = Operand::Null();
+
+  bool used_pre_existing_alloca = false;
+  if (!m.current_alloca) {
+    dest = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  } else {
+    used_pre_existing_alloca = true;
+    dest = *m.current_alloca;
+  }
 
   Operand result = m.create_temporary(node->type);
-  EMIT_LOAD(result, dest);
+
+  if (!used_pre_existing_alloca) {
+    EMIT_LOAD(result, dest);
+  }
   return result;
 }
 
@@ -586,7 +607,7 @@ void generate_for(const THIRFor *node, Module &m) {
 
   // cond
   m.current_function->set_insert_block(cond_bb);
-  Operand cond = node->condition ? generate_expr(node->condition, m) : Operand::Imm(Constant::Bool(true), bool_type());
+  Operand cond = generate_expr(node->condition, m);
   EMIT_JUMP_TRUE(body_bb, cond);
   EMIT_JUMP(after_bb);
 
@@ -1138,7 +1159,6 @@ void Instruction::print(FILE *f, Module &m) const {
 
     fprintf(f, "  %s", line.c_str());
 
-    
     for (int i = 0; i < pad; ++i) {
       fputc(' ', f);
     }

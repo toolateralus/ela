@@ -305,7 +305,7 @@ struct LLVM_Emitter {
 
     inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
       if (is_memory && requires_load) {
-        return builder.CreateLoad(emitter.llvm_typeof(type), value);
+        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);
       } else {  // return the pointer or the SSA register
         return value;
       }
@@ -321,6 +321,10 @@ struct LLVM_Emitter {
         .value = v,
         .is_memory = is_alloca,
     };
+
+    if (is_alloca && !allocation.type->is_pointer()) {
+      allocation.type = allocation.type->take_pointer_to(); 
+    }
 
     if (is_alloca) {
       allocation.value = builder.CreateAlloca(llvm_typeof(allocation.type));
