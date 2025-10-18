@@ -2,7 +2,6 @@
 
 #include "mir.hpp"
 #include "core.hpp"
-#include "interpreter.hpp"
 #include "type.hpp"
 
 #include "llvm/IR/LLVMContext.h"
@@ -10,9 +9,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DIBuilder.h"
 #include <llvm/BinaryFormat/Dwarf.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/CodeGen.h>
@@ -24,6 +26,7 @@
 #include <llvm/MC/TargetRegistry.h>
 #include <map>
 #include <memory>
+#include <unordered_map>
 
 using namespace Mir;
 
@@ -265,12 +268,11 @@ struct DIManager {
 };
 
 struct LLVM_Emitter {
-  Context &ctx;
   LLVMContext llvm_ctx;
   IRBuilder<> builder;
   llvm::DIFile *file;
 
-  std::unique_ptr<llvm::Module> module;
+  std::unique_ptr<llvm::Module> llvm_module;
   std::shared_ptr<DIBuilder> di_builder;
   llvm::Target *target;
   llvm::DataLayout data_layout;
@@ -278,15 +280,24 @@ struct LLVM_Emitter {
   DIManager dbg;
 
   Nullable<llvm::Value> sret_destination = nullptr;
+  
+  Mir::Module &m;
+  
+  // this is per each function, is cleared on exit.
+  std::unordered_map<uint32_t, llvm::Value *> temps;
+  std::unordered_map<Global_Variable *, llvm::GlobalVariable *> global_variables;
+  std::unordered_map<Mir::Function *, llvm::Function *> function_table;
+  std::unordered_map<Mir::Basic_Block*, llvm::BasicBlock*> bb_table;
+  std::vector<llvm::Value *> arg_stack;
 
-  inline LLVM_Emitter(Context &ctx)
-      : ctx(ctx),
-        llvm_ctx(),
+  inline LLVM_Emitter(Mir::Module &m)
+      : llvm_ctx(),
         builder(llvm_ctx),
-        module(std::make_unique<llvm::Module>("module", llvm_ctx)),
-        di_builder(std::make_shared<DIBuilder>(*module)),
+        llvm_module(std::make_unique<llvm::Module>("module", llvm_ctx)),
+        di_builder(std::make_shared<DIBuilder>(*llvm_module)),
         data_layout(""),
-        dbg(di_builder) {
+        dbg(di_builder),
+        m(m) {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -295,7 +306,7 @@ struct LLVM_Emitter {
 
     std::string error;
     auto target_triple = "x86_64-pc-linux-gnu";
-    module->setTargetTriple(target_triple);
+    llvm_module->setTargetTriple(target_triple);
 
     auto target = llvm::TargetRegistry::lookupTarget(target_triple, error);
     if (!target) {
@@ -305,8 +316,8 @@ struct LLVM_Emitter {
     llvm::TargetOptions opt;
     auto reloc_model = llvm::Reloc::Model::PIC_;
     auto target_machine = target->createTargetMachine(target_triple, "generic", "", opt, reloc_model);
-    module->setDataLayout(data_layout = target_machine->createDataLayout());
-    module->setTargetTriple(target_machine->getTargetTriple().str());
+    llvm_module->setDataLayout(data_layout = target_machine->createDataLayout());
+    llvm_module->setTargetTriple(target_machine->getTargetTriple().str());
   }
 
   using type_pair = std::pair<llvm::Type *, llvm::DIType *>;
@@ -403,7 +414,6 @@ struct LLVM_Emitter {
         memoized_types.insert({type, pair});
         return pair;
       } break;
-
       case TYPE_STRUCT: {
         auto info = type->info->as<StructTypeInfo>();
 
@@ -456,14 +466,13 @@ struct LLVM_Emitter {
         memoized_types[type] = final_pair;
         return final_pair;
       } break;
-
       case TYPE_ENUM: {
         auto info = type->info->as<EnumTypeInfo>();
 
         std::vector<llvm::Metadata *> enumerators;
         for (const auto &[name, value] : info->scope->symbols) {
           if (value.is_variable) {
-            // TODO: fix this
+            // TODO: fix this once our interpreter works on MIR
             // auto val = interpret(value.variable.initial_value.get(), ctx);
             // enumerators.push_back(di_builder->createEnumerator(name.get_str(), 0, false));
           }
@@ -478,7 +487,6 @@ struct LLVM_Emitter {
         memoized_types.insert({type, pair});
         return pair;
       } break;
-
       case TYPE_TUPLE: {
         auto info = type->info->as<TupleTypeInfo>();
 
@@ -514,7 +522,6 @@ struct LLVM_Emitter {
         memoized_types[type] = final_pair;
         return final_pair;
       } break;
-
       case TYPE_CHOICE: {
         auto info = type->info->as<ChoiceTypeInfo>();
 
@@ -611,7 +618,7 @@ struct LLVM_Emitter {
           auto param_type = info->parameter_types[i];
           auto [llvm_param_type, di_param_type] = llvm_typeof_impl(param_type);
           param_types.push_back(llvm_param_type);
-          // param_debug_info.push_back(di_param_type);
+          param_debug_info.push_back(di_param_type);
         }
 
         auto [llvm_return_type, di_return_type] = llvm_typeof_impl(info->return_type);
@@ -631,6 +638,14 @@ struct LLVM_Emitter {
     throw_error("failed to lower type", {});
     return {};
   }
+
+  void emit_module();
+  void emit_function(Mir::Function *f, llvm::Function *ir_f);
+  void emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f);
+
+  llvm::Value *pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr);
+  llvm::Value *pointer_unary(llvm::Value *operand, const Instruction &instr);
+  llvm::Value *visit_operand(Operand op, bool do_load);
 
   llvm::Value *binary_signed(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op);

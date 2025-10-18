@@ -210,6 +210,10 @@ struct ScalarTypeInfo : TypeInfo {
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
 
+  inline bool is_float() const {
+    return scalar_type == TYPE_FLOAT || scalar_type == TYPE_DOUBLE;
+  }
+  
   inline bool is_signed() const {
     switch (scalar_type) {
       case TYPE_S8:

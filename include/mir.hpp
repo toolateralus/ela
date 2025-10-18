@@ -319,12 +319,16 @@ struct Global_Variable {
 struct Module {
   std::vector<Function *> functions;
   std::unordered_map<InternedString, Function *> function_table;
-  std::unordered_map<THIRVariable const *, Global_Variable> global_variables;
+  std::vector<Global_Variable *> global_variables;
+  std::unordered_map<THIRVariable const *, Global_Variable*> global_variable_table;
   std::unordered_set<Type *> used_types;
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
+
+  // Used to save allocations when creating aggregates and directly assigning them to variables.
+  Operand *current_alloca = nullptr;
 
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;

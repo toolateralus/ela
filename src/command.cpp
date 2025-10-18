@@ -1,5 +1,7 @@
+#include <llvm/Support/raw_ostream.h>
 #include "core.hpp"
 #include "error.hpp"
+#include "llvm_emit.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -7,6 +9,7 @@
 #include "ast.hpp"
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include "emit.hpp"
 #include "resolver.hpp"
 #include "mir.hpp"
@@ -103,6 +106,17 @@ int CompileCommand::compile() {
         fflush(f);
         fclose(f);
       }
+
+      LLVM_Emitter llvm_emitter{m};
+      llvm_emitter.emit_module();
+
+      std::error_code ec;
+      llvm::raw_fd_ostream llvm_output_stream("output.llir", ec);
+      if (ec) {
+        throw_error(ec.message(), {});
+      }
+      llvm_emitter.llvm_module->print(llvm_output_stream, nullptr);
+      llvm_output_stream.flush();
     }
   });
 

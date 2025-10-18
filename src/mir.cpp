@@ -100,8 +100,8 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   Operand result = m.create_temporary(node->type);
 
   if (node->is_global) {
-    auto var = m.global_variables[node];
-    EMIT_LOAD_GLOBAL(result, Operand::Imm(Constant::Int(var.idx), node->type));
+    auto g_var = m.global_variable_table[node];
+    EMIT_LOAD_GLOBAL(result, Operand::Imm(Constant::Int(g_var->idx), node->type));
     return result;
   }
 
@@ -121,7 +121,10 @@ void generate_variable(const THIRVariable *node, Module &m) {
       throw_error("invalid type in global var\n", node->span);
     }
 
-    m.global_variables[node] = Global_Variable{.name = node->name, .type = node->type, .idx = idx};
+    Global_Variable *v = mir_arena.construct<Global_Variable>(Global_Variable{.name = node->name, .type = node->type, .idx = idx});
+
+    m.global_variables.push_back(v);
+    m.global_variable_table[node] = v;
 
     if (node->value && node->value != THIRNoop::shared()) {
       if (m.current_function) {
@@ -135,8 +138,20 @@ void generate_variable(const THIRVariable *node, Module &m) {
 
   Operand dest = m.create_temporary(node->type);
   EMIT_ALLOCA(dest, Operand::Ty(node->type));
-  EMIT_STORE(dest, generate_expr(node->value, m));
+
+  Operand *old_alloca = m.current_alloca;
+  m.current_alloca = &dest;
+
+  Operand value_temp = generate_expr(node->value, m);
+
+  // If we took advantage of the pre-existing alloca thing with m.current alloca,
+  // we wrote directly into the variables storage, so a store here would be redundant
+  if (value_temp.tag != Operand::OPERAND_TEMP || value_temp.temp != dest.temp) {
+    EMIT_STORE(dest, value_temp);
+  }
+
   m.variables[node] = dest;
+  m.current_alloca = old_alloca;
 }
 
 Operand generate_lvalue_addr(const THIR *node, Module &m) {
@@ -145,17 +160,17 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
       const THIRVariable *var = (const THIRVariable *)node;
 
       if (var->is_global) {
-        auto it = m.global_variables.find(var);
-        if (it == m.global_variables.end()) {
+        auto it = m.global_variable_table.find(var);
+        if (it == m.global_variable_table.end()) {
           // lazily visit global variables.
           generate_variable(var, m);
-          it = m.global_variables.find(var);
-          if (it == m.global_variables.end()) {
+          it = m.global_variable_table.find(var);
+          if (it == m.global_variable_table.end()) {
             throw_error(std::format("global variable '{}' failed to lazy init", var->name.get_str()), var->span);
           }
         }
         Operand result = m.create_temporary(var->type->take_pointer_to());
-        Operand gidx = Operand::Imm(Constant::Int(it->second.idx), u32_type());
+        Operand gidx = Operand::Imm(Constant::Int(it->second->idx), u32_type());
         EMIT_LOAD_GLOBAL_PTR(result, gidx);
         // TODO: we actually have to take the address of the global here.
         // globals aren't stored with an "alloca" per-se, so we'll probably need a
@@ -421,6 +436,7 @@ Operand generate_call(const THIRCall *node, Module &m) {
 
   Operand result = m.create_temporary(node->type);
   Operand fn_operand = generate_expr(node->callee, m);
+
   Operand arg_count = Operand::Imm(Constant::Int(node->arguments.size()), u32_type());
 
   if (node->callee->type->is_pointer()) {
@@ -456,8 +472,16 @@ Operand generate_index(const THIRIndex *node, Module &m) {
 }
 
 Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m) {
-  Operand dest = m.create_temporary(node->type);
-  EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  Operand dest = Operand::Null();
+  bool used_pre_existing_alloca = false;
+  if (!m.current_alloca) {
+    dest = m.create_temporary(node->type);
+    EMIT_ALLOCA(dest, Operand::Ty(node->type));
+  } else {
+    // Reuse a variables alloca so we don't have to double allocate.
+    used_pre_existing_alloca = true;
+    dest = *m.current_alloca;
+  }
 
   for (const auto &[key, value] : node->key_values) {
     Type *base = node->type;
@@ -476,9 +500,12 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
     EMIT_STORE(field_addr, field_value);
   }
 
-  Operand result = m.create_temporary(node->type);
-  EMIT_LOAD(result, dest);
-  return result;
+  // The consumer of the pre existing alloca will load, this prevents an unneccesary double load.
+  if (!used_pre_existing_alloca) {
+    Operand result = m.create_temporary(node->type);
+    EMIT_LOAD(result, dest);
+  }
+  return dest;
 }
 
 Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m) {
@@ -759,7 +786,6 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
 
       for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
       fprintf(f, "instance: %s\n", format_type_ref(void_type()->take_pointer_to()).c_str());
-      
 
       for (const auto &method : info->methods) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
@@ -1028,7 +1054,7 @@ void Instruction::print(FILE *f) const {
         return "null";
       case Operand::OPERAND_TEMP: {
         std::string s = "t" + std::to_string(op.temp);
-        // we don't double print the type of temps because 
+        // we don't double print the type of temps because
         // it clutters the format and it's already known by the consumer
         // of the IR what type that local is (via its declaration)
         if (is_destination) {
@@ -1067,7 +1093,7 @@ void Instruction::print(FILE *f) const {
   if (dest.tag != Operand::OPERAND_NULL) {
     line += print_operand_to_string(dest, true);
   }
-  
+
   line += opcode_name;
 
   if (left.tag != Operand::OPERAND_NULL) ops.push_back(&left);
@@ -1080,7 +1106,7 @@ void Instruction::print(FILE *f) const {
       line += print_operand_to_string(*ops[i]);
     }
   }
-  
+
   if (!compile_command.has_flag("release")) {
     const int DEBUG_COMMENT_COLUMN = 80;
     int printed_len = 2 + (int)line.size();
