@@ -282,6 +282,21 @@ struct Function {
     if (label == std::nullopt) {
       label = generate_default_bb_label(this->basic_blocks.size());
     }
+
+    bool clash = false;
+    size_t index = 0;
+    InternedString original_label = *label;
+    do {
+      clash = false;
+      for (auto* bb : basic_blocks) {
+        if (bb->label == *label) {
+          label = std::format("{}{}", original_label, index++);
+          clash = true;
+          break;
+        }
+      }
+    } while (clash);
+
     Basic_Block *block = mir_arena.construct<Basic_Block>(*label);
     basic_blocks.push_back(block);
     insert_block = block;

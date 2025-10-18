@@ -67,6 +67,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   }
   m.enter_function(f);
 
+  m.create_basic_block("entry");
   generate_block(node->block, m);
   Basic_Block *insert_block = f->get_insert_block();
   if (f->type_info->return_type == void_type() && (!insert_block->code.size() || insert_block->back_opcode() != OP_RET_VOID)) {
@@ -77,7 +78,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 }
 
 void generate_block(const THIRBlock *node, Module &m) {
-  m.create_basic_block();
   if (node->statements.empty() || block_only_contains_noop(node)) {
     return;
   }
@@ -575,10 +575,10 @@ void generate_for(const THIRFor *node, Module &m) {
   // remember the block where initialization finished
   Basic_Block *orig_bb = m.get_insert_block();
 
-  Basic_Block *cond_bb = m.create_basic_block();
-  Basic_Block *body_bb = m.create_basic_block();
-  Basic_Block *incr_bb = m.create_basic_block();
-  Basic_Block *after_bb = m.create_basic_block();
+  Basic_Block *cond_bb = m.create_basic_block("for");
+  Basic_Block *body_bb = m.create_basic_block("do");
+  Basic_Block *incr_bb = m.create_basic_block("incr");
+  Basic_Block *after_bb = m.create_basic_block("done");
 
   // jump from original to cond
   m.current_function->set_insert_block(orig_bb);
@@ -615,9 +615,9 @@ void generate_if(const THIRIf *node, Module &m) {
   Operand cond = generate_expr(node->condition, m);
 
   Basic_Block *cond_bb = m.get_insert_block();
-  Basic_Block *then_bb = m.create_basic_block();
-  Basic_Block *after_bb = m.create_basic_block();
-  Basic_Block *else_bb = node->_else ? m.create_basic_block() : nullptr;
+  Basic_Block *then_bb = m.create_basic_block("then");
+  Basic_Block *else_bb = node->_else ? m.create_basic_block("else") : nullptr;
+  Basic_Block *after_bb = m.create_basic_block("end");
 
   m.current_function->set_insert_block(cond_bb);
   EMIT_JUMP_TRUE(then_bb, cond);
@@ -642,9 +642,9 @@ void generate_if(const THIRIf *node, Module &m) {
 
 void generate_while(const THIRWhile *node, Module &m) {
   Basic_Block *orig_bb = m.get_insert_block();
-  Basic_Block *cond_bb = m.create_basic_block();
-  Basic_Block *body_bb = m.create_basic_block();
-  Basic_Block *after_bb = m.create_basic_block();
+  Basic_Block *cond_bb = m.create_basic_block("while");
+  Basic_Block *body_bb = m.create_basic_block("do");
+  Basic_Block *after_bb = m.create_basic_block("done");
 
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
