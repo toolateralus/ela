@@ -541,11 +541,10 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load = true) {
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
-      if (do_load) {
-        return builder.CreateLoad(llvm_typeof(o.type), temps[o.temp].value);
-      } else {
-        return temps[o.temp].value;
+      if (temps.size() < o.temp) {
+        throw_error("use of undeclared temp", {});
       }
+      return temps[o.temp].read(builder, *this, do_load);
     }
     case Mir::Operand::OPERAND_CONSTANT: {
       switch (o.constant.tag) {
