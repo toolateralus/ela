@@ -1653,6 +1653,8 @@ THIR *THIRGen::visit_while(ASTWhile *ast) {
   THIR_ALLOC(THIRWhile, thir, ast)
   if (ast->condition) {
     thir->condition = visit_node(ast->condition.get());
+  } else {
+    thir->condition = make_literal("true", ast->span, bool_type(), ASTLiteral::Bool);
   }
 
   enter_defer_boundary(DeferBoundary::LOOP);

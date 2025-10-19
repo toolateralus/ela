@@ -432,7 +432,7 @@ struct Module {
 };
 
 void generate_block(const THIRBlock *node, Module &m);
-void generate_variable(const THIRVariable *node, Module &m);
+Operand generate_variable(const THIRVariable *node, Module &m);
 Operand generate_function(const THIRFunction *node, Module &m);
 Operand generate_expr_block(const THIRExprBlock *node, Module &m);
 Operand generate_bin_expr(const THIRBinExpr *node, Module &m);

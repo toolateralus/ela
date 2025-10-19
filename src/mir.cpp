@@ -100,7 +100,7 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   return result;
 }
 
-void generate_variable(const THIRVariable *node, Module &m) {
+Operand generate_variable(const THIRVariable *node, Module &m) {
   // static locals is just syntax sugar for a scoped global
   if (node->is_global || node->is_static) {  
     Global_Variable global = {.name = node->name, .type = node->type, .has_external_linkage = node->is_global};
@@ -108,7 +108,7 @@ void generate_variable(const THIRVariable *node, Module &m) {
     m.global_variables.push_back(gv);
     m.global_variable_table[node] = gv;
     // TODO; figure out how the fuck we're going to make global initializers.
-    return;
+    return Operand::MakeNull();
   }
 
   Operand dest = m.create_temporary(node->type->take_pointer_to());
@@ -127,6 +127,7 @@ void generate_variable(const THIRVariable *node, Module &m) {
 
   m.variables[node] = dest;
   m.current_alloca = old_alloca;
+  return dest;
 }
 
 Operand generate_lvalue_addr(const THIR *node, Module &m) {
@@ -385,7 +386,7 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
 }
 
 Operand generate_expr_block(const THIRExprBlock *node, Module &m) {
-  generate_variable(node->return_register, m);
+  Operand var = generate_variable(node->return_register, m);
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
   }
