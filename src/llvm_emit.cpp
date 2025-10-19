@@ -492,7 +492,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_JMP_TRUE: {
         Mir::Basic_Block *target_mir_bb = instr.left.bb;
-        Mir::Basic_Block *fallthrough_bb = target_mir_bb->fallthrough;
+        Mir::Basic_Block *fallthrough_bb = instr.left.bb;
 
         llvm::Value *cond = visit_operand(instr.right, true, instr.span);
         Type *unused = nullptr;
@@ -500,31 +500,6 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
         if (!cond->getType()->isIntegerTy(1)) {
           cond = builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv");
-        }
-
-        auto it = bb_table.find(target_mir_bb);
-        if (it == bb_table.end()) {
-          throw_error("Unknown target basic block", instr.span);
-        }
-        llvm::BasicBlock *target_bb = it->second;
-
-        auto fallthrough_it = bb_table.find(fallthrough_bb);
-        if (fallthrough_it == bb_table.end()) {
-          throw_error("Unknown fallthrough basic block", instr.span);
-        }
-        builder.CreateCondBr(cond, target_bb, fallthrough_it->second);
-      } break;
-
-      case Mir::OP_JMP_FALSE: {
-        Mir::Basic_Block *target_mir_bb = instr.left.bb;
-        Mir::Basic_Block *fallthrough_bb = target_mir_bb->fallthrough;
-
-        llvm::Value *cond = visit_operand(instr.right, true, instr.span);
-        Type *unused = nullptr;
-        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
-
-        if (!cond->getType()->isIntegerTy(1)) {
-          cond = builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
         }
 
         auto it = bb_table.find(target_mir_bb);

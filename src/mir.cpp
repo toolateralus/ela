@@ -386,7 +386,7 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
 }
 
 Operand generate_expr_block(const THIRExprBlock *node, Module &m) {
-  Operand var = generate_variable(node->return_register, m);
+  generate_variable(node->return_register, m);
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
   }
@@ -592,8 +592,7 @@ void generate_for(const THIRFor *node, Module &m) {
   // cond
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(body_bb, cond);
-  EMIT_JUMP(after_bb);
+  EMIT_JUMP_TRUE(body_bb, after_bb, cond);
 
   // body
   m.current_function->set_insert_block(body_bb);
@@ -625,11 +624,10 @@ void generate_if(const THIRIf *node, Module &m) {
   Basic_Block *after_bb = m.create_basic_block("end");
 
   m.current_function->set_insert_block(cond_bb);
-  EMIT_JUMP_TRUE(then_bb, cond);
   if (else_bb) {
-    EMIT_JUMP(else_bb);
+    EMIT_JUMP_TRUE(then_bb, else_bb, cond);
   } else {
-    EMIT_JUMP(after_bb);
+    EMIT_JUMP_TRUE(then_bb, after_bb, cond);
   }
 
   m.current_function->set_insert_block(then_bb);
@@ -656,8 +654,7 @@ void generate_while(const THIRWhile *node, Module &m) {
 
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(body_bb, cond);
-  EMIT_JUMP(after_bb);
+  EMIT_JUMP_TRUE(body_bb, after_bb, cond);
 
   m.current_function->set_insert_block(body_bb);
   g_break_targets.push_back(after_bb);

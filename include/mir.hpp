@@ -47,15 +47,14 @@ enum Op_Code : uint8_t {
     temporaries are assumed to always we a pointer to stack memory, just like LLVM.
     load/store always take a pointer operand, and alloca always returns a pointer operand.
   */
-  OP_LOAD,             // dest=result, left=ptr (tag determines const/imm/register)
-  OP_STORE,            // left=ptr,   right=value
-  OP_ALLOCA,           // dest=result, left=type_index (type->uid) (stack allocate),
-  OP_LOAD_FN_PTR,      // dest=ptr, right=fn_idx,
+  OP_LOAD,         // dest=result, left=ptr (tag determines const/imm/register)
+  OP_STORE,        // left=ptr,   right=value
+  OP_ALLOCA,       // dest=result, left=type_index (type->uid) (stack allocate),
+  OP_LOAD_FN_PTR,  // dest=ptr, right=fn_idx,
 
   // see Instruction for info on bb.
   OP_JMP,        // left=bb
   OP_JMP_TRUE,   // left=bb, right=condition
-  OP_JMP_FALSE,  // left=bb, right=condition
 
   OP_PUSH_ARG,  // push argument to stack.   left=value
   OP_CALL,      // dest=result, left=fn_idx, right=n_args
@@ -74,7 +73,7 @@ enum Op_Code : uint8_t {
 struct Basic_Block;
 
 struct Constant {
-  Type *type; // TODO: remove this to optimize the size of these giant structs.
+  Type *type;  // TODO: remove this to optimize the size of these giant structs.
   union {
     InternedString string_lit;
     uint64_t int_lit;
@@ -142,8 +141,8 @@ struct Operand {
     OPERAND_TEMP,             // union.temp         || local variable, temporary, "register", etc. parent->local[temp] = value.
     OPERAND_IMMEDIATE_VALUE,  // union.immediate    || immediate value.
     OPERAND_GLOBAL_VARIABLE_REFERENCE,
-    OPERAND_BASIC_BLOCK,      // union.bb           || basic block target for jumps.
-    OPERAND_TYPE,             // this->type         || a type reference, mainly for casting and alloca.
+    OPERAND_BASIC_BLOCK,  // union.bb           || basic block target for jumps.
+    OPERAND_TYPE,         // this->type         || a type reference, mainly for casting and alloca.
   } tag = OPERAND_NULL;
 
   union {
@@ -280,7 +279,7 @@ struct Function {
     InternedString original_label = *label;
     do {
       clash = false;
-      for (auto* bb : basic_blocks) {
+      for (auto *bb : basic_blocks) {
         if (bb->label == *label) {
           label = std::format("{}{}", original_label, index++);
           clash = true;
@@ -316,18 +315,11 @@ struct Function {
     }
   }
 
-  inline Basic_Block *get_insert_block() {
-    return insert_block;
-  }
+  inline Basic_Block *get_insert_block() { return insert_block; }
 
-  inline void reset_insert_block()  {
-    insert_block = basic_blocks.back();
-  }
+  inline void reset_insert_block() { insert_block = basic_blocks.back(); }
 
-  inline void set_insert_block(Basic_Block *bb) {
-    insert_block = bb;
-  }
-
+  inline void set_insert_block(Basic_Block *bb) { insert_block = bb; }
 
   void print(FILE *, Module &) const;
 };
@@ -342,7 +334,7 @@ struct Module {
   std::vector<Function *> functions;
   std::unordered_map<InternedString, Function *> function_table;
   std::vector<Global_Variable *> global_variables;
-  std::unordered_map<THIRVariable const *, Global_Variable*> global_variable_table;
+  std::unordered_map<THIRVariable const *, Global_Variable *> global_variable_table;
   std::unordered_set<Type *> used_types;
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
@@ -614,13 +606,13 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
   m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::Make_BB(TARGET_BB), .span = node->span})
 
 // OP_JMP_TRUE: left=bb, right=condition
-#define EMIT_JUMP_TRUE(TARGET_BB, COND)         \
-  m.current_function->get_insert_block()->push( \
-      Instruction{OP_JMP_TRUE, Operand(), Operand::Make_BB(TARGET_BB), COND, .span = node->span})
+#define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND) \
+  m.current_function->get_insert_block()->push(          \
+      Instruction{OP_JMP_TRUE, Operand::Make_BB(TARGET_BB), Operand::Make_BB(FALL_THROUGH_BB), COND, .span = node->span})
 
 // OP_JMP_FALSE: left=bb, right=condition
-#define EMIT_JUMP_FALSE(TARGET_BB, COND)        \
-  m.current_function->get_insert_block()->push( \
-      Instruction{OP_JMP_FALSE, Operand(), Operand::Make_BB(TARGET_BB), COND, .span = node->span})
+#define EMIT_JUMP_FALSE(TARGET_BB, FALL_THROUGH_BB, COND) \
+  m.current_function->get_insert_block()->push(           \
+      Instruction{OP_JMP_FALSE, Operand::Make_BB(TARGET_BB), Operand::Make_BB(FALL_THROUGH_BB), COND, .span = node->span})
 
 }  // namespace Mir

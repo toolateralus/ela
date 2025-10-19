@@ -350,9 +350,6 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
     case OP_JMP_TRUE:
       opcode_name = "JMP_TRUE";
       break;
-    case OP_JMP_FALSE:
-      opcode_name = "JMP_FALSE";
-      break;
     case OP_BITCAST:
       opcode_name = "BITCAST";
       break;
