@@ -587,19 +587,21 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         Type *ty = instr.right.type;  // Non-pointer type ref
 
         uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
+
         llvm::Type *i8_ty = llvm::Type::getInt8Ty(llvm_ctx);
+        llvm::Type *i8_ptr_ty = llvm::PointerType::get(i8_ty, 0);
+        llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
         llvm::Type *i64_ty = llvm::Type::getInt64Ty(llvm_ctx);
 
         llvm::Value *cast_ptr = builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr");
         llvm::Value *zero = llvm::ConstantInt::get(i8_ty, 0);
         llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
-        llvm::Value *is_volatile = llvm::ConstantInt::get(llvm::Type::getInt1Ty(llvm_ctx), 0);
+        llvm::Value *is_volatile = llvm::ConstantInt::get(i1_ty, 0);
 
-        llvm::Type *i8_ptr_ty = llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_ctx), 0);
-        llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
-        std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i8_ty, i64_ty, i1_ty};
+        std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i64_ty};
 
-        llvm::Function *memset_fn = llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
+        llvm::Function *memset_fn =
+            llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
 
         builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
         insert_temp(instr.dest.temp, f, false, ptr);
