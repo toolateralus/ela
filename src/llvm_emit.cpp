@@ -553,6 +553,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_RET: {
         llvm::Value *val = visit_operand(instr.left, instr.span);
         builder.CreateRet(val);
+        return;
       } break;
 
       case Mir::OP_RET_VOID: {

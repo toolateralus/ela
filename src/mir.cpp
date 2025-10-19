@@ -84,7 +84,6 @@ void generate_block(const THIRBlock *node, Module &m) {
 
 Operand load_variable(const THIRVariable *node, Module &m) {
   Operand result = m.create_temporary(node->type);
-
   if (node->is_global || node->is_static) {
     auto g_var = m.global_variable_table[node];
     EMIT_LOAD(result, Operand::Make_Global_Ref(g_var));
@@ -499,6 +498,7 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   if (!used_pre_existing_alloca) {
     Operand result = m.create_temporary(node->type);
     EMIT_LOAD(result, dest);
+    return result;
   }
   return dest;
 }
