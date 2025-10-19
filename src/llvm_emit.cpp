@@ -604,7 +604,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
             llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
 
         builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
-        insert_temp(instr.dest.temp, f, ptr);
+        builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
+        llvm::Value *val = builder.CreateLoad(llvm_typeof(ty), ptr);
+        insert_temp(instr.dest.temp, f, val);
         break;
       }
     }
