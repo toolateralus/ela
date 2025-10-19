@@ -100,9 +100,9 @@ int CompileCommand::compile() {
       Mir::generate(thir_gen.emit_runtime_entry_point(), m);
       m.finalize();
       {
-        FILE *f = fopen("./output.ir", "w");
+        auto path = compile_command.binary_path.string() + std::string{".ir"};
+        FILE *f = fopen(path.c_str(), "w");
         m.print(f);
-        // m.print(stdout);
         fflush(f);
         fclose(f);
       }
@@ -111,7 +111,8 @@ int CompileCommand::compile() {
       llvm_emitter.emit_module();
 
       std::error_code ec;
-      llvm::raw_fd_ostream llvm_output_stream("output.ll", ec);
+      auto path = compile_command.binary_path.string() + std::string{".ll"};
+      llvm::raw_fd_ostream llvm_output_stream(path, ec);
       if (ec) {
         throw_error(ec.message(), {});
       }
