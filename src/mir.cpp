@@ -386,7 +386,6 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
 }
 
 Operand generate_expr_block(const THIRExprBlock *node, Module &m) {
-  generate_variable(node->return_register, m);
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
   }
@@ -530,22 +529,24 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
 }
 
 Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) {
-  Operand dest = Operand::MakeNull();
+  Operand ptr = Operand::MakeNull();
 
   bool used_pre_existing_alloca = false;
   if (!m.current_alloca) {
-    dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+    ptr = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   } else {
     used_pre_existing_alloca = true;
-    dest = *m.current_alloca;
+    ptr = *m.current_alloca;
   }
 
-  Operand result = m.create_temporary(node->type);
-
+  auto result = m.create_temporary(node->type);
+  EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
+  
   if (!used_pre_existing_alloca) {
-    EMIT_LOAD(result, dest);
+    EMIT_LOAD(result, ptr);
   }
+
   return result;
 }
 

@@ -45,38 +45,40 @@ enum struct THIRNodeType : unsigned char {
   Noop,  // Some things just return nothing, but need to return something
 };
 
-
 #define THIR_NODE_TYPE_LIST \
-  X(Program) \
-  X(Block) \
-  X(Variable) \
-  X(Function) \
-  X(Type) \
-  X(ExpressionBlock) \
-  X(BinExpr) \
-  X(UnaryExpr) \
-  X(Literal) \
-  X(Call) \
-  X(MemberAccess) \
-  X(Cast) \
-  X(Index) \
-  X(AggregateInitializer) \
-  X(CollectionInitializer) \
-  X(EmptyInitializer) \
-  X(Return) \
-  X(Break) \
-  X(Continue) \
-  X(For) \
-  X(If) \
-  X(While) \
+  X(Program)                \
+  X(Block)                  \
+  X(Variable)               \
+  X(Function)               \
+  X(Type)                   \
+  X(ExpressionBlock)        \
+  X(BinExpr)                \
+  X(UnaryExpr)              \
+  X(Literal)                \
+  X(Call)                   \
+  X(MemberAccess)           \
+  X(Cast)                   \
+  X(Index)                  \
+  X(AggregateInitializer)   \
+  X(CollectionInitializer)  \
+  X(EmptyInitializer)       \
+  X(Return)                 \
+  X(Break)                  \
+  X(Continue)               \
+  X(For)                    \
+  X(If)                     \
+  X(While)                  \
   X(Noop)
 
-inline const char* node_type_to_string(THIRNodeType type) {
+inline const char *node_type_to_string(THIRNodeType type) {
   switch (type) {
-#define X(name) case THIRNodeType::name: return #name;
+#define X(name)            \
+  case THIRNodeType::name: \
+    return #name;
     THIR_NODE_TYPE_LIST
 #undef X
-    default: return "<unknown>";
+    default:
+      return "<unknown>";
   }
 }
 
@@ -162,7 +164,7 @@ struct THIRType : THIR {
 };
 
 // this is just a block that can return a value, and can be used as an expression.
-// used primarily for 
+// used primarily for
 // x := if true { 1 } else { false };
 struct THIRExprBlock : THIR {
   std::vector<THIR *> statements;
@@ -193,9 +195,9 @@ struct THIRFunction : THIR {
   bool is_no_mangle : 1 = false;
   bool is_macro : 1 = false;
 
-  /* 
+  /*
     0 == not a constructor.
-    1 == run in the global initializer function, after all globals have run. 
+    1 == run in the global initializer function, after all globals have run.
     2 == use clang __attribute__(constructor) (or an equivalent)
   */
   uint8_t constructor_index : 2;
@@ -289,6 +291,7 @@ struct THIRWhile : THIR {
 };
 
 struct THIREmptyInitializer : THIR {
+  bool is_uninitialized = false;  // TODO: add --- ast to indicate we don't want to initialize a variable.
   THIRNodeType get_node_type() const override { return THIRNodeType::EmptyInitializer; }
 };
 
@@ -313,7 +316,7 @@ static inline T *thir_alloc() {
 #define THIR_ALLOC(__type, __name, ast)                                                \
   static_assert(std::is_base_of<THIR, __type>::value, "__type must derive from THIR"); \
   __type *__name = thir_alloc<__type>();                                               \
-  __name->span = ast->span;                                            \
+  __name->span = ast->span;                                                            \
   __name->type = ast->resolved_type;
 
 #define THIR_ALLOC_NO_SRC_RANGE(__type, __name)                                        \
@@ -345,20 +348,19 @@ struct DeferFrame {
 };
 
 struct THIRGen {
-  
   THIRGen(Context &ctx, bool for_emitter = true);
   std::vector<THIR *> *current_expression_list;
   bool is_making_call = false;
   Context &ctx;
-  
+
   std::vector<THIRFunction *> constructors;
   std::vector<THIRFunction *> test_functions;
-  
+
   THIRCall *global_initializer_call;
   THIRFunction *global_initializer_function;
-  
+
   std::vector<DeferFrame> defer_stack;
-  
+
   void enter_defer_boundary(DeferBoundary boundary);
   void exit_defer_boundary();
 
@@ -368,7 +370,7 @@ struct THIRGen {
   void check_for_deprecation(Span call_site, THIR *thir);
   void format_and_print_deprecated_warning(Span call_site, THIR *thir, const Attribute &attr);
   void convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs);
-  
+
   Symbol *get_symbol(ASTNode *);
 
   // remove frames up to `boundary` and return defers in execution order
@@ -456,9 +458,8 @@ struct THIRGen {
   THIR *visit_method_call(ASTMethodCall *node);
   THIR *visit_path(ASTPath *node);
 
-  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope,
-                                          std::vector<THIR *> &statements, Type *variant_type,
-                                          const InternedString &variant_name);
+  void make_destructure_for_pattern_match(ASTPatternMatch *ast, THIR *object, Scope *block_scope, std::vector<THIR *> &statements,
+                                          Type *variant_type, const InternedString &variant_name);
 
   THIR *visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_object, const size_t discriminant);
   THIR *visit_pattern_match(ASTPatternMatch *node, Scope *scope, std::vector<THIR *> &statements);
@@ -472,8 +473,8 @@ struct THIRGen {
   THIR *visit_unary_expr(ASTUnaryExpr *node);
   THIR *visit_literal(ASTLiteral *node);
 
-  void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args,
-                                          std::vector<THIR *> &out_args, Nullable<THIR> self = nullptr);
+  void extract_arguments_desugar_defaults(const THIR *callee, const ASTArguments *in_args, std::vector<THIR *> &out_args,
+                                          Nullable<THIR> self = nullptr);
 
   void extract_thir_values_for_type_members(Type *type);
 
@@ -489,8 +490,7 @@ struct THIRGen {
   THIR *visit_lambda(ASTLambda *node);
   THIR *visit_size_of(ASTSize_Of *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
-  THIR *initialize(const Span &span, Type *type,
-                   std::vector<std::pair<InternedString, ASTExpr *>> key_values);
+  THIR *initialize(const Span &span, Type *type, std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);
 
   void mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFunction *&thir);

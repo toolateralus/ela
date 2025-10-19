@@ -97,7 +97,14 @@ int CompileCommand::compile() {
     // MIR generator.
     {
       Mir::Module m;
-      Mir::generate(thir_gen.emit_runtime_entry_point(), m);
+      auto entry_point = thir_gen.emit_runtime_entry_point();
+
+      if (entry_point) {
+        Mir::generate(entry_point, m);
+      }
+      else {
+        Mir::generate(thir_program, m);
+      }
       m.finalize();
       {
         auto path = compile_command.binary_path.string() + std::string{".ir"};

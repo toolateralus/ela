@@ -5,6 +5,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 #include "mir.hpp"
@@ -580,6 +581,30 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
         insert_temp(instr.dest.temp, f, true, gep);
       } break;
+      case Mir::OP_ZERO_INIT: {
+        // PTR is a pointer to the memory to zero, TY is the type (non-pointer) to zero-init
+        llvm::Value *ptr = visit_operand(instr.left, false, instr.span);
+        Type *ty = instr.right.type;  // Non-pointer type ref
+
+        uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
+        llvm::Type *i8_ty = llvm::Type::getInt8Ty(llvm_ctx);
+        llvm::Type *i64_ty = llvm::Type::getInt64Ty(llvm_ctx);
+
+        llvm::Value *cast_ptr = builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr");
+        llvm::Value *zero = llvm::ConstantInt::get(i8_ty, 0);
+        llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
+        llvm::Value *is_volatile = llvm::ConstantInt::get(llvm::Type::getInt1Ty(llvm_ctx), 0);
+
+        llvm::Type *i8_ptr_ty = llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_ctx), 0);
+        llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
+        std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i8_ty, i64_ty, i1_ty};
+
+        llvm::Function *memset_fn = llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
+
+        builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
+        insert_temp(instr.dest.temp, f, false, ptr);
+        break;
+      }
     }
   }
 }
@@ -591,7 +616,7 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load, Span span) {
     case Mir::Operand::OPERAND_TYPE:         // only for special instructions. see mir.hpp
     case Mir::Operand::OPERAND_NULL:         // unused operand.
     case Mir::Operand::OPERAND_BASIC_BLOCK_PAIR:
-      return nullptr;                        // TODO: figure out if this is valid
+      return nullptr;  // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
       if (o.temp >= temps.size()) {

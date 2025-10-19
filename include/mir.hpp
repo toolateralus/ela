@@ -47,9 +47,10 @@ enum Op_Code : uint8_t {
     temporaries are assumed to always we a pointer to stack memory, just like LLVM.
     load/store always take a pointer operand, and alloca always returns a pointer operand.
   */
-  OP_LOAD,         // dest=result, left=ptr (tag determines const/imm/register)
-  OP_STORE,        // left=ptr,   right=value
-  OP_ALLOCA,       // dest=result, left=type_index (type->uid) (stack allocate),
+  OP_LOAD,    // dest=result, left=ptr (tag determines const/imm/register)
+  OP_STORE,   // left=ptr,   right=value
+  OP_ALLOCA,  // dest=result, left=type_index (type->uid) (stack allocate),
+  OP_ZERO_INIT,
   OP_LOAD_FN_PTR,  // dest=ptr, right=fn_idx,
 
   // see Instruction for info on bb.
@@ -621,13 +622,16 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
   m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::Make_BB(TARGET_BB), .span = node->span})
 
 // OP_JMP_TRUE: left=bb, right=condition
-#define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND) \
-  m.current_function->get_insert_block()->push(          \
-      Instruction{OP_JMP_TRUE, Operand::MakeNull(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
+#define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND)    \
+  m.current_function->get_insert_block()->push(Instruction{ \
+      OP_JMP_TRUE, Operand::MakeNull(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
 // OP_JMP_FALSE: left=bb, right=condition
 #define EMIT_JUMP_FALSE(TARGET_BB, FALL_THROUGH_BB, COND) \
   m.current_function->get_insert_block()->push(           \
       Instruction{OP_JMP_FALSE, Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
+
+#define EMIT_ZERO_INIT(DEST, PTR, TY) \
+  m.current_function->get_insert_block()->push(Instruction{OP_ZERO_INIT, DEST, PTR, TY, .span = node->span})
 
 }  // namespace Mir
