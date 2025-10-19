@@ -491,8 +491,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_JMP_TRUE: {
-        Mir::Basic_Block *target_mir_bb = instr.left.bb;
-        Mir::Basic_Block *fallthrough_bb = instr.left.bb;
+        Mir::Basic_Block *target_mir_bb = instr.left.bb_pair.target;
+        Mir::Basic_Block *fallthrough_bb = instr.left.bb_pair.fallthrough;
 
         llvm::Value *cond = visit_operand(instr.right, true, instr.span);
         Type *unused = nullptr;
@@ -590,6 +590,7 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load, Span span) {
     case Mir::Operand::OPERAND_BASIC_BLOCK:  // only for jumps.
     case Mir::Operand::OPERAND_TYPE:         // only for special instructions. see mir.hpp
     case Mir::Operand::OPERAND_NULL:         // unused operand.
+    case Mir::Operand::OPERAND_BASIC_BLOCK_PAIR:
       return nullptr;                        // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {

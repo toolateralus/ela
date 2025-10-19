@@ -53,8 +53,8 @@ enum Op_Code : uint8_t {
   OP_LOAD_FN_PTR,  // dest=ptr, right=fn_idx,
 
   // see Instruction for info on bb.
-  OP_JMP,        // left=bb
-  OP_JMP_TRUE,   // left=bb, right=condition
+  OP_JMP,       // left=bb
+  OP_JMP_TRUE,  // left=bb, right=condition
 
   OP_PUSH_ARG,  // push argument to stack.   left=value
   OP_CALL,      // dest=result, left=fn_idx, right=n_args
@@ -140,15 +140,20 @@ struct Operand {
     OPERAND_NULL,             // placeholder.       || shouldn't ever be used, but should be checked for (removed after initdevel)
     OPERAND_TEMP,             // union.temp         || local variable, temporary, "register", etc. parent->local[temp] = value.
     OPERAND_IMMEDIATE_VALUE,  // union.immediate    || immediate value.
-    OPERAND_GLOBAL_VARIABLE_REFERENCE,
-    OPERAND_BASIC_BLOCK,  // union.bb           || basic block target for jumps.
-    OPERAND_TYPE,         // this->type         || a type reference, mainly for casting and alloca.
+    OPERAND_GLOBAL_VARIABLE_REFERENCE,  // union.gv           || ref to a global var
+    OPERAND_BASIC_BLOCK,                // union.bb           || basic block target for jumps.
+    OPERAND_BASIC_BLOCK_PAIR,           // union.bb           || basic block target/fallthrough for conditional jump
+    OPERAND_TYPE,                       // this->type         || a type reference, mainly for casting and alloca.
   } tag = OPERAND_NULL;
 
   union {
     Global_Variable *gv;
     Constant imm;
     Basic_Block *bb;
+    struct {
+      Basic_Block *target;
+      Basic_Block *fallthrough;
+    } bb_pair;
     uint32_t temp = 0;
   };
 
@@ -182,6 +187,16 @@ struct Operand {
   static Operand Make_BB(Basic_Block *b) {
     Operand o;
     o.bb = b;
+    o.tag = OPERAND_BASIC_BLOCK;
+    return o;
+  }
+
+  static Operand Make_BB_Pair(Basic_Block *target, Basic_Block *fallthrough) {
+    Operand o;
+    o.bb_pair = {
+        .target = target,
+        .fallthrough = fallthrough,
+    };
     o.tag = OPERAND_BASIC_BLOCK;
     return o;
   }
@@ -608,11 +623,11 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 // OP_JMP_TRUE: left=bb, right=condition
 #define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND) \
   m.current_function->get_insert_block()->push(          \
-      Instruction{OP_JMP_TRUE, Operand::Make_BB(TARGET_BB), Operand::Make_BB(FALL_THROUGH_BB), COND, .span = node->span})
+      Instruction{OP_JMP_TRUE, Operand::MakeNull(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
 // OP_JMP_FALSE: left=bb, right=condition
 #define EMIT_JUMP_FALSE(TARGET_BB, FALL_THROUGH_BB, COND) \
   m.current_function->get_insert_block()->push(           \
-      Instruction{OP_JMP_FALSE, Operand::Make_BB(TARGET_BB), Operand::Make_BB(FALL_THROUGH_BB), COND, .span = node->span})
+      Instruction{OP_JMP_FALSE, Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
 }  // namespace Mir

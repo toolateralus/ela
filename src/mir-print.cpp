@@ -417,6 +417,10 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
         return std::string("bb(") + op.bb->label.get_str() + ")";
       case Operand::OPERAND_TYPE:
         return format_type_ref(op.type);
+      case Operand::OPERAND_BASIC_BLOCK_PAIR:
+        return std::string("target(") + op.bb_pair.target->label.get_str() + "), ";
+        return std::string("fallthrough(") + op.bb_pair.target->label.get_str() + ")";
+        break;
     }
     return "";
   };
