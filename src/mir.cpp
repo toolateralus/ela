@@ -64,7 +64,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     return Operand::Make_Temp(index, node->type);
   }
   m.enter_function(f);
-
   m.create_basic_block("entry");
   generate_block(node->block, m);
   Basic_Block *insert_block = f->get_insert_block();
