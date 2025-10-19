@@ -293,33 +293,19 @@ struct LLVM_Emitter {
     Type *type;
     InternedString name;
     llvm::Value *value;
-    bool is_memory = false;
-    inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
-      if (is_memory && requires_load) {
-        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value, name.get_str());
-      } else {  // return the pointer or the SSA register
-        return value;
-      }
-    }
   };
 
   // this is per each function, is cleared on exit.
   std::unordered_map<uint32_t, Allocation> temps;
 
-  inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_memory, llvm::Value *v) {
+  inline void insert_temp(uint32_t idx, Mir::Function *f, llvm::Value *v) {
     Allocation allocation = {
         .type = f->temps[idx].type,
         .name = f->temps[idx].name,
         .value = v,
-        .is_memory = is_memory,
     };
 
     assert(v != nullptr);
-
-    if (is_memory && !allocation.type->is_pointer()) {
-      assert(false && "insert_temp got an alloca that wasn't a pointer");
-    }
-
     temps[idx] = allocation;
   }
 
@@ -680,7 +666,7 @@ struct LLVM_Emitter {
 
   llvm::Value *pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr);
   llvm::Value *pointer_unary(llvm::Value *operand, const Instruction &instr);
-  llvm::Value *visit_operand(Operand op, bool do_load, Span span);
+  llvm::Value *visit_operand(Operand op, Span span);
 
   llvm::Value *binary_signed(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op);

@@ -218,6 +218,7 @@ struct Instruction {
   Operand left;
   Operand right;
   Span span;
+  uint32_t index;  // for debugging
   void print(FILE *, Module &) const;
 };
 
@@ -229,7 +230,10 @@ struct Basic_Block {
   Basic_Block() = default;
   explicit Basic_Block(InternedString l) : label(l) {}
 
-  inline void push(Instruction &&bc) { code.push_back(std::move(bc)); }
+  inline void push(Instruction &&bc) {
+    bc.index = code.size();
+    code.push_back(std::move(bc));
+  }
   inline const Instruction &back() const {
     assert(code.size() && "no instructions");
     return code.back();
@@ -397,9 +401,9 @@ struct Module {
     for (const auto &param : node->parameters) {
       f->temps.push_back({
           .name = generate_temp_identifier(param_idx),
-          .type = param.associated_variable->type,
+          .type = param.associated_variable->type->take_pointer_to(), // we have to do this because loading from params is neccesary
       });
-      variables[param.associated_variable] = Operand::Make_Temp(param_idx, param.associated_variable->type);
+      variables[param.associated_variable] = Operand::Make_Temp(param_idx, param.associated_variable->type->take_pointer_to());
       param_idx++;
     }
 
@@ -588,7 +592,12 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_RET_VOID() m.current_function->get_insert_block()->push(Instruction{OP_RET_VOID, .span = node->span})
 
 // OP_LOAD: dest=result, left=ptr
-#define EMIT_LOAD(DEST, PTR) m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, PTR, .span = node->span})
+#define EMIT_LOAD(DEST, PTR)                                                                           \
+  do {                                                                                                 \
+    auto p = (PTR);                                                                                    \
+    assert((p).type->is_pointer() && "Got a non pointer type in a load");                              \
+    m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, (p), .span = node->span}); \
+  } while (false);
 
 // OP_STORE: left=ptr, right=value
 #define EMIT_STORE(PTR, VAL) \

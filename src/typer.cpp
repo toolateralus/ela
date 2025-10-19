@@ -41,15 +41,15 @@
 
 #ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, span) \
-  GenericInstantiationErrorUserData data_name;                     \
-  set_panic_handler(generic_instantiation_panic_handler);          \
-  set_error_user_data(&data_name);                                 \
-  Defer defer_##uid([] { reset_panic_handler(); });                \
-  if (setjmp(data_name.save_state) == 0) {                         \
+  GenericInstantiationErrorUserData data_name;             \
+  set_panic_handler(generic_instantiation_panic_handler);  \
+  set_error_user_data(&data_name);                         \
+  Defer defer_##uid([] { reset_panic_handler(); });        \
+  if (setjmp(data_name.save_state) == 0) {                 \
     /* clang-format off */\
-    block                                        \
-    /* clang-format on */                                          \
-  } else {                                                         \
+    block                                \
+    /* clang-format on */                                  \
+  } else {                                                 \
     handle_generic_error(&data_name, span);                \
   }
 #else
@@ -99,14 +99,21 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
   auto from_t = expr->resolved_type;
   auto to_t = to;
   auto conv_rule = type_conversion_rule(from_t, to_t, span);
+  
   if (to != expr->resolved_type && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
-    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()),
-                span);
+    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()), span);
   }
 
   if (conv_rule == CONVERT_IMPLICIT) {
+    if (expr->conversion.has_value) {
+      // printf("a conversion was done twice on a single expression.\n");
+      // return;
+    }
     expr->resolved_type = to;
-    // TODO: would a single expression ever go through multiple implicit conversions?
+    // TODO: would a single expression ever go through multiple implicit conversions? -- the answer is yes via monomorphization
+    // !BUG and this is a bug.
+    // See the copier as to why, I have no idea what's going on there.
+    // primarily its calls in default trait methods that seem to fail.
     expr->conversion = {
         .has_value = true,
         .from = from_t,
@@ -584,8 +591,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
   block->accept(this);
   auto control_flow = block->control_flow;
   if (control_flow.type == Type::INVALID_TYPE) control_flow.type = void_type();
-  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE))
-    throw_error("Keyword \"continue\" must be in a loop.", node->span);
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE)) throw_error("Keyword \"continue\" must be in a loop.", node->span);
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK)) throw_error("Keyword \"break\" must be in a loop.", node->span);
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH) && node->return_type->resolved_type != void_type())
     throw_error("Not all code paths return a value.", node->span);
@@ -675,8 +681,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool visit_where
   node->return_type->accept(this);
 
   if (node->return_type->resolved_type->is_fixed_sized_array()) {
-    throw_error("cannot return a fixed sized array from a function! the memory would be invalid immediately!",
-                node->span);
+    throw_error("cannot return a fixed sized array from a function! the memory would be invalid immediately!", node->span);
   }
 
   node->params->accept(this);
@@ -909,8 +914,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto declaring_node = trait_ty->declaring_node.get();
 
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_TRAIT_DECLARATION) {
-      throw_error(std::format("\'impl <trait> for <type>\' must implement a trait. got {}", trait_ty->to_string()),
-                  node->span);
+      throw_error(std::format("\'impl <trait> for <type>\' must implement a trait. got {}", trait_ty->to_string()), node->span);
     }
 
     auto trait = static_cast<ASTTraitDeclaration *>(declaring_node);
@@ -1747,8 +1751,7 @@ void Typer::visit(ASTVariable *node) {
 
     ENTER_EXPECTED_TYPE(node->type->resolved_type);
     node->value.get()->accept(this);
-    assert_types_can_cast_or_equal(node->value.get(), node->type->resolved_type, node->span,
-                                   "invalid type in declaration");
+    assert_types_can_cast_or_equal(node->value.get(), node->type->resolved_type, node->span, "invalid type in declaration");
   }
 
   if (!node->is_constexpr && ctx.scope->local_lookup(node->name)) {
@@ -2123,8 +2126,7 @@ void Typer::visit(ASTCall *node) {
           type_context = &func_type_ast;
         }
 
-        func_decl =
-            resolve_generic_function_call(func_decl, node->get_generic_arguments().get(), node->arguments, node->span);
+        func_decl = resolve_generic_function_call(func_decl, node->get_generic_arguments().get(), node->arguments, node->span);
       }
 
       if (func_decl->params->has_self) {
@@ -2144,8 +2146,7 @@ void Typer::visit(ASTCall *node) {
           node->span);
     }
     if (!symbol->resolved_type->is_kind(TYPE_TUPLE)) {
-      throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->resolved_type->basename),
-                  node->span);
+      throw_error(std::format("type {} must be tuple to use '(..)' constructor", symbol->resolved_type->basename), node->span);
     }
     ASTTuple tuple;
     tuple.values = node->arguments->arguments;
@@ -2424,7 +2425,8 @@ void Typer::visit(ASTBinExpr *node) {
     return;
   }
 
-  if (node->op != TType::Assign && !left_ty->is_pointer() && left_ty->kind != TYPE_SCALAR && !operator_overload_sym && left_ty->kind != TYPE_ENUM) {
+  if (node->op != TType::Assign && !left_ty->is_pointer() && left_ty->kind != TYPE_SCALAR && !operator_overload_sym &&
+      left_ty->kind != TYPE_ENUM) {
     throw_error(
         std::format(
             "unable to use operator {}, it is a non trivial operation and no operator overload was implemented for type {}",
@@ -2616,8 +2618,7 @@ void Typer::visit(ASTDotExpr *node) {
   }
 
   if (node->member.tag != ASTPath::Segment::IDENTIFIER) {
-    throw_error("cannot use a non-identifier as the right hand side of a dot expression. what were you doing??",
-                node->span);
+    throw_error("cannot use a non-identifier as the right hand side of a dot expression. what were you doing??", node->span);
   }
 
   auto identifier = node->member.get_identifier();
@@ -2838,7 +2839,6 @@ void Typer::visit(ASTInitializerList *node) {
 }
 
 void Typer::visit(ASTRange *node) {
-
   if (node->left) {
     node->left->accept(this);
   }
@@ -2850,10 +2850,10 @@ void Typer::visit(ASTRange *node) {
   if (node->left && node->right) {
     auto left = node->left->resolved_type;
     auto right = node->right->resolved_type;
-  
+
     auto conversion_rule_left_to_right = type_conversion_rule(left, right);
     auto conversion_rule_right_to_left = type_conversion_rule(right, left);
-  
+
     // Alwyas cast to the left? or should we upcast to the largest number type?
     if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
       implicit_cast(node->right, right = left);
@@ -2877,7 +2877,6 @@ void Typer::visit(ASTRange *node) {
   } else {
     type = node->right->resolved_type;
   }
-
 
   node->resolved_type = find_generic_type_of("RangeBase", {type}, node->span);
 
@@ -3115,8 +3114,7 @@ void Typer::visit(ASTCast *node) {
   auto type = node->target_type->resolved_type;
   auto conversion = type_conversion_rule(expr_type, type);
   if (conversion == CONVERT_PROHIBITED) {
-    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()),
-                node->span);
+    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()), node->span);
   }
   node->resolved_type = type;
 }
@@ -3141,8 +3139,7 @@ void Typer::visit(ASTSize_Of *node) {
   node->resolved_type = u64_type();
 }
 
-void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope,
-                               const Span &range) {
+void Typer::visit_import_group(const ASTImport::Group &group, Scope *module_scope, Scope *import_scope, const Span &range) {
   ENTER_SCOPE(module_scope);
   import_scope->create_reference(ctx.get_symbol_and_scope(group.path));
 
@@ -3368,8 +3365,8 @@ void Typer::visit(ASTDyn_Of *node) {
                 node->span);
   }
 
-  auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type,
-                                                  node->span, this);
+  auto ty =
+      ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type, node->span, this);
   node->resolved_type = ty;
 }
 
@@ -3391,10 +3388,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, Span range, Typer *typ
 
   ty->traits.push_back(is_dyn_trait());
 
-  dyn_info->members.push_back({
-    .name = "instance",
-    .type = void_type()->take_pointer_to(true)
-  });
+  dyn_info->members.push_back({.name = "instance", .type = void_type()->take_pointer_to(true)});
 
   dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{TYPE_EXT_POINTER_MUT}}), nullptr, MUT);
 
@@ -3459,8 +3453,8 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, Span range, Typer *typ
 
     auto function_type = global_find_function_type_id(type_info, {{TYPE_EXT_POINTER_MUT}});
     dyn_info->members.push_back({
-      .name = name,
-      .type = function_type->take_pointer_to(),
+        .name = name,
+        .type = function_type->take_pointer_to(),
     });
     dyn_info->methods.push_back({name.get_str(), function_type /* , declaration */});
     dyn_info->scope->insert_variable(name.get_str(), function_type, nullptr, MUT, nullptr);
@@ -3542,8 +3536,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         } else if (part.tag == ASTPath::Segment::TYPE) {
           type = part.get_type()->resolved_type;
         } else {
-          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor type",
-                      node->span);
+          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor type", node->span);
         }
 
         if (index == path->length() - 1) {
@@ -3625,8 +3618,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
         } else if (part.tag == ASTPath::Segment::TYPE) {
           type = part.get_type()->resolved_type;
         } else {
-          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression",
-                      node->span);
+          throw_error("INTERNAL COMPILER ERROR: got an invalid path segment, was neither identifier nor expression", node->span);
           return nullptr;
         }
 
@@ -3692,8 +3684,8 @@ void Typer::visit(ASTMethodCall *node) {
           type_context = &func_type_ast;
         }
 
-        func_decl = resolve_generic_function_call(func_decl, &node->callee->member.generic_arguments, node->arguments,
-                                                  node->span);
+        func_decl =
+            resolve_generic_function_call(func_decl, &node->callee->member.generic_arguments, node->arguments, node->span);
       }
 
       type = func_decl->resolved_type;
@@ -3893,8 +3885,7 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type) {
         if (symbol->resolved_type == Type::UNRESOLVED_GENERIC) {
-          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name),
-                      node->span);
+          throw_error(std::format("use of generic type {}, but no type arguments were provided.", symbol->name), node->span);
         }
         previous_type = symbol->resolved_type;
         scope = previous_type->info->scope;
@@ -4102,8 +4093,7 @@ void Typer::visit(ASTUnpack *node) {
       element->tag = ASTUnpackElement::TUPLE_ELEMENT;
 
       if (current_expression_list.is_null()) {
-        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
-                    node->span);
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null", node->span);
         return;
       }
 
@@ -4142,8 +4132,7 @@ void Typer::visit(ASTUnpack *node) {
       element->resolved_type = s32_type();
 
       if (current_expression_list.is_null()) {
-        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null",
-                    node->span);
+        throw_error("INTERNAL_COMPILER_ERROR: Used an unpack statement but the current expression list was null", node->span);
         return;
       }
 

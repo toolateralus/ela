@@ -449,111 +449,172 @@ ASTWhereStatement *ASTCopier::copy_where_statement(ASTWhereStatement *node) {
 
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   const auto type = node->get_node_type();
+  ASTNode *new_node = nullptr;
+
   switch (type) {
     case AST_NODE_RUN:
-      return copy_run((ASTRun *)node);
+      new_node = copy_run((ASTRun *)node);
+      break;
     case AST_NODE_UNPACK:
-      return copy_unpack((ASTUnpack *)node);
+      new_node = copy_unpack((ASTUnpack *)node);
+      break;
     case AST_NODE_UNPACK_ELEMENT:
-      return copy_unpack_element((ASTUnpackElement *)node);
+      new_node = copy_unpack_element((ASTUnpackElement *)node);
+      break;
     case AST_NODE_WHERE_STATEMENT:
-      return copy_where_statement((ASTWhereStatement *)node);
+      new_node = copy_where_statement((ASTWhereStatement *)node);
+      break;
     case AST_NODE_WHERE:
-      return copy_where(static_cast<ASTWhere *>(node));
+      new_node = copy_where(static_cast<ASTWhere *>(node));
+      break;
     case AST_NODE_CAST:
-      return copy_cast(static_cast<ASTCast *>(node));
+      new_node = copy_cast(static_cast<ASTCast *>(node));
+      break;
     case AST_NODE_IMPL:
-      return copy_impl(static_cast<ASTImpl *>(node));
+      new_node = copy_impl(static_cast<ASTImpl *>(node));
+      break;
     case AST_NODE_PROGRAM:
-      return copy_program(static_cast<ASTProgram *>(node));
+      new_node = copy_program(static_cast<ASTProgram *>(node));
+      break;
     case AST_NODE_BLOCK:
-      return copy_block(static_cast<ASTBlock *>(node));
+      new_node = copy_block(static_cast<ASTBlock *>(node));
+      break;
     case AST_NODE_FUNCTION_DECLARATION:
-      return copy_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
+      new_node = copy_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
+      break;
     case AST_NODE_PARAMS_DECL:
-      return copy_params_decl(static_cast<ASTParamsDecl *>(node));
+      new_node = copy_params_decl(static_cast<ASTParamsDecl *>(node));
+      break;
     case AST_NODE_PARAM_DECL:
-      return copy_param_decl(static_cast<ASTParamDecl *>(node));
+      new_node = copy_param_decl(static_cast<ASTParamDecl *>(node));
+      break;
     case AST_NODE_VARIABLE:
-      return copy_variable(static_cast<ASTVariable *>(node));
+      new_node = copy_variable(static_cast<ASTVariable *>(node));
+      break;
     case AST_NODE_EXPR_STATEMENT:
-      return copy_expr_statement(static_cast<ASTExprStatement *>(node));
+      new_node = copy_expr_statement(static_cast<ASTExprStatement *>(node));
+      break;
     case AST_NODE_BIN_EXPR:
-      return copy_bin_expr(static_cast<ASTBinExpr *>(node));
+      new_node = copy_bin_expr(static_cast<ASTBinExpr *>(node));
+      break;
     case AST_NODE_UNARY_EXPR:
-      return copy_unary_expr(static_cast<ASTUnaryExpr *>(node));
+      new_node = copy_unary_expr(static_cast<ASTUnaryExpr *>(node));
+      break;
     case AST_NODE_LITERAL:
-      return copy_literal(static_cast<ASTLiteral *>(node));
+      new_node = copy_literal(static_cast<ASTLiteral *>(node));
+      break;
     case AST_NODE_TYPE:
-      return copy_type(static_cast<ASTType *>(node));
+      new_node = copy_type(static_cast<ASTType *>(node));
+      break;
     case AST_NODE_TUPLE:
-      return copy_tuple(static_cast<ASTTuple *>(node));
+      new_node = copy_tuple(static_cast<ASTTuple *>(node));
+      break;
     case AST_NODE_CALL:
-      return copy_call(static_cast<ASTCall *>(node));
+      new_node = copy_call(static_cast<ASTCall *>(node));
+      break;
     case AST_NODE_ARGUMENTS:
-      return copy_arguments(static_cast<ASTArguments *>(node));
+      new_node = copy_arguments(static_cast<ASTArguments *>(node));
+      break;
     case AST_NODE_RETURN:
-      return copy_return(static_cast<ASTReturn *>(node));
+      new_node = copy_return(static_cast<ASTReturn *>(node));
+      break;
     case AST_NODE_CONTINUE:
-      return copy_continue(static_cast<ASTContinue *>(node));
+      new_node = copy_continue(static_cast<ASTContinue *>(node));
+      break;
     case AST_NODE_BREAK:
-      return copy_break(static_cast<ASTBreak *>(node));
+      new_node = copy_break(static_cast<ASTBreak *>(node));
+      break;
     case AST_NODE_FOR:
-      return copy_for(static_cast<ASTFor *>(node));
+      new_node = copy_for(static_cast<ASTFor *>(node));
+      break;
     case AST_NODE_IF:
-      return copy_if(static_cast<ASTIf *>(node));
+      new_node = copy_if(static_cast<ASTIf *>(node));
+      break;
     case AST_NODE_ELSE:
-      return copy_else(static_cast<ASTElse *>(node));
+      new_node = copy_else(static_cast<ASTElse *>(node));
+      break;
     case AST_NODE_WHILE:
-      return copy_while(static_cast<ASTWhile *>(node));
+      new_node = copy_while(static_cast<ASTWhile *>(node));
+      break;
     case AST_NODE_STRUCT_DECLARATION:
-      return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
+      new_node = copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
+      break;
     case AST_NODE_DOT_EXPR:
-      return copy_dot_expr(static_cast<ASTDotExpr *>(node));
+      new_node = copy_dot_expr(static_cast<ASTDotExpr *>(node));
+      break;
     case AST_NODE_INDEX:
-      return copy_subscript(static_cast<ASTIndex *>(node));
+      new_node = copy_subscript(static_cast<ASTIndex *>(node));
+      break;
     case AST_NODE_INITIALIZER_LIST:
-      return copy_initializer_list(static_cast<ASTInitializerList *>(node));
+      new_node = copy_initializer_list(static_cast<ASTInitializerList *>(node));
+      break;
     case AST_NODE_ENUM_DECLARATION:
-      return copy_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
+      new_node = copy_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
+      break;
     case AST_NODE_RANGE:
-      return copy_range(static_cast<ASTRange *>(node));
+      new_node = copy_range(static_cast<ASTRange *>(node));
+      break;
     case AST_NODE_SWITCH:
-      return copy_switch(static_cast<ASTSwitch *>(node));
+      new_node = copy_switch(static_cast<ASTSwitch *>(node));
+      break;
     case AST_NODE_TUPLE_DECONSTRUCTION:
-      return copy_destructure(static_cast<ASTDestructure *>(node));
+      new_node = copy_destructure(static_cast<ASTDestructure *>(node));
+      break;
     case AST_NODE_TRAIT_DECLARATION:
-      return copy_trait_declaration(static_cast<ASTTraitDeclaration *>(node));
+      new_node = copy_trait_declaration(static_cast<ASTTraitDeclaration *>(node));
+      break;
     case AST_NODE_CHOICE_DECLARATION:
-      return copy_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
-    case AST_NODE_NOOP:
-      return node;
+      new_node = copy_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
+      break;
     case AST_NODE_ALIAS:
-      return copy_alias(static_cast<ASTAlias *>(node));
+      new_node = copy_alias(static_cast<ASTAlias *>(node));
+      break;
     case AST_NODE_SIZE_OF:
-      return copy_sizeof(static_cast<ASTSize_Of *>(node));
+      new_node = copy_sizeof(static_cast<ASTSize_Of *>(node));
+      break;
     case AST_NODE_DEFER:
-      return copy_defer(static_cast<ASTDefer *>(node));
+      new_node = copy_defer(static_cast<ASTDefer *>(node));
+      break;
     case AST_NODE_LAMBDA:
-      return copy_lambda(static_cast<ASTLambda *>(node));
+      new_node = copy_lambda(static_cast<ASTLambda *>(node));
+      break;
     case AST_NODE_STATEMENT_LIST:
-      return copy_statement_list(static_cast<ASTStatementList *>(node));
+      new_node = copy_statement_list(static_cast<ASTStatementList *>(node));
+      break;
     case AST_NODE_TYPE_OF:
-      return copy_type_of(static_cast<ASTType_Of *>(node));
+      new_node = copy_type_of(static_cast<ASTType_Of *>(node));
+      break;
     case AST_NODE_IMPORT:
-      return copy_import(static_cast<ASTImport *>(node));
+      new_node = copy_import(static_cast<ASTImport *>(node));
+      break;
     case AST_NODE_MODULE:
-      return copy_module(static_cast<ASTModule *>(node));
+      new_node = copy_module(static_cast<ASTModule *>(node));
+      break;
     case AST_NODE_DYN_OF:
-      return copy_dyn_of(static_cast<ASTDyn_Of *>(node));
+      new_node = copy_dyn_of(static_cast<ASTDyn_Of *>(node));
+      break;
     case AST_NODE_PATTERN_MATCH:
-      return copy_pattern_match(static_cast<ASTPatternMatch *>(node));
+      new_node = copy_pattern_match(static_cast<ASTPatternMatch *>(node));
+      break;
     case AST_NODE_PATH:
-      return copy_path(static_cast<ASTPath *>(node));
+      new_node = copy_path(static_cast<ASTPath *>(node));
+      break;
     case AST_NODE_METHOD_CALL:
-      return copy_method_call(static_cast<ASTMethodCall *>(node));
+      new_node = copy_method_call(static_cast<ASTMethodCall *>(node));
+      break;
+    case AST_NODE_NOOP:
+      new_node = node;
       break;
   }
+
+  if (new_node->is_expr()) {
+    // ASTExpr *expr = (ASTExpr*)new_node;
+    // TODO: this needs to happen, but for some reason, if we do this, we randomly get "too few arguments for function call"
+    // ! BUG
+    // expr->conversion = {.has_value = false};
+  }
+
+  return new_node;
 }
 
 ASTType_Of *ASTCopier::copy_type_of(ASTType_Of *node) {

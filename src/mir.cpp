@@ -1,6 +1,7 @@
 #include "mir.hpp"
 #include <cstdio>
 #include "error.hpp"
+#include "lex.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -58,8 +59,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 
   convert_function_flags(node, f);
 
-  // TODO: figure out how we're going to do externs.
-  // probably just need an extern section
   if (node->is_extern) {
     return Operand::Make_Temp(index, node->type);
   }
@@ -102,8 +101,9 @@ Operand load_variable(const THIRVariable *node, Module &m) {
 
 Operand generate_variable(const THIRVariable *node, Module &m) {
   // static locals is just syntax sugar for a scoped global
-  if (node->is_global || node->is_static) {  
-    Global_Variable global = {.name = node->name, .type = node->type, .has_external_linkage = node->is_global};
+  if (node->is_global || node->is_static) {
+    // we take a pointer to it because we have to load from this.
+    Global_Variable global = {.name = node->name, .type = node->type->take_pointer_to(), .has_external_linkage = node->is_global};
     Global_Variable *gv = mir_arena.construct<Global_Variable>(global);
     m.global_variables.push_back(gv);
     m.global_variable_table[node] = gv;
@@ -182,11 +182,17 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
 }
 
 Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
-  Operand base_addr = generate_lvalue_addr(node->base, m);
+  Operand base_addr;
+  if (node->base->type->is_pointer()) {
+    base_addr = generate_expr(node->base, m);
+  } else {
+    base_addr = generate_lvalue_addr(node->base, m);
+  }
+
   Operand result = m.create_temporary(node->type->take_pointer_to());
   Type *base = node->base->type;
 
-  size_t index = 0;
+  size_t index = 0;  // choice discriminant is always offset 0
 
   if (node->member != CHOICE_TYPE_DISCRIMINANT_KEY) {
     if (!base->try_get_index_of_member(node->member, index)) {
@@ -209,9 +215,7 @@ Operand generate_index_addr(const THIRIndex *node, Module &m) {
 }
 
 Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
-  if (node->op == TType::Assign || node->op == TType::CompAdd || node->op == TType::CompSub || node->op == TType::CompMul ||
-      node->op == TType::CompDiv || node->op == TType::CompMod || node->op == TType::CompAnd || node->op == TType::CompOr ||
-      node->op == TType::CompXor || node->op == TType::CompSHL || node->op == TType::CompSHR) {
+  if (node->op == TType::Assign || ttype_is_comp_assign(node->op)) {
     Operand lvalue_addr = generate_lvalue_addr(node->left, m);
     Operand rvalue = generate_expr(node->right, m);
 
@@ -347,7 +351,7 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
     case TType::Sub:
       op = OP_NEG;
       break;
-    case TType::And: {
+    case TType::And: {  // address of just doesn't load the reference to this
       return generate_lvalue_addr(node->operand, m);
     }
     case TType::Mul: {
@@ -542,7 +546,7 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
 
   auto result = m.create_temporary(node->type);
   EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
-  
+
   if (!used_pre_existing_alloca) {
     EMIT_LOAD(result, ptr);
   }
