@@ -2517,6 +2517,14 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         }
       }
     }
+
+    // Don't rely on C's weird implicit return 0 behaviour, always return 0.
+    THIR_ALLOC_NO_SRC_RANGE(THIRReturn, ret_0);
+    ret_0->expression = make_literal("0", {}, s32_type(), ASTLiteral::Integer);
+    ret_0->type = s32_type();
+    ret_0->is_statement = true;
+    block->statements.push_back(ret_0);
+
     main->block = block;
     return main;
   }

@@ -306,6 +306,7 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
 void LLVM_Emitter::emit_module() {
   // Forward declare all functions by header so we can refer to them in other functions with no worry
   dbg.enter_file_scope({});
+
   for (const auto &f : m.functions) {
     llvm::FunctionType *func_type = (llvm::FunctionType *)llvm_typeof(f->type);
     llvm::Function *llvm_f =
@@ -313,17 +314,11 @@ void LLVM_Emitter::emit_module() {
     function_table[f] = llvm_f;
   }
 
-  for (const Global_Variable *gv: m.global_variables) {
+  for (const Global_Variable *gv : m.global_variables) {
     llvm::Type *gv_type = llvm_typeof(gv->type);
     llvm::Constant *initializer = nullptr;
-    llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(
-      *llvm_module,
-      gv_type,
-      false,
-      llvm::GlobalValue::InternalLinkage,
-      initializer,
-      gv->name.get_str()
-    );
+    llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage,
+                                                             initializer, gv->name.get_str());
     global_variables[gv] = llvm_gv;
   }
 
@@ -333,7 +328,6 @@ void LLVM_Emitter::emit_module() {
     }
     emit_function(f, function_table[f]);
   }
-
 
   dbg.pop_scope();
 }
@@ -370,9 +364,6 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
   for (auto &instr : bb->code) {
     switch (instr.opcode) {
-      case Mir::OP_NOOP:
-        continue;
-
       case Mir::OP_ADD:
       case Mir::OP_SUB:
       case Mir::OP_MUL:
@@ -407,7 +398,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         Type *new_type = nullptr;
         right = cast_scalar(right, instr.right.type, instr.left.type, &new_type);
 
-        if (new_type) {  // We performed a cast so now we have to update to the new type so the below logic is correct
+        // We performed a cast so now we have to update to the new type so the below logic is correct
+        if (new_type) {
           instr.right.type = new_type;
           right_info = new_type->info->as<ScalarTypeInfo>();
         }
@@ -472,8 +464,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_STORE: {
-        llvm::Value *ptr = visit_operand(instr.left, false, instr.span);
         llvm::Value *val = visit_operand(instr.right, true, instr.span);
+        llvm::Value *ptr = temps[instr.left.temp].value;
         builder.CreateStore(val, ptr);
       } break;
 
@@ -499,68 +491,53 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       } break;
 
       case Mir::OP_JMP_TRUE: {
-        Mir::Basic_Block *target_mb = instr.left.bb;
+        Mir::Basic_Block *target_mir_bb = instr.left.bb;
+        Mir::Basic_Block *fallthrough_bb = target_mir_bb->fallthrough;
+
         llvm::Value *cond = visit_operand(instr.right, true, instr.span);
         Type *unused = nullptr;
         cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
 
         if (!cond->getType()->isIntegerTy(1)) {
-          cond = builder.CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
+          cond = builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv");
         }
 
-        auto it = bb_table.find(target_mb);
-        if (it == bb_table.end()) throw_error("Unknown target basic block", instr.span);
-        llvm::BasicBlock *target_bb = it->second;
-
-        llvm::BasicBlock *parent_bb = builder.GetInsertBlock();
-        llvm::Function *cur_f = parent_bb->getParent();
-        llvm::BasicBlock *fallthrough_bb = nullptr;
-        for (auto itb = cur_f->begin(); itb != cur_f->end(); ++itb) {
-          if (&*itb == parent_bb) {
-            auto next = std::next(itb);
-            if (next != cur_f->end()) fallthrough_bb = &*next;
-            break;
-          }
-        }
-        if (!fallthrough_bb) {
-          fallthrough_bb = llvm::BasicBlock::Create(llvm_ctx, parent_bb->getName() + ".cont", cur_f);
-        }
-
-        builder.CreateCondBr(cond, target_bb, fallthrough_bb);
-      } break;
-
-      case Mir::OP_JMP_FALSE: {
-        Mir::Basic_Block *target_mb = instr.left.bb;
-        llvm::Value *cond = visit_operand(instr.right, true, instr.span);
-        Type *unused = nullptr;
-        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
-
-        if (!cond->getType()->isIntegerTy(1)) {
-          cond = builder.CreateICmpNE(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
-        }
-        cond = builder.CreateNot(cond, "notcond");
-
-        auto it = bb_table.find(target_mb);
+        auto it = bb_table.find(target_mir_bb);
         if (it == bb_table.end()) {
           throw_error("Unknown target basic block", instr.span);
         }
         llvm::BasicBlock *target_bb = it->second;
 
-        llvm::BasicBlock *parent_bb = builder.GetInsertBlock();
-        llvm::Function *cur_f = parent_bb->getParent();
-        llvm::BasicBlock *fallthrough_bb = nullptr;
-        for (auto itb = cur_f->begin(); itb != cur_f->end(); ++itb) {
-          if (&*itb == parent_bb) {
-            auto next = std::next(itb);
-            if (next != cur_f->end()) fallthrough_bb = &*next;
-            break;
-          }
+        auto fallthrough_it = bb_table.find(fallthrough_bb);
+        if (fallthrough_it == bb_table.end()) {
+          throw_error("Unknown fallthrough basic block", instr.span);
         }
-        if (!fallthrough_bb) {
-          fallthrough_bb = llvm::BasicBlock::Create(llvm_ctx, parent_bb->getName() + ".cont", cur_f);
+        builder.CreateCondBr(cond, target_bb, fallthrough_it->second);
+      } break;
+
+      case Mir::OP_JMP_FALSE: {
+        Mir::Basic_Block *target_mir_bb = instr.left.bb;
+        Mir::Basic_Block *fallthrough_bb = target_mir_bb->fallthrough;
+
+        llvm::Value *cond = visit_operand(instr.right, true, instr.span);
+        Type *unused = nullptr;
+        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
+
+        if (!cond->getType()->isIntegerTy(1)) {
+          cond = builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 0), "boolconv");
         }
 
-        builder.CreateCondBr(cond, target_bb, fallthrough_bb);
+        auto it = bb_table.find(target_mir_bb);
+        if (it == bb_table.end()) {
+          throw_error("Unknown target basic block", instr.span);
+        }
+        llvm::BasicBlock *target_bb = it->second;
+
+        auto fallthrough_it = bb_table.find(fallthrough_bb);
+        if (fallthrough_it == bb_table.end()) {
+          throw_error("Unknown fallthrough basic block", instr.span);
+        }
+        builder.CreateCondBr(cond, target_bb, fallthrough_it->second);
       } break;
 
       case Mir::OP_PUSH_ARG: {
@@ -652,7 +629,7 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load, Span span) {
         throw_error("use of undeclared global variable", span);
       }
       if (do_load) {
-        return builder.CreateLoad(llvm_typeof(o.type), gv, "loadtmp");
+        return builder.CreateLoad(llvm_typeof(o.type), gv, gv->getName());
       }
       return gv;
     }
@@ -667,7 +644,7 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, bool do_load, Span span) {
         case Mir::Constant::CONST_CHAR:
           return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.char_lit);
         case Mir::Constant::CONST_STRING:
-          return builder.CreateGlobalString(o.imm.string_lit.get_str());
+          return builder.CreateGlobalString(unescape_string_lit(o.imm.string_lit.get_str()));
         default:
           return nullptr;
       }

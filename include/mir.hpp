@@ -18,8 +18,6 @@
 */
 namespace Mir {
 enum Op_Code : uint8_t {
-  OP_NOOP,  // no operands or destination.
-
   /* Arithmetic */
   // dest=result, left=left, right=right :D. unary only stores left operand.
   OP_ADD,
@@ -157,7 +155,7 @@ struct Operand {
 
   static Operand MakeNull() { return {.tag = OPERAND_NULL}; }
 
-  static Operand Make_Ty(Type *t) {
+  static Operand Make_Type_Ref(Type *t) {
     Operand o;
     o.type = t;
     o.tag = OPERAND_TYPE;
@@ -200,7 +198,7 @@ struct Operand {
 // and optimized.
 struct Module;
 struct Instruction {
-  Op_Code opcode = OP_NOOP;
+  Op_Code opcode;
   Operand dest;
   Operand left;
   Operand right;
@@ -211,6 +209,7 @@ struct Instruction {
 struct Basic_Block {
   InternedString label;
   std::vector<Instruction> code;
+  Basic_Block *fallthrough;
 
   Basic_Block() = default;
   explicit Basic_Block(InternedString l) : label(l) {}
@@ -291,6 +290,9 @@ struct Function {
     } while (clash);
 
     Basic_Block *block = mir_arena.construct<Basic_Block>(*label);
+    if (insert_block) {
+      insert_block->fallthrough = block;
+    }
     basic_blocks.push_back(block);
     insert_block = block;
     return block;

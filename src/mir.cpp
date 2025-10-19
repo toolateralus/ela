@@ -113,7 +113,7 @@ void generate_variable(const THIRVariable *node, Module &m) {
   }
 
   Operand dest = m.create_temporary(node->type->take_pointer_to());
-  EMIT_ALLOCA(dest, Operand::Make_Ty(node->type));
+  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
   Operand *old_alloca = m.current_alloca;
   m.current_alloca = &dest;
@@ -386,6 +386,7 @@ Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m) {
 }
 
 Operand generate_expr_block(const THIRExprBlock *node, Module &m) {
+  generate_variable(node->return_register, m);
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
   }
@@ -447,7 +448,7 @@ Operand generate_member_access(const THIRMemberAccess *node, Module &m) {
 Operand generate_cast(const THIRCast *node, Module &m) {
   Operand value = generate_expr(node->operand, m);
   Operand result = m.create_temporary(node->type);
-  Operand type_operand = Operand::Make_Ty(node->type);
+  Operand type_operand = Operand::Make_Type_Ref(node->type);
   EMIT_CAST(result, value, type_operand);
   return result;
 }
@@ -464,7 +465,7 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   bool used_pre_existing_alloca = false;
   if (!m.current_alloca) {
     dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Ty(node->type));
+    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
   } else {
     // Reuse a variables alloca so we don't have to double allocate.
     used_pre_existing_alloca = true;
@@ -501,7 +502,7 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
   bool used_pre_existing_alloca = false;
   if (!m.current_alloca) {
     dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Ty(node->type));
+    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
   } else {
     used_pre_existing_alloca = true;
     dest = *m.current_alloca;
@@ -531,7 +532,7 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
   bool used_pre_existing_alloca = false;
   if (!m.current_alloca) {
     dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Ty(node->type));
+    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
   } else {
     used_pre_existing_alloca = true;
     dest = *m.current_alloca;

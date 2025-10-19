@@ -111,7 +111,7 @@ int CompileCommand::compile() {
       llvm_emitter.emit_module();
 
       std::error_code ec;
-      llvm::raw_fd_ostream llvm_output_stream("output.llir", ec);
+      llvm::raw_fd_ostream llvm_output_stream("output.ll", ec);
       if (ec) {
         throw_error(ec.message(), {});
       }

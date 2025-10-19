@@ -291,11 +291,12 @@ struct LLVM_Emitter {
 
   struct Allocation {
     Type *type;
+    InternedString name;
     llvm::Value *value;
     bool is_memory = false;
     inline llvm::Value *read(llvm::IRBuilder<> &builder, LLVM_Emitter &emitter, bool requires_load = false) {
       if (is_memory && requires_load) {
-        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value);
+        return builder.CreateLoad(emitter.llvm_typeof(type->get_element_type()), value, name.get_str());
       } else {  // return the pointer or the SSA register
         return value;
       }
@@ -308,6 +309,7 @@ struct LLVM_Emitter {
   inline void insert_temp(uint32_t idx, Mir::Function *f, bool is_memory, llvm::Value *v) {
     Allocation allocation = {
         .type = f->temps[idx].type,
+        .name = f->temps[idx].name,
         .value = v,
         .is_memory = is_memory,
     };

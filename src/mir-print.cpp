@@ -251,9 +251,6 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
   const char *opcode_name;
 
   switch (opcode) {
-    case OP_NOOP:
-      opcode_name = "NOP";
-      break;
     case OP_ADD:
       opcode_name = "ADD";
       break;

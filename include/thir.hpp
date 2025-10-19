@@ -162,7 +162,8 @@ struct THIRType : THIR {
 };
 
 // this is just a block that can return a value, and can be used as an expression.
-// this distinction is important in C, but llvm ir too probably.
+// used primarily for 
+// x := if true { 1 } else { false };
 struct THIRExprBlock : THIR {
   std::vector<THIR *> statements;
   THIRVariable *return_register;
