@@ -424,7 +424,10 @@ Operand generate_call(const THIRCall *node, Module &m) {
     EMIT_PUSH_ARG(arg_operand);
   }
 
-  Operand result = m.create_temporary(node->type);
+  Operand result = Operand::MakeNull();
+  if (node->type != void_type()) {
+    result = m.create_temporary(node->type);
+  }
   Operand fn_operand = generate_expr(node->callee, m);
   Operand arg_count = Operand::Make_Imm(Constant::Int(node->arguments.size()), u32_type());
 
