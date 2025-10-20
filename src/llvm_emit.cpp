@@ -370,7 +370,7 @@ void LLVM_Emitter::emit_module() {
 
   for (const Global_Variable *gv : m.global_variables) {
     llvm::Type *gv_type = llvm_typeof(gv->type);
-    llvm::Constant *initializer = nullptr;
+    llvm::Constant *initializer = llvm::Constant::getNullValue(gv_type);
     llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage,
                                                              initializer, gv->name.get_str());
     global_variables[gv] = llvm_gv;
@@ -438,7 +438,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_GE: {
         llvm::Value *left = visit_operand(instr.left, instr.span);
         llvm::Value *right = visit_operand(instr.right, instr.span);
-        
+
         if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
           llvm::Value *result = pointer_binary(left, right, instr);
           insert_temp(instr.dest.temp, f, result);

@@ -373,7 +373,6 @@ struct Module {
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.
-  std::stack<Operand> current_alloca_stack {};                  // also only used for lowering
   Function *current_function;
 
 

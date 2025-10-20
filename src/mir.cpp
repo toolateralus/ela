@@ -118,16 +118,7 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
   Operand dest = m.create_temporary(node->type->take_pointer_to());
   EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
-  m.current_alloca_stack.push(dest);
-  const size_t length_after_push = m.current_alloca_stack.size();
-
   Operand value_temp = generate_expr(node->value, m);
-
-  if (m.current_alloca_stack.size() == length_after_push) {
-    // We didn't actually use the alloca, which is strange. print a warning and pop it.
-    m.current_alloca_stack.pop();
-    printf("didn't use the 'current_alloca'\n");
-  }
 
   // If we took advantage of the pre-existing alloca thing with m.current alloca,
   // we wrote directly into the variables storage, so a store here would be redundant
@@ -233,13 +224,12 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
       EMIT_STORE(lvalue_addr, rvalue);
       return rvalue;
     } else {
-
-      Operand current_val = lvalue_addr; // Parameters don't need to load.
+      Operand current_val = lvalue_addr;  // Parameters don't need to load.
       if (!lvalue_addr.is_parameter) {
         Operand current_val = m.create_temporary(node->left->type);
         EMIT_LOAD(current_val, lvalue_addr);
       }
-      
+
       Operand result = m.create_temporary(node->type);
 
       Op_Code op;
@@ -485,13 +475,13 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   Operand dest = Operand::MakeNull();
   // bool used_pre_existing_alloca = false;
   // if (m.current_alloca_stack.empty()) {
-    dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+  dest = m.create_temporary(node->type->take_pointer_to());
+  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
   // } else {
-    // Reuse a variables alloca so we don't have to double allocate.
-    // used_pre_existing_alloca = true;
-    // dest = m.current_alloca_stack.top();
-    // m.current_alloca_stack.pop();
+  // Reuse a variables alloca so we don't have to double allocate.
+  // used_pre_existing_alloca = true;
+  // dest = m.current_alloca_stack.top();
+  // m.current_alloca_stack.pop();
   // }
 
   for (const auto &[key, value] : node->key_values) {
@@ -513,24 +503,16 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
 
   // The consumer of the pre existing alloca will load, this prevents an unneccesary double load.
   // if (!used_pre_existing_alloca) {
-    Operand result = m.create_temporary(node->type);
-    EMIT_LOAD(result, dest);
-    return result;
+  Operand result = m.create_temporary(node->type);
+  EMIT_LOAD(result, dest);
+  return result;
   // }
   // return dest;
 }
 
 Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m) {
-  Operand dest = Operand::MakeNull();
-  bool used_pre_existing_alloca = false;
-  if (m.current_alloca_stack.empty()) {
-    dest = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
-  } else {
-    used_pre_existing_alloca = true;
-    dest = m.current_alloca_stack.top();
-    m.current_alloca_stack.pop();
-  }
+  Operand dest = m.create_temporary(node->type->take_pointer_to());
+  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
   for (size_t i = 0; i < node->values.size(); i++) {
     Operand element_addr = m.create_temporary(node->values[i]->type->take_pointer_to());
@@ -542,36 +524,16 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
   }
 
   Operand result = m.create_temporary(node->type);
-
-  if (!used_pre_existing_alloca) {
-    Operand result = m.create_temporary(node->type);
-    EMIT_LOAD(result, dest);
-    return result;
-  }
-
+  EMIT_LOAD(result, dest);
   return result;
 }
 
 Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) {
-  Operand ptr = Operand::MakeNull();
-
-  bool used_pre_existing_alloca = false;
-  if (m.current_alloca_stack.empty()) {
-    ptr = m.create_temporary(node->type->take_pointer_to());
-    EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
-  } else {
-    used_pre_existing_alloca = true;
-    ptr = m.current_alloca_stack.top();
-    m.current_alloca_stack.pop();
-  }
-
+  Operand ptr = m.create_temporary(node->type->take_pointer_to());
+  EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   auto result = m.create_temporary(node->type);
   EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
-
-  if (!used_pre_existing_alloca) {
-    EMIT_LOAD(result, ptr);
-  }
-
+  EMIT_LOAD(result, ptr);
   return result;
 }
 
