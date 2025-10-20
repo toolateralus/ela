@@ -68,8 +68,9 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   m.current_function->set_insert_block(entry);
   generate_block(node->block, m);
 
-  Basic_Block *insert_block = f->get_insert_block();
-  if (f->type_info->return_type == void_type() && (insert_block->code.empty() || insert_block->back_opcode() != OP_RET_VOID)) {
+  Basic_Block *end = f->basic_blocks.back();
+  if (f->type_info->return_type == void_type() && (end->code.empty() || end->back_opcode() != OP_RET_VOID)) {
+    m.current_function->set_insert_block(end);
     EMIT_OP(OP_RET_VOID);
   }
   m.leave_function();
@@ -629,9 +630,22 @@ void generate_if(const THIRIf *node, Module &m) {
   m.current_function->set_insert_block(then_bb);
   generate_block(node->block, m);
 
+  if (!then_bb->ends_with_terminator()) {
+    auto insert_block = m.get_insert_block();
+    m.current_function->set_insert_block(then_bb);
+    EMIT_JUMP(end_bb);
+    m.current_function->set_insert_block(insert_block);
+  }
+
   if (else_bb) {
     m.current_function->set_insert_block(else_bb);
     generate(node->_else, m);
+    if (!else_bb->ends_with_terminator()) {
+      auto insert_block = m.get_insert_block();
+      m.current_function->set_insert_block(else_bb);
+      EMIT_JUMP(end_bb);
+      m.current_function->set_insert_block(insert_block);
+    }
   }
 
   m.current_function->set_insert_block(end_bb);

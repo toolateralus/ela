@@ -1,5 +1,6 @@
 #pragma once
 
+#include "interned_string.hpp"
 #include "mir.hpp"
 #include "core.hpp"
 #include "type.hpp"
@@ -301,9 +302,18 @@ struct LLVM_Emitter {
   std::unordered_map<uint32_t, Allocation> temps;
 
   inline void insert_temp(uint32_t idx, Mir::Function *f, llvm::Value *v) {
+    Type *type = nullptr;
+    InternedString name = "";
+    
+    // We have to check this for stuff like void call returns.
+    if (f->temps.size() < (size_t)idx) {
+      type = f->temps[idx].type;
+      name = f->temps[idx].name;
+    }
+
     Allocation allocation = {
-        .type = f->temps[idx].type,
-        .name = f->temps[idx].name,
+        .type = type,
+        .name = name,
         .value = v,
     };
 
