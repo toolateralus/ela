@@ -357,7 +357,6 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
 }
 
 void LLVM_Emitter::emit_module() {
-  // Forward declare all functions by header so we can refer to them in other functions with no worry
   file = dbg.enter_file_scope(m.functions[0]->span);
 
   for (const auto &f : m.functions) {

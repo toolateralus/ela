@@ -589,7 +589,11 @@ void generate_block(const THIRBlock *node, Module &m) {
 }
 
 void generate_for(const THIRFor *node, Module &m) {
-  generate(node->initialization, m);
+  if (node->get_node_type() == THIRNodeType::Variable) {
+    generate_variable((THIRVariable *)node->initialization, m);
+  } else {
+    generate(node->initialization, m);
+  }
 
   Basic_Block *orig_bb = m.get_insert_block();
 

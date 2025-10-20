@@ -110,3 +110,26 @@ I know i'm forgetting loads of things. the commit history is a nightmare so bewa
 I will try my best to remember to maintain this log from here on out.
 
 --------------------------------------------------------------------------------------------------------------------
+
+-------- (toolaterlus) 10/20/2025, 4:36:56 PM ----------------------------------------------------------------------
+
+- While writing the LLVM backend and MIR system, I decided that having a c style for loop is obviously a good idea. So I implemented them as:
+
+  ```
+    for i := 0; i < 100; ++i {
+      ...
+    }
+  ```
+
+  The only thing worth noting here, is that the init variable, `i := 0` in this case, is automatically mutable,
+  because writing:
+
+  ```
+    for mut i := 0; i < 100; ++i {
+
+    }
+  ```
+  is just ugly and dumb. you'll never have an immutable loop variable, in 99% of cases.
+
+
+--------------------------------------------------------------------------------------------------------------------
