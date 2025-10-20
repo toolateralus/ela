@@ -282,6 +282,9 @@ struct DIManager {
   }
 
   inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
+    if (compile_command.has_flag("nl")) {
+      return v;
+    }
     if (auto *inst = llvm::dyn_cast<llvm::Instruction>(v)) {
       attach_debug_info(inst, span);
     }
@@ -289,6 +292,9 @@ struct DIManager {
   }
 
   inline llvm::Instruction *create_dbg(llvm::Instruction *v, Span span) {
+    if (compile_command.has_flag("nl")) {
+      return v;
+    }
     attach_debug_info(v, span);
     return v;
   }

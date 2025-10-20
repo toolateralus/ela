@@ -544,6 +544,8 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
   Operand ptr = m.create_temporary(node->type->take_pointer_to());
   EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   auto result = m.create_temporary(node->type);
+  // TODO: this is completely fucking 
+  // this reuses a temp for no reason
   EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
   EMIT_LOAD(result, ptr);
   return result;
