@@ -95,7 +95,6 @@ Operand load_variable(const THIRVariable *node, Module &m) {
 
   auto it = m.variables.find(node);
   if (it == m.variables.end()) {
-    throw_error(std::format("variable '{}' not declared", node->name.get_str().c_str()), node->span);
     throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
   }
 
