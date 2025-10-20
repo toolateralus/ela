@@ -38,6 +38,7 @@ struct ASTCopier {
   ASTContinue *copy_continue(ASTContinue *node);
   ASTBreak *copy_break(ASTBreak *node);
   ASTFor *copy_for(ASTFor *node);
+  ASTForCStyle *copy_for_c_style(ASTForCStyle *node);
   ASTIf *copy_if(ASTIf *node);
   ASTElse *copy_else(ASTElse *node);
   ASTWhile *copy_while(ASTWhile *node);

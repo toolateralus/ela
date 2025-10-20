@@ -99,7 +99,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
   auto from_t = expr->resolved_type;
   auto to_t = to;
   auto conv_rule = type_conversion_rule(from_t, to_t, span);
-  
+
   if (to != expr->resolved_type && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()), span);
   }
@@ -2778,8 +2778,7 @@ void Typer::visit(ASTInitializerList *node) {
 
       for (const auto &[id, value] : node->key_values) {
         if (names.contains(id)) {
-          throw_error(std::format("Duplicate member initialization in named initializer list. member {}", id.str()),
-                      value->span);
+          throw_error(std::format("Duplicate member initialization in named initializer list. member {}", id.str()), value->span);
         }
         names.insert(id);
         auto symbol = scope->local_lookup(id);
@@ -4152,3 +4151,15 @@ void Typer::visit(ASTUnpackElement *) {
 }
 
 void Typer::visit(ASTRun *node) { node->node_to_run->accept(this); }
+
+void Typer::visit(ASTForCStyle *node) {
+  ENTER_SCOPE(node->scope);
+  // the init is always implicitly mut, just so it's a little more ergonomic.
+  if (node->initialization->mutability != MUT) {
+    node->initialization->mutability = MUT;
+  }
+  node->initialization->accept(this);
+  node->condition->accept(this);
+  node->increment->accept(this);
+  node->block->accept(this);
+};

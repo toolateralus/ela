@@ -45,6 +45,7 @@ struct VisitorBase {
   virtual void visit(ASTContinue *node) = 0;
   virtual void visit(ASTBreak *node) = 0;
   virtual void visit(ASTFor *node) = 0;
+  virtual void visit(ASTForCStyle *node) = 0;
   virtual void visit(ASTIf *node) = 0;
   virtual void visit(ASTElse *node) = 0;
   virtual void visit(ASTWhile *node) = 0;
@@ -131,6 +132,7 @@ struct Typer : VisitorBase {
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
   void visit(ASTLiteral *node) override;
+  void visit(ASTForCStyle *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTType *node) override;
   void visit(ASTTraitDeclaration *node) override;

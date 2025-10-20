@@ -33,6 +33,7 @@ enum ASTNodeType {
   AST_NODE_CONTINUE,
   AST_NODE_BREAK,
   AST_NODE_FOR,
+  AST_NODE_FOR_C_STYLE,
   AST_NODE_IF,
   AST_NODE_ELSE,
   AST_NODE_WHILE,
@@ -791,6 +792,16 @@ struct ASTRange : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
 
+struct ASTForCStyle: ASTStatement {
+  Scope *scope;
+  ASTVariable *initialization;
+  ASTExpr *condition;
+  ASTExprStatement *increment;
+  ASTBlock *block;
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_FOR_C_STYLE; }
+};
+
 struct ASTFor : ASTStatement {
   enum {
     // implicitly pulled an iter() off a type that implements Iterable![T]
@@ -1338,6 +1349,7 @@ struct Parser {
   std::vector<Attribute> parse_statement_attributes();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
+  ASTForCStyle *parse_for_c_style();
   ASTPath::Segment parse_path_segment();
   ASTImport *parse_import();
   ASTModule *parse_module();

@@ -2337,7 +2337,8 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
       return visit_defer((ASTDefer *)ast);
     case AST_NODE_PROGRAM:
       return visit_program((ASTProgram *)ast);
-
+    case AST_NODE_FOR_C_STYLE:
+      return visit_for_c_style((ASTForCStyle *)ast);
     // Ignored nodes.
     case AST_NODE_NOOP:
     case AST_NODE_ALIAS:
@@ -2692,4 +2693,15 @@ void THIRGen::check_for_deprecation(Span call_site, THIR *thir) {
   if (thir->deprecated) {
     format_and_print_deprecated_warning(call_site, thir, thir->deprecated_attr);
   }
+}
+
+THIR *THIRGen::visit_for_c_style(ASTForCStyle *ast) {
+  ENTER_SCOPE(ast->scope);
+  THIR_ALLOC(THIRFor, thir, ast);
+  thir->initialization = visit_node(ast->initialization);
+  thir->condition = visit_node(ast->condition);
+  thir->increment = visit_node(ast->increment);
+  thir->block = visit_node(ast->block);
+  thir->is_statement = true;
+  return thir;
 }

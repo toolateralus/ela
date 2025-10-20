@@ -605,6 +605,9 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_NOOP:
       new_node = node;
       break;
+    case AST_NODE_FOR_C_STYLE:
+      new_node = copy_for_c_style((ASTForCStyle*)node);
+      break;
   }
 
   if (new_node->is_expr()) {
@@ -775,5 +778,14 @@ ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   auto new_node = make_copy(node);
   new_node->callee = (ASTDotExpr *)copy_node(node->callee);
   new_node->arguments = (ASTArguments *)copy_node(node->arguments);
+  return new_node;
+}
+
+ASTForCStyle *ASTCopier::copy_for_c_style(ASTForCStyle *node) {
+  auto new_node = make_copy(node);
+  new_node->initialization = copy_variable(node->initialization);
+  new_node->condition = (ASTExpr*)copy_node(node->condition);
+  new_node->increment = copy_expr_statement(node->increment);
+  new_node->block = copy_block(node->block);
   return new_node;
 }

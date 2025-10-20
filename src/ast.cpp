@@ -1048,7 +1048,8 @@ ASTExpr *Parser::parse_postfix() {
       Precedence peeked_prec = get_operator_precedence(peeked);
 
       if (peeked.type == TType::Integer || peeked.type == TType::Identifier || peeked.type == TType::Mul ||
-          peeked.type == TType::LParen || peeked.type == TType::Size_Of || peeked.type == TType::Dyn_Of || peeked.type == TType::Type_Of || peeked_prec != Precedence::PRECEDENCE_INVALID_OPERATOR) {
+          peeked.type == TType::LParen || peeked.type == TType::Size_Of || peeked.type == TType::Dyn_Of ||
+          peeked.type == TType::Type_Of || peeked_prec != Precedence::PRECEDENCE_INVALID_OPERATOR) {
         node->right = parse_expr();
       }
 
@@ -2061,6 +2062,16 @@ ASTStatement *Parser::parse_statement() {
     }
 
     if (tok.type == TType::For) {
+      const bool mutable_c_style = lookahead_buf()[1].type == TType::Mut && lookahead_buf()[2].type == TType::Identifier &&
+                                   (lookahead_buf()[3].type == TType::Colon || lookahead_buf()[3].type == TType::ColonEquals);
+
+      const bool regular_c_style = lookahead_buf()[1].type == TType::Identifier &&
+                                   (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
+
+      if (mutable_c_style || regular_c_style) {
+        return parse_for_c_style();
+      }
+
       NODE_ALLOC(ASTFor, node, range, _, this)
       eat();
 
@@ -2089,7 +2100,22 @@ ASTStatement *Parser::parse_statement() {
         auto expr = parse_expr();
         node->right = expr;
       } else {
-        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in iterable || for *elem in iterable'", range);
+        constexpr const char *error_string = R"_(
+Invalid 'for' syntax.
+expected:
+  for i in 0..10 { .. } (where 0..10 could be any iterator or iterable, we will use $iter from now on)
+  for a, b in $iter { .. }
+  for a, *b in $iter { .. }
+  for ptr in iter_mut() { .. }
+
+Or, for a "C Style" for loop: (You do not need mut in the declaration. it is implicitly mutable)
+  for i: s32 = 0; i < 100; i += 1 { .. }
+  for i := 100; i > 0; i -= 1 { .. }
+
+  (I didn't cover _every_ variation, but it's available in the tutorial documentation)
+        )_";
+
+        throw_error(error_string, range);
       }
 
       node->block = parse_block();
@@ -3332,4 +3358,21 @@ ASTType *Parser::context_trait_ast_type() {
     type->normal.path = path;
   }
   return type;
+}
+
+ASTForCStyle *Parser::parse_for_c_style() {
+  NODE_ALLOC(ASTForCStyle, ast, _, _1, this);
+  ast->scope = create_child(ctx.scope);
+  ENTER_SCOPE(ast->scope);
+  
+  NODE_ALLOC(ASTExprStatement, stmt, _2, _3, this);
+  expect(TType::For);
+  ast->initialization = parse_variable();
+  expect(TType::Semi);
+  ast->condition = parse_expr();
+  expect(TType::Semi);
+  stmt->expression = parse_expr();
+  ast->increment = stmt;
+  ast->block = parse_block();
+  return ast;
 }
