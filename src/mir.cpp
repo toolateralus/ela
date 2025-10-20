@@ -233,8 +233,13 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
       EMIT_STORE(lvalue_addr, rvalue);
       return rvalue;
     } else {
-      Operand current_val = m.create_temporary(node->left->type);
-      EMIT_LOAD(current_val, lvalue_addr);
+
+      Operand current_val = lvalue_addr; // Parameters don't need to load.
+      if (!lvalue_addr.is_parameter) {
+        Operand current_val = m.create_temporary(node->left->type);
+        EMIT_LOAD(current_val, lvalue_addr);
+      }
+      
       Operand result = m.create_temporary(node->type);
 
       Op_Code op;
