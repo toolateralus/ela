@@ -406,12 +406,14 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
           right_info = new_type->info->as<ScalarTypeInfo>();
         }
 
-        std::error_code ec;
-        llvm::raw_fd_ostream stream("-", ec);
-        left->getType()->print(stream);
-        stream.write('\n');
-        right->getType()->print(stream);
-        stream.write('\n');
+        if (false) {
+          std::error_code ec;
+          llvm::raw_fd_ostream stream("-", ec);
+          left->getType()->print(stream);
+          stream.write('\n');
+          right->getType()->print(stream);
+          stream.write('\n');
+        }
 
         if (left_info->is_signed() && right_info->is_signed()) {
           result = binary_signed(left, right, instr.opcode);
