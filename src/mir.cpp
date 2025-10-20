@@ -146,9 +146,7 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
             throw_error(std::format("global variable '{}' failed to lazy init", var->name.get_str()), var->span);
           }
         }
-        Operand result = m.create_temporary(var->type->take_pointer_to());
-        EMIT_LOAD(result, Operand::Make_Global_Ref(it->second));
-        return result;
+        return Operand::Make_Global_Ref(it->second);
       }
 
       auto it = m.variables.find(var);

@@ -388,7 +388,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
   auto print_operand_to_string = [&append_constant](const Operand &op, bool is_destination = false) -> std::string {
     switch (op.tag) {
       case Operand::OPERAND_NULL:
-        return "null";
+        return "<null>";
       case Operand::OPERAND_TEMP: {
         std::string s = "t" + std::to_string(op.temp);
         // we don't double print the type of temps because
@@ -410,20 +410,20 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
         return s;
       }
       case Operand::OPERAND_IMMEDIATE_VALUE: {
-        std::string s = "imm(";
+        std::string s = "IMM(";
         s += append_constant(op.imm);
-        s += ", ";
+        s += ", TY";
         s += format_type_ref(op.type);
         s += ")";
         return s;
       }
       case Operand::OPERAND_BASIC_BLOCK:
-        return std::string("bb(") + op.bb->label.get_str() + ")";
+        return std::string("BB(") + op.bb->label.get_str() + ')';
       case Operand::OPERAND_TYPE:
-        return format_type_ref(op.type);
+        return "TY" + format_type_ref(op.type); // the parens already come from the type ref formatter
       case Operand::OPERAND_BASIC_BLOCK_PAIR:
-        return std::string("target(") + op.bb_pair.target->label.get_str() + "), ";
-        return std::string("fallthrough(") + op.bb_pair.target->label.get_str() + ")";
+        return std::string("TARGET_BB(") + op.bb_pair.target->label.get_str() + "), ";
+        return std::string("FALLTHROUGH_BB(") + op.bb_pair.target->label.get_str() + ")";
         break;
     }
     return "";
