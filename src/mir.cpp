@@ -66,7 +66,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   m.create_basic_block("entry");
   generate_block(node->block, m);
   Basic_Block *insert_block = f->get_insert_block();
-  if (f->type_info->return_type == void_type() && (!insert_block->code.size() || insert_block->back_opcode() != OP_RET_VOID)) {
+  if (f->type_info->return_type == void_type() && (insert_block->code.empty() || insert_block->back_opcode() != OP_RET_VOID)) {
     EMIT_OP(OP_RET_VOID);
   }
   m.leave_function();
@@ -83,6 +83,15 @@ void generate_block(const THIRBlock *node, Module &m) {
 }
 
 Operand load_variable(const THIRVariable *node, Module &m) {
+  auto it = m.variables.find(node);
+  if (it == m.variables.end()) {
+    throw_error(std::format("variable '{}' not declared", node->name.get_str()), node->span);
+  }
+
+  if (it->second.is_parameter) {
+    return it->second;  // parameters do not have to be loaded, they are the only "register based" SSA values in the MIR.
+  }
+
   Operand result = m.create_temporary(node->type);
   if (node->is_global || node->is_static) {
     auto g_var = m.global_variable_table[node];
@@ -90,10 +99,6 @@ Operand load_variable(const THIRVariable *node, Module &m) {
     return result;
   }
 
-  auto it = m.variables.find(node);
-  if (it == m.variables.end()) {
-    throw_error(std::format("variable '{}' not declared", node->name.get_str()), node->span);
-  }
   EMIT_LOAD(result, it->second);
   return result;
 }
@@ -113,10 +118,16 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
   Operand dest = m.create_temporary(node->type->take_pointer_to());
   EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
-  Operand *old_alloca = m.current_alloca;
-  m.current_alloca = &dest;
+  m.current_alloca_stack.push(dest);
+  const size_t length_after_push = m.current_alloca_stack.size();
 
   Operand value_temp = generate_expr(node->value, m);
+
+  if (m.current_alloca_stack.size() == length_after_push) {
+    // We didn't actually use the alloca, which is strange. print a warning and pop it.
+    m.current_alloca_stack.pop();
+    printf("didn't use the 'current_alloca'\n");
+  }
 
   // If we took advantage of the pre-existing alloca thing with m.current alloca,
   // we wrote directly into the variables storage, so a store here would be redundant
@@ -125,7 +136,7 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
   }
 
   m.variables[node] = dest;
-  m.current_alloca = old_alloca;
+
   return dest;
 }
 
@@ -199,9 +210,9 @@ Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
     }
   }
 
-  Operand field_index = Operand::Make_Imm(Constant::Int(index), u32_type());
+  const Operand member_idx = Operand::Make_Imm(Constant::Int(index), u32_type());
 
-  EMIT_GEP(result, base_addr, field_index);
+  EMIT_GEP(result, base_addr, member_idx);
   return result;
 }
 
@@ -467,15 +478,16 @@ Operand generate_index(const THIRIndex *node, Module &m) {
 
 Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m) {
   Operand dest = Operand::MakeNull();
-  bool used_pre_existing_alloca = false;
-  if (!m.current_alloca) {
+  // bool used_pre_existing_alloca = false;
+  // if (m.current_alloca_stack.empty()) {
     dest = m.create_temporary(node->type->take_pointer_to());
     EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
-  } else {
+  // } else {
     // Reuse a variables alloca so we don't have to double allocate.
-    used_pre_existing_alloca = true;
-    dest = *m.current_alloca;
-  }
+    // used_pre_existing_alloca = true;
+    // dest = m.current_alloca_stack.top();
+    // m.current_alloca_stack.pop();
+  // }
 
   for (const auto &[key, value] : node->key_values) {
     Type *base = node->type;
@@ -495,23 +507,24 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
   }
 
   // The consumer of the pre existing alloca will load, this prevents an unneccesary double load.
-  if (!used_pre_existing_alloca) {
+  // if (!used_pre_existing_alloca) {
     Operand result = m.create_temporary(node->type);
     EMIT_LOAD(result, dest);
     return result;
-  }
-  return dest;
+  // }
+  // return dest;
 }
 
 Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m) {
   Operand dest = Operand::MakeNull();
   bool used_pre_existing_alloca = false;
-  if (!m.current_alloca) {
+  if (m.current_alloca_stack.empty()) {
     dest = m.create_temporary(node->type->take_pointer_to());
     EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
   } else {
     used_pre_existing_alloca = true;
-    dest = *m.current_alloca;
+    dest = m.current_alloca_stack.top();
+    m.current_alloca_stack.pop();
   }
 
   for (size_t i = 0; i < node->values.size(); i++) {
@@ -526,7 +539,9 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
   Operand result = m.create_temporary(node->type);
 
   if (!used_pre_existing_alloca) {
+    Operand result = m.create_temporary(node->type);
     EMIT_LOAD(result, dest);
+    return result;
   }
 
   return result;
@@ -536,12 +551,13 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
   Operand ptr = Operand::MakeNull();
 
   bool used_pre_existing_alloca = false;
-  if (!m.current_alloca) {
+  if (m.current_alloca_stack.empty()) {
     ptr = m.create_temporary(node->type->take_pointer_to());
     EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   } else {
     used_pre_existing_alloca = true;
-    ptr = *m.current_alloca;
+    ptr = m.current_alloca_stack.top();
+    m.current_alloca_stack.pop();
   }
 
   auto result = m.create_temporary(node->type);
@@ -555,7 +571,7 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
 }
 
 void generate_return(const THIRReturn *node, Module &m) {
-  if (!node->expression || node->expression == THIRNoop::shared()) {
+  if (!node->expression) {
     EMIT_RET_VOID();
     return;
   }

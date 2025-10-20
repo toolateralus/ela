@@ -151,11 +151,16 @@ struct Operand {
     Global_Variable *gv;
     Constant imm;
     Basic_Block *bb;
+
     struct {
       Basic_Block *target;
       Basic_Block *fallthrough;
     } bb_pair;
-    uint32_t temp = 0;
+
+    struct {
+      uint32_t temp = 0;
+      bool is_parameter = false;
+    };
   };
 
   static Operand MakeNull() { return {.tag = OPERAND_NULL}; }
@@ -172,6 +177,15 @@ struct Operand {
     o.temp = i;
     o.type = t;
     o.tag = OPERAND_TEMP;
+    return o;
+  }
+
+  static Operand Make_Parameter_Temp(uint32_t i, Type *t) {
+    Operand o;
+    o.temp = i;
+    o.type = t;
+    o.tag = OPERAND_TEMP;
+    o.is_parameter = true;
     return o;
   }
 
@@ -359,10 +373,9 @@ struct Module {
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.
+  std::stack<Operand> current_alloca_stack {};                  // also only used for lowering
   Function *current_function;
 
-  // Used to save allocations when creating aggregates and directly assigning them to variables.
-  Operand *current_alloca = nullptr;
 
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
@@ -401,9 +414,9 @@ struct Module {
     for (const auto &param : node->parameters) {
       f->temps.push_back({
           .name = generate_temp_identifier(param_idx),
-          .type = param.associated_variable->type->take_pointer_to(), // we have to do this because loading from params is neccesary
+          .type = param.associated_variable->type,
       });
-      variables[param.associated_variable] = Operand::Make_Temp(param_idx, param.associated_variable->type->take_pointer_to());
+      variables[param.associated_variable] = Operand::Make_Parameter_Temp(param_idx, param.associated_variable->type);
       param_idx++;
     }
 
@@ -420,7 +433,9 @@ struct Module {
   }
 
   inline void leave_function() {
-    assert(function_stack.size() && "cannot leave entry point function");
+    if (function_stack.empty()) {
+      throw_error(std::format("function stack was empty but we tried to leave_function(). current_function: {}", current_function->name), current_function->span);
+    }
     current_function = function_stack.top();
     function_stack.pop();
   }

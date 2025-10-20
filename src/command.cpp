@@ -107,7 +107,7 @@ int CompileCommand::compile() {
       }
       m.finalize();
       {
-        auto path = compile_command.binary_path.string() + std::string{".ir"};
+        auto path = compile_command.binary_path.string() + std::string{".emir"};
         FILE *f = fopen(path.c_str(), "w");
         m.print(f);
         fflush(f);
