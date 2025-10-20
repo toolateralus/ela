@@ -83,9 +83,25 @@ void generate_block(const THIRBlock *node, Module &m) {
 }
 
 Operand load_variable(const THIRVariable *node, Module &m) {
+  if (node->is_global || node->is_static) {
+    Operand result = m.create_temporary(node->type);
+
+    auto it = m.global_variable_table.find(node);
+
+    if (it == m.global_variable_table.end()) {
+      generate_variable(node, m);
+      it = m.global_variable_table.find(node);
+      assert(it != m.global_variable_table.end());
+    }
+
+    Global_Variable *g_var = it->second;
+    EMIT_LOAD(result, Operand::Make_Global_Ref(g_var));
+    return result;
+  }
+
   auto it = m.variables.find(node);
   if (it == m.variables.end()) {
-    throw_error(std::format("variable '{}' not declared", node->name.get_str()), node->span);
+    throw_error(std::format("variable '{}' not declared", node->name.get_str().c_str()), node->span);
   }
 
   if (it->second.is_parameter) {
@@ -93,12 +109,6 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   }
 
   Operand result = m.create_temporary(node->type);
-  if (node->is_global || node->is_static) {
-    auto g_var = m.global_variable_table[node];
-    EMIT_LOAD(result, Operand::Make_Global_Ref(g_var));
-    return result;
-  }
-
   EMIT_LOAD(result, it->second);
   return result;
 }
@@ -111,7 +121,6 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
     Global_Variable *gv = mir_arena.construct<Global_Variable>(global);
     m.global_variables.push_back(gv);
     m.global_variable_table[node] = gv;
-    // TODO; figure out how the fuck we're going to make global initializers.
     return Operand::MakeNull();
   }
 
