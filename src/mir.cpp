@@ -63,23 +63,17 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     return Operand::Make_Temp(index, node->type);
   }
   m.enter_function(f);
-  m.create_basic_block("entry");
+
+  Basic_Block *entry = m.create_basic_block("entry");
+  m.current_function->set_insert_block(entry);
   generate_block(node->block, m);
+
   Basic_Block *insert_block = f->get_insert_block();
   if (f->type_info->return_type == void_type() && (insert_block->code.empty() || insert_block->back_opcode() != OP_RET_VOID)) {
     EMIT_OP(OP_RET_VOID);
   }
   m.leave_function();
   return Operand::Make_Temp(index, node->type);
-}
-
-void generate_block(const THIRBlock *node, Module &m) {
-  if (node->statements.empty() || block_only_contains_noop(node)) {
-    return;
-  }
-  for (const THIR *stmt : node->statements) {
-    generate(stmt, m);
-  }
 }
 
 Operand load_variable(const THIRVariable *node, Module &m) {
@@ -102,6 +96,7 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   auto it = m.variables.find(node);
   if (it == m.variables.end()) {
     throw_error(std::format("variable '{}' not declared", node->name.get_str().c_str()), node->span);
+    throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
   }
 
   if (it->second.is_parameter) {
@@ -152,7 +147,7 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
           generate_variable(var, m);
           it = m.global_variable_table.find(var);
           if (it == m.global_variable_table.end()) {
-            throw_error(std::format("global variable '{}' failed to lazy init", var->name.get_str()), var->span);
+            throw_error(std::format("global variable '{}' failed to lazy init", var->name.str()), var->span);
           }
         }
         return Operand::Make_Global_Ref(it->second);
@@ -160,7 +155,7 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
 
       auto it = m.variables.find(var);
       if (it == m.variables.end()) {
-        throw_error(std::format("variable '{}' not declared", var->name.get_str()), var->span);
+        throw_error(std::format("variable '{}' not declared", var->name.str()), var->span);
       }
       return it->second;
     }
@@ -204,7 +199,7 @@ Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
 
   if (node->member != CHOICE_TYPE_DISCRIMINANT_KEY) {
     if (!base->try_get_index_of_member(node->member, index)) {
-      throw_error(std::format("unable to find index of member: {}", node->member.get_str()), node->span);
+      throw_error(std::format("unable to find index of member: {}", node->member.str()), node->span);
     }
   }
 
@@ -412,16 +407,16 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
   Constant value;
   switch (node->tag) {
     case ASTLiteral::Integer:
-      value = Constant::Int(atoll(node->value.get_str().c_str()));
+      value = Constant::Int(atoll(node->value.c_str()));
       break;
     case ASTLiteral::Float:
-      value = Constant::Float(atof(node->value.get_str().c_str()));
+      value = Constant::Float(atof(node->value.c_str()));
       break;
     case ASTLiteral::Bool:
       value = Constant::Bool(node->value == "true" ? true : false);
       break;
     case ASTLiteral::Char:
-      value = Constant::Char(node->value.get_str()[0]);  // TODO: handle utf8
+      value = Constant::Char(node->value.str()[0]);  // TODO: handle utf8
       break;
     case ASTLiteral::String:
     case ASTLiteral::MultiLineString:
@@ -496,7 +491,7 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
     size_t field_index = 0;
     if (key != CHOICE_TYPE_DISCRIMINANT_KEY) {
       if (!base->try_get_index_of_member(key, field_index)) {
-        throw_error(std::format("unable to find index of member: {}", key.get_str()), node->span);
+        throw_error(std::format("unable to find index of member: {}", key.str()), node->span);
       }
     }
 
@@ -569,10 +564,23 @@ void generate_continue(const THIRContinue *node, Module &m) {
   EMIT_JUMP(target);
 }
 
+void generate_block(const THIRBlock *node, Module &m) {
+  if (node->statements.empty() || block_only_contains_noop(node)) {
+    return;
+  }
+  for (const THIR *stmt : node->statements) {
+    generate(stmt, m);
+    if (stmt->get_node_type() == THIRNodeType::Return) {
+      // We terminate this basic block on return. to emit intructions after this
+      // point would be illegal.
+      return;
+    }
+  }
+}
+
 void generate_for(const THIRFor *node, Module &m) {
   generate(node->initialization, m);
 
-  // remember the block where initialization finished
   Basic_Block *orig_bb = m.get_insert_block();
 
   Basic_Block *cond_bb = m.create_basic_block("for");
@@ -580,16 +588,13 @@ void generate_for(const THIRFor *node, Module &m) {
   Basic_Block *incr_bb = m.create_basic_block("incr");
   Basic_Block *after_bb = m.create_basic_block("done");
 
-  // jump from original to cond
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
 
-  // cond
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
   EMIT_JUMP_TRUE(body_bb, after_bb, cond);
 
-  // body
   m.current_function->set_insert_block(body_bb);
   g_break_targets.push_back(after_bb);
   g_continue_targets.push_back(incr_bb);
@@ -600,42 +605,37 @@ void generate_for(const THIRFor *node, Module &m) {
   g_continue_targets.pop_back();
   EMIT_JUMP(incr_bb);
 
-  // incr
   m.current_function->set_insert_block(incr_bb);
   generate(node->increment, m);
 
   EMIT_JUMP(cond_bb);
-
-  // after
   m.current_function->set_insert_block(after_bb);
 }
 
 void generate_if(const THIRIf *node, Module &m) {
   Operand cond = generate_expr(node->condition, m);
 
-  Basic_Block *cond_bb = m.get_insert_block();
+  Basic_Block *if_bb = m.get_insert_block();
   Basic_Block *then_bb = m.create_basic_block("then");
   Basic_Block *else_bb = node->_else ? m.create_basic_block("else") : nullptr;
-  Basic_Block *after_bb = m.create_basic_block("end");
+  Basic_Block *end_bb = m.create_basic_block("end");
+  m.current_function->set_insert_block(if_bb);
 
-  m.current_function->set_insert_block(cond_bb);
   if (else_bb) {
     EMIT_JUMP_TRUE(then_bb, else_bb, cond);
   } else {
-    EMIT_JUMP_TRUE(then_bb, after_bb, cond);
+    EMIT_JUMP_TRUE(then_bb, end_bb, cond);
   }
 
   m.current_function->set_insert_block(then_bb);
-  generate(node->block, m);
-  EMIT_JUMP(after_bb);
+  generate_block(node->block, m);
 
   if (else_bb) {
     m.current_function->set_insert_block(else_bb);
     generate(node->_else, m);
-    EMIT_JUMP(after_bb);
   }
 
-  m.current_function->set_insert_block(after_bb);
+  m.current_function->set_insert_block(end_bb);
 }
 
 void generate_while(const THIRWhile *node, Module &m) {
@@ -668,5 +668,15 @@ Operand Operand::Make_Global_Ref(Global_Variable *gv_ref) {
   o.type = gv_ref->type;
   o.tag = OPERAND_GLOBAL_VARIABLE_REFERENCE;
   return o;
+}
+
+void Basic_Block::finalize(Function *f) const {
+  if (!ends_with_terminator()) {
+    printf(
+        "in function: %s, basic block: %s\n"
+        "malformed basic block: every basic block must end with one of the following instructions:\n[OP_JMP, OP_JMP_TRUE, "
+        "OP_RET, OP_RET_VOID]\n",
+        f->name.c_str(), label.c_str());
+  }
 }
 }  // namespace Mir

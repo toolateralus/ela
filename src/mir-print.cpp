@@ -130,14 +130,14 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_DYN: {
       auto info = t->info->as<DynTypeInfo>();
       print_indent();
-      fprintf(f, "(%zu): struct dyn %s {\n", t->uid, info->trait_type->basename.get_str().c_str());
+      fprintf(f, "(%zu): struct dyn %s {\n", t->uid, info->trait_type->basename.c_str());
 
       for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
       fprintf(f, "instance: %s\n", format_type_ref(void_type()->take_pointer_to()).c_str());
 
       for (const auto &method : info->methods) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
-        fprintf(f, "%s: %s\n", method.first.get_str().c_str(), format_type_ref(method.second).c_str());
+        fprintf(f, "%s: %s\n", method.first.c_str(), format_type_ref(method.second).c_str());
       }
 
       print_indent();
@@ -147,10 +147,10 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_STRUCT: {
       auto info = t->info->as<StructTypeInfo>();
       print_indent();
-      fprintf(f, "(%zu): %sstruct %s {\n", t->uid, info->is_union ? "union " : "", t->basename.get_str().c_str());
+      fprintf(f, "(%zu): %sstruct %s {\n", t->uid, info->is_union ? "union " : "", t->basename.c_str());
       for (const auto &member : t->info->members) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
-        fprintf(f, "%s: %s\n", member.name.get_str().c_str(), format_type_ref(member.type).c_str());
+        fprintf(f, "%s: %s\n", member.name.c_str(), format_type_ref(member.type).c_str());
       }
       print_indent();
       fprintf(f, "}\n");
@@ -159,11 +159,10 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     case TYPE_ENUM: {
       auto info = t->info->as<EnumTypeInfo>();
       print_indent();
-      fprintf(f, "(%zu): enum %s : %s {\n", t->uid, t->basename.get_str().c_str(),
-              format_type_ref(info->underlying_type).c_str());
+      fprintf(f, "(%zu): enum %s : %s {\n", t->uid, t->basename.c_str(), format_type_ref(info->underlying_type).c_str());
       for (const auto &member : t->info->members) {
         for (int i = 0; i < indent + 2; ++i) fprintf(f, " ");
-        fprintf(f, "%s\n", member.name.get_str().c_str());
+        fprintf(f, "%s\n", member.name.c_str());
       }
       print_indent();
       fprintf(f, "}\n");
@@ -182,11 +181,11 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
     }
     case TYPE_CHOICE: {
       print_indent();
-      fprintf(f, "(%zu): choice %s {\n", t->uid, t->basename.get_str().c_str());
+      fprintf(f, "(%zu): choice %s {\n", t->uid, t->basename.c_str());
       for (size_t i = 0; i < t->info->members.size(); ++i) {
         const auto &variant = t->info->members[i];
         for (int j = 0; j < indent + 2; ++j) fprintf(f, " ");
-        fprintf(f, "%s: %zu", variant.name.get_str().c_str(), i);
+        fprintf(f, "%s: %zu", variant.name.c_str(), i);
 
         if (variant.type == void_type()) {
           fprintf(f, ",\n");
@@ -206,7 +205,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
           fprintf(f, " {\n");
           for (const auto &member : variant.type->info->members) {
             for (int k = 0; k < indent + 4; ++k) fprintf(f, " ");
-            fprintf(f, "%s: %s,\n", member.name.get_str().c_str(), format_type_ref(member.type).c_str());
+            fprintf(f, "%s: %s,\n", member.name.c_str(), format_type_ref(member.type).c_str());
           }
           for (int k = 0; k < indent + 2; ++k) fprintf(f, " ");
           fprintf(f, "},\n");
@@ -251,7 +250,6 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
   const char *opcode_name;
 
   switch (opcode) {
-    
     case OP_ADD:
       opcode_name = "ADD";
       break;
@@ -372,7 +370,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
       case Constant::CONST_INT:
         return std::to_string(c.int_lit);
       case Constant::CONST_STRING:
-        return std::string("\"") + c.string_lit.get_str() + "\"";
+        return std::string("\"") + c.string_lit.str() + "\"";
       case Constant::CONST_FLOAT:
         return std::to_string(c.float_lit);
       case Constant::CONST_BOOL:
@@ -403,7 +401,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
       }
       case Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE: {
         std::string s = "GV(";
-        s += op.gv->name.get_str();
+        s += op.gv->name.str();
         s += ", ";
         s += format_type_ref(op.gv->type);
         s += ")";
@@ -418,12 +416,12 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
         return s;
       }
       case Operand::OPERAND_BASIC_BLOCK:
-        return std::string("BB(") + op.bb->label.get_str() + ')';
+        return std::string("BB(") + op.bb->label.str() + ')';
       case Operand::OPERAND_TYPE:
-        return "TY" + format_type_ref(op.type); // the parens already come from the type ref formatter
+        return "TY" + format_type_ref(op.type);  // the parens already come from the type ref formatter
       case Operand::OPERAND_BASIC_BLOCK_PAIR:
-        return std::string("TARGET_BB(") + op.bb_pair.target->label.get_str() + "), ";
-        return std::string("FALLTHROUGH_BB(") + op.bb_pair.target->label.get_str() + ")";
+        return std::string("TARGET_BB(") + op.bb_pair.target->label.str() + "), " + std::string("FALLTHROUGH_BB(") +
+               op.bb_pair.target->label.str() + ")";
         break;
     }
     return "";
@@ -439,7 +437,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
 
   if (left.tag != Operand::OPERAND_NULL) {
     if (opcode == OP_CALL) {
-      line += " " + m.functions[left.temp]->name.get_str();
+      line += " " + m.functions[left.temp]->name.str();
     } else {
       ops.push_back(&left);
     }
@@ -481,7 +479,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
 }
 
 void Mir::Basic_Block::print(FILE *f, Module &m) const {
-  fprintf(f, "%s:", label.get_str().c_str());
+  fprintf(f, "%s:", label.c_str());
   fprintf(f, "\n");
   for (const auto &instruction : code) {
     instruction.print(f, m);
@@ -492,7 +490,7 @@ void Mir::Function::print(FILE *f, Module &m) const {
   if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
     fprintf(f, "extern ");
   }
-  fprintf(f, "fn %s(", name.get_str().c_str());
+  fprintf(f, "fn %s(", name.c_str());
   for (size_t i = 0; i < type_info->params_len; ++i) {
     fprintf(f, "t%zu: %s", i, format_type_ref(type_info->parameter_types[i]).c_str());
     if (i + 1 < type_info->params_len) {
@@ -529,7 +527,7 @@ void Mir::Constant::print(FILE *f) const {
       fprintf(f, "%zu", int_lit);
       break;
     case CONST_STRING:
-      fprintf(f, "\"%s\"", string_lit.get_str().c_str());
+      fprintf(f, "\"%s\"", string_lit.c_str());
       break;
     case CONST_FLOAT:
       fprintf(f, "%f", float_lit);

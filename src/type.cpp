@@ -64,7 +64,7 @@ std::string FunctionTypeInfo::to_string() const {
   else
     ss << ')';
 
-  ss << " -> " << return_type->basename.get_str();
+  ss << " -> " << return_type->basename.str();
 
   return ss.str();
 }
@@ -461,7 +461,7 @@ std::string Type::to_string() const {
 Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_TRAIT));
   Type *type = type_table.back();
-  std::string base = name.get_str();
+  std::string base = name.str();
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
   }
@@ -477,7 +477,7 @@ Type *global_create_trait_type(const InternedString &name, Scope *scope, std::ve
 Type *global_create_struct_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
   Type *type = type_table.back();
-  std::string base = name.get_str();
+  std::string base = name.str();
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
   }
@@ -525,7 +525,7 @@ Type *global_create_struct_type(const InternedString &name, Scope *scope, std::v
 Type *global_create_choice_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_CHOICE));
   Type *type = type_table.back();
-  std::string base = name.get_str();
+  std::string base = name.str();
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
   }
@@ -1245,7 +1245,7 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
         for (const auto &member : info->members) {
           if (member.name == field) return 0;
         }
-        throw_error("type has no field \"" + field.get_str() + "\"", {});
+        throw_error("type has no field \"" + field.str() + "\"", {});
       }
 
       size_t offset = 0;
@@ -1260,13 +1260,13 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
         }
         offset += member_size;
       }
-      throw_error("type has no field \"" + field.get_str() + "\"", {});
+      throw_error("type has no field \"" + field.str() + "\"", {});
     }
 
     case TYPE_TUPLE: {
       auto info = this->info->as<TupleTypeInfo>();
       // Accept either "$N" or "N" as the field identifier.
-      std::string fname = field.get_str();
+      std::string fname = field.str();
       size_t idx = std::string::npos;
       try {
         if (!fname.empty() && fname[0] == '$') {
@@ -1286,11 +1286,11 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
           if (member.name == field) return offset;
           offset += member_size;
         }
-        throw_error("tuple type has no field \"" + field.get_str() + "\"", {});
+        throw_error("tuple type has no field \"" + field.str() + "\"", {});
       }
 
       if (idx >= info->members.size()) {
-        throw_error("tuple index out of range for field \"" + field.get_str() + "\"", {});
+        throw_error("tuple index out of range for field \"" + field.str() + "\"", {});
       }
 
       size_t offset = 0;
@@ -1324,12 +1324,12 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
           return offset;
         }
       }
-      throw_error("choice type has no variant \"" + field.get_str() + "\"", {});
+      throw_error("choice type has no variant \"" + field.str() + "\"", {});
     }
 
     case TYPE_ENUM: {
       // Enums do not have per-field offsets in this representation.
-      throw_error("enum type has no field \"" + field.get_str() + "\"", {});
+      throw_error("enum type has no field \"" + field.str() + "\"", {});
     }
 
     case TYPE_FUNCTION:
@@ -1337,7 +1337,7 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
     case TYPE_TRAIT:
     case TYPE_DYN:
     default:
-      throw_error("type has no field \"" + field.get_str() + "\"", {});
+      throw_error("type has no field \"" + field.str() + "\"", {});
   }
 
   return 0;

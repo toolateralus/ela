@@ -18,9 +18,9 @@ struct InternedString {
     return table;
   }
 
-  std::string get_str() const { 
-    return *str_ptr;
-  }
+  std::string str() const { return *str_ptr; }
+  
+  const char *c_str() const { return str_ptr->c_str(); }
 
   inline void insert_or_set(const std::string &value) {
     auto hash = std::hash<std::string>()(value);
@@ -44,14 +44,15 @@ struct InternedString {
 };
 
 namespace std {
-template <> struct hash<InternedString> {
-  inline size_t operator()(const InternedString &string) const {
-    return (size_t)string.str_ptr;
-  }
+template <>
+struct hash<InternedString> {
+  inline size_t operator()(const InternedString &string) const { return (size_t)string.str_ptr; }
 };
 
-template <> struct formatter<InternedString, char> {
-  template <class ParseContext> constexpr typename ParseContext::iterator parse(ParseContext &ctx) {
+template <>
+struct formatter<InternedString, char> {
+  template <class ParseContext>
+  constexpr typename ParseContext::iterator parse(ParseContext &ctx) {
     auto it = ctx.begin();
     auto end = ctx.end();
     while (it != end && *it != '}') {
@@ -62,7 +63,7 @@ template <> struct formatter<InternedString, char> {
 
   template <class FormatContext>
   typename FormatContext::iterator format(const InternedString &s, FormatContext &ctx) const {
-    return std::format_to(ctx.out(), "{}", s.get_str());
+    return std::format_to(ctx.out(), "{}", s.str());
   }
 };
-} // namespace std
+}  // namespace std

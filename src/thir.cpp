@@ -430,8 +430,8 @@ THIR *THIRGen::visit_dot_expr(ASTDotExpr *ast) {
   thir->member = ast->member.get_identifier();
 
   // Tuple.0;
-  if (thir->member == "0" || atoi(thir->member.get_str().c_str()) != 0) {
-    thir->member = "$" + thir->member.get_str();
+  if (thir->member == "0" || atoi(thir->member.c_str()) != 0) {
+    thir->member = "$" + thir->member.str();
   }
 
   return thir;
@@ -1076,7 +1076,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
   } else {
     std::string name;
     if (ast->declaring_type) {
-      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.get_str();
+      name = ast->declaring_type->info->scope->full_name() + "$" + ast->name.str();
     } else {
       name = ast->scope->full_name();
     }
@@ -1176,7 +1176,7 @@ THIR *THIRGen::visit_function_declaration(ASTFunctionDeclaration *ast) {
 
   // Either the tests have to be in the root scope, i.e declared or included via a main.ela file or a test.ela file,
   // or this flag has to be present
-  auto should_be_tested = ast->declaring_scope->name.get_str().empty() || compile_command.has_flag("run-every-test");
+  auto should_be_tested = ast->declaring_scope->name.str().empty() || compile_command.has_flag("run-every-test");
 
   if (is_testing && ast->is_test && should_be_tested) {
     test_functions.push_back(thir);
@@ -1207,9 +1207,9 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   if (!ast->is_local && !ast->is_extern) {
     auto scope_name = ast->declaring_scope->full_name();
     if (scope_name.empty()) {
-      thir->name = ast->name.get_str();
+      thir->name = ast->name.str();
     } else {
-      thir->name = scope_name + ast->name.get_str();
+      thir->name = scope_name + ast->name.str();
     }
   } else {
     thir->name = ast->name;
@@ -1307,7 +1307,7 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
     var->span = ast->span;
     var->is_global = false;
     var->is_statement = true;
-    var->name = ast->resolved_type->basename.get_str() + '$' + member.name.get_str();
+    var->name = ast->resolved_type->basename.str() + '$' + member.name.str();
     var->value = member.thir_value.get();
     var->type = member.type;
     auto symbol = ast->resolved_type->info->scope->local_lookup(member.name);
@@ -1816,7 +1816,7 @@ THIR *THIRGen::make_str(const InternedString &value, const Span &src_range) {
   thir->span = src_range;
   thir->type = str_type;
   thir->key_values.push_back({"data", make_literal(value, src_range, u8_ptr_type(), ASTLiteral::String)});
-  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.get_str())), src_range,
+  thir->key_values.push_back({"length", make_literal(std::to_string(calculate_strings_actual_length(value.str())), src_range,
                                                      u64_type(), ASTLiteral::Integer)});
   return thir;
 }
@@ -1941,7 +1941,7 @@ THIR *THIRGen::get_field_struct_list(Type *type) {
   collection->type = field_type->make_array_of(length);
 
   for (const auto &member : type->info->members) {
-    collection->values.push_back(get_field_struct(member.name.get_str(), member.type, type));
+    collection->values.push_back(get_field_struct(member.name.str(), member.type, type));
   }
 
   THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, thir);
@@ -1968,7 +1968,7 @@ THIR *THIRGen::get_methods_list(Type *type) {
   collection->type = method_type->make_array_of(length);
   for (const auto &[name, member] : type->info->scope->symbols) {
     if (member.is_function) {
-      collection->values.push_back(get_method_struct(name.get_str(), type));
+      collection->values.push_back(get_method_struct(name.str(), type));
     }
   }
 
@@ -2181,18 +2181,18 @@ void THIRGen::format_and_print_deprecated_warning(Span call_site, THIR *node, co
   switch (node->get_node_type()) {
     case THIRNodeType::Variable: {
       auto var = static_cast<THIRVariable *>(node);
-      fprintf(stderr, "Deprecated variable: %s\n", var->name.get_str().c_str());
+      fprintf(stderr, "Deprecated variable: %s\n", var->name.c_str());
       break;
     }
     case THIRNodeType::Function: {
       auto func = static_cast<THIRFunction *>(node);
-      fprintf(stderr, "Deprecated function: %s\n", func->name.get_str().c_str());
+      fprintf(stderr, "Deprecated function: %s\n", func->name.c_str());
       break;
     }
     case THIRNodeType::Type: {
       // Could be struct, enum, choice, etc.
       auto type = static_cast<THIRType *>(node);
-      fprintf(stderr, "Deprecated type: %s\n", type->type->basename.get_str().c_str());
+      fprintf(stderr, "Deprecated type: %s\n", type->type->basename.c_str());
       break;
     }
     default:
@@ -2204,7 +2204,7 @@ void THIRGen::format_and_print_deprecated_warning(Span call_site, THIR *node, co
 
   printf("from: %s\n", call_site.ToString().c_str());
 
-  printf("\n %s --- instead, use: ---\n", string_literal->value.get_str().c_str());
+  printf("\n %s --- instead, use: ---\n", string_literal->value.c_str());
   auto sl = format_source_location(range, ERROR_WARNING, 5);
   printf("%s\n", sl.c_str());
 }
@@ -2391,7 +2391,7 @@ void THIRGen::setup__all_tests() {
 
     for (const auto &function : test_functions) {
       auto fn_ptr = take_address_of(function, {});
-      auto function_name = function->name.get_str();
+      auto function_name = function->name.str();
 
       // Replace all occurrences of '$' with "::", so the tests match what the user typed.
       size_t pos = 0;

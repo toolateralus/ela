@@ -6,6 +6,7 @@
 #include <vector>
 #include "arena.hpp"
 #include "core.hpp"
+#include "error.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "thir.hpp"
@@ -212,7 +213,7 @@ struct Operand {
         .target = target,
         .fallthrough = fallthrough,
     };
-    o.tag = OPERAND_BASIC_BLOCK;
+    o.tag = OPERAND_BASIC_BLOCK_PAIR;
     return o;
   }
 
@@ -236,10 +237,10 @@ struct Instruction {
   void print(FILE *, Module &) const;
 };
 
+struct Function;
 struct Basic_Block {
   InternedString label;
   std::vector<Instruction> code;
-  Basic_Block *fallthrough;
 
   Basic_Block() = default;
   explicit Basic_Block(InternedString l) : label(l) {}
@@ -254,6 +255,16 @@ struct Basic_Block {
   }
   inline Op_Code back_opcode() const { return back().opcode; }
   void print(FILE *, Module &) const;
+
+  inline bool ends_with_terminator() const {
+    if (code.empty()) {
+      return false;
+    }
+    Instruction const &back = code.back();
+    return back.opcode == OP_JMP || back.opcode == OP_JMP_TRUE || back.opcode == OP_RET || back.opcode == OP_RET_VOID;
+  }
+
+  void finalize(Function *f) const;
 };
 
 extern jstl::Arena mir_arena;
@@ -323,9 +334,6 @@ struct Function {
     } while (clash);
 
     Basic_Block *block = mir_arena.construct<Basic_Block>(*label);
-    if (insert_block) {
-      insert_block->fallthrough = block;
-    }
     basic_blocks.push_back(block);
     insert_block = block;
     return block;
@@ -346,6 +354,10 @@ struct Function {
     }
     if (stack_size_needed_in_bytes % 16 != 0) {
       stack_size_needed_in_bytes += 16 - (stack_size_needed_in_bytes % 16);
+    }
+
+    for (auto *bb : basic_blocks) {
+      bb->finalize(this);
     }
   }
 
@@ -374,7 +386,6 @@ struct Module {
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
-
 
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
@@ -433,7 +444,9 @@ struct Module {
 
   inline void leave_function() {
     if (function_stack.empty()) {
-      throw_error(std::format("function stack was empty but we tried to leave_function(). current_function: {}", current_function->name), current_function->span);
+      throw_error(
+          std::format("function stack was empty but we tried to leave_function(). current_function: {}", current_function->name),
+          current_function->span);
     }
     current_function = function_stack.top();
     function_stack.pop();
@@ -457,7 +470,6 @@ struct Module {
   void print(FILE *) const;
 };
 
-void generate_block(const THIRBlock *node, Module &m);
 Operand generate_variable(const THIRVariable *node, Module &m);
 Operand generate_function(const THIRFunction *node, Module &m);
 Operand generate_expr_block(const THIRExprBlock *node, Module &m);
@@ -476,6 +488,8 @@ Operand load_variable(const THIRVariable *node, Module &m);
 void generate_return(const THIRReturn *node, Module &m);
 void generate_break(const THIRBreak *node, Module &m);
 void generate_continue(const THIRContinue *node, Module &m);
+
+void generate_block(const THIRBlock *node, Module &m);
 void generate_for(const THIRFor *node, Module &m);
 void generate_if(const THIRIf *node, Module &m);
 void generate_while(const THIRWhile *node, Module &m);
@@ -648,11 +662,6 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND)    \
   m.current_function->get_insert_block()->push(Instruction{ \
       OP_JMP_TRUE, Operand::MakeNull(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
-
-// OP_JMP_FALSE: left=bb, right=condition
-#define EMIT_JUMP_FALSE(TARGET_BB, FALL_THROUGH_BB, COND) \
-  m.current_function->get_insert_block()->push(           \
-      Instruction{OP_JMP_FALSE, Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
 #define EMIT_ZERO_INIT(DEST, PTR, TY) \
   m.current_function->get_insert_block()->push(Instruction{OP_ZERO_INIT, DEST, PTR, TY, .span = node->span})

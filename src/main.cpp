@@ -69,7 +69,7 @@ ASTChoiceDeclaration *g_Option_type = nullptr;
 
 Type *g_Init_trait_type = nullptr, *g_Iterable_trait_type = nullptr, *g_Iterator_trait_type = nullptr;
 
-int ignored_warnings = 0;
+int num_ignored_warnings = 0;
 
 bool run_on_finished = false;
 

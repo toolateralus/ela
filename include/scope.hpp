@@ -256,10 +256,10 @@ struct Scope {
     if (parent) {
       auto parent_name = parent->full_name();
       if (!parent_name.empty()) {
-        return parent->full_name() + "$" + name.get_str();
+        return parent->full_name() + "$" + name.str();
       }
     }
-    return name.get_str();
+    return name.str();
   }
   inline static std::unordered_set<InternedString> &defines() {
     static std::unordered_set<InternedString> defines;

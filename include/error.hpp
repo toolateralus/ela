@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <sstream>
 
 #include "core.hpp"
@@ -168,7 +169,7 @@ const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
     [WARNING_GENERAL] = "Wno-general",
 };
 
-extern int ignored_warnings;
+extern int num_ignored_warnings;
 
 using PanicHandler = void (*)(const std::string &, const Span &, void *);
 
@@ -201,7 +202,7 @@ static inline void set_panic_handler(PanicHandler handler) { panic_handler = han
 static inline void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
 static inline void throw_warning(const WarningFlags id, const std::string message, const Span &span) {
-  if ((ignored_warnings & id) != 0 || (ignored_warnings & WARNING_IGNORE_ALL) != 0) {
+  if ((num_ignored_warnings & id) != 0 || (num_ignored_warnings & WARNING_IGNORE_ALL) != 0) {
     return;
   }
   std::stringstream ss;

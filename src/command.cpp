@@ -1,3 +1,4 @@
+#include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
 #include "core.hpp"
 #include "error.hpp"
@@ -10,8 +11,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include "emit.hpp"
-#include "resolver.hpp"
 #include "mir.hpp"
 
 bool CompileCommand::has_flag(const std::string &flag) const {
@@ -28,104 +27,57 @@ int CompileCommand::compile() {
     compile_command.flags["nl"] = true;
   }
 
-  auto program = parse.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  ASTProgram *program = parse_metric.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
   });
 
-  lower.run<void>("typing & lowering to C", [&] {
+  typing_metric.run<void>("Typing AST", [&] {
     Typer typer{context};
     typer.visit(program);
-    THIRGen thir_gen(context);
-    Emitter emitter;
-    Resolver resolver(emitter);
+  });
 
-    auto thir_program = thir_gen.visit_program(program);
+  THIR *thir_program = nullptr;
+  THIRGen thir_gen(context);
+  THIR *entry_point = thir_gen_metric.run<THIR *>("Generating THIR", [&] {
+    thir_program = thir_gen.visit_program(program);
+    return thir_gen.emit_runtime_entry_point();
+  });
 
-    // THIR C emitter.
-    {
-      resolver.visit_node(thir_program);
+  Mir::Module m;
+  mir_gen_metric.run<void>("Generating MIR", [&] {
+    if (entry_point) {
+      Mir::generate(entry_point, m);
+    } else {
+      Mir::generate(thir_program, m);
+    }
+    m.finalize();
+    if (compile_command.has_flag("save-mir")) {
+      auto path = compile_command.binary_path.string() + std::string{".emir"};
+      FILE *f = fopen(path.c_str(), "w");
+      m.print(f);
+      fflush(f);
+      fclose(f);
+    }
+  });
 
-      std::filesystem::current_path(compile_command.original_path);
-      std::ofstream output(compile_command.output_path);
+  LLVM_Emitter llvm_emitter{m};
+  llvm_gen_metric.run<void>("Generating LLVM IR", [&] { llvm_emitter.emit_module(); });
 
-      std::string program;
-      if (compile_command.has_flag("test")) {
-        output << "#define TESTING\n";
-      }
-
-      output << BOILERPLATE_C_CODE << '\n';
-
-      if (thir_gen.reflected_upon_types.size()) {
-        output << emitter.reflection_prelude(thir_gen.reflected_upon_types);
-      }
-
-      output << emitter.code.str();
-
-      {  // emit global initializer function that's called in main
-        emitter.code.clear();
-        THIRFunction *global_ini = thir_gen.global_initializer_function;
-        emitter.emitting_global_initializer = true;
-
-        for (const auto &constructor : thir_gen.constructors) {
-          if (constructor->constructor_index == 1) {
-            THIR_ALLOC_NO_SRC_RANGE(THIRCall, call);
-            call->callee = constructor;
-            call->arguments = {};
-            call->is_statement = true;
-            global_ini->block->statements.push_back(call);
-          }
-        }
-
-        resolver.visit_function(global_ini);
-        emitter.emitting_global_initializer = false;
-        output << emitter.code.str();
-        emitter.code.clear();
-      }
-
-      // Emit our main last always
-      {
-        THIRFunction *ep = thir_gen.emit_runtime_entry_point();
-        if (ep) {  // TODO: fix the fact that global initializers do not run at all when we compile as a .so or .a
-          emitter.emit_function(ep);
-        }
-        output << emitter.code.str();
-      }
+  llvm_opt_metric.run<void>("Running LLVM Optimization Passes.", [&] {
+    // TODO: actually run optimization passes.
+    std::error_code ec;
+    auto path = compile_command.binary_path.string() + std::string{".ll"};
+    llvm::raw_fd_ostream llvm_output_stream(path, ec);
+    if (ec) {
+      throw_error(ec.message(), {});
     }
 
-    // MIR generator.
-    {
-      Mir::Module m;
-      auto entry_point = thir_gen.emit_runtime_entry_point();
+    llvm::verifyModule(*llvm_emitter.llvm_module);
 
-      if (entry_point) {
-        Mir::generate(entry_point, m);
-      }
-      else {
-        Mir::generate(thir_program, m);
-      }
-      m.finalize();
-      {
-        auto path = compile_command.binary_path.string() + std::string{".emir"};
-        FILE *f = fopen(path.c_str(), "w");
-        m.print(f);
-        fflush(f);
-        fclose(f);
-      }
-
-      LLVM_Emitter llvm_emitter{m};
-      llvm_emitter.emit_module();
-
-      std::error_code ec;
-      auto path = compile_command.binary_path.string() + std::string{".ll"};
-      llvm::raw_fd_ostream llvm_output_stream(path, ec);
-      if (ec) {
-        throw_error(ec.message(), {});
-      }
-      llvm_emitter.llvm_module->print(llvm_output_stream, nullptr);
-      llvm_output_stream.flush();
-    }
+    llvm_emitter.llvm_module->print(llvm_output_stream, nullptr);
+    llvm_output_stream.flush();
   });
 
   if (has_flag("no-compile")) {
@@ -139,19 +91,17 @@ int CompileCommand::compile() {
     extra_flags += " -g ";
   }
 
-  const static std::string ignored_warnings = "-w";
-
   const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
   const auto compilation_string =
-      std::format("clang -std=c23 {} {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
+      std::format("clang -x ir {} {} {}", output_path.string(), output_flag, extra_flags);
 
   if (compile_command.has_flag("x")) {
     printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
   }
 
-  int result = cpp.run<int>("invoking 'clang' compiler on transpiled C code",
-                            [&compilation_string] { return system(compilation_string.c_str()); });
+  int result = clang_invocation_metric.run<int>("invoking 'clang' compiler on llvm ir",
+                                                [&compilation_string] { return system(compilation_string.c_str()); });
 
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
@@ -187,6 +137,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
                                bool &run_on_finished, bool &run_tests, bool &lldb) {
   auto default_input_path = "main.ela";
   std::string init_string = "";
+
   for (size_t i = 1; i < args.size(); ++i) {
     std::string arg = args[i];
 
@@ -257,9 +208,9 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     std::string filename = input_fs_path.filename().string();
     size_t pos = filename.rfind(".ela");
     if (pos != std::string::npos) {
-      filename.replace(pos, 4, ".c");
+      filename.replace(pos, 4, ".ll");
     } else {
-      filename += ".c";
+      filename += ".ll";
     }
     output_path = filename;
   }
@@ -281,7 +232,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       continue;
     }
     if (has_flag(WARNING_FLAG_STRINGS[i])) {
-      ignored_warnings |= i;
+      num_ignored_warnings |= i;
     }
   }
 }

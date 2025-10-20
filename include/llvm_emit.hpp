@@ -269,6 +269,8 @@ struct DIManager {
 };
 
 struct LLVM_Emitter {
+  inline bool is_temporary_valid(uint32_t temp) const { return temps.contains(temp); }
+
   LLVMContext llvm_ctx;
   IRBuilder<> builder;
   llvm::DIFile *file;
@@ -470,7 +472,7 @@ struct LLVM_Emitter {
             member_types.push_back(llvm_member_type);
           }
 
-          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.get_str(), file, {}, di_member_type));
+          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.str(), file, {}, di_member_type));
         }
 
         if (is_union) {
@@ -512,7 +514,7 @@ struct LLVM_Emitter {
         auto info = type->info->as<TupleTypeInfo>();
 
         // Forward declaration for recursive types
-        auto tuple_name = type->basename.get_str();
+        auto tuple_name = type->basename.str();
         auto llvm_tuple_type = llvm::StructType::create(llvm_ctx, tuple_name);
 
         // Memoize the forward declaration
@@ -547,7 +549,7 @@ struct LLVM_Emitter {
         auto info = type->info->as<ChoiceTypeInfo>();
 
         // Forward declaration for recursive types
-        auto choice_name = type->basename.get_str();
+        auto choice_name = type->basename.str();
         auto llvm_choice_type = llvm::StructType::create(llvm_ctx, choice_name);
 
         // Memoize the forward declaration
@@ -576,7 +578,7 @@ struct LLVM_Emitter {
             }
 
             variant_debug_info.push_back(dbg.create_struct_type(
-                dbg.current_scope(), member.name.get_str(), file, 0, data_layout.getTypeAllocSize(llvm_payload_type) * 8,
+                dbg.current_scope(), member.name.str(), file, 0, data_layout.getTypeAllocSize(llvm_payload_type) * 8,
                 data_layout.getABITypeAlign(llvm_payload_type).value() * 8, llvm::DINode::FlagZero, {di_payload_type}));
           }
         }
@@ -599,7 +601,7 @@ struct LLVM_Emitter {
         auto info = type->info->as<DynTypeInfo>();
 
         // Forward declaration for recursive types
-        auto dyn_name = type->basename.get_str();
+        auto dyn_name = type->basename.str();
         auto llvm_dyn_type = llvm::StructType::create(llvm_ctx, dyn_name);
 
         // Memoize the forward declaration

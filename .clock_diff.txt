@@ -1,29 +1,27 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/typer.cpp                                579            217           3369
+src/typer.cpp                                578            222           3354
 src/ast.cpp                                  401            141           2793
-src/thir.cpp                                 433             97           2155
+src/thir.cpp                                 435             98           2162
 include/ast.hpp                              208            146           1077
 src/type.cpp                                 210            118           1076
-src/copier.cpp                                71              6            641
+src/copier.cpp                                74             10            695
 src/interpreter.cpp                          100             18            624
-src/emit.cpp                                  78             12            622
+src/llvm_emit.cpp                             75             11            624
 src/libffi.cpp                                54             32            608
-src/llvm_emit.cpp                             73              3            583
-src/mir.cpp                                   92             14            581
-include/llvm_emit.hpp                         99             16            572
+include/llvm_emit.hpp                         97             16            562
+src/mir.cpp                                   85             25            553
+include/mir.hpp                               90             40            530
 include/type.hpp                             115             50            507
-include/mir.hpp                               87             41            496
-src/mir-print.cpp                             40             13            489
+src/mir-print.cpp                             41             13            490
 src/value.cpp                                 54             11            473
 include/lex.hpp                               53              6            419
-include/thir.hpp                              97             45            403
+include/thir.hpp                              97             46            404
 src/lex.cpp                                   25              6            367
 include/scope.hpp                             28             11            293
-src/resolver.cpp                              33             11            293
-src/command.cpp                               47              6            244
 include/value.hpp                             51              3            209
+src/command.cpp                               36              3            208
 include/core.hpp                              23              2            193
 include/error.hpp                             37              2            193
 include/visitor.hpp                           31              5            186
@@ -33,12 +31,10 @@ src/main.cpp                                  27              5            110
 include/interpreter.hpp                       11              1            103
 src/scope.cpp                                 25              5            100
 include/copier.hpp                             6              0             70
-include/emit.hpp                              14              6             69
 src/visitor.cpp                                7             15             68
 include/interned_string.hpp                    9              0             59
 include/arena.hpp                             12             11             40
-include/resolver.hpp                           4              0             37
 include/libffi.hpp                             3              0              8
 -----------------------------------------------------------------------------------------
-SUM:                                        3307           1105          20475
+SUM:                                        3168           1102          19503
 -----------------------------------------------------------------------------------------

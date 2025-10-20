@@ -126,8 +126,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::LParen);
         auto string = parser->expect(TType::String);
         parser->expect(TType::RParen);
-        DYNAMIC_LIBRARY_LOAD_PATH.push_back(string.value.get_str());
-        printf("adding dynamic library to compile time function dispatch tool: %s\n", string.value.get_str().c_str());
+        DYNAMIC_LIBRARY_LOAD_PATH.push_back(string.value.str());
+        printf("adding dynamic library to compile time function dispatch tool: %s\n", string.value.c_str());
         return nullptr;
       }
     },
@@ -138,7 +138,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto filename = parser->expect(TType::String).value;
-        if (!std::filesystem::exists(filename.get_str())) {
+        if (!std::filesystem::exists(filename.str())) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
                                   std::filesystem::current_path().string()),
                       {});
@@ -147,7 +147,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return nullptr;
         }
         include_set.insert(filename);
-        parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+        parser->states.push_back(Lexer::State::from_file(filename.str()));
         parser->fill_buffer_if_needed(parser->states.back());
         parser->fill_buffer_if_needed(parser->states.back());
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
@@ -165,7 +165,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto str = parser->expect(TType::String);
-        std::cout << str.value.get_str() << "\n";
+        std::cout << str.value.str() << "\n";
         return nullptr;
      }
     },
@@ -187,7 +187,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           // could be binary, and whatever other options
           mode = parser->eat().value;
         }
-        if (!std::filesystem::exists(filename.get_str())) {
+        if (!std::filesystem::exists(filename.str())) {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
 
@@ -196,12 +196,12 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         string->tag = ASTLiteral::String;
         std::stringstream ss;
         if (mode == "binary") {
-          std::ifstream isftr(filename.get_str(), std::ios::binary);
+          std::ifstream isftr(filename.str(), std::ios::binary);
           ss << isftr.rdbuf();
           string->value = ss.str();
           return string;
         } else {
-          std::ifstream isftr(filename.get_str());
+          std::ifstream isftr(filename.str());
           ss << isftr.rdbuf();
           string->value = ss.str();
           return string;
@@ -261,7 +261,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error("Can only throw a literal as a error", error->span);
         }
         auto literal = static_cast<ASTLiteral *>(error);
-        throw_error(literal->value.get_str(), error->span);
+        throw_error(literal->value.str(), error->span);
         return nullptr;
     }},
 
@@ -272,9 +272,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto string = parser->expect(TType::String).value;
         if (string == "-g") {
-          compile_command.flags[string.get_str()] = true;
+          compile_command.flags[string.str()] = true;
         }
-        compile_command.add_c_flag(string.get_str());
+        compile_command.add_c_flag(string.str());
         return nullptr;
     }},
     
@@ -1577,7 +1577,7 @@ ASTModule *Parser::parse_module() {
     expected_delimiter = TType::RCurly;
   } else {
     throw_error(
-        std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'", peek().value.get_str()),
+        std::format("expected ';' for a file scoped module, or '{{' to begin a module block, got '{}'", peek().value.str()),
         mod->span);
   }
 
@@ -1856,7 +1856,7 @@ std::vector<Attribute> Parser::parse_statement_attributes() {
       attribute.tag = ATTRIBUTE_CONST;
     } else {
       AttributeTag tag;
-      const std::string &ident = expect(TType::Identifier).value.get_str();
+      const std::string &ident = expect(TType::Identifier).value.str();
       if (!try_get_attribute_tag_from_string(ident, &tag)) {
         throw_error(std::format("invalid attribute {}", ident), {peek().location});
       }
@@ -3216,8 +3216,8 @@ bool Parser::try_import(InternedString name, Scope **scope) {
   });
 
   // TODO: we'll eventually use weave with a local ./pkg_cache/, this is not a great system currently.
-  std::string module_name = name.get_str();
-  std::string filename = std::filesystem::path(ela_lib_path) / name.get_str();
+  std::string module_name = name.str();
+  std::string filename = std::filesystem::path(ela_lib_path) / name.str();
 
   if (std::filesystem::exists(module_name) || std::filesystem::exists(module_name + ".ela")) {
     filename = module_name;

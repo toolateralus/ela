@@ -3,7 +3,6 @@
 #include <chrono>
 #include <filesystem>
 #include <functional>
-#include <iostream>
 #include <unordered_map>
 #include "lex.hpp"
 
@@ -55,7 +54,7 @@ struct CompilationMetric {
     end();
   }
 
-  std::string get_time() {
+  inline std::string get_time() {
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     if (ms >= 1000) {
       auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
@@ -67,13 +66,19 @@ struct CompilationMetric {
       return std::to_string(us) + " µs";
     }
   }
+
+  inline std::string to_string() { return "\033[1;36m" + id + "\033[0m " + "\033[1;32m" + get_time() + "\033[0m\n"; }
 };
 
 struct Span;
 struct CompileCommand {
-  CompilationMetric parse;
-  CompilationMetric lower;
-  CompilationMetric cpp;
+  CompilationMetric parse_metric;
+  CompilationMetric typing_metric;
+  CompilationMetric thir_gen_metric;
+  CompilationMetric mir_gen_metric;
+  CompilationMetric llvm_gen_metric;
+  CompilationMetric llvm_opt_metric;
+  CompilationMetric clang_invocation_metric;
 
   CompileCommand() = default;
   std::filesystem::path input_path;
@@ -91,9 +96,13 @@ struct CompileCommand {
   bool has_flag(const std::string &flag) const;
 
   void print_metrics() {
-    std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
-    std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
-    std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
+    const static CompilationMetric metrics[] = {
+        parse_metric, typing_metric, thir_gen_metric, mir_gen_metric, llvm_gen_metric, llvm_opt_metric, clang_invocation_metric,
+    };
+    for (auto metric : metrics) {
+      const std::string string = metric.to_string();
+      fprintf(stdout, "%s\n", string.c_str());
+    }
   }
 
   void request_compile_time_code_execution(const Span &range);

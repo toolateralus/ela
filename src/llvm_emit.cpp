@@ -364,15 +364,16 @@ void LLVM_Emitter::emit_module() {
   for (const auto &f : m.functions) {
     llvm::FunctionType *func_type = (llvm::FunctionType *)llvm_typeof(f->type);
     llvm::Function *llvm_f =
-        llvm::Function::Create(func_type, llvm::GlobalValue::ExternalLinkage, f->name.get_str(), llvm_module.get());
+        llvm::Function::Create(func_type, llvm::GlobalValue::ExternalLinkage, f->name.str(), llvm_module.get());
     function_table[f] = llvm_f;
   }
 
   for (const Global_Variable *gv : m.global_variables) {
     llvm::Type *gv_type = llvm_typeof(gv->type);
     llvm::Constant *initializer = llvm::Constant::getNullValue(gv_type);
-    llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage,
-                                                             initializer, gv->name.get_str());
+    llvm::GlobalVariable *llvm_gv =
+        new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage, initializer, gv->name.str());
+    printf("declaring global: %s\n", gv->name.c_str());
     global_variables[gv] = llvm_gv;
   }
 
@@ -387,13 +388,13 @@ void LLVM_Emitter::emit_module() {
 }
 
 void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
-  auto subprogram = dbg.enter_function_scope(dbg.current_scope(), ir_f, f->name.get_str(), f->span);
+  auto subprogram = dbg.enter_function_scope(dbg.current_scope(), ir_f, f->name.str(), f->span);
   ir_f->setSubprogram(subprogram);
 
   bb_table.reserve(f->basic_blocks.size());
 
   for (auto *bb : f->basic_blocks) {  // pre-create the basic blocks so we can easily do jumps and flips on it and shit
-    llvm::BasicBlock *ir_bb = llvm::BasicBlock::Create(llvm_ctx, bb->label.get_str(), ir_f);
+    llvm::BasicBlock *ir_bb = llvm::BasicBlock::Create(llvm_ctx, bb->label.str(), ir_f);
     bb_table[bb] = ir_bb;
   }
 
@@ -504,7 +505,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_LOAD: {
         llvm::Value *val = visit_operand(instr.left, instr.span);
-        auto loaded = builder.CreateLoad(llvm_typeof(instr.left.type->get_element_type()), val);
+        auto loaded =
+            builder.CreateLoad(llvm_typeof(instr.left.type->get_element_type()), val, f->temps[instr.dest.temp].name.str());
         insert_temp(instr.dest.temp, f, loaded);
       } break;
 
@@ -530,12 +532,14 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
         Temporary &temp = f->temps[index];
-        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.get_str());
+        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.str());
         insert_temp(index, f, ai);
       } break;
 
       case Mir::OP_LOAD_FN_PTR: {
-        llvm::Value *fnptr = visit_operand(instr.right, instr.span);
+        uint32_t fn_idx = instr.right.temp;
+        Mir::Function *fn = m.functions[fn_idx];
+        llvm::Value *fnptr = function_table[fn];
         insert_temp(instr.dest.temp, f, fnptr);
       } break;
 
@@ -586,10 +590,13 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         auto start = arg_stack.end() - nargs;
         std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
         arg_stack.erase(start, arg_stack.end());
-        llvm::CallInst *call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args);
+        llvm::CallInst *call;
         if (mir_fn->type_info->return_type != void_type()) {
-          insert_temp(instr.dest.temp, f, call);
+          call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args, f->temps[instr.dest.temp].name.str());
+        } else {
+          call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args);
         }
+        insert_temp(instr.dest.temp, f, call);
       } break;
 
       case Mir::OP_CALL_PTR: {
@@ -636,7 +643,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         llvm::Value *index = visit_operand(instr.right, instr.span);
         Temporary &temp = f->temps[instr.dest.temp];
         llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
-        llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.get_str());
+        llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.str());
         insert_temp(instr.dest.temp, f, gep);
       } break;
       case Mir::OP_ZERO_INIT: {
@@ -678,15 +685,19 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
       return nullptr;  // TODO: figure out if this is valid
 
     case Mir::Operand::OPERAND_TEMP: {
-      if (o.temp >= temps.size()) {
-        throw_error("use of undeclared temp", span);
+      if (!is_temporary_valid(o.temp)) {
+        for (auto [temp, _] : temps) {
+          printf("existing: %u\n", temp);
+        }
+
+        throw_error(std::format("use of undeclared temp '{}'", o.temp), span);
       }
       return temps[o.temp].value;
     }
     case Mir::Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE: {
       llvm::GlobalVariable *gv = global_variables[o.gv];
       if (!gv) {
-        throw_error("use of undeclared global variable", span);
+        throw_error(std::format("use of undeclared global variable: {}", o.gv->name.str()), span);
       }
       return gv;
     }
@@ -701,7 +712,7 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
         case Mir::Constant::CONST_CHAR:
           return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.char_lit);
         case Mir::Constant::CONST_STRING:
-          return builder.CreateGlobalString(unescape_string_lit(o.imm.string_lit.get_str()));
+          return builder.CreateGlobalString(unescape_string_lit(o.imm.string_lit.str()));
         default:
           return nullptr;
       }
