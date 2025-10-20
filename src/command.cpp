@@ -1,5 +1,14 @@
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Passes/OptimizationLevel.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/PassPlugin.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/IR/Verifier.h>
 #include "core.hpp"
 #include "error.hpp"
 #include "llvm_emit.hpp"
@@ -64,17 +73,38 @@ int CompileCommand::compile() {
 
   LLVM_Emitter llvm_emitter{m};
   llvm_gen_metric.run<void>("Generating LLVM IR", [&] { llvm_emitter.emit_module(); });
-
   llvm_opt_metric.run<void>("Running LLVM Optimization Passes.", [&] {
-    // TODO: actually run optimization passes.
     std::error_code ec;
-    auto path = compile_command.binary_path.string() + std::string{".ll"};
+    auto path = compile_command.binary_path.string() + ".ll";
     llvm::raw_fd_ostream llvm_output_stream(path, ec);
     if (ec) {
       throw_error(ec.message(), {});
     }
 
-    llvm::verifyModule(*llvm_emitter.llvm_module);
+    std::string s;
+    llvm::raw_string_ostream err_stream{s};
+    // We still write the file out for inspection, but don't optimize
+    if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
+      llvm::errs() << "Module verification failed:\n";
+      llvm::errs() << err_stream.str();
+    } else {
+      llvm::PassBuilder pass_builder{};
+      llvm::ModuleAnalysisManager module_analysis_manager;
+      llvm::FunctionAnalysisManager function_analysis_manager;
+      llvm::LoopAnalysisManager loop_analysis_manager;
+      llvm::CGSCCAnalysisManager cgscc_analysis_manager;
+
+      pass_builder.registerModuleAnalyses(module_analysis_manager);
+      pass_builder.registerFunctionAnalyses(function_analysis_manager);
+      pass_builder.registerLoopAnalyses(loop_analysis_manager);
+      pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);
+      pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager,
+                                        module_analysis_manager);
+
+      auto module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+
+      module_pass_manager.run(*llvm_emitter.llvm_module, module_analysis_manager);
+    }
 
     llvm_emitter.llvm_module->print(llvm_output_stream, nullptr);
     llvm_output_stream.flush();
@@ -93,8 +123,7 @@ int CompileCommand::compile() {
 
   const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-  const auto compilation_string =
-      std::format("clang -x ir {} {} {}", output_path.string(), output_flag, extra_flags);
+  const auto compilation_string = std::format("clang -x ir {} {} {}", output_path.string(), output_flag, extra_flags);
 
   if (compile_command.has_flag("x")) {
     printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());

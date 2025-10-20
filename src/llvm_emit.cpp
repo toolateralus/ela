@@ -8,7 +8,6 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
-#include <system_error>
 #include "mir.hpp"
 #include "type.hpp"
 
@@ -359,7 +358,7 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
 
 void LLVM_Emitter::emit_module() {
   // Forward declare all functions by header so we can refer to them in other functions with no worry
-  dbg.enter_file_scope({});
+  file = dbg.enter_file_scope(m.functions[0]->span);
 
   for (const auto &f : m.functions) {
     llvm::FunctionType *func_type = (llvm::FunctionType *)llvm_typeof(f->type);
@@ -417,262 +416,223 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 }
 
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
-  for (auto &instr : bb->code) {
-    switch (instr.opcode) {
-      case Mir::OP_ADD:
-      case Mir::OP_SUB:
-      case Mir::OP_MUL:
-      case Mir::OP_DIV:
-      case Mir::OP_MOD:
-      case Mir::OP_AND:
-      case Mir::OP_OR:
-      case Mir::OP_XOR:
-      case Mir::OP_SHL:
-      case Mir::OP_SHR:
-      case Mir::OP_LOGICAL_AND:
-      case Mir::OP_LOGICAL_OR:
-      case Mir::OP_EQ:
-      case Mir::OP_NE:
-      case Mir::OP_LT:
-      case Mir::OP_LE:
-      case Mir::OP_GT:
-      case Mir::OP_GE: {
-        llvm::Value *left = visit_operand(instr.left, instr.span);
-        llvm::Value *right = visit_operand(instr.right, instr.span);
+    for (auto &instr : bb->code) {
+        switch (instr.opcode) {
+            case Mir::OP_ADD:
+            case Mir::OP_SUB:
+            case Mir::OP_MUL:
+            case Mir::OP_DIV:
+            case Mir::OP_MOD:
+            case Mir::OP_AND:
+            case Mir::OP_OR:
+            case Mir::OP_XOR:
+            case Mir::OP_SHL:
+            case Mir::OP_SHR:
+            case Mir::OP_LOGICAL_AND:
+            case Mir::OP_LOGICAL_OR:
+            case Mir::OP_EQ:
+            case Mir::OP_NE:
+            case Mir::OP_LT:
+            case Mir::OP_LE:
+            case Mir::OP_GT:
+            case Mir::OP_GE: {
+                llvm::Value *left = visit_operand(instr.left, instr.span);
+                llvm::Value *right = visit_operand(instr.right, instr.span);
 
-        if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
-          llvm::Value *result = pointer_binary(left, right, instr);
-          insert_temp(instr.dest.temp, f, result);
-          break;
+                if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
+                    llvm::Value *result = create_dbg(pointer_binary(left, right, instr), instr.span);
+                    insert_temp(instr.dest.temp, f, result);
+                    break;
+                }
+
+                ScalarTypeInfo *left_info = instr.left.type->info->as<ScalarTypeInfo>();
+                ScalarTypeInfo *right_info = instr.right.type->info->as<ScalarTypeInfo>();
+                Type *new_type = nullptr;
+                right = cast_scalar(right, instr.right.type, instr.left.type, &new_type);
+                if (new_type) {
+                    instr.right.type = new_type;
+                    right_info = new_type->info->as<ScalarTypeInfo>();
+                }
+
+                llvm::Value *result = nullptr;
+                if (left_info->is_signed() && right_info->is_signed())
+                    result = create_dbg(binary_signed(left, right, instr.opcode), instr.span);
+                else if (left_info->is_integral && right_info->is_integral)
+                    result = create_dbg(binary_unsigned(left, right, instr.opcode), instr.span);
+                else if (left_info->is_float() && right_info->is_float())
+                    result = create_dbg(binary_fp(left, right, instr.opcode), instr.span);
+                else
+                    throw_error(std::format("Unsupported operand types for binary op: '{}' '{}'",
+                                            instr.left.type->to_string(), instr.right.type->to_string()), instr.span);
+
+                insert_temp(instr.dest.temp, f, result);
+            } break;
+
+            case Mir::OP_LOGICAL_NOT: {
+                llvm::Value *v = visit_operand(instr.left, instr.span);
+                Type *unused = nullptr;
+                v = cast_scalar(v, instr.left.type, bool_type(), &unused);
+                if (!v->getType()->isIntegerTy(1))
+                    v = create_dbg(builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv"), instr.span);
+                llvm::Value *not_val = create_dbg(builder.CreateNot(v, "nottmp"), instr.span);
+                insert_temp(instr.dest.temp, f, not_val);
+            } break;
+
+            case Mir::OP_NOT: {
+                llvm::Value *v = visit_operand(instr.left, instr.span);
+                llvm::Value *res = create_dbg(builder.CreateNot(v, "nottmp"), instr.span);
+                insert_temp(instr.dest.temp, f, res);
+            } break;
+
+            case Mir::OP_LOAD: {
+                llvm::Value *val = visit_operand(instr.left, instr.span);
+                llvm::Value *loaded = create_dbg(
+                    builder.CreateLoad(llvm_typeof(instr.left.type->get_element_type()), val, f->temps[instr.dest.temp].name.str()),
+                    instr.span
+                );
+                insert_temp(instr.dest.temp, f, loaded);
+            } break;
+
+            case Mir::OP_NEG: {
+                llvm::Value *v = visit_operand(instr.left, instr.span);
+                llvm::Value *res;
+                if (instr.left.type->is_pointer())
+                    res = create_dbg(pointer_unary(v, instr), instr.span);
+                else {
+                    auto info = instr.left.type->info->as<ScalarTypeInfo>();
+                    res = create_dbg(info->is_float() ? builder.CreateFNeg(v, "fnegtmp") : builder.CreateNeg(v, "negtmp"), instr.span);
+                }
+                insert_temp(instr.dest.temp, f, res);
+            } break;
+
+            case Mir::OP_STORE: {
+                llvm::Value *val = visit_operand(instr.right, instr.span);
+                llvm::Value *ptr = temps[instr.left.temp].value;
+                create_dbg(builder.CreateStore(val, ptr), instr.span);
+            } break;
+
+            case Mir::OP_ALLOCA: {
+                uint32_t index = instr.dest.temp;
+                Temporary &temp = f->temps[index];
+                llvm::Value *ai = create_dbg(builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.str()), instr.span);
+                insert_temp(index, f, ai);
+            } break;
+
+            case Mir::OP_LOAD_FN_PTR: {
+                llvm::Value *fnptr = function_table[m.functions[instr.right.temp]];
+                insert_temp(instr.dest.temp, f, fnptr);
+            } break;
+
+            case Mir::OP_JMP: {
+                auto it = bb_table.find(instr.left.bb);
+                if (it == bb_table.end()) throw_error("Unknown target basic block", instr.span);
+                create_dbg(builder.CreateBr(it->second), instr.span);
+            } break;
+
+            case Mir::OP_JMP_TRUE: {
+                llvm::Value *cond = visit_operand(instr.right, instr.span);
+                Type *unused = nullptr;
+                cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
+                if (!cond->getType()->isIntegerTy(1))
+                    cond = create_dbg(builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv"), instr.span);
+
+                auto target_it = bb_table.find(instr.left.bb_pair.target);
+                auto fallthrough_it = bb_table.find(instr.left.bb_pair.fallthrough);
+                if (target_it == bb_table.end() || fallthrough_it == bb_table.end())
+                    throw_error("Unknown basic block", instr.span);
+
+                create_dbg(builder.CreateCondBr(cond, target_it->second, fallthrough_it->second), instr.span);
+            } break;
+
+            case Mir::OP_PUSH_ARG:
+                arg_stack.push_back(visit_operand(instr.left, instr.span));
+                break;
+
+            case Mir::OP_CALL: {
+                Mir::Function *mir_fn = m.functions[instr.left.temp];
+                llvm::Value *fnval = function_table[mir_fn];
+                uint32_t nargs = instr.right.imm.int_lit;
+
+                auto start = arg_stack.end() - nargs;
+                std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
+                arg_stack.erase(start, arg_stack.end());
+
+                llvm::CallInst *call;
+                if (mir_fn->type_info->return_type != void_type())
+                    call = create_dbg(builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args, f->temps[instr.dest.temp].name.str()), instr.span);
+                else
+                    call = create_dbg(builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args), instr.span);
+
+                insert_temp(instr.dest.temp, f, call);
+            } break;
+
+            case Mir::OP_CALL_PTR: {
+                llvm::Value *fn = visit_operand(instr.left, instr.span);
+                uint32_t nargs = instr.right.imm.int_lit;
+                auto start = arg_stack.end() - nargs;
+                std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
+                arg_stack.erase(start, arg_stack.end());
+
+                llvm::CallInst *call = create_dbg(builder.CreateCall(llvm_fn_typeof(instr.left.type), fn, call_args), instr.span);
+                if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, call);
+            } break;
+
+            case Mir::OP_RET: {
+                llvm::Value *val = visit_operand(instr.left, instr.span);
+                create_dbg(builder.CreateRet(val), instr.span);
+                return;
+            } break;
+
+            case Mir::OP_RET_VOID:
+                create_dbg(builder.CreateRetVoid(), instr.span);
+                break;
+
+            case Mir::OP_CAST: {
+                llvm::Value *v = visit_operand(instr.left, instr.span);
+                Type *new_type = nullptr;
+                llvm::Value *casted = create_dbg(cast_scalar(v, instr.left.type, instr.right.type, &new_type), instr.span);
+                if (new_type) instr.right.type = new_type;
+                insert_temp(instr.dest.temp, f, casted);
+            } break;
+
+            case Mir::OP_BITCAST: {
+                llvm::Value *v = visit_operand(instr.left, instr.span);
+                llvm::Type *to_ty = llvm_typeof(instr.right.type);
+                llvm::Value *bc = create_dbg(builder.CreateBitCast(v, to_ty, "bitcasttmp"), instr.span);
+                insert_temp(instr.dest.temp, f, bc);
+            } break;
+
+            case Mir::OP_GEP: {
+                llvm::Value *base = visit_operand(instr.left, instr.span);
+                llvm::Value *index = visit_operand(instr.right, instr.span);
+                Temporary &temp = f->temps[instr.dest.temp];
+                llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
+                llvm::Value *gep = create_dbg(builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.str()), instr.span);
+                insert_temp(instr.dest.temp, f, gep);
+            } break;
+
+            case Mir::OP_ZERO_INIT: {
+                static llvm::Type *i8_ty = llvm::Type::getInt8Ty(llvm_ctx);
+                static llvm::Type *i8_ptr_ty = llvm::PointerType::get(i8_ty, 0);
+                static llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
+                static llvm::Type *i64_ty = llvm::Type::getInt64Ty(llvm_ctx);
+                static llvm::Value *zero = llvm::ConstantInt::get(i8_ty, 0);
+                static llvm::Value *is_volatile = llvm::ConstantInt::get(i1_ty, 0);
+                static std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i64_ty};
+
+                llvm::Value *ptr = visit_operand(instr.left, instr.span);
+                Type *ty = instr.right.type;
+                uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
+                llvm::Value *cast_ptr = create_dbg(builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr"), instr.span);
+                llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
+                llvm::Function *memset_fn = llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
+
+                create_dbg(builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile}), instr.span);
+                llvm::Value *val = create_dbg(builder.CreateLoad(llvm_typeof(ty), ptr), instr.span);
+                insert_temp(instr.dest.temp, f, val);
+            } break;
         }
-
-        ScalarTypeInfo *left_info = instr.left.type->info->as<ScalarTypeInfo>();
-        ScalarTypeInfo *right_info = instr.right.type->info->as<ScalarTypeInfo>();
-        llvm::Value *result = nullptr;
-
-        Type *new_type = nullptr;
-        right = cast_scalar(right, instr.right.type, instr.left.type, &new_type);
-
-        // We performed a cast so now we have to update to the new type so the below logic is correct
-        if (new_type) {
-          instr.right.type = new_type;
-          right_info = new_type->info->as<ScalarTypeInfo>();
-        }
-
-        if (false) {
-          std::error_code ec;
-          llvm::raw_fd_ostream stream("-", ec);
-          left->getType()->print(stream);
-          stream.write('\n');
-          right->getType()->print(stream);
-          stream.write('\n');
-        }
-
-        if (left_info->is_signed() && right_info->is_signed()) {
-          result = binary_signed(left, right, instr.opcode);
-        } else if (left_info->is_integral && right_info->is_integral) {
-          result = binary_unsigned(left, right, instr.opcode);
-        } else if (left_info->is_float() && right_info->is_float()) {
-          result = binary_fp(left, right, instr.opcode);
-        } else {
-          std::string msg = std::format("Unsupported operand types for binary operation: left type '{}', right type '{}'",
-                                        instr.left.type->to_string(), instr.right.type->to_string());
-          throw_error(msg, instr.span);
-          return;
-        }
-
-        insert_temp(instr.dest.temp, f, result);
-      } break;
-
-      case Mir::OP_LOGICAL_NOT: {
-        llvm::Value *v = visit_operand(instr.left, instr.span);
-        Type *unused = nullptr;
-        v = cast_scalar(v, instr.left.type, bool_type(), &unused);
-
-        if (!v->getType()->isIntegerTy(1)) {
-          v = builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv");
-        }
-
-        llvm::Value *not_val = builder.CreateNot(v, "nottmp");
-        insert_temp(instr.dest.temp, f, not_val);
-      } break;
-
-      case Mir::OP_NOT: {
-        llvm::Value *v = visit_operand(instr.left, instr.span);
-        llvm::Value *res = builder.CreateNot(v, "nottmp");
-        insert_temp(instr.dest.temp, f, res);
-      } break;
-
-      case Mir::OP_LOAD: {
-        llvm::Value *val = visit_operand(instr.left, instr.span);
-        auto loaded =
-            builder.CreateLoad(llvm_typeof(instr.left.type->get_element_type()), val, f->temps[instr.dest.temp].name.str());
-        insert_temp(instr.dest.temp, f, loaded);
-      } break;
-
-      case Mir::OP_NEG: {
-        if (instr.left.type->is_pointer()) {
-          llvm::Value *v = visit_operand(instr.left, instr.span);
-          llvm::Value *res = pointer_unary(v, instr);
-          insert_temp(instr.dest.temp, f, res);
-          break;
-        }
-        llvm::Value *v = visit_operand(instr.left, instr.span);
-        auto info = instr.left.type->info->as<ScalarTypeInfo>();
-        llvm::Value *res = info->is_float() ? builder.CreateFNeg(v, "fnegtmp") : builder.CreateNeg(v, "negtmp");
-        insert_temp(instr.dest.temp, f, res);
-      } break;
-
-      case Mir::OP_STORE: {
-        llvm::Value *val = visit_operand(instr.right, instr.span);
-        llvm::Value *ptr = temps[instr.left.temp].value;
-        builder.CreateStore(val, ptr);
-      } break;
-
-      case Mir::OP_ALLOCA: {
-        uint32_t index = instr.dest.temp;
-        Temporary &temp = f->temps[index];
-        llvm::Value *ai = builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.str());
-        insert_temp(index, f, ai);
-      } break;
-
-      case Mir::OP_LOAD_FN_PTR: {
-        uint32_t fn_idx = instr.right.temp;
-        Mir::Function *fn = m.functions[fn_idx];
-        llvm::Value *fnptr = function_table[fn];
-        insert_temp(instr.dest.temp, f, fnptr);
-      } break;
-
-      case Mir::OP_JMP: {
-        Mir::Basic_Block *target_mb = instr.left.bb;
-        auto it = bb_table.find(target_mb);
-        if (it == bb_table.end()) {
-          throw_error("Unknown target basic block", instr.span);
-        }
-        builder.CreateBr(it->second);
-      } break;
-
-      case Mir::OP_JMP_TRUE: {
-        Mir::Basic_Block *target_mir_bb = instr.left.bb_pair.target;
-        Mir::Basic_Block *fallthrough_bb = instr.left.bb_pair.fallthrough;
-
-        llvm::Value *cond = visit_operand(instr.right, instr.span);
-        Type *unused = nullptr;
-        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
-
-        if (!cond->getType()->isIntegerTy(1)) {
-          cond = builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv");
-        }
-
-        auto it = bb_table.find(target_mir_bb);
-        if (it == bb_table.end()) {
-          throw_error("Unknown target basic block", instr.span);
-        }
-        llvm::BasicBlock *target_bb = it->second;
-
-        auto fallthrough_it = bb_table.find(fallthrough_bb);
-        if (fallthrough_it == bb_table.end()) {
-          throw_error("Unknown fallthrough basic block", instr.span);
-        }
-        builder.CreateCondBr(cond, target_bb, fallthrough_it->second);
-      } break;
-
-      case Mir::OP_PUSH_ARG: {
-        llvm::Value *arg = visit_operand(instr.left, instr.span);
-        arg_stack.push_back(arg);
-      } break;
-
-      case Mir::OP_CALL: {
-        Mir::Function *mir_fn = m.functions[instr.left.temp];
-        llvm::Value *fnval = function_table[mir_fn];
-        uint32_t nargs = (uint32_t)instr.right.imm.int_lit;
-
-        auto start = arg_stack.end() - nargs;
-        std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
-        arg_stack.erase(start, arg_stack.end());
-        llvm::CallInst *call;
-        if (mir_fn->type_info->return_type != void_type()) {
-          call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args, f->temps[instr.dest.temp].name.str());
-        } else {
-          call = builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args);
-        }
-        insert_temp(instr.dest.temp, f, call);
-      } break;
-
-      case Mir::OP_CALL_PTR: {
-        llvm::Value *fn = visit_operand(instr.left, instr.span);
-        const uint32_t n_args = (uint32_t)instr.right.imm.int_lit;
-        const auto start = arg_stack.end() - n_args;
-        const std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
-        arg_stack.erase(start, arg_stack.end());
-        llvm::CallInst *call = builder.CreateCall(llvm_fn_typeof(instr.left.type), fn, call_args);
-        if (call && !call->getType()->isVoidTy()) {
-          insert_temp(instr.dest.temp, f, call);
-        }
-      } break;
-
-      case Mir::OP_RET: {
-        llvm::Value *val = visit_operand(instr.left, instr.span);
-        builder.CreateRet(val);
-        return;
-      } break;
-
-      case Mir::OP_RET_VOID: {
-        builder.CreateRetVoid();
-      } break;
-
-      case Mir::OP_CAST: {
-        llvm::Value *v = visit_operand(instr.left, instr.span);
-        Type *new_type = nullptr;
-        llvm::Value *casted = cast_scalar(v, instr.left.type, instr.right.type, &new_type);
-        if (new_type) {
-          instr.right.type = new_type;
-        }
-        insert_temp(instr.dest.temp, f, casted);
-      } break;
-
-      case Mir::OP_BITCAST: {
-        llvm::Value *v = visit_operand(instr.left, instr.span);
-        llvm::Type *to_ty = llvm_typeof(instr.right.type);
-        llvm::Value *bc = builder.CreateBitCast(v, to_ty, "bitcasttmp");
-        insert_temp(instr.dest.temp, f, bc);
-      } break;
-
-      case Mir::OP_GEP: {
-        llvm::Value *base = visit_operand(instr.left, instr.span);
-        llvm::Value *index = visit_operand(instr.right, instr.span);
-        Temporary &temp = f->temps[instr.dest.temp];
-        llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
-        llvm::Value *gep = builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.str());
-        insert_temp(instr.dest.temp, f, gep);
-      } break;
-      case Mir::OP_ZERO_INIT: {
-        // crap we need.
-        static llvm::Type *i8_ty = llvm::Type::getInt8Ty(llvm_ctx);
-        static llvm::Type *i8_ptr_ty = llvm::PointerType::get(i8_ty, 0);
-        static llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
-        static llvm::Type *i64_ty = llvm::Type::getInt64Ty(llvm_ctx);
-        static llvm::Value *zero = llvm::ConstantInt::get(i8_ty, 0);
-        static llvm::Value *is_volatile = llvm::ConstantInt::get(i1_ty, 0);
-        static std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i64_ty};
-
-        // PTR is a pointer to the memory to zero, TY is the type (non-pointer) to zero-init
-        llvm::Value *ptr = visit_operand(instr.left, instr.span);
-        Type *ty = instr.right.type;  // Non-pointer type ref
-        uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
-        llvm::Value *cast_ptr = builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr");
-        llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
-        llvm::Function *memset_fn =
-            llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
-
-        builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
-        builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile});
-        llvm::Value *val = builder.CreateLoad(llvm_typeof(ty), ptr);
-        insert_temp(instr.dest.temp, f, val);
-        break;
-      }
     }
-  }
 }
 
 llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {

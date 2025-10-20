@@ -16,6 +16,8 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Casting.h>
@@ -167,8 +169,17 @@ static inline std::string unescape_string_lit(const std::string &s) {
 struct DIManager {
   std::shared_ptr<DIBuilder> di_builder;
   std::stack<DIScope *> scope_stack;
+  llvm::DICompileUnit *cu;
 
-  explicit DIManager(std::shared_ptr<DIBuilder> &builder) : di_builder(builder) {}
+  explicit inline DIManager(std::shared_ptr<DIBuilder> &builder) : di_builder(builder) {
+    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust,                                                // Language
+                                       di_builder->createFile("main.ela", "/home/josh/source/temp/ela_source"),  // File
+                                       "Ela",  // Producer string
+                                       false,  // isOptimized
+                                       "",     // Flags
+                                       0       // Runtime version
+    );
+  }
 
   struct ScopeDropStub {
     DIManager *manager;
@@ -188,17 +199,17 @@ struct DIManager {
     ~ScopeDropStub() { manager->pop_scope(); }
   };
 
-  void push_scope(DIScope *scope) { scope_stack.push(scope); }
+  inline void push_scope(DIScope *scope) { scope_stack.push(scope); }
 
-  void pop_scope() {
+  inline void pop_scope() {
     if (!scope_stack.empty()) {
       scope_stack.pop();
     }
   }
 
-  DIScope *current_scope() const { return scope_stack.empty() ? nullptr : scope_stack.top(); }
+  inline DIScope *current_scope() const { return scope_stack.empty() ? nullptr : scope_stack.top(); }
 
-  std::tuple<std::string, std::string, unsigned, unsigned> extract_span(Span span) {
+  inline std::tuple<std::string, std::string, unsigned, unsigned> extract_span(Span span) {
     auto location = span;
     auto line = location.line, column = location.column;
     std::filesystem::path abs_path = location.files()[location.file];
@@ -208,64 +219,78 @@ struct DIManager {
     return {basename, dirpath, line, column};
   }
 
-  llvm::DIFile *enter_file_scope(const Span &span) {
+  inline llvm::DIFile *enter_file_scope(const Span &span) {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *file = di_builder->createFile(basename, dirpath);
     push_scope(file);
     return file;
   }
 
-  llvm::DISubprogram *enter_function_scope(DIScope *parent, llvm::Function *function, const std::string &name, const Span &span) {
+  inline llvm::DISubprogram *enter_function_scope(DIScope *parent, llvm::Function *function, const std::string &name,
+                                                  const Span &span) {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *file = dyn_cast<llvm::DIFile>(parent);
     auto *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray({}));
-    auto *subprogram = di_builder->createFunction(file, name, name, file, line, func_type, line, llvm::DINode::FlagZero,
+    auto *subprogram = di_builder->createFunction(cu, name, name, file, line, func_type, line, llvm::DINode::FlagZero,
                                                   llvm::DISubprogram::SPFlagDefinition);
     function->setSubprogram(subprogram);
     push_scope(subprogram);
     return subprogram;
   }
 
-  llvm::DILexicalBlock *enter_lexical_scope(DIScope *parent, const Span &span) {
+  inline llvm::DILexicalBlock *enter_lexical_scope(DIScope *parent, const Span &span) {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *block = di_builder->createLexicalBlock(parent, di_builder->createFile(basename, dirpath), line, column);
     push_scope(block);
     return block;
   }
 
-  llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, llvm::DIFile *file, Span span, llvm::DIType *type) {
+  inline llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, llvm::DIFile *file, Span span,
+                                           llvm::DIType *type) {
     auto [basename, dirpath, line, column] = extract_span(span);
     return di_builder->createAutoVariable(scope, name, file, line, type, true);
   }
 
-  void attach_debug_info(llvm::Instruction *instruction, Span span) {
+  inline void attach_debug_info(llvm::Instruction *instruction, Span span) {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, current_scope());
     instruction->setDebugLoc(debug_loc);
   }
 
-  llvm::DIType *create_basic_type(const std::string &name, uint64_t size_in_bits, unsigned encoding) {
+  inline llvm::DIType *create_basic_type(const std::string &name, uint64_t size_in_bits, unsigned encoding) {
     return di_builder->createBasicType(name, size_in_bits, encoding);
   }
 
-  llvm::DIType *create_pointer_type(llvm::DIType *pointee_type, uint64_t size_in_bits) {
+  inline llvm::DIType *create_pointer_type(llvm::DIType *pointee_type, uint64_t size_in_bits) {
     return di_builder->createPointerType(pointee_type, size_in_bits);
   }
 
-  llvm::DIType *create_function_type(llvm::ArrayRef<llvm::Metadata *> param_types) {
+  inline llvm::DIType *create_function_type(llvm::ArrayRef<llvm::Metadata *> param_types) {
     return di_builder->createSubroutineType(di_builder->getOrCreateTypeArray(param_types));
   }
 
-  llvm::DIType *create_struct_type(DIScope *scope, const std::string &name, llvm::DIFile *file, unsigned line,
-                                   uint64_t size_in_bits, uint64_t align_in_bits, llvm::DINode::DIFlags flags,
-                                   llvm::ArrayRef<llvm::Metadata *> elements) {
+  inline llvm::DIType *create_struct_type(DIScope *scope, const std::string &name, llvm::DIFile *file, unsigned line,
+                                          uint64_t size_in_bits, uint64_t align_in_bits, llvm::DINode::DIFlags flags,
+                                          llvm::ArrayRef<llvm::Metadata *> elements) {
     return di_builder->createStructType(scope, name, file, line, size_in_bits, align_in_bits, flags, nullptr,
                                         di_builder->getOrCreateArray(elements));
   }
 
-  llvm::DIType *create_array_type(uint64_t size, uint64_t align_in_bits, llvm::DIType *element_type,
-                                  llvm::ArrayRef<llvm::Metadata *> subscripts) {
+  inline llvm::DIType *create_array_type(uint64_t size, uint64_t align_in_bits, llvm::DIType *element_type,
+                                         llvm::ArrayRef<llvm::Metadata *> subscripts) {
     return di_builder->createArrayType(size, align_in_bits, element_type, di_builder->getOrCreateArray(subscripts));
+  }
+
+  inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
+    if (auto *inst = llvm::dyn_cast<llvm::Instruction>(v)) {
+      attach_debug_info(inst, span);
+    }
+    return v;
+  }
+
+  inline llvm::Instruction *create_dbg(llvm::Instruction *v, Span span) {
+    attach_debug_info(v, span);
+    return v;
   }
 };
 
@@ -304,7 +329,7 @@ struct LLVM_Emitter {
   inline void insert_temp(uint32_t idx, Mir::Function *f, llvm::Value *v) {
     Type *type = nullptr;
     InternedString name = "";
-    
+
     // We have to check this for stuff like void call returns.
     if (f->temps.size() < (size_t)idx) {
       type = f->temps[idx].type;
@@ -675,6 +700,18 @@ struct LLVM_Emitter {
   void emit_module();
   void emit_function(Mir::Function *f, llvm::Function *ir_f);
   void emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f);
+
+  inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
+    return dbg.create_dbg(v, span);  // attaches debug info if v is an instruction
+  }
+
+  inline llvm::Instruction *create_dbg(llvm::Instruction *v, Span span) {
+    return dbg.create_dbg(v, span);  // attaches debug info if v is an instruction
+  }
+
+  inline llvm::CallInst *create_dbg(llvm::CallInst *v, Span span) {
+    return (llvm::CallInst *)dbg.create_dbg(v, span);  // attaches debug info if v is an instruction
+  }
 
   llvm::Value *pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr);
   llvm::Value *pointer_unary(llvm::Value *operand, const Instruction &instr);
