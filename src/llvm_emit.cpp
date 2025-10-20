@@ -692,7 +692,9 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
 
         throw_error(std::format("use of undeclared temp '{}'", o.temp), span);
       }
-      return temps[o.temp].value;
+      auto val = temps[o.temp].value;
+      assert(val);
+      return val;
     }
     case Mir::Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE: {
       llvm::GlobalVariable *gv = global_variables[o.gv];
