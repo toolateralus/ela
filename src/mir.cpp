@@ -226,54 +226,64 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
       EMIT_STORE(lvalue_addr, rvalue);
       return rvalue;
     } else {
-      Operand current_val = lvalue_addr;  // Parameters don't need to load.
-      if (!lvalue_addr.is_parameter) {
-        Operand current_val = m.create_temporary(node->left->type);
-        EMIT_LOAD(current_val, lvalue_addr);
+      Operand lvalue_addr = generate_lvalue_addr(node->left, m);
+      Operand rvalue = generate_expr(node->right, m);
+
+      if (node->op == TType::Assign) {
+        EMIT_STORE(lvalue_addr, rvalue);
+        return rvalue;
+      } else {
+        Operand current_val;
+        if (lvalue_addr.is_parameter) {
+          current_val = lvalue_addr;
+        } else {
+          current_val = m.create_temporary(node->left->type);
+          EMIT_LOAD(current_val, lvalue_addr);
+        }
+
+        Operand result = m.create_temporary(node->type);
+
+        Op_Code op;
+        switch (node->op) {
+          case TType::CompAdd:
+            op = OP_ADD;
+            break;
+          case TType::CompSub:
+            op = OP_SUB;
+            break;
+          case TType::CompMul:
+            op = OP_MUL;
+            break;
+          case TType::CompDiv:
+            op = OP_DIV;
+            break;
+          case TType::CompMod:
+            op = OP_MOD;
+            break;
+          case TType::CompAnd:
+            op = OP_AND;
+            break;
+          case TType::CompOr:
+            op = OP_OR;
+            break;
+          case TType::CompXor:
+            op = OP_XOR;
+            break;
+          case TType::CompSHL:
+            op = OP_SHL;
+            break;
+          case TType::CompSHR:
+            op = OP_SHR;
+            break;
+          default:
+            op = (Op_Code)-1;
+            throw_error(std::format("unknown compound assignment operator {}", (int)node->op), node->span);
+        }
+
+        EMIT_BINOP(op, result, current_val, rvalue);
+        EMIT_STORE(lvalue_addr, result);
+        return result;
       }
-
-      Operand result = m.create_temporary(node->type);
-
-      Op_Code op;
-      switch (node->op) {
-        case TType::CompAdd:
-          op = OP_ADD;
-          break;
-        case TType::CompSub:
-          op = OP_SUB;
-          break;
-        case TType::CompMul:
-          op = OP_MUL;
-          break;
-        case TType::CompDiv:
-          op = OP_DIV;
-          break;
-        case TType::CompMod:
-          op = OP_MOD;
-          break;
-        case TType::CompAnd:
-          op = OP_AND;
-          break;
-        case TType::CompOr:
-          op = OP_OR;
-          break;
-        case TType::CompXor:
-          op = OP_XOR;
-          break;
-        case TType::CompSHL:
-          op = OP_SHL;
-          break;
-        case TType::CompSHR:
-          op = OP_SHR;
-          break;
-        default:
-          throw_error(std::format("unknown compound assignment operator {}", (int)node->op), node->span);
-          exit(1);
-      }
-
-      EMIT_BINOP(op, result, current_val, rvalue);
-      EMIT_STORE(lvalue_addr, result);
-      return result;
     }
   }
 
