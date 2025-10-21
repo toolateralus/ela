@@ -506,6 +506,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
 
       case Mir::OP_STORE: {
         llvm::Value *val = visit_operand(instr.right, instr.span);
+        assert(is_temporary_valid(instr.left.temp));
         llvm::Value *ptr = temps[instr.left.temp].value;
         create_dbg(builder.CreateStore(val, ptr), instr.span);
       } break;
@@ -557,14 +558,15 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
         arg_stack.erase(start, arg_stack.end());
 
         llvm::CallInst *call;
-        if (mir_fn->type_info->return_type != void_type())
+        if (mir_fn->type_info->return_type != void_type()) {
           call =
               create_dbg(builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args, f->temps[instr.dest.temp].name.str()),
                          instr.span);
-        else
+          insert_temp(instr.dest.temp, f, call);
+        } else {
           call = create_dbg(builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args), instr.span);
+        }
 
-        insert_temp(instr.dest.temp, f, call);
       } break;
 
       case Mir::OP_CALL_PTR: {

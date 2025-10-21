@@ -515,6 +515,11 @@ Operand generate_member_access(const THIRMemberAccess *node, Module &m) {
 
 Operand generate_cast(const THIRCast *node, Module &m) {
   Operand value = generate_expr(node->operand, m);
+  // Tiny optimization: avoid redundant casts.
+  // This is a hack-- we shouldn't be doing this
+  if (node->operand->type == node->type) {
+    return value;
+  }
   Operand result = m.create_temporary(node->type);
   Operand type_operand = Operand::Make_Type_Ref(node->type);
   EMIT_CAST(result, value, type_operand);
@@ -752,6 +757,168 @@ void Basic_Block::finalize(Function *f) const {
         "malformed basic block: every basic block must end with one of the following instructions:\n[OP_JMP, OP_JMP_TRUE, "
         "OP_RET, OP_RET_VOID]\n",
         f->name.c_str(), label.c_str(), opcode);
+  }
+}
+
+Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
+  // handle compound-assignment forms first (they need lvalue handling)
+  if (ttype_is_comp_assign(node->op)) {
+    // only += and -= make sense for pointers
+    if (!(node->op == TType::CompAdd || node->op == TType::CompSub)) {
+      throw_error(std::format("unsupported compound pointer operator {}", (int)node->op), node->span);
+      return Operand::MakeNull();
+    }
+
+    Operand lvalue_addr = generate_lvalue_addr(node->left, m);
+    Operand rvalue = generate_expr(node->right, m);
+
+    // disallow ptr += ptr
+    if (node->right->type->is_pointer()) {
+      throw_error("pointer compound assign with pointer RHS is not allowed", node->span);
+      return Operand::MakeNull();
+    }
+
+    // load current pointer value (or use register value if already a value)
+    Operand current_val;
+    if (lvalue_addr.is_register_value) {
+      current_val = lvalue_addr;
+    } else {
+      current_val = m.create_temporary(node->left->type);
+      EMIT_LOAD(current_val, lvalue_addr);
+    }
+
+    Operand result = m.create_temporary(node->left->type);
+
+    if (node->op == TType::CompAdd) {
+      // ptr += int  -> GEP(ptr, int)
+      EMIT_GEP(result, current_val, rvalue);
+    } else {  // CompSub
+      // ptr -= int -> GEP(ptr, -int)
+      Operand neg = m.create_temporary(rvalue.type);
+      Operand zero = Operand::Make_Imm(Constant::Int(0), rvalue.type);
+      EMIT_BINOP(OP_SUB, neg, zero, rvalue);  // neg = 0 - rvalue
+      EMIT_GEP(result, current_val, neg);
+    }
+
+    EMIT_STORE(lvalue_addr, result);
+    return result;
+  }
+
+  Operand left = generate_expr(node->left, m);
+  Operand right = generate_expr(node->right, m);
+  Operand result;
+
+  switch (node->op) {
+    case TType::Add: {
+      Operand base, index;
+      if (node->left->type->is_pointer()) {
+        base = left;
+        index = right;
+      } else if (node->right->type->is_pointer()) {
+        base = right;
+        index = left;
+      } else {
+        throw_error("add on non-pointer types reached pointer generator", node->span);
+        return Operand::MakeNull();
+      }
+
+      result = m.create_temporary(node->type);
+      EMIT_GEP(result, base, index);
+      return result;
+    }
+
+    case TType::Sub: {
+      if (node->left->type->is_pointer() && node->right->type->is_integer()) {
+        Operand neg = m.create_temporary(right.type);
+        Operand zero = Operand::Make_Imm(Constant::Int(0), right.type);
+        EMIT_BINOP(OP_SUB, neg, zero, right);  // neg = 0 - right
+        result = m.create_temporary(node->type);
+        EMIT_GEP(result, left, neg);
+        return result;
+      } else if (node->left->type->is_pointer() && node->right->type->is_pointer()) {
+        Operand lhs_int = m.create_temporary(u64_type());
+        Operand rhs_int = m.create_temporary(u64_type());
+        EMIT_BITCAST(lhs_int, left, Operand::Make_Type_Ref(u64_type()));
+        EMIT_BITCAST(rhs_int, right, Operand::Make_Type_Ref(u64_type()));
+        result = m.create_temporary(node->type);
+        EMIT_BINOP(OP_SUB, result, lhs_int, rhs_int);
+        return result;
+      } else {
+        throw_error("invalid pointer subtraction", node->span);
+        return Operand::MakeNull();
+      }
+    }
+
+    // pointer comparisons (==, !=, <, <=, >, >=)
+    case TType::EQ:
+    case TType::NEQ:
+    case TType::LT:
+    case TType::LE:
+    case TType::GT:
+    case TType::GE: {
+      Op_Code cmp_op;
+      switch (node->op) {
+        case TType::EQ:
+          cmp_op = OP_EQ;
+          break;
+        case TType::NEQ:
+          cmp_op = OP_NE;
+          break;
+        case TType::LT:
+          cmp_op = OP_LT;
+          break;
+        case TType::LE:
+          cmp_op = OP_LE;
+          break;
+        case TType::GT:
+          cmp_op = OP_GT;
+          break;
+        case TType::GE:
+          cmp_op = OP_GE;
+          break;
+        default:
+          cmp_op = (Op_Code)-1;
+          break;
+      }
+
+      result = m.create_temporary(node->type);
+      EMIT_BINOP(cmp_op, result, left, right);
+      return result;
+    }
+
+    default:
+      throw_error(std::format("unsupported pointer operator {}", (int)node->op), node->span);
+      return Operand::MakeNull();
+  }
+
+  return Operand::MakeNull();
+}
+
+Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
+  switch (node->op) {
+    case TType::Increment: {
+      Operand addr = generate_lvalue_addr(node->operand, m);
+      Operand current_val = m.create_temporary(node->operand->type);
+      EMIT_LOAD(current_val, addr);
+      Operand one = Operand::Make_Imm(Constant::Int(1), u64_type());
+      Operand next = m.create_temporary(node->operand->type);
+      EMIT_GEP(next, current_val, one);
+      EMIT_STORE(addr, next);
+      return next;
+    }
+    case TType::Decrement: {
+      Operand addr = generate_lvalue_addr(node->operand, m);
+      Operand current_val = m.create_temporary(node->operand->type);
+      EMIT_LOAD(current_val, addr);
+      Operand neg_one = Operand::Make_Imm(Constant::Int(-1), u64_type());
+      Operand next = m.create_temporary(node->operand->type);
+      EMIT_GEP(next, current_val, neg_one);  // ptr - 1
+      EMIT_STORE(addr, next);
+      return next;
+    }
+    default:
+      throw_error(std::format("unsupported pointer unary operator {}", (int)node->op), node->span);
+      return Operand::MakeNull();
   }
 }
 

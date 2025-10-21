@@ -534,6 +534,34 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     THIR_ALLOC(THIRBinExpr, binexpr, ast);
     binexpr->left = visit_node(ast->left);
     binexpr->right = visit_node(ast->right);
+
+    // Even for permissible conversions, we should explicitly cast.
+    // As well as having special pointer arithmetic nodes.
+    if (binexpr->left->type != binexpr->right->type) {
+      Type *left = binexpr->left->type, *right = binexpr->right->type;
+
+      // Pointer arithmetic gets a special node since it has completely
+      // different lowering semantics from here on out.
+      if ((left->is_pointer() || right->is_pointer()) && ast->op != TType::Assign) {
+        THIR_ALLOC(THIRPtrBinExpr, ptr_binary, ast);
+        ptr_binary->left = binexpr->left;
+        ptr_binary->right = binexpr->right;
+        ptr_binary->op = ast->op;
+        return ptr_binary;
+      } else {
+        // Cast the right operand since the entire compiler works under the assumption
+        // that for permissible mismatched types in a binary expression,
+        // the resulting expression, and therefore the right operand, inherits the type
+        // of the left operand in an implicit cast.
+
+        // This isn't always great, so we should re-think this.
+        THIR_ALLOC(THIRCast, cast, ast);
+        cast->operand = binexpr->right;
+        cast->type = ast->resolved_type;
+        binexpr->right = cast;
+      }
+    }
+
     binexpr->op = ast->op;
     return binexpr;
   } else {
@@ -551,6 +579,18 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
     THIR_ALLOC(THIRUnaryExpr, unary, ast);
     unary->operand = visit_node(ast->operand);
     unary->op = ast->op;
+
+    // Even for permissible conversions, we should explicitly cast.
+    // As well as having special pointer arithmetic nodes.
+    // Dereference expressions do not use a ptrunary expression.
+    // It's only for pointer arithmetic.
+    if (unary->operand->type->is_pointer() && ast->op != TType::Mul) {
+      THIR_ALLOC(THIRPtrUnaryExpr, ptr_unary, ast);
+      ptr_unary->operand = unary->operand;
+      ptr_unary->op = ast->op;
+      return ptr_unary;
+    }
+
     return unary;
   } else {
     THIR_ALLOC(THIRCall, overload_call, ast);
@@ -1051,7 +1091,7 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
       bind(param, var);
     }
 
-    thir->parameters.push_back(THIRParameter {
+    thir->parameters.push_back(THIRParameter{
         .mutability = param->mutability,
         .name = var->name,
         .default_value = var->value,

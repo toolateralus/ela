@@ -146,8 +146,6 @@ struct TypeInfo {
     return static_cast<T *>(this);
   }
 
-
-
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 
@@ -210,10 +208,8 @@ struct ScalarTypeInfo : TypeInfo {
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
 
-  inline bool is_float() const {
-    return scalar_type == TYPE_FLOAT || scalar_type == TYPE_DOUBLE;
-  }
-  
+  inline bool is_float() const { return scalar_type == TYPE_FLOAT || scalar_type == TYPE_DOUBLE; }
+
   inline bool is_signed() const {
     switch (scalar_type) {
       case TYPE_S8:
@@ -554,6 +550,9 @@ struct Type {
 
   bool has_dependencies() const;
   size_t offset_in_bytes(const InternedString &field) const;
+
+  inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integral; }
+  inline bool is_float() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_float(); }
 };
 
 static inline constexpr bool type_is_valid(Type *type) { return type != Type::UNRESOLVED_GENERIC && type != Type::INVALID_TYPE; }

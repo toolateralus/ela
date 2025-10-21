@@ -78,7 +78,7 @@ struct Constant {
   Type *type;  // TODO: remove this to optimize the size of these giant structs.
   union {
     InternedString string_lit;
-    uint64_t int_lit;
+    int64_t int_lit;
     double float_lit;
     bool bool_lit;
     uint16_t char_lit;
@@ -92,7 +92,7 @@ struct Constant {
     CONST_CHAR,
   } tag = CONST_INVALID;
 
-  static Constant Int(uint64_t value, Type *t = s32_type()) {
+  static Constant Int(int64_t value, Type *t = s32_type()) {
     Constant c;
     c.int_lit = value;
     c.tag = CONST_INT;
@@ -160,7 +160,7 @@ struct Operand {
 
     struct {
       uint32_t temp = 0;
-      bool is_register_value; // This is not backed by an alloca, therefore cannot be written to with STORE nor 'LOAD'ed
+      bool is_register_value;  // This is not backed by an alloca, therefore cannot be written to with STORE nor 'LOAD'ed
     };
   };
 
@@ -260,7 +260,9 @@ struct Basic_Block {
 
 extern jstl::Arena mir_arena;
 
-static inline InternedString generate_temp_identifier(size_t index, std::string prefix = "t") { return std::format("{}{}", prefix, index); }
+static inline InternedString generate_temp_identifier(size_t index, std::string prefix = "t") {
+  return std::format("{}{}", prefix, index);
+}
 
 // local variable handle.
 struct Temporary {
@@ -403,8 +405,6 @@ struct Module {
     return it->second;
   }
 
-  
-
   inline void enter_function(Function *f) {
     if (current_function) {
       function_stack.push(current_function);
@@ -443,8 +443,13 @@ struct Module {
 Operand generate_variable(const THIRVariable *node, Module &m);
 Operand generate_function(const THIRFunction *node, Module &m);
 Operand generate_expr_block(const THIRExprBlock *node, Module &m);
+
 Operand generate_bin_expr(const THIRBinExpr *node, Module &m);
 Operand generate_unary_expr(const THIRUnaryExpr *node, Module &m);
+
+Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m);
+Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m);
+
 Operand generate_literal(const THIRLiteral *node, Module &m);
 Operand generate_call(const THIRCall *node, Module &m);
 Operand generate_member_access(const THIRMemberAccess *node, Module &m);
@@ -487,6 +492,12 @@ static inline void generate(const THIR *node, Module &m) {
       break;
     case THIRNodeType::UnaryExpr:
       generate_unary_expr((THIRUnaryExpr *)node, m);
+      break;
+    case THIRNodeType::PtrBinExpr:
+      generate_ptr_bin_expr((THIRPtrBinExpr *)node, m);
+      break;
+    case THIRNodeType::PtrUnaryExpr:
+      generate_ptr_unary_expr((THIRPtrUnaryExpr *)node, m);
       break;
     case THIRNodeType::Literal:
       generate_literal((THIRLiteral *)node, m);
@@ -534,6 +545,7 @@ static inline void generate(const THIR *node, Module &m) {
     case THIRNodeType::Type:
     case THIRNodeType::Noop:
     case THIRNodeType::Program:
+      break;
       break;
   }
 }
@@ -612,7 +624,8 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 // OP_CAST / OP_BITCAST: dest=result, left=value, right=type_index
 #define EMIT_CAST(DEST, VAL, TYPE_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX, .span = node->span})
-#define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
+
+  #define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_BITCAST, DEST, VAL, TYPE_IDX, .span = node->span})
 
 // OP_GEP: dest=ptr, left=base, right=index

@@ -24,12 +24,14 @@
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Triple.h>
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <map>
 #include <memory>
+#include <system_error>
 #include <unordered_map>
 
 using namespace Mir;
@@ -332,15 +334,20 @@ struct LLVM_Emitter {
   // this is per each function, is cleared on exit.
   std::unordered_map<uint32_t, Allocation> temps;
 
+  inline llvm::raw_fd_ostream &ostream() {
+    static std::error_code ec;
+    static llvm::raw_fd_ostream stream{"-", ec};
+    return stream;
+  }
+
   inline void insert_temp(uint32_t idx, Mir::Function *f, llvm::Value *v) {
     Type *type = nullptr;
     InternedString name = "";
 
-    // We have to check this for stuff like void call returns.
-    if (f->temps.size() < (size_t)idx) {
-      type = f->temps[idx].type;
-      name = f->temps[idx].name;
-    }
+    assert(f->temps.size() > idx);
+
+    type = f->temps[idx].type;
+    name = f->temps[idx].name;
 
     Allocation allocation = {
         .type = type,
@@ -348,6 +355,7 @@ struct LLVM_Emitter {
         .value = v,
     };
 
+    assert(!v->getType()->isVoidTy());
     assert(v != nullptr);
     temps[idx] = allocation;
   }

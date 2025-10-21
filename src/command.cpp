@@ -87,7 +87,7 @@ int CompileCommand::compile() {
     if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
       llvm::errs() << "Module verification failed:\n";
       llvm::errs() << err_stream.str() << '\n';
-    } else {
+    } else if (false) {
       llvm::PassBuilder pass_builder{};
       llvm::ModuleAnalysisManager module_analysis_manager;
       llvm::FunctionAnalysisManager function_analysis_manager;

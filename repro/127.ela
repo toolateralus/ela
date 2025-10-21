@@ -1,0 +1,35 @@
+extern fn printf(_: *u8, ...);
+
+fn main() {
+  a := 0; // We need this variable for the loop to not get "<bad ref>"
+  for i := 0; i <= 4; i += 1 {
+    printf("woo hoo: %d!\n"c, i);
+  }
+  p := &a; // This causes an infinite hang on a CreateStore() call because the target of the store is a void.
+
+
+  /* 
+    This works:
+
+    a := 0;
+    p := &a;
+    for i := 0; i <= 4; i += 1 {
+      printf("woo hoo: %d!\n"c, i);
+    }
+  */
+
+  /* This has the same issue
+    for i := 0; i <= 4; i += 1 {
+      printf("woo hoo: %d!\n"c, i);
+    }
+    a := 0;
+    p := &a;
+  */
+
+  /*  This alone has the same issue with <bad ref>
+    for i := 0; i <= 4; i += 1 {
+      printf("woo hoo: %d!\n"c, i);
+    }
+  */
+
+}
