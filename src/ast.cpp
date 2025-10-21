@@ -3285,6 +3285,12 @@ void Parser::end_node(ASTNode *node, Span &range) {
 
 Parser::Parser(const std::string &filename, Context &context) : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed(states.back());
+
+  if (states.back().input.empty()) {
+    fprintf(stderr, "No code to compile, so exiting.\n");
+    exit(1);
+  }
+
   typer = new Typer(context);
 }
 
