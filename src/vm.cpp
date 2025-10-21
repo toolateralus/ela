@@ -1,4 +1,4 @@
-#include "interp.hpp"
+#include "vm.hpp"
 #include "mir.hpp"
 
 namespace Mir::VM {
@@ -67,7 +67,6 @@ static inline std::vector<uint64_t> decode_operand_span(const Operand &op, const
 
 void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
   Mir::Function *entry_point_function = m.functions[entry_point];
-
   Stack_Frame &sf = c.call_stack.emplace_back(entry_point_function);
 
   while (true) {
@@ -155,7 +154,6 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         sf.write(address, -operand);
         continue;
       }
-
       case OP_JMP: {
         sf.jump(instr.left.bb);
         continue;
@@ -170,7 +168,6 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         }
         continue;
       }
-
       case OP_PUSH_ARG: {
         sf.argument_stack.push_back(decode_operand_span(instr.left, sf));
         continue;
@@ -203,7 +200,6 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         }
         continue;
       }
-
       case OP_RET: {
         Stack_Frame &caller_sf = c.call_stack[c.call_stack.size() - 2];
         if (instr.left.tag == Operand::OPERAND_TEMP) {
@@ -216,16 +212,11 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         sf = c.call_stack.back();
         continue;
       }
-      case OP_RET_VOID:
+      case OP_RET_VOID: {
         c.call_stack.pop_back();
         sf = c.call_stack.back();
         continue;
-      // TODO: implement function pointers later.
-      case OP_CALL_PTR:
-        continue;
-      case OP_LOAD_FN_PTR:
-        continue;
-
+      }
       case OP_GEP: {
         uint64_t ptr = decode_operand(instr.left, sf);
         const Type *type = instr.left.type->get_element_type();
@@ -236,15 +227,22 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         continue;
       }
 
-      // these opcodes don't do anything in the interpreter.
-      // types are interpeted as the correct memory on read,
-      // the stack is already all pre-allocated and always zeroed on
-      // function entry.
+      /*
+        these opcodes don't do anything in the interpreter.
+        types are interpeted as the correct memory on read,
+        the stack is already all pre-allocated and always zeroed on
+        function entry.
+        TODO: implement function pointers later.
+      */
+      case OP_CALL_PTR:
+      case OP_LOAD_FN_PTR:
+        continue;
       case OP_CAST:
       case OP_BITCAST:
       case OP_ZERO_INIT:
       case OP_ALLOCA:
         continue;
+
       default:  // binary opcodes are handled with an if to help condense code.
         continue;
     }

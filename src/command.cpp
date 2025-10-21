@@ -11,7 +11,6 @@
 #include <llvm/IR/Verifier.h>
 #include "core.hpp"
 #include "error.hpp"
-#include "interp.hpp"
 #include "interpreter.hpp"
 #include "llvm_emit.hpp"
 #include "strings.hpp"
@@ -28,6 +27,11 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
   return it != flags.end() && it->second;
 }
+
+
+#if 0
+#include "vm.hpp"
+#endif
 
 int CompileCommand::compile() {
   init_type_system();
@@ -65,9 +69,10 @@ int CompileCommand::compile() {
     }
     m.finalize();
 
+#if 0
     Mir::VM::Context c;
     Mir::VM::interpret(c, m, 0);
-
+#endif
     if (compile_command.has_flag("save-mir")) {
       auto path = compile_command.binary_path.string() + std::string{".emir"};
       FILE *f = fopen(path.c_str(), "w");
