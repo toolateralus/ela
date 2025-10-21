@@ -1409,3 +1409,8 @@ bool Type::has_dependencies() const {
     } break;
   }
 }
+
+size_t Type::offset_in_bytes(const size_t index) const {
+  InternedString name = info->members[index].name;  // TODO: stop doing this lazy hack. just iterate.
+  return offset_in_bytes(name);
+}

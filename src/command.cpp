@@ -11,6 +11,8 @@
 #include <llvm/IR/Verifier.h>
 #include "core.hpp"
 #include "error.hpp"
+#include "interp.hpp"
+#include "interpreter.hpp"
 #include "llvm_emit.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
@@ -62,6 +64,10 @@ int CompileCommand::compile() {
       Mir::generate(thir_program, m);
     }
     m.finalize();
+
+    Mir::VM::Context c;
+    Mir::VM::interpret(c, m, 0);
+
     if (compile_command.has_flag("save-mir")) {
       auto path = compile_command.binary_path.string() + std::string{".emir"};
       FILE *f = fopen(path.c_str(), "w");

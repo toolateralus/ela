@@ -31,18 +31,21 @@ enum Op_Code : uint8_t {
   OP_XOR,
   OP_SHL,
   OP_SHR,
-  OP_NOT,
-  OP_LOGICAL_AND,
-  OP_LOGICAL_OR,
-  OP_LOGICAL_NOT,
   OP_EQ,
   OP_NE,
   OP_LT,
   OP_LE,
   OP_GT,
   OP_GE,
+  OP_LOGICAL_AND,
+  OP_LOGICAL_OR,
+  
+  
   OP_NEG,
-
+  
+  /* Unary */
+  OP_LOGICAL_NOT,
+  OP_NOT,
   /*
     Memory
     temporaries are assumed to always we a pointer to stack memory, just like LLVM.

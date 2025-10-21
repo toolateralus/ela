@@ -551,6 +551,8 @@ struct Type {
   bool has_dependencies() const;
   size_t offset_in_bytes(const InternedString &field) const;
 
+  size_t offset_in_bytes(const size_t index) const;
+
   inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integral; }
   inline bool is_float() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_float(); }
 };
