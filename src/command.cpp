@@ -87,21 +87,24 @@ int CompileCommand::compile() {
     if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
       llvm::errs() << "Module verification failed:\n";
       llvm::errs() << err_stream.str() << '\n';
-    } else if (false) {
+    } else if (!has_flag("nostdlib")) {
+      /* 
+        This just crashes on --nostdlib
+        TODO: fixme
+      */
       llvm::PassBuilder pass_builder{};
       llvm::ModuleAnalysisManager module_analysis_manager;
       llvm::FunctionAnalysisManager function_analysis_manager;
       llvm::LoopAnalysisManager loop_analysis_manager;
       llvm::CGSCCAnalysisManager cgscc_analysis_manager;
 
-      pass_builder.registerModuleAnalyses(module_analysis_manager);
       pass_builder.registerFunctionAnalyses(function_analysis_manager);
       pass_builder.registerLoopAnalyses(loop_analysis_manager);
       pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);
       pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager,
                                         module_analysis_manager);
 
-      auto module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+      auto module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O0);
 
       module_pass_manager.run(*llvm_emitter.llvm_module, module_analysis_manager);
     }

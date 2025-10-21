@@ -61,16 +61,19 @@ target_compile_options(ela PRIVATE
   -Wno-c99-designator
 )
 
-# Set compiler flags based on the compiler and platform
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # -fsanitize=address,leak
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto -DRELEASE")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /EHsc")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Ob0 /Od /RTC1")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Ob2 /DNDEBUG")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        target_compile_options(ela PRIVATE
+            -g
+            -Wall -Wextra -Wunused-function
+            -fsanitize=address,leak,undefined
+        )
+        target_link_options(ela PRIVATE
+            -fsanitize=address,leak,undefined
+        )
+    endif()
 endif()
+
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(ela PRIVATE DEBUG DEBUG=1)

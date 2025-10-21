@@ -1,0 +1,7 @@
+fn main() { 
+  // MIR
+  args := Env::args();
+  for arg in args {
+    printf("arg=%s\n"c, arg.data);
+  }
+}
