@@ -70,7 +70,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     f->create_and_enter_basic_block("entry");
   }
 
-  printf("function: %s\n", node->name.c_str());
   for (const auto &param : node->parameters) {
     Operand parameter_temp = m.create_temporary(param.associated_variable->type);
     f->parameter_temps.push_back({
@@ -78,7 +77,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
         .type = parameter_temp.type,
         .index = parameter_temp.temp
     });
-    printf("param: %s = %d\n", param.name.c_str(), parameter_temp.temp);
     Type *type = param.associated_variable->type;
     if (!node->is_extern) {
       // We just make allocas and store the initial values of parameters for all parameters,
@@ -87,7 +85,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
       EMIT_ALLOCA(alloca_temp, Operand ::Make_Type_Ref(type));
       EMIT_STORE(alloca_temp, parameter_temp);
       m.variables[param.associated_variable] = alloca_temp;
-      printf("param alloca: %s = %d\n", param.name.c_str(), alloca_temp.temp);
     } else {
       m.variables[param.associated_variable] = parameter_temp;
     }

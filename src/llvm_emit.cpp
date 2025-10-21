@@ -371,7 +371,6 @@ void LLVM_Emitter::emit_module() {
     llvm::Constant *initializer = llvm::Constant::getNullValue(gv_type);
     llvm::GlobalVariable *llvm_gv =
         new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage, initializer, gv->name.str());
-    printf("declaring global: %s\n", gv->name.c_str());
     global_variables[gv] = llvm_gv;
   }
 
@@ -402,7 +401,6 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   size_t i = 0;
   for (const auto &param_temp: f->parameter_temps) {
     llvm::Argument *llvm_param = ir_f->getArg(i);
-    printf("function: %s, inserting parameter: %s at index: %u\n", f->name.c_str(), param_temp.name.c_str(), param_temp.index);
     insert_temp(param_temp.index, f, llvm_param);
     ++i;
   }
