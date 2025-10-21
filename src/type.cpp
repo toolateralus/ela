@@ -291,8 +291,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span
     auto from_elem = from->get_element_type();
     auto to_elem = to->get_element_type();
     auto conversion = type_conversion_rule(from_elem, to_elem);
-    if (conversion == CONVERT_NONE_NEEDED ||
-        (conversion == CONVERT_IMPLICIT && (from->pointer_depth() == to->pointer_depth()))) {
+    if (conversion == CONVERT_NONE_NEEDED || (conversion == CONVERT_IMPLICIT && (from->pointer_depth() == to->pointer_depth()))) {
       elements_cast = true;
     }
   }
@@ -429,8 +428,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
     return false;
   }
 
-  return std::memcmp(finder_info->parameter_types, self_info->parameter_types,
-                     finder_info->params_len * sizeof(Type *)) == 0;
+  return std::memcmp(finder_info->parameter_types, self_info->parameter_types, finder_info->params_len * sizeof(Type *)) == 0;
 }
 
 /*
@@ -568,8 +566,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (type_extensions_is_back_pointer(extensions) &&
-      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
 
     if (type_extensions_is_back_const_pointer(extensions)) {
@@ -591,10 +588,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
 Type *Type::get_element_type() const {
   if (!is_pointer() && !is_fixed_sized_array()) {
-    throw_error(
-        std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
-                    to_string()),
-        {});
+    throw_error(std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
+                            to_string()),
+                {});
   }
   auto extensions = extensions_without_back();
   if (is_kind(TYPE_TUPLE)) {
@@ -1331,11 +1327,24 @@ size_t Type::offset_in_bytes(const InternedString &field) const {
       // Enums do not have per-field offsets in this representation.
       throw_error("enum type has no field \"" + field.str() + "\"", {});
     }
-
+    case TYPE_DYN: {
+      // Dyn is effectively a struct of function pointers right now
+      size_t offset = 0;
+      size_t max_align = 1;
+      for (const auto &member : info->members) {
+        size_t member_size = member.type->size_in_bytes();
+        size_t align = member.type->alignment_in_bytes();
+        max_align = std::max(max_align, align);
+        offset = (offset + align - 1) & ~(align - 1);
+        if (member.name == field) {
+          return offset;
+        }
+        offset += member_size;
+      }
+    } break;
     case TYPE_FUNCTION:
     case TYPE_SCALAR:
     case TYPE_TRAIT:
-    case TYPE_DYN:
     default:
       throw_error("type has no field \"" + field.str() + "\"", {});
   }
@@ -1397,8 +1406,6 @@ bool Type::has_dependencies() const {
     case TYPE_DYN: {
       // this doesn't depend on any other type, rather function declarations, but that's not relevant.
       return false;
-    }
-    break;
+    } break;
   }
 }
-

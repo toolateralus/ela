@@ -363,7 +363,7 @@ struct LLVM_Emitter {
   inline LLVM_Emitter(Mir::Module &m)
       : llvm_ctx(),
         builder(llvm_ctx),
-        llvm_module(std::make_unique<llvm::Module>("module", llvm_ctx)),
+        llvm_module(std::make_unique<llvm::Module>(Span::files()[m.functions[0]->span.file], llvm_ctx)),
         di_builder(std::make_shared<DIBuilder>(*llvm_module)),
         data_layout(""),
         dbg(di_builder),
@@ -394,6 +394,7 @@ struct LLVM_Emitter {
 
   inline llvm::FunctionType *llvm_fn_typeof(Type *type) { return llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(type)); }
   inline llvm::Type *llvm_typeof(Type *type) { return llvm_typeof_impl(type).first; }
+
   inline type_pair llvm_typeof_impl(Type *type) {
     static std::map<Type *, type_pair> memoized_types;
 
@@ -663,6 +664,8 @@ struct LLVM_Emitter {
         };
         std::vector<llvm::Metadata *> dyn_debug_info = {
             dbg.create_pointer_type(dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned), 64)};
+
+        dyn_fields.push_back(llvm::PointerType::get(llvm::PointerType::getVoidTy(llvm_ctx), 0));
 
         for (const auto &[method_name, method_type] : info->methods) {
           auto [llvm_function_type, di_function_type] = llvm_typeof_impl(method_type);

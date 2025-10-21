@@ -491,11 +491,17 @@ void Mir::Function::print(FILE *f, Module &m) const {
     fprintf(f, "extern ");
   }
   fprintf(f, "fn %s(", name.c_str());
-  for (size_t i = 0; i < type_info->params_len; ++i) {
-    fprintf(f, "t%zu: %s", i, format_type_ref(type_info->parameter_types[i]).c_str());
-    if (i + 1 < type_info->params_len) {
+
+  size_t i = 0;
+  for (const auto &temp : parameter_temps) {
+    fprintf(f, "%s: %s", temp.name.c_str(), format_type_ref(temp.type).c_str());
+    if (i != parameter_temps.size() - 1) {
       fprintf(f, ", ");
     }
+    ++i;
+  }
+
+  for (size_t i = 0; i < type_info->params_len; ++i) {
   }
   fprintf(f, ")");
   if (type_info->return_type && type_info->return_type != void_type()) {

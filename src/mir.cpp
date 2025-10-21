@@ -70,34 +70,24 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     f->create_and_enter_basic_block("entry");
   }
 
-  size_t param_idx = 0;
+  printf("function: %s\n", node->name.c_str());
   for (const auto &param : node->parameters) {
-    f->temps.push_back({
-        .name = generate_temp_identifier(param_idx),
-        .type = param.associated_variable->type,
+    Operand parameter_temp = m.create_temporary(param.associated_variable->type);
+    f->parameter_temps.push_back({
+        .name = std::format("t{}: {}", parameter_temp.temp, param.name),
+        .type = parameter_temp.type,
+        .index = parameter_temp.temp
     });
-
-    Operand parameter_temp = Operand::Make_Temp(param_idx, param.associated_variable->type);
-    // parameters by default are not backed by ALLOCA storage.
-    parameter_temp.is_register_value = true;
-
-    param_idx += 1;
+    printf("param: %s = %d\n", param.name.c_str(), parameter_temp.temp);
     Type *type = param.associated_variable->type;
-
-    if (param.mutability == MUT && !node->is_extern) {
-      // If this parameter is mutable, we need to allocate storage for it so
-      // writes back into it actually make sense and are possible with SSA semantics.
-      Operand alloca_temp = Operand::Make_Temp(param_idx, type->take_pointer_to());
-      f->temps.push_back({
-          .name = generate_temp_identifier(param_idx),
-          .type = type->take_pointer_to(),
-      });
-      param_idx += 1;
-      // allocate shum memory
+    if (!node->is_extern) {
+      // We just make allocas and store the initial values of parameters for all parameters,
+      // this way we can take the address of a parameter, and mutate them.
+      Operand alloca_temp = m.create_temporary(type->take_pointer_to());
       EMIT_ALLOCA(alloca_temp, Operand ::Make_Type_Ref(type));
-      // Store the initial value of the incoming parameter in our alloca
       EMIT_STORE(alloca_temp, parameter_temp);
       m.variables[param.associated_variable] = alloca_temp;
+      printf("param alloca: %s = %d\n", param.name.c_str(), alloca_temp.temp);
     } else {
       m.variables[param.associated_variable] = parameter_temp;
     }
@@ -142,10 +132,6 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   auto it = m.variables.find(node);
   if (it == m.variables.end()) {
     throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
-  }
-
-  if (it->second.is_register_value) {
-    return it->second;  // parameters do not have to be loaded, they are the only "register based" SSA values in the MIR.
   }
 
   Operand result = m.create_temporary(node->type);
@@ -279,12 +265,8 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
         return rvalue;
       } else {
         Operand current_val;
-        if (lvalue_addr.is_register_value) {
-          current_val = lvalue_addr;
-        } else {
-          current_val = m.create_temporary(node->left->type);
-          EMIT_LOAD(current_val, lvalue_addr);
-        }
+        current_val = m.create_temporary(node->left->type);
+        EMIT_LOAD(current_val, lvalue_addr);
 
         Operand result = m.create_temporary(node->type);
 
@@ -780,12 +762,8 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
 
     // load current pointer value (or use register value if already a value)
     Operand current_val;
-    if (lvalue_addr.is_register_value) {
-      current_val = lvalue_addr;
-    } else {
-      current_val = m.create_temporary(node->left->type);
-      EMIT_LOAD(current_val, lvalue_addr);
-    }
+    current_val = m.create_temporary(node->left->type);
+    EMIT_LOAD(current_val, lvalue_addr);
 
     Operand result = m.create_temporary(node->left->type);
 
@@ -915,6 +893,14 @@ Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
       EMIT_GEP(next, current_val, neg_one);  // ptr - 1
       EMIT_STORE(addr, next);
       return next;
+    }
+    case TType::LogicalNot: {
+      Operand addr = generate_lvalue_addr(node->operand, m);
+      Operand loaded = m.create_temporary(node->operand->type);
+      EMIT_LOAD(loaded, addr);
+      auto dest = m.create_temporary(bool_type());
+      EMIT_BINOP(OP_EQ, dest, loaded, Operand::Make_Imm(Constant::Int(0), u64_type()));
+      return dest;
     }
     default:
       throw_error(std::format("unsupported pointer unary operator {}", (int)node->op), node->span);

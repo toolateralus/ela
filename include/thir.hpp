@@ -263,7 +263,7 @@ struct THIRPtrBinExpr : THIR {
 struct THIRPtrUnaryExpr: THIR {
   THIR *operand;
   TType op;
-  THIRNodeType get_node_type() const override { return THIRNodeType::PtrBinExpr; }
+  THIRNodeType get_node_type() const override { return THIRNodeType::PtrUnaryExpr; }
 };
 
 struct THIRIndex : THIR {

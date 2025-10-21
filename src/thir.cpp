@@ -495,11 +495,11 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
   THIR_ALLOC(THIRMemberAccess, discriminant_access, ast)
   discriminant_access->base = cached_object;
   discriminant_access->member = CHOICE_TYPE_DISCRIMINANT_KEY;
-  discriminant_access->type = u64_type();
+  discriminant_access->type = u32_type(); // This depends completely on the size of the choice type...
   THIR_ALLOC(THIRBinExpr, thir, ast);
   thir->left = discriminant_access;
   thir->op = TType::EQ;
-  thir->right = make_literal(std::to_string(discriminant), ast->span, u64_type(), ASTLiteral::Integer);
+  thir->right = make_literal(std::to_string(discriminant), ast->span, u32_type(), ASTLiteral::Integer);
   return thir;
 }
 
@@ -632,12 +632,12 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
     // We always dereference index operator overLOADs, unless it's slice_index
 
     const InternedString name = ast->resolved_operator_overload->name;
+
     if (name != "slice_index" && name != "slice_index_mut") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
       deref->type = ast->resolved_type;
       deref->op = TType::Mul;
       deref->operand = overload_call;
-
       return deref;
     }
     return overload_call;

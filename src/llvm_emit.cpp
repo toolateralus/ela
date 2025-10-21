@@ -398,9 +398,13 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 
   // Declare the parameters and store them in the temps
   temps.reserve(f->temps.size());
-  for (size_t i = 0; i < f->type_info->params_len; ++i) {
+
+  size_t i = 0;
+  for (const auto &param_temp: f->parameter_temps) {
     llvm::Argument *llvm_param = ir_f->getArg(i);
-    insert_temp(i, f, llvm_param);
+    printf("function: %s, inserting parameter: %s at index: %u\n", f->name.c_str(), param_temp.name.c_str(), param_temp.index);
+    insert_temp(param_temp.index, f, llvm_param);
+    ++i;
   }
 
   for (const auto &bb : f->basic_blocks) {

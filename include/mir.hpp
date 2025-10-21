@@ -160,7 +160,6 @@ struct Operand {
 
     struct {
       uint32_t temp = 0;
-      bool is_register_value;  // This is not backed by an alloca, therefore cannot be written to with STORE nor 'LOAD'ed
     };
   };
 
@@ -178,7 +177,6 @@ struct Operand {
     o.temp = i;
     o.type = t;
     o.tag = OPERAND_TEMP;
-    o.is_register_value = false;
     return o;
   }
   static Operand Make_Global_Ref(Global_Variable *gv);
@@ -268,6 +266,7 @@ static inline InternedString generate_temp_identifier(size_t index, std::string 
 struct Temporary {
   InternedString name;
   Type *type;
+  uint32_t index;
 };
 
 struct Function {
@@ -282,6 +281,9 @@ struct Function {
   // parameters are stored in here as the first locals, to simplify indexing
   // in the MIR
   std::vector<Temporary> temps;
+
+  // These are used just for printing.
+  std::vector<Temporary> parameter_temps;
 
   uint64_t stack_size_needed_in_bytes = 0;
 
@@ -383,7 +385,7 @@ struct Module {
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
     assert(type && f);
-    size_t idx = f->temps.size();
+    uint32_t idx = f->temps.size();
 
     if (label == std::nullopt) {
       label = generate_temp_identifier(idx);
@@ -392,6 +394,7 @@ struct Module {
     f->temps.push_back(Temporary{
         .name = *label,
         .type = type,
+        .index = idx,
     });
 
     used_types.insert(type);
@@ -552,6 +555,10 @@ static inline void generate(const THIR *node, Module &m) {
 
 static inline Operand generate_expr(const THIR *node, Module &m) {
   switch (node->get_node_type()) {
+    case THIRNodeType::PtrBinExpr:
+      return generate_ptr_bin_expr((THIRPtrBinExpr *)node, m);
+    case THIRNodeType::PtrUnaryExpr:
+      return generate_ptr_unary_expr((THIRPtrUnaryExpr *)node, m);
     case THIRNodeType::Variable:
       return load_variable((THIRVariable *)node, m);
     case THIRNodeType::Function:
@@ -625,7 +632,7 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
 #define EMIT_CAST(DEST, VAL, TYPE_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_CAST, DEST, VAL, TYPE_IDX, .span = node->span})
 
-  #define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
+#define EMIT_BITCAST(DEST, VAL, TYPE_IDX) \
   m.current_function->get_insert_block()->push(Instruction{OP_BITCAST, DEST, VAL, TYPE_IDX, .span = node->span})
 
 // OP_GEP: dest=ptr, left=base, right=index

@@ -87,26 +87,35 @@ int CompileCommand::compile() {
     if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
       llvm::errs() << "Module verification failed:\n";
       llvm::errs() << err_stream.str() << '\n';
-    } else if (!has_flag("nostdlib")) {
-      /* 
-        This just crashes on --nostdlib
-        TODO: fixme
-      */
-      llvm::PassBuilder pass_builder{};
-      llvm::ModuleAnalysisManager module_analysis_manager;
-      llvm::FunctionAnalysisManager function_analysis_manager;
-      llvm::LoopAnalysisManager loop_analysis_manager;
-      llvm::CGSCCAnalysisManager cgscc_analysis_manager;
+    } else if (true) {
+      using namespace llvm;
+      // Create the analysis managers.
+      // These must be declared in this order so that they are destroyed in the
+      // correct order due to inter-analysis-manager references.
+      LoopAnalysisManager LAM;
+      FunctionAnalysisManager FAM;
+      CGSCCAnalysisManager CGAM;
+      ModuleAnalysisManager MAM;
 
-      pass_builder.registerFunctionAnalyses(function_analysis_manager);
-      pass_builder.registerLoopAnalyses(loop_analysis_manager);
-      pass_builder.registerCGSCCAnalyses(cgscc_analysis_manager);
-      pass_builder.crossRegisterProxies(loop_analysis_manager, function_analysis_manager, cgscc_analysis_manager,
-                                        module_analysis_manager);
+      // Create the new pass manager builder.
+      // Take a look at the PassBuilder constructor parameters for more
+      // customization, e.g. specifying a TargetMachine or various debugging
+      // options.
+      PassBuilder PB;
 
-      auto module_pass_manager = pass_builder.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O0);
+      // Register all the basic analyses with the managers.
+      PB.registerModuleAnalyses(MAM);
+      PB.registerCGSCCAnalyses(CGAM);
+      PB.registerFunctionAnalyses(FAM);
+      PB.registerLoopAnalyses(LAM);
+      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-      module_pass_manager.run(*llvm_emitter.llvm_module, module_analysis_manager);
+      // Create the pass manager.
+      // This one corresponds to a typical -O2 optimization pipeline.
+      ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
+
+      // Optimize the IR!
+      MPM.run(*llvm_emitter.llvm_module, MAM);
     }
 
     llvm_emitter.llvm_module->print(llvm_output_stream, nullptr);
