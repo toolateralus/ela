@@ -86,7 +86,7 @@ int CompileCommand::compile() {
     // We still write the file out for inspection, but don't optimize
     if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
       llvm::errs() << "Module verification failed:\n";
-      llvm::errs() << err_stream.str();
+      llvm::errs() << err_stream.str() << '\n';
     } else {
       llvm::PassBuilder pass_builder{};
       llvm::ModuleAnalysisManager module_analysis_manager;

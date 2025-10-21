@@ -160,7 +160,7 @@ struct Operand {
 
     struct {
       uint32_t temp = 0;
-      bool is_parameter = false;
+      bool is_register_value; // This is not backed by an alloca, therefore cannot be written to with STORE nor 'LOAD'ed
     };
   };
 
@@ -178,18 +178,9 @@ struct Operand {
     o.temp = i;
     o.type = t;
     o.tag = OPERAND_TEMP;
+    o.is_register_value = false;
     return o;
   }
-
-  static Operand Make_Parameter_Temp(uint32_t i, Type *t) {
-    Operand o;
-    o.temp = i;
-    o.type = t;
-    o.tag = OPERAND_TEMP;
-    o.is_parameter = true;
-    return o;
-  }
-
   static Operand Make_Global_Ref(Global_Variable *gv);
 
   static Operand Make_Imm(Constant i, Type *t) {
@@ -269,7 +260,7 @@ struct Basic_Block {
 
 extern jstl::Arena mir_arena;
 
-static inline InternedString generate_temp_identifier(size_t index) { return std::format("t{}", index); }
+static inline InternedString generate_temp_identifier(size_t index, std::string prefix = "t") { return std::format("{}{}", prefix, index); }
 
 // local variable handle.
 struct Temporary {
@@ -286,7 +277,7 @@ struct Function {
   std::vector<Basic_Block *> basic_blocks;
   Basic_Block *insert_block;
 
-  // parameters are stored in here as the first locals, to simplifying indexing
+  // parameters are stored in here as the first locals, to simplify indexing
   // in the MIR
   std::vector<Temporary> temps;
 
@@ -314,7 +305,7 @@ struct Function {
 
   static inline InternedString generate_default_bb_label(size_t index) { return std::format("bb{}", index); }
 
-  inline Basic_Block *enter_bb(std::optional<InternedString> label = std::nullopt) {
+  inline Basic_Block *create_and_enter_basic_block(std::optional<InternedString> label = std::nullopt) {
     if (label == std::nullopt) {
       label = generate_default_bb_label(this->basic_blocks.size());
     }
@@ -412,28 +403,7 @@ struct Module {
     return it->second;
   }
 
-  inline Function *create_function(const THIRFunction *node, uint32_t &index) {
-    Function *f = mir_arena.construct<Function>();
-    index = (uint32_t)functions.size();
-    f->name = node->name;
-    f->type_info = node->type->info->as<FunctionTypeInfo>();
-    f->type = node->type;
-    f->index = index;
-
-    size_t param_idx = 0;
-    for (const auto &param : node->parameters) {
-      f->temps.push_back({
-          .name = generate_temp_identifier(param_idx),
-          .type = param.associated_variable->type,
-      });
-      variables[param.associated_variable] = Operand::Make_Parameter_Temp(param_idx, param.associated_variable->type);
-      param_idx++;
-    }
-
-    functions.push_back(f);
-    function_table[node->name] = f;
-    return f;
-  }
+  
 
   inline void enter_function(Function *f) {
     if (current_function) {
@@ -453,9 +423,9 @@ struct Module {
   }
 
   // small helper to insert and enter a basic block in the current function
-  inline Basic_Block *create_basic_block(std::optional<InternedString> label = std::nullopt) {
+  inline Basic_Block *create_and_enter_basic_block(std::optional<InternedString> label = std::nullopt) {
     assert(current_function);
-    return current_function->enter_bb(label);
+    return current_function->create_and_enter_basic_block(label);
   }
 
   inline Basic_Block *get_insert_block() {

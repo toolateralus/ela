@@ -2,6 +2,7 @@
 #include <cstdio>
 #include "error.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
 #include "type.hpp"
@@ -55,17 +56,62 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   }
 
   uint32_t index;
-  Function *f = m.create_function(node, index);
+  Function *f = mir_arena.construct<Function>();
+  index = (uint32_t)m.functions.size();
+  f->name = node->name;
+  f->type_info = node->type->info->as<FunctionTypeInfo>();
+  f->type = node->type;
+  f->index = index;
+
+  m.enter_function(f);
+  Defer _defer([&] { m.leave_function(); });
+
+  if (!node->is_extern) {
+    f->create_and_enter_basic_block("entry");
+  }
+
+  size_t param_idx = 0;
+  for (const auto &param : node->parameters) {
+    f->temps.push_back({
+        .name = generate_temp_identifier(param_idx),
+        .type = param.associated_variable->type,
+    });
+
+    Operand parameter_temp = Operand::Make_Temp(param_idx, param.associated_variable->type);
+    // parameters by default are not backed by ALLOCA storage.
+    parameter_temp.is_register_value = true;
+
+    param_idx += 1;
+    Type *type = param.associated_variable->type;
+
+    if (param.mutability == MUT && !node->is_extern) {
+      // If this parameter is mutable, we need to allocate storage for it so
+      // writes back into it actually make sense and are possible with SSA semantics.
+      Operand alloca_temp = Operand::Make_Temp(param_idx, type->take_pointer_to());
+      f->temps.push_back({
+          .name = generate_temp_identifier(param_idx),
+          .type = type->take_pointer_to(),
+      });
+      param_idx += 1;
+      // allocate shum memory
+      EMIT_ALLOCA(alloca_temp, Operand ::Make_Type_Ref(type));
+      // Store the initial value of the incoming parameter in our alloca
+      EMIT_STORE(alloca_temp, parameter_temp);
+      m.variables[param.associated_variable] = alloca_temp;
+    } else {
+      m.variables[param.associated_variable] = parameter_temp;
+    }
+  }
+
+  m.functions.push_back(f);
+  m.function_table[node->name] = f;
 
   convert_function_flags(node, f);
 
   if (node->is_extern) {
     return Operand::Make_Temp(index, node->type);
   }
-  m.enter_function(f);
 
-  Basic_Block *entry = m.create_basic_block("entry");
-  m.current_function->set_insert_block(entry);
   generate_block(node->block, m);
 
   Basic_Block *end = f->basic_blocks.back();
@@ -73,7 +119,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     m.current_function->set_insert_block(end);
     EMIT_OP(OP_RET_VOID);
   }
-  m.leave_function();
   return Operand::Make_Temp(index, node->type);
 }
 
@@ -99,7 +144,7 @@ Operand load_variable(const THIRVariable *node, Module &m) {
     throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
   }
 
-  if (it->second.is_parameter) {
+  if (it->second.is_register_value) {
     return it->second;  // parameters do not have to be loaded, they are the only "register based" SSA values in the MIR.
   }
 
@@ -234,7 +279,7 @@ Operand generate_bin_expr(const THIRBinExpr *node, Module &m) {
         return rvalue;
       } else {
         Operand current_val;
-        if (lvalue_addr.is_parameter) {
+        if (lvalue_addr.is_register_value) {
           current_val = lvalue_addr;
         } else {
           current_val = m.create_temporary(node->left->type);
@@ -544,7 +589,7 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) 
   Operand ptr = m.create_temporary(node->type->take_pointer_to());
   EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   auto result = m.create_temporary(node->type);
-  // TODO: this is completely fucking 
+  // TODO: this is completely fucking
   // this reuses a temp for no reason
   EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
   EMIT_LOAD(result, ptr);
@@ -599,10 +644,10 @@ void generate_for(const THIRFor *node, Module &m) {
 
   Basic_Block *orig_bb = m.get_insert_block();
 
-  Basic_Block *cond_bb = m.create_basic_block("for");
-  Basic_Block *body_bb = m.create_basic_block("do");
-  Basic_Block *incr_bb = m.create_basic_block("incr");
-  Basic_Block *after_bb = m.create_basic_block("done");
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("for");
+  Basic_Block *body_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *incr_bb = m.create_and_enter_basic_block("incr");
+  Basic_Block *after_bb = m.create_and_enter_basic_block("done");
 
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
@@ -632,9 +677,9 @@ void generate_if(const THIRIf *node, Module &m) {
   Operand cond = generate_expr(node->condition, m);
 
   Basic_Block *if_bb = m.get_insert_block();
-  Basic_Block *then_bb = m.create_basic_block("then");
-  Basic_Block *else_bb = node->_else ? m.create_basic_block("else") : nullptr;
-  Basic_Block *end_bb = m.create_basic_block("end");
+  Basic_Block *then_bb = m.create_and_enter_basic_block("then");
+  Basic_Block *else_bb = node->_else ? m.create_and_enter_basic_block("else") : nullptr;
+  Basic_Block *end_bb = m.create_and_enter_basic_block("end");
   m.current_function->set_insert_block(if_bb);
 
   if (else_bb) {
@@ -669,9 +714,9 @@ void generate_if(const THIRIf *node, Module &m) {
 
 void generate_while(const THIRWhile *node, Module &m) {
   Basic_Block *orig_bb = m.get_insert_block();
-  Basic_Block *cond_bb = m.create_basic_block("while");
-  Basic_Block *body_bb = m.create_basic_block("do");
-  Basic_Block *after_bb = m.create_basic_block("done");
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("while");
+  Basic_Block *body_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *after_bb = m.create_and_enter_basic_block("done");
 
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
@@ -701,11 +746,13 @@ Operand Operand::Make_Global_Ref(Global_Variable *gv_ref) {
 
 void Basic_Block::finalize(Function *f) const {
   if (!ends_with_terminator()) {
+    Op_Code opcode = code.size() ? code.back().opcode : (Op_Code)-1;
     printf(
-        "in function: %s, basic block: %s\n"
+        "in function: %s, basic block: %s, opcode: %d\n"
         "malformed basic block: every basic block must end with one of the following instructions:\n[OP_JMP, OP_JMP_TRUE, "
         "OP_RET, OP_RET_VOID]\n",
-        f->name.c_str(), label.c_str());
+        f->name.c_str(), label.c_str(), opcode);
   }
 }
+
 }  // namespace Mir

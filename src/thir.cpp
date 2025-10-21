@@ -1051,7 +1051,8 @@ void THIRGen::convert_parameters(ASTFunctionDeclaration *&ast, THIRFunction *&th
       bind(param, var);
     }
 
-    thir->parameters.push_back(THIRParameter{
+    thir->parameters.push_back(THIRParameter {
+        .mutability = param->mutability,
         .name = var->name,
         .default_value = var->value,
         .associated_variable = var,

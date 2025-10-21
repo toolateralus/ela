@@ -176,6 +176,7 @@ struct THIRBlock : THIR {
 };
 
 struct THIRParameter {
+  Mutability mutability;
   InternedString name;
   THIR *default_value;
   THIRVariable *associated_variable;
