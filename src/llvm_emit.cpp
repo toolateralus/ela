@@ -393,8 +393,13 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 
   bb_table.reserve(f->basic_blocks.size());
 
+  llvm::BasicBlock *entry_bb = nullptr;
+
   for (auto *bb : f->basic_blocks) {  // pre-create the basic blocks so we can easily do jumps and flips on it and shit
     llvm::BasicBlock *ir_bb = llvm::BasicBlock::Create(llvm_ctx, bb->label.str(), ir_f);
+    if (!entry_bb) {
+      entry_bb = ir_bb;
+    }
     bb_table[bb] = ir_bb;
   }
 
@@ -407,10 +412,10 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
     insert_temp(param_temp.index, f, llvm_param);
     ++i;
   }
-
+  
   for (const auto &bb : f->basic_blocks) {
     builder.SetInsertPoint(bb_table[bb]);
-    emit_basic_block(bb, f);
+    emit_basic_block(bb, f, entry_bb);
   }
 
   temps.clear();
@@ -421,7 +426,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   }
 }
 
-void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
+void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm::BasicBlock *entry_bb) {
   for (auto &instr : bb->code) {
     switch (instr.opcode) {
       case Mir::OP_ADD:
@@ -521,8 +526,14 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
         Temporary &temp = f->temps[index];
-        llvm::Value *ai =
-            create_dbg(builder.CreateAlloca(llvm_typeof(temp.type->get_element_type()), nullptr, temp.name.str()), instr.span);
+        auto [alloc_ty, alloc_ty_di] = llvm_typeof_impl(temp.type->get_element_type());
+        llvm::IRBuilder<> tmp_builder(entry_bb, entry_bb->begin());
+        llvm::AllocaInst *ai = tmp_builder.CreateAlloca(alloc_ty, nullptr, temp.name.str());
+
+        if (!compile_command.has_flag("nl")) {
+          dbg.create_variable(dbg.current_scope(), temp.name.str(), instr.span, alloc_ty_di);
+        }
+
         insert_temp(index, f, ai);
       } break;
 

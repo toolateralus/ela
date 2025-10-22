@@ -766,7 +766,7 @@ struct LLVM_Emitter {
 
   void emit_module();
   void emit_function(Mir::Function *f, llvm::Function *ir_f);
-  void emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f);
+  void emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm::BasicBlock *entry_bb);
 
   inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
     return dbg.create_dbg(v, span);  // attaches debug info if v is an instruction
