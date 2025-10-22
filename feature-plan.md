@@ -64,8 +64,8 @@ To search for all info comments in the source just use vscodes regex search with
    slice syntax, and a compile time for loop over that slice.
   
 ```rust
-  fn variadic!<slice: [type]>() {
-    for T in slice {
+  fn variadic!<types: [type]>() {
+    for T in types {
       println(T.name);
     }
   } 
@@ -388,7 +388,6 @@ fn register_some_handler_in_system!<HandlerT>(handler: *HandlerT, slot: u32, kin
   registry.insert_or_update_at_slot(slot, handler);
   return Some(registry);
 }
-
 ```
 
 This function could simply get type erased down to a void pointer, and used for every handler type, since it never needed to be

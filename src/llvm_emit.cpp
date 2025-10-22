@@ -493,6 +493,8 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 }
 
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm::BasicBlock *entry_bb) {
+  dbg.enter_lexical_scope(dbg.current_scope(), bb->code.front().span);
+
   for (auto &instr : bb->code) {
     switch (instr.opcode) {
       case Mir::OP_ADD:
@@ -753,6 +755,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
       } break;
     }
   }
+
+  dbg.pop_scope(DIManager::Kind::Lexical);
 }
 
 llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
