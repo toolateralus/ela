@@ -227,6 +227,10 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         continue;
       }
 
+      case OP_UNREACHABLE:
+        throw_error("unreachable instruction executed.", instr.span);
+        break;
+
       /*
         these opcodes don't do anything in the interpreter.
         types are interpeted as the correct memory on read,

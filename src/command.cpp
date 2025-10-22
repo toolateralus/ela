@@ -62,7 +62,7 @@ int CompileCommand::compile() {
   Mir::Module m;
   mir_gen_metric.run<void>("Generating MIR", [&] {
     if (entry_point) {
-      Mir::generate(entry_point, m);
+      Mir::compile(entry_point, m, thir_gen.constructors, thir_gen.test_functions, thir_gen.global_initializer_function);
     } else {
       Mir::generate(thir_program, m);
     }
@@ -146,8 +146,8 @@ int CompileCommand::compile() {
   const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
   const std::string obj_file = output_path.filename().string() + ".o";
 
-  const auto llc_string = std::format("llc -filetype=obj -O0 {} -o {}", output_path.string(), obj_file);
-  const auto compilation_string = std::format("clang {} {} {}", obj_file, output_flag, extra_flags);
+  const auto llc_string = std::format("llc -filetype=obj -relocation-model=pic -O0 {} -o {}", output_path.string(), obj_file);
+  const auto compilation_string = std::format("clang -fPIE {} {} {}", obj_file, output_flag, extra_flags);
 
   if (compile_command.has_flag("x")) {
     printf("\033[1;36m%s\n\033[0m", llc_string.c_str());

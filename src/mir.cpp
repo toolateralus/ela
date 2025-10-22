@@ -1,5 +1,6 @@
 #include "mir.hpp"
 #include <cstdio>
+#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -36,16 +37,19 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
   if (t->is_extern) {
     flags |= Function::FUNCTION_FLAGS_IS_EXTERN;
   }
-  if (t->is_entry) {
-    flags |= Function::FUNCTION_FLAGS_IS_ENTRY_POINT;
-  }
   if (t->is_exported) {
     flags |= Function::FUNCTION_FLAGS_IS_EXPORTED;
   }
-  if (t->is_test) {
-    flags |= Function::FUNCTION_FLAGS_IS_TEST;
+  if (t->is_no_return) {
+    flags |= Function::FUNCTION_FLAGS_IS_NO_RETURN;
   }
   f->flags = flags;
+
+  // either CONSTRUCTOR_0 or CONSTRUCTOR_1, which gives it priority for getting called
+  // either BEFORE        or AFTER          global initializers run.
+  if (t->constructor_index != 0) {
+    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0 + (t->constructor_index - 1);
+  }
 }
 
 Operand generate_function(const THIRFunction *node, Module &m) {
@@ -63,11 +67,12 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   f->type = node->type;
   f->index = index;
   f->span = node->span;
+  convert_function_flags(node, f);
 
   m.enter_function(f);
-  Defer _defer([&] { 
-    if (m.function_stack.size()) { // we never push the first function
-      m.leave_function(); 
+  Defer _defer([&] {
+    if (m.function_stack.size()) {  // we never push the first function
+      m.leave_function();
     }
   });
 
@@ -77,11 +82,9 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 
   for (const auto &param : node->parameters) {
     Operand parameter_temp = m.create_temporary(param.associated_variable->type);
-    f->parameter_temps.push_back({
-        .name = std::format("t{}: {}", parameter_temp.temp, param.name),
-        .type = parameter_temp.type,
-        .index = parameter_temp.temp
-    });
+    f->parameter_temps.push_back({.name = std::format("t{}: {}", parameter_temp.temp, param.name),
+                                  .type = parameter_temp.type,
+                                  .index = parameter_temp.temp});
     Type *type = param.associated_variable->type;
     if (!node->is_extern) {
       // We just make allocas and store the initial values of parameters for all parameters,
@@ -98,8 +101,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   m.functions.push_back(f);
   m.function_table[node->name] = f;
 
-  convert_function_flags(node, f);
-
   if (node->is_extern) {
     return Operand::Make_Temp(index, node->type);
   }
@@ -111,6 +112,17 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     m.current_function->set_insert_block(end);
     EMIT_OP(OP_RET_VOID);
   }
+
+  size_t num_blocks_ending_with_non_divergent_terminator = 0;
+  for (const auto &bb : f->basic_blocks) {
+    num_blocks_ending_with_non_divergent_terminator += bb->ends_with_terminator();
+  }
+
+  if (num_blocks_ending_with_non_divergent_terminator == f->basic_blocks.size() - 1 &&
+      !f->basic_blocks.back()->ends_with_terminator()) {
+    f->basic_blocks.back()->push({OP_UNREACHABLE});
+  }
+
   return Operand::Make_Temp(index, node->type);
 }
 
@@ -132,6 +144,13 @@ Operand load_variable(const THIRVariable *node, Module &m) {
   }
 
   auto it = m.variables.find(node);
+  if (node->is_from_enum_declaration && it == m.variables.end()) {
+    for (const auto &var : node->enum_type->enum_members) {
+      generate(var, m);
+    }
+    it = m.variables.find(node);
+  }
+  
   if (it == m.variables.end()) {
     throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
   }
@@ -487,6 +506,13 @@ Operand generate_call(const THIRCall *node, Module &m) {
     EMIT_CALL(result, fn_operand, arg_count);
   }
 
+  if (node->callee->get_node_type() == THIRNodeType::Function) {
+    THIRFunction *f = (THIRFunction *)node->callee;
+    if (f->is_no_return) {
+      EMIT_UNREACHABLE();
+    }
+  }
+
   return result;
 }
 
@@ -734,13 +760,20 @@ Operand Operand::Make_Global_Ref(Global_Variable *gv_ref) {
 }
 
 void Basic_Block::finalize(Function *f) const {
-  if (!ends_with_terminator()) {
-    Op_Code opcode = code.size() ? code.back().opcode : (Op_Code)-1;
-    printf(
-        "in function: %s, basic block: %s, opcode: %d\n"
-        "malformed basic block: every basic block must end with one of the following instructions:\n[OP_JMP, OP_JMP_TRUE, "
-        "OP_RET, OP_RET_VOID]\n",
-        f->name.c_str(), label.c_str(), opcode);
+  if (!ends_with_terminator() && DOESNT_HAVE_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_NO_RETURN)) {
+    const Op_Code last_opcode = code.size() ? code.back().opcode : (Op_Code)-1;
+
+    // Accept OP_UNREACHABLE as a valid terminator
+    bool valid_terminator = last_opcode == OP_JMP || last_opcode == OP_JMP_TRUE || last_opcode == OP_RET ||
+                            last_opcode == OP_RET_VOID || last_opcode == OP_UNREACHABLE;
+
+    if (!valid_terminator) {
+      printf(
+          "in function: %s, basic block: %s, opcode: %d\n"
+          "malformed basic block: every basic block must end with one of the following instructions:\n"
+          "[OP_JMP, OP_JMP_TRUE, OP_RET, OP_RET_VOID, OP_UNREACHABLE]\n",
+          f->name.c_str(), label.c_str(), last_opcode);
+    }
   }
 }
 
@@ -904,10 +937,29 @@ Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
       EMIT_BINOP(OP_EQ, dest, loaded, Operand::Make_Imm(Constant::Int(0), u64_type()));
       return dest;
     }
+    case TType::And: {
+      return generate_lvalue_addr(node->operand, m);
+    }
     default:
       throw_error(std::format("unsupported pointer unary operator {}", (int)node->op), node->span);
       return Operand::MakeNull();
   }
 }
 
+void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
+             const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer) {
+  if (compile_command.has_flag("test")) {
+    for (const auto &f : test_functions) {
+      generate(f, m);
+    }
+  }
+
+  for (const auto &ctor : constructors) {
+    generate(ctor, m);
+  }
+
+  generate(global_initializer, m);
+
+  generate(entry_point, m);
+}
 }  // namespace Mir

@@ -1224,193 +1224,122 @@ size_t TupleTypeInfo::size_in_bytes() const {
   return offset;
 }
 
-size_t Type::offset_in_bytes(const InternedString &field) const {
-  // If this is a pointer/array type, delegate to the element/base type.
+bool Type::try_get_offset_in_bytes(const InternedString &field, size_t &out_offset) const {
   if (is_pointer() || is_fixed_sized_array()) {
-    if (!base_type || base_type == Type::INVALID_TYPE) {
-      throw_error("internal compiler error: asked for field offset on pointer/array with invalid base", {});
-    }
-    return base_type->offset_in_bytes(field);
+    if (!base_type || base_type == Type::INVALID_TYPE) return false;
+    return base_type->try_get_offset_in_bytes(field, out_offset);
   }
 
-  switch (kind) {
-    case TYPE_STRUCT: {
-      auto info = this->info->as<StructTypeInfo>();
-      if (info->is_union) {
-        // In a union, all members start at offset 0.
-        for (const auto &member : info->members) {
-          if (member.name == field) return 0;
-        }
-        throw_error("type has no field \"" + field.str() + "\"", {});
-      }
+  if (kind == TYPE_STRUCT) {
+    auto info = this->info->as<StructTypeInfo>();
 
-      size_t offset = 0;
-      size_t max_align = 1;
-      for (const auto &member : info->members) {
-        size_t member_size = member.type->size_in_bytes();
-        size_t align = member.type->alignment_in_bytes();
-        max_align = std::max(max_align, align);
-        offset = (offset + align - 1) & ~(align - 1);
-        if (member.name == field) {
-          return offset;
-        }
-        offset += member_size;
-      }
-      throw_error("type has no field \"" + field.str() + "\"", {});
-    }
-
-    case TYPE_TUPLE: {
-      auto info = this->info->as<TupleTypeInfo>();
-      // Accept either "$N" or "N" as the field identifier.
-      std::string fname = field.str();
-      size_t idx = std::string::npos;
-      try {
-        if (!fname.empty() && fname[0] == '$') {
-          idx = std::stoul(fname.substr(1));
-        } else {
-          idx = std::stoul(fname);
-        }
-      } catch (...) {
-        // If it's not a numeric index, try to match by member.name (which are "$0", "$1", ...)
-        size_t offset = 0;
-        size_t max_align = 1;
-        for (const auto &member : info->members) {
-          size_t member_size = member.type->size_in_bytes();
-          size_t align = member.type->alignment_in_bytes();
-          max_align = std::max(max_align, align);
-          offset = (offset + align - 1) & ~(align - 1);
-          if (member.name == field) return offset;
-          offset += member_size;
-        }
-        throw_error("tuple type has no field \"" + field.str() + "\"", {});
-      }
-
-      if (idx >= info->members.size()) {
-        throw_error("tuple index out of range for field \"" + field.str() + "\"", {});
-      }
-
-      size_t offset = 0;
-      size_t max_align = 1;
-      for (size_t i = 0; i < idx; ++i) {
-        auto &member = info->members[i];
-        size_t member_size = member.type->size_in_bytes();
-        size_t align = member.type->alignment_in_bytes();
-        max_align = std::max(max_align, align);
-        offset = (offset + align - 1) & ~(align - 1);
-        offset += member_size;
-      }
-      // Align for the requested member (not strictly necessary for returning offset,
-      // but keep consistent with layout rules).
-      {
-        auto &target = info->members[idx];
-        size_t align = target.type->alignment_in_bytes();
-        offset = (offset + align - 1) & ~(align - 1);
-      }
-      return offset;
-    }
-
-    case TYPE_CHOICE: {
-      auto info = this->info->as<ChoiceTypeInfo>();
+    // Unions — all members at offset 0.
+    if (info->is_union) {
       for (const auto &member : info->members) {
         if (member.name == field) {
-          // discriminant is stored first (int32_t), then payload aligned accordingly.
-          size_t offset = sizeof(int32_t);
-          size_t align = member.type->alignment_in_bytes();
-          offset = (offset + align - 1) & ~(align - 1);
-          return offset;
+          out_offset = 0;
+          return true;
+        }
+
+        // Scan anonymous union members
+        if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+          size_t suboffset = 0;
+          if (member.type->try_get_offset_in_bytes(field, suboffset)) {
+            out_offset = 0;  // all union fields at 0
+            return true;
+          }
         }
       }
-      throw_error("choice type has no variant \"" + field.str() + "\"", {});
+      return false;
     }
 
-    case TYPE_ENUM: {
-      // Enums do not have per-field offsets in this representation.
-      throw_error("enum type has no field \"" + field.str() + "\"", {});
-    }
-    case TYPE_DYN: {
-      // Dyn is effectively a struct of function pointers right now
-      size_t offset = 0;
-      size_t max_align = 1;
-      for (const auto &member : info->members) {
-        size_t member_size = member.type->size_in_bytes();
-        size_t align = member.type->alignment_in_bytes();
-        max_align = std::max(max_align, align);
-        offset = (offset + align - 1) & ~(align - 1);
-        if (member.name == field) {
-          return offset;
-        }
-        offset += member_size;
+    // Regular struct
+    size_t offset = 0;
+    size_t max_align = 1;
+    for (const auto &member : info->members) {
+      size_t member_size = member.type->size_in_bytes();
+      size_t align = member.type->alignment_in_bytes();
+      max_align = std::max(max_align, align);
+      offset = (offset + align - 1) & ~(align - 1);
+
+      if (member.name == field) {
+        out_offset = offset;
+        return true;
       }
-    } break;
-    case TYPE_FUNCTION:
-    case TYPE_SCALAR:
-    case TYPE_TRAIT:
-    default:
-      throw_error("type has no field \"" + field.str() + "\"", {});
+
+      // Recurse through anonymous members
+      if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+        size_t suboffset = 0;
+        if (member.type->try_get_offset_in_bytes(field, suboffset)) {
+          out_offset = offset + suboffset;
+          return true;
+        }
+      }
+
+      offset += member_size;
+    }
+
+    return false;
   }
 
+  // Handle tuple, choice, enum, dyn, etc. as needed
+  if (kind == TYPE_TUPLE || kind == TYPE_CHOICE || kind == TYPE_ENUM || kind == TYPE_DYN) {
+    // You can add recursive behavior here if needed later
+    return false;
+  }
+
+  return false;
+}
+
+size_t Type::offset_in_bytes(const InternedString &field) const {
+  size_t offset = 0;
+  
+  if (try_get_offset_in_bytes(field, offset)) {
+    return offset;
+  }
+
+  throw_error("type has no field \"" + field.str() + "\"", {});
   return 0;
 }
 
-// If this type has members or generics that depend on other types being defined first, this returns true.
-bool Type::has_dependencies() const {
-  switch (kind) {
-    case TYPE_ENUM:
-      return false;
-    case TYPE_SCALAR:
-      return false;
-    case TYPE_FUNCTION: {
-      auto info = this->info->as<FunctionTypeInfo>();
-      if (info->return_type->has_dependencies()) {
+bool TypeInfo::try_get_index_of_member(const InternedString &name, size_t &index) const {
+  for (size_t i = 0; i < members.size(); ++i) {
+    const auto &member = members[i];
+
+    // Direct match
+    if (member.name == name) {
+      index = i;
+      return true;
+    }
+
+    // Recurse into anonymous members
+    if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+      const TypeInfo *subinfo = member.type->info;
+      if (subinfo && subinfo->try_get_index_of_member(name, index)) {
         return true;
       }
-      for (size_t i = 0; i < info->params_len; ++i) {
-        Type *param = info->parameter_types[i];
-        if (param->has_dependencies()) {
-          return true;
-        }
-      }
-      return false;
     }
-    case TYPE_STRUCT: {
-      auto info = this->info->as<StructTypeInfo>();
-      for (const auto &member : info->members) {
-        if (member.type->has_dependencies()) {
-          return true;
-        }
-      }
-      return false;
-    }
-    case TYPE_TUPLE: {
-      auto info = this->info->as<TupleTypeInfo>();
-      for (const auto &type : info->types) {
-        if (type->has_dependencies()) {
-          return true;
-        }
-      }
-      return false;
-    }
-    case TYPE_CHOICE: {
-      auto info = this->info->as<ChoiceTypeInfo>();
-      for (const auto &member : info->members) {
-        if (member.type->has_dependencies()) {
-          return true;
-        }
-      }
-      return false;
-    }
-    case TYPE_TRAIT: {
-      // these are never declared, so it doesn't depend on the declaration of another.
-      return false;
-    }
-    case TYPE_DYN: {
-      // this doesn't depend on any other type, rather function declarations, but that's not relevant.
-      return false;
-    } break;
   }
+
+  return false;
 }
 
-size_t Type::offset_in_bytes(const size_t index) const {
-  InternedString name = info->members[index].name;  // TODO: stop doing this lazy hack. just iterate.
-  return offset_in_bytes(name);
+bool Type::try_get_index_of_member(const InternedString &name, size_t &index) {
+  Type *t = this;
+
+  while (t && t->has_extensions()) {
+    if (t->info->try_get_index_of_member(name, index)) {
+      return true;
+    }
+    t = t->base_type;
+  }
+
+  if (t->info->try_get_index_of_member(name, index)) {
+    return true;
+  }
+
+  index = -1;
+  return false;
 }
+
+size_t Type::offset_in_bytes(const size_t index) const { return offset_in_bytes(info->members[index].name); }

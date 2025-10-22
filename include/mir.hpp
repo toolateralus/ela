@@ -19,6 +19,7 @@
 */
 namespace Mir {
 enum Op_Code : uint8_t {
+  OP_UNREACHABLE = 0,
   /* Arithmetic */
   // dest=result, left=left, right=right :D. unary only stores left operand.
   OP_ADD,
@@ -39,10 +40,9 @@ enum Op_Code : uint8_t {
   OP_GE,
   OP_LOGICAL_AND,
   OP_LOGICAL_OR,
-  
-  
+
   OP_NEG,
-  
+
   /* Unary */
   OP_LOGICAL_NOT,
   OP_NOT,
@@ -253,7 +253,16 @@ struct Basic_Block {
       return false;
     }
     Instruction const &back = code.back();
-    return back.opcode == OP_JMP || back.opcode == OP_JMP_TRUE || back.opcode == OP_RET || back.opcode == OP_RET_VOID;
+    return back.opcode == OP_JMP || back.opcode == OP_JMP_TRUE || back.opcode == OP_RET || back.opcode == OP_RET_VOID ||
+           back.opcode == OP_UNREACHABLE;
+  }
+
+  inline bool ends_with_non_divergent_terminator() const {
+    if (code.empty()) {
+      return false;
+    }
+    Instruction const &back = code.back();
+    return back.opcode == OP_RET || back.opcode == OP_RET_VOID || back.opcode == OP_UNREACHABLE;
   }
 
   void finalize(Function *f) const;
@@ -298,9 +307,10 @@ struct Function {
     FUNCTION_FLAGS_IS_INLINE = 1 << 0,
     FUNCTION_FLAGS_IS_VAR_ARGS = 1 << 1,
     FUNCTION_FLAGS_IS_EXTERN = 1 << 2,
-    FUNCTION_FLAGS_IS_ENTRY_POINT = 1 << 3,
-    FUNCTION_FLAGS_IS_EXPORTED = 1 << 4,
-    FUNCTION_FLAGS_IS_TEST = 1 << 5,
+    FUNCTION_FLAGS_IS_EXPORTED = 1 << 3,
+    FUNCTION_FLAGS_IS_NO_RETURN = 1 << 4,
+    FUNCTION_FLAGS_IS_CONSTRUCTOR_0 = 1 << 5,
+    FUNCTION_FLAGS_IS_CONSTRUCTOR_1 = 1 << 6,
   };
 
   uint8_t flags = FUNCTION_FLAGS_NONE;
@@ -479,6 +489,9 @@ Operand generate_lvalue_addr(const THIR *node, Module &m);
 Operand generate_index_addr(const THIRIndex *node, Module &m);
 Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m);
 
+void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
+                     const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer);
+
 static inline void generate(const THIR *node, Module &m) {
   switch (node->get_node_type()) {
     case THIRNodeType::Block:
@@ -652,11 +665,13 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
   m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand::Make_BB(TARGET_BB), .span = node->span})
 
 // OP_JMP_TRUE: left=bb, right=condition
-#define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND)    \
-  m.current_function->get_insert_block()->push(Instruction{ \
-      OP_JMP_TRUE, Operand::MakeNull(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
+#define EMIT_JUMP_TRUE(TARGET_BB, FALL_THROUGH_BB, COND) \
+  m.current_function->get_insert_block()->push(          \
+      Instruction{OP_JMP_TRUE, Operand(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
 #define EMIT_ZERO_INIT(DEST, PTR, TY) \
   m.current_function->get_insert_block()->push(Instruction{OP_ZERO_INIT, DEST, PTR, TY, .span = node->span})
+
+#define EMIT_UNREACHABLE() m.current_function->get_insert_block()->push(Instruction{OP_UNREACHABLE, .span = node->span})
 
 }  // namespace Mir

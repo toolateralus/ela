@@ -307,6 +307,9 @@ struct DIManager {
   }
 
   inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
+    if (!v) {
+      throw_error("create_dbg got a null llvm::Value *", span);
+    }
     if (compile_command.has_flag("nl")) return v;
     if (auto *inst = llvm::dyn_cast<llvm::Instruction>(v)) attach_debug_info(inst, span);
     return v;
@@ -342,6 +345,8 @@ struct DIManager {
 
 struct LLVM_Emitter {
   inline bool is_temporary_valid(uint32_t temp) const { return temps.contains(temp); }
+
+  void register_constructor(llvm::Function *, uint32_t);
 
   LLVMContext llvm_ctx;
   IRBuilder<> builder;

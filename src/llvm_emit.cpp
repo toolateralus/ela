@@ -1,4 +1,5 @@
 #include "llvm_emit.hpp"
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -71,7 +72,7 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
           break;
         default:
           throw_error("Invalid pointer comparison", instr.span);
-          return nullptr;
+          exit(1);
       }
       result = builder.CreateICmp(pred, li, ri, "ptrcmp");
     }
@@ -90,7 +91,6 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
       return builder.CreateGEP(elem_ty, right, left, "ptr_add_int");  // swap for int - ptr
     } else {
       throw_error("Pointer subtraction requires at least one pointer", instr.span);
-      return nullptr;
     }
   }
 
@@ -101,12 +101,20 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
     if (left->getType()->isPointerTy()) {
       result = builder.CreateGEP(elem_ty, left, right, "ptradd");
     } else if (right->getType()->isPointerTy()) {
-      result = builder.CreateGEP(elem_ty, right, left, "ptradd");  // commutative
+      result = builder.CreateGEP(elem_ty, right, left, "ptradd");
     } else {
       throw_error("Pointer addition requires at least one pointer", instr.span);
-      return nullptr;
     }
     return result;
+  }
+
+  // Logical AND / OR (for pointer truthiness)
+  if (instr.opcode == Mir::OP_LOGICAL_AND || instr.opcode == Mir::OP_LOGICAL_OR) {
+    llvm::Value *l =
+        builder.CreateICmpNE(left, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(left->getType())), "ptr_truth_l");
+    llvm::Value *r = builder.CreateICmpNE(right, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(right->getType())),
+                                          "ptr_truth_r");
+    return (instr.opcode == Mir::OP_LOGICAL_AND) ? builder.CreateAnd(l, r, "ptr_land") : builder.CreateOr(l, r, "ptr_lor");
   }
 
   // MUL, DIV, MOD (pointer → integer)
@@ -130,9 +138,9 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
         break;
     }
 
-    if (left->getType()->isPointerTy() || right->getType()->isPointerTy()) {
+    if (left->getType()->isPointerTy() || right->getType()->isPointerTy())
       result = builder.CreateIntToPtr(result, elem_ty, "ptr_back");
-    }
+
     return result;
   }
 
@@ -142,23 +150,12 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
 
 llvm::Value *LLVM_Emitter::pointer_unary(llvm::Value *operand, const Instruction &instr) {
   if (instr.opcode == Mir::OP_LOGICAL_NOT) {
-    Type *unused = nullptr;
-    llvm::Value *v = cast_scalar(operand, instr.left.type, bool_type(), &unused);
-    if (!v) {
-      throw_error("Pointer logical-not: failed to cast pointer to bool via MIR type system", instr.span);
-      return nullptr;
-    }
-    if (!v->getType()->isIntegerTy(1)) {
-      v = builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv");
-    }
-    return builder.CreateNot(v, "ptr_lnot");
+    llvm::Value *cmp = builder.CreateICmpEQ(
+        operand, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(operand->getType())), "ptr_is_null");
+    return builder.CreateZExt(cmp, llvm::Type::getInt1Ty(llvm_ctx), "ptr_lnot");
   }
 
   if (instr.opcode == Mir::OP_NOT) {
-    if (!operand->getType()->isPointerTy()) {
-      throw_error("Bitwise-not on non-pointer operand", instr.span);
-      return nullptr;
-    }
     unsigned bits = data_layout.getPointerSizeInBits(0);
     llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
     llvm::Value *i = builder.CreatePtrToInt(operand, intptr_ty, "ptr2int");
@@ -167,10 +164,6 @@ llvm::Value *LLVM_Emitter::pointer_unary(llvm::Value *operand, const Instruction
   }
 
   if (instr.opcode == Mir::OP_NEG) {
-    if (!operand->getType()->isPointerTy()) {
-      throw_error("Unary minus on non-pointer operand", instr.span);
-      return nullptr;
-    }
     unsigned bits = data_layout.getPointerSizeInBits(0);
     llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
     llvm::Value *i = builder.CreatePtrToInt(operand, intptr_ty, "ptr2int");
@@ -195,6 +188,7 @@ llvm::Value *LLVM_Emitter::binary_signed(llvm::Value *left, llvm::Value *right, 
       return builder.CreateSDiv(left, right, "divtmp");
     case Mir::OP_MOD:
       return builder.CreateSRem(left, right, "modtmp");
+
     case Mir::OP_LT:
       return builder.CreateICmpSLT(left, right, "lttmp");
     case Mir::OP_GT:
@@ -207,6 +201,7 @@ llvm::Value *LLVM_Emitter::binary_signed(llvm::Value *left, llvm::Value *right, 
       return builder.CreateICmpEQ(left, right, "eqtmp");
     case Mir::OP_NE:
       return builder.CreateICmpNE(left, right, "neqtmp");
+
     case Mir::OP_AND:
       return builder.CreateAnd(left, right, "andtmp");
     case Mir::OP_OR:
@@ -216,11 +211,17 @@ llvm::Value *LLVM_Emitter::binary_signed(llvm::Value *left, llvm::Value *right, 
     case Mir::OP_SHL:
       return builder.CreateShl(left, right, "shltmp");
     case Mir::OP_SHR:
-      return builder.CreateAShr(left, right, "shrtmp");  // Arithmetic shift
+      return builder.CreateAShr(left, right, "shrtmp");
+
+    case Mir::OP_LOGICAL_AND:
+      return builder.CreateAnd(builder.CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0)),
+                               builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0)), "landtmp");
+    case Mir::OP_LOGICAL_OR:
+      return builder.CreateOr(builder.CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0)),
+                              builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0)), "lortmp");
     default:
       return nullptr;
   }
-  return nullptr;
 }
 
 llvm::Value *LLVM_Emitter::binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op) {
@@ -235,6 +236,7 @@ llvm::Value *LLVM_Emitter::binary_unsigned(llvm::Value *left, llvm::Value *right
       return builder.CreateUDiv(left, right, "divtmp");
     case Mir::OP_MOD:
       return builder.CreateURem(left, right, "modtmp");
+
     case Mir::OP_LT:
       return builder.CreateICmpULT(left, right, "lttmp");
     case Mir::OP_GT:
@@ -247,6 +249,7 @@ llvm::Value *LLVM_Emitter::binary_unsigned(llvm::Value *left, llvm::Value *right
       return builder.CreateICmpEQ(left, right, "eqtmp");
     case Mir::OP_NE:
       return builder.CreateICmpNE(left, right, "neqtmp");
+
     case Mir::OP_AND:
       return builder.CreateAnd(left, right, "andtmp");
     case Mir::OP_OR:
@@ -256,11 +259,17 @@ llvm::Value *LLVM_Emitter::binary_unsigned(llvm::Value *left, llvm::Value *right
     case Mir::OP_SHL:
       return builder.CreateShl(left, right, "shltmp");
     case Mir::OP_SHR:
-      return builder.CreateLShr(left, right, "shrtmp");  // Logical shift
+      return builder.CreateLShr(left, right, "shrtmp");
+
+    case Mir::OP_LOGICAL_AND:
+      return builder.CreateAnd(builder.CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0)),
+                               builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0)), "landtmp");
+    case Mir::OP_LOGICAL_OR:
+      return builder.CreateOr(builder.CreateICmpNE(left, llvm::ConstantInt::get(left->getType(), 0)),
+                              builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0)), "lortmp");
     default:
       return nullptr;
   }
-  return nullptr;
 }
 
 llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_Code op) {
@@ -275,6 +284,7 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
       return builder.CreateFDiv(left, right, "divtmp");
     case Mir::OP_MOD:
       return builder.CreateFRem(left, right, "modtmp");
+
     case Mir::OP_LT:
       return builder.CreateFCmpOLT(left, right, "lttmp");
     case Mir::OP_GT:
@@ -287,10 +297,16 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
       return builder.CreateFCmpOEQ(left, right, "eqtmp");
     case Mir::OP_NE:
       return builder.CreateFCmpONE(left, right, "neqtmp");
+
+    case Mir::OP_LOGICAL_AND:
+      return builder.CreateAnd(builder.CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0)),
+                               builder.CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0)), "flandtmp");
+    case Mir::OP_LOGICAL_OR:
+      return builder.CreateOr(builder.CreateFCmpONE(left, llvm::ConstantFP::get(left->getType(), 0.0)),
+                              builder.CreateFCmpONE(right, llvm::ConstantFP::get(right->getType(), 0.0)), "flortmp");
     default:
       return nullptr;
   }
-  return nullptr;
 }
 
 llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to, Type **new_type) {
@@ -386,7 +402,49 @@ void LLVM_Emitter::emit_module() {
   dbg.pop_scope(DIManager::Kind::CU);
 }
 
+void LLVM_Emitter::register_constructor(llvm::Function *func, uint32_t priority) {
+  llvm::LLVMContext &ctx = llvm_module->getContext();
+
+  // Type of ctor entry: { i32, void ()*, i8* } (i8* for stupid C++ legacy ABI stuff)
+  llvm::StructType *ctor_struct_ty =
+      llvm::StructType::get(llvm::Type::getInt32Ty(ctx), func->getType(), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+
+  llvm::Constant *ctor_entry =
+      llvm::ConstantStruct::get(ctor_struct_ty, llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), priority), func,
+                                llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)));
+
+  llvm::GlobalVariable *global_ctors = llvm_module->getNamedGlobal("llvm.global_ctors");
+  if (!global_ctors) {
+    llvm::ArrayType *array_ty = llvm::ArrayType::get(ctor_struct_ty, 1);
+    global_ctors = new llvm::GlobalVariable(*llvm_module, array_ty, false, llvm::GlobalValue::AppendingLinkage,
+                                            llvm::ConstantArray::get(array_ty, {ctor_entry}), "llvm.global_ctors");
+  } else {
+    auto *old_array = llvm::cast<llvm::ConstantArray>(global_ctors->getInitializer());
+    std::vector<llvm::Constant *> new_elems;
+    for (unsigned i = 0, e = old_array->getNumOperands(); i != e; ++i) {
+      new_elems.push_back(llvm::cast<llvm::Constant>(old_array->getOperand(i)));
+    }
+    new_elems.push_back(ctor_entry);
+    llvm::ArrayType *new_array_ty = llvm::ArrayType::get(ctor_struct_ty, new_elems.size());
+    global_ctors->setInitializer(llvm::ConstantArray::get(new_array_ty, new_elems));
+  }
+}
+
+void convert_function_flags(Mir::Function *f, llvm::Function *ir_f) {
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_NO_RETURN)) {
+    ir_f->addFnAttr(llvm::Attribute::NoReturn);
+  }
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_INLINE)) {
+    ir_f->addFnAttr(llvm::Attribute::AlwaysInline);
+  }
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0)) {
+  }
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1)) {
+  }
+}
+
 void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
+  convert_function_flags(f, ir_f);
   if (!compile_command.has_flag("nl")) {
     dbg.enter_function_scope(f->type, this, ir_f, f->name.str(), f->span);
   }
@@ -412,7 +470,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
     insert_temp(param_temp.index, f, llvm_param);
     ++i;
   }
-  
+
   for (const auto &bb : f->basic_blocks) {
     builder.SetInsertPoint(bb_table[bb]);
     emit_basic_block(bb, f, entry_bb);
@@ -423,6 +481,14 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   builder.ClearInsertionPoint();
   if (!compile_command.has_flag("nl")) {
     dbg.pop_scope(DIManager::Kind::Subroutine);
+  }
+
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0)) {
+    register_constructor(ir_f, 0);
+  }
+
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1)) {
+    register_constructor(ir_f, 1);
   }
 }
 
@@ -518,10 +584,23 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
 
       case Mir::OP_STORE: {
         llvm::Value *val = visit_operand(instr.right, instr.span);
-        assert(is_temporary_valid(instr.left.temp));
-        llvm::Value *ptr = temps[instr.left.temp].value;
-        create_dbg(builder.CreateStore(val, ptr), instr.span);
-      } break;
+
+        if (instr.left.tag == Mir::Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE) {
+          auto it = global_variables.find(instr.left.gv);
+          if (it != global_variables.end()) {
+            create_dbg(builder.CreateStore(val, it->second), instr.span);
+          } else {
+            throw_error("somehow a global variable wasn't declared in LLVM backend", instr.span);
+          }
+
+        } else {
+          assert(is_temporary_valid(instr.left.temp) && "Invalid temporary in STORE");
+          llvm::Value *ptr = temps[instr.left.temp].value;
+          create_dbg(builder.CreateStore(val, ptr), instr.span);
+        }
+
+        break;
+      }
 
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
@@ -588,14 +667,30 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
       } break;
 
       case Mir::OP_CALL_PTR: {
-        llvm::Value *fn = visit_operand(instr.left, instr.span);
+        // Get the function value from the operand
+        llvm::Value *val = visit_operand(instr.left, instr.span);
+
+        llvm::FunctionCallee fn;
+
+        if (auto *func = llvm::dyn_cast<llvm::Function>(val)) {
+          fn = llvm::FunctionCallee(func);
+        } else {
+          auto *funcTy = llvm::cast<llvm::FunctionType>(llvm_typeof(instr.left.type->get_element_type()));
+          fn = llvm::FunctionCallee(funcTy, val);
+        }
+
+        // Prepare arguments
         uint32_t nargs = instr.right.imm.int_lit;
         auto start = arg_stack.end() - nargs;
         std::vector<llvm::Value *> call_args(std::make_move_iterator(start), std::make_move_iterator(arg_stack.end()));
         arg_stack.erase(start, arg_stack.end());
 
-        llvm::CallInst *call = create_dbg(builder.CreateCall(llvm_fn_typeof(instr.left.type), fn, call_args), instr.span);
-        if (call && !call->getType()->isVoidTy()) insert_temp(instr.dest.temp, f, call);
+        // Emit the call with debug info
+        llvm::CallInst *call = create_dbg(builder.CreateCall(fn, call_args), instr.span);
+
+        if (call && !call->getType()->isVoidTy()) {
+          insert_temp(instr.dest.temp, f, call);
+        }
       } break;
 
       case Mir::OP_RET: {
@@ -631,7 +726,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::Value *gep = create_dbg(builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.str()), instr.span);
         insert_temp(instr.dest.temp, f, gep);
       } break;
-
+      case Mir::OP_UNREACHABLE: {
+        builder.CreateUnreachable();
+      } break;
       case Mir::OP_ZERO_INIT: {
         static llvm::Type *i8_ty = llvm::Type::getInt8Ty(llvm_ctx);
         static llvm::Type *i8_ptr_ty = llvm::PointerType::get(i8_ty, 0);

@@ -160,15 +160,7 @@ struct TypeInfo {
     return nullptr;
   }
 
-  inline bool try_get_index_of_member(const InternedString &name, size_t &index) const {
-    for (size_t i = 0; i < members.size(); ++i) {
-      if (members[i].name == name) {
-        index = i;
-        return true;
-      }
-    }
-    return false;
-  }
+  bool try_get_index_of_member(const InternedString &name, size_t &index) const;
 };
 
 struct TraitTypeInfo : TypeInfo {
@@ -417,20 +409,7 @@ struct Type {
     }
   }
 
-  inline bool try_get_index_of_member(const InternedString &name, size_t &index) {
-    Type *t = this;
-    while (t && t->has_extensions()) {
-      if (t->info->try_get_index_of_member(name, index)) {
-        return true;
-      }
-      t = t->base_type;
-    }
-    if (t && t->info->try_get_index_of_member(name, index)) {
-      return true;
-    }
-    index = -1;
-    return false;
-  }
+  bool try_get_index_of_member(const InternedString &name, size_t &index);
 
   inline bool is_fixed_sized_array() const { return back_ext_type() == TYPE_EXT_ARRAY; }
 
@@ -548,10 +527,9 @@ struct Type {
   size_t size_in_bytes() const;
   size_t alignment_in_bytes() const;
 
-  bool has_dependencies() const;
   size_t offset_in_bytes(const InternedString &field) const;
-
   size_t offset_in_bytes(const size_t index) const;
+  bool try_get_offset_in_bytes(const InternedString &field, size_t &out_offset) const;
 
   inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integral; }
   inline bool is_float() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_float(); }

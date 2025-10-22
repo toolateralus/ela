@@ -940,7 +940,9 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   if (auto thir = symbol_map[symbol]) {
     return thir;
   }
+
   THIR_ALLOC(THIRFunction, thir, ast);
+  thir->type = ast->resolved_type->get_element_type();
 
   bind(symbol, thir);
   bind(ast, thir);
@@ -956,17 +958,18 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
     var->name = ast_param->normal.name;
     var->type = ast_param->resolved_type;
     var->is_global = false;
-
+    
     if (ast_param->normal.default_value) {
       thir_param.default_value = visit_node(ast_param->normal.default_value.get());
       var->value = thir_param.default_value;
     }
-
+    
     auto symbol = ast->block->scope->local_lookup(ast_param->normal.name);
-
+    
     bind(symbol, var);
     bind(ast_param, var);
-
+    
+    thir_param.associated_variable = var;
     thir->parameters.push_back(thir_param);
   }
 
@@ -985,7 +988,7 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
   exit_defer_boundary();
   defer_stack = std::move(saved_defer_stack);
 
-  return thir;
+  return take_address_of(thir, ast);
 }
 
 THIR *THIRGen::visit_block(ASTBlock *ast) {
@@ -1345,7 +1348,18 @@ THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
   extract_thir_values_for_type_members(thir->type);
   for (const auto &member : ast->resolved_type->info->members) {
     THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
+
+    // TODO: instead of even doing this, we should just lower
+    // these directly to integer literals.
+
+    // Also, with the new MIR api, we don't need any THIRType at all.
+    // would save a lot by refactoring this to be even simpler.
+    thir->enum_members.push_back(var);
+    var->is_from_enum_declaration = true;
+
+
     var->span = ast->span;
+    var->enum_type = thir;
     var->is_global = false;
     var->is_statement = true;
     var->name = ast->resolved_type->basename.str() + '$' + member.name.str();
@@ -2713,6 +2727,8 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
 
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
   global_initializer_function = global_ini;
+  global_ini->constructor_index = 0; // highest priority.
+
   FunctionTypeInfo info;
   info.params_len = 0;
   info.return_type = void_type();

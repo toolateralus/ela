@@ -250,6 +250,9 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
   const char *opcode_name;
 
   switch (opcode) {
+    case OP_UNREACHABLE:
+      opcode_name = "UNREACHABLE";
+      break;
     case OP_ADD:
       opcode_name = "ADD";
       break;
@@ -421,7 +424,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
         return "TY" + format_type_ref(op.type);  // the parens already come from the type ref formatter
       case Operand::OPERAND_BASIC_BLOCK_PAIR:
         return std::string("TARGET_BB(") + op.bb_pair.target->label.str() + "), " + std::string("FALLTHROUGH_BB(") +
-               op.bb_pair.target->label.str() + ")";
+               op.bb_pair.fallthrough->label.str() + ")";
         break;
     }
     return "";

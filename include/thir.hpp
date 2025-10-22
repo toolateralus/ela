@@ -134,6 +134,7 @@ struct THIRProgram : THIR {
 
 struct Value;
 struct THIRBinExpr;
+struct THIRType;
 struct THIRVariable : THIR {
   InternedString name;
   THIR *value;
@@ -148,6 +149,14 @@ struct THIRVariable : THIR {
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;
   bool is_extern : 1 = false;
+
+  // We track this so we can emit all the variables the first time this gets used,
+  // so dead code gets eliminated,
+  // Also this should be removed and enum accesses can be lower to just integer literals.
+  // This is a temporary hack until we get the THIR simplified even further.
+  bool is_from_enum_declaration : 1 = false;
+  THIRType *enum_type;
+
   THIRNodeType get_node_type() const override { return THIRNodeType::Variable; }
 };
 
@@ -162,6 +171,7 @@ struct THIRVariable : THIR {
   as long as we structure it in a desugared, literal way.
 */
 struct THIRType : THIR {
+  std::vector<THIRVariable *> enum_members;
   THIRNodeType get_node_type() const override { return THIRNodeType::Type; }
 };
 
@@ -203,7 +213,7 @@ struct THIRFunction : THIR {
     1 == run in the global initializer function, after all globals have run.
     2 == use clang __attribute__(constructor) (or an equivalent)
   */
-  uint8_t constructor_index : 2;
+  uint8_t constructor_index : 2 = 0;
 
   InternedString name;
   std::vector<THIRParameter> parameters;
@@ -260,7 +270,7 @@ struct THIRPtrBinExpr : THIR {
   THIRNodeType get_node_type() const override { return THIRNodeType::PtrBinExpr; }
 };
 
-struct THIRPtrUnaryExpr: THIR {
+struct THIRPtrUnaryExpr : THIR {
   THIR *operand;
   TType op;
   THIRNodeType get_node_type() const override { return THIRNodeType::PtrUnaryExpr; }
