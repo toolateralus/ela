@@ -171,20 +171,24 @@ static inline std::string unescape_string_lit(const std::string &s) {
 }
 
 struct LLVM_Emitter;
-
 struct DIManager {
-  DIManager() {};
-
   std::shared_ptr<DIBuilder> di_builder;
-  std::stack<DIScope *> scope_stack;
+
   llvm::DICompileUnit *cu;
   llvm::DIFile *last_known_file;
 
   std::vector<llvm::DIFile *> files;
   std::unordered_map<std::filesystem::path, llvm::DIFile *> files_by_path;
 
+  std::stack<llvm::DICompileUnit *> cu_stack;
+  std::stack<llvm::DIFile *> file_stack;
+  std::stack<llvm::DISubprogram *> subprogram_stack;
+  std::stack<llvm::DILexicalBlock *> lexical_stack;
+
+  DIManager() = default;
+
   explicit inline DIManager(std::shared_ptr<DIBuilder> &builder) : di_builder(builder) {
-    for (std::filesystem::path file : Span::files()) {
+    for (const std::filesystem::path file : Span::files()) {
       auto abs = std::filesystem::absolute(file).lexically_normal();
       auto basename = abs.filename().string();
       auto dirpath = abs.parent_path().string();
@@ -195,82 +199,85 @@ struct DIManager {
 
     auto entry_file = files_by_path[Span::user_entry_file()];
     last_known_file = entry_file;
-    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust,  // Language
-                                       entry_file,                 // File
-                                       "Ela",                      // Producer string
-                                       false,                      // isOptimized
-                                       "",                         // Flags
-                                       0                           // Runtime version
-    );
+    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust, entry_file, "Ela", false, "", 0);
+    cu_stack.push(cu);
+    file_stack.push(entry_file);
   }
 
-  struct ScopeDropStub {
-    DIManager *manager;
-    ScopeDropStub() = delete;
-    explicit ScopeDropStub(DIManager *manager) : manager(manager) {}
-    ScopeDropStub(const ScopeDropStub &) = delete;
-    ScopeDropStub &operator=(const ScopeDropStub &) = delete;
-    ScopeDropStub(ScopeDropStub &&other) noexcept : manager(other.manager) { other.manager = nullptr; }
+  enum class Kind { Lexical, Subroutine, File, CU } kind;
 
-    ScopeDropStub &operator=(ScopeDropStub &&other) noexcept {
-      if (this != &other) {
-        manager = other.manager;
-        other.manager = nullptr;
-      }
-      return *this;
-    }
-    ~ScopeDropStub() { manager->pop_scope(); }
-  };
-
-  inline void push_scope(DIScope *scope) { scope_stack.push(scope); }
-
-  inline void pop_scope() {
-    if (!scope_stack.empty()) {
-      scope_stack.pop();
+  inline void push_scope(llvm::DIScope *scope, Kind kind) {
+    switch (kind) {
+      case Kind::Lexical:
+        lexical_stack.push(llvm::cast<llvm::DILexicalBlock>(scope));
+        break;
+      case Kind::Subroutine:
+        subprogram_stack.push(llvm::cast<llvm::DISubprogram>(scope));
+        break;
+      case Kind::File:
+        file_stack.push(llvm::cast<llvm::DIFile>(scope));
+        break;
+      case Kind::CU:
+        cu_stack.push(llvm::cast<llvm::DICompileUnit>(scope));
+        break;
     }
   }
 
-  inline DIScope *current_scope() const {
-    return scope_stack.empty() ? (last_known_file ? (llvm::DIScope *)cu : last_known_file) : scope_stack.top();
+  inline void pop_scope(Kind kind) {
+    switch (kind) {
+      case Kind::Lexical:
+        if (!lexical_stack.empty()) lexical_stack.pop();
+        break;
+      case Kind::Subroutine:
+        if (!subprogram_stack.empty()) subprogram_stack.pop();
+        break;
+      case Kind::File:
+        if (!file_stack.empty()) file_stack.pop();
+        break;
+      case Kind::CU:
+        if (!cu_stack.empty()) cu_stack.pop();
+        break;
+    }
+  }
+
+  inline llvm::DIScope *current_scope() const {
+    if (!lexical_stack.empty()) return lexical_stack.top();
+    if (!subprogram_stack.empty()) return subprogram_stack.top();
+    if (!file_stack.empty()) return file_stack.top();
+    if (!cu_stack.empty()) return cu_stack.top();
+    return cu;
   }
 
   inline std::tuple<std::string, std::string, unsigned, unsigned> extract_span(Span span) {
-    auto location = span;
-    auto line = location.line, column = location.column;
-    std::filesystem::path abs_path = location.files()[location.file];
-
+    auto line = span.line, column = span.column;
+    std::filesystem::path abs_path = span.files()[span.file];
     auto basename = abs_path.filename().string();
     auto dirpath = abs_path.parent_path().string();
     return {basename, dirpath, line, column};
   }
 
   inline llvm::DIFile *get_file_scope(const Span &span) {
-    auto raw = span.filename();
-    std::filesystem::path path = std::filesystem::absolute(raw).lexically_normal();
-
+    std::filesystem::path path = std::filesystem::absolute(span.filename()).lexically_normal();
     auto it = files_by_path.find(path);
-    printf("got path: %s for span: %s\n", path.c_str(), span.to_string().c_str());
     if (it != files_by_path.end()) {
       last_known_file = it->second;
       return it->second;
     }
-
-    std::string got = path.string();
-    throw_error(std::format("unable to get file from span: {}", got), span);
+    throw_error(std::format("unable to get file from span: {}", path.string()), span);
     return nullptr;
   }
 
   llvm::DISubprogram *enter_function_scope(const Type *type, LLVM_Emitter *emitter, llvm::Function *function,
                                            const std::string &name, const Span &span);
 
-  inline llvm::DILexicalBlock *enter_lexical_scope(DIScope *parent, const Span &span) {
+  inline llvm::DILexicalBlock *enter_lexical_scope(llvm::DIScope *parent, const Span &span) {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *block = di_builder->createLexicalBlock(parent, get_file_scope(span), line, column);
-    push_scope(block);
+    lexical_stack.push(block);
     return block;
   }
 
-  inline llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, Span span, llvm::DIType *type) {
+  inline llvm::DIVariable *create_variable(llvm::DIScope *scope, const std::string &name, Span span, llvm::DIType *type) {
     auto [basename, dirpath, line, column] = extract_span(span);
     return di_builder->createAutoVariable(scope, name, get_file_scope(span), line, type, true);
   }
@@ -287,7 +294,7 @@ struct DIManager {
     return di_builder->createSubroutineType(di_builder->getOrCreateTypeArray(param_types));
   }
 
-  inline llvm::DIType *create_struct_type(DIScope *scope, const std::string &name, llvm::DIFile *file, unsigned line,
+  inline llvm::DIType *create_struct_type(llvm::DIScope *scope, const std::string &name, llvm::DIFile *file, unsigned line,
                                           uint64_t size_in_bits, uint64_t align_in_bits, llvm::DINode::DIFlags flags,
                                           llvm::ArrayRef<llvm::Metadata *> elements) {
     return di_builder->createStructType(scope, name, file, line, size_in_bits, align_in_bits, flags, nullptr,
@@ -300,19 +307,13 @@ struct DIManager {
   }
 
   inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
-    if (compile_command.has_flag("nl")) {
-      return v;
-    }
-    if (auto *inst = llvm::dyn_cast<llvm::Instruction>(v)) {
-      attach_debug_info(inst, span);
-    }
+    if (compile_command.has_flag("nl")) return v;
+    if (auto *inst = llvm::dyn_cast<llvm::Instruction>(v)) attach_debug_info(inst, span);
     return v;
   }
 
   inline llvm::Instruction *create_dbg(llvm::Instruction *v, Span span) {
-    if (compile_command.has_flag("nl")) {
-      return v;
-    }
+    if (compile_command.has_flag("nl")) return v;
     attach_debug_info(v, span);
     return v;
   }
@@ -321,6 +322,21 @@ struct DIManager {
     auto [basename, dirpath, line, column] = extract_span(span);
     auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, current_scope());
     instruction->setDebugLoc(debug_loc);
+  }
+
+  inline llvm::DIDerivedType *create_type_member(llvm::DIType *parent, llvm::DIFile *file, size_t line, size_t align_in_bits,
+                                                 size_t size_in_bits, size_t offset_in_bits, llvm::DIType *t,
+                                                 InternedString name) {
+    return di_builder->createMemberType(parent,          // The scope is the containing struct.
+                                        name.str(),      // The member's name.
+                                        file,            // The file it's defined in.
+                                        line,            // The line number.
+                                        size_in_bits,    // Size in bits.
+                                        align_in_bits,   // Alignment in bits.
+                                        offset_in_bits,  // Offset in bits.
+                                        llvm::DINode::FlagZero,
+                                        t  // The member's type.
+    );
   }
 };
 
@@ -527,6 +543,10 @@ struct LLVM_Emitter {
         llvm::Type *largest_member_type = nullptr;
         uint64_t largest_member_size = 0;
 
+        auto di_struct_type = dbg.create_struct_type(
+            dbg.current_scope(), struct_name, file, 0, type->size_in_bytes() * 8,
+            data_layout.getABITypeAlign(llvm_struct_type).value() * 8, llvm::DINode::FlagZero, member_debug_info);
+
         for (const auto &[name, symbol] : info->scope->symbols) {
           if (!symbol.is_variable) continue;
 
@@ -534,7 +554,7 @@ struct LLVM_Emitter {
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member_type);
 
           if (is_union) {
-            uint64_t member_size = data_layout.getTypeAllocSize(llvm_member_type);
+            uint64_t member_size = member_type->size_in_bytes();
             if (member_size > largest_member_size) {
               largest_member_size = member_size;
               largest_member_type = llvm_member_type;
@@ -544,7 +564,11 @@ struct LLVM_Emitter {
             member_types.push_back(llvm_member_type);
           }
 
-          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.str(), {}, di_member_type));
+          llvm::DIDerivedType *member =
+              dbg.create_type_member(di_struct_type, file, 0, member_type->alignment_in_bytes() * 8,
+                                     member_type->size_in_bytes() * 8, type->offset_in_bytes(name) * 8, di_member_type, name);
+
+          member_debug_info.push_back(member);
         }
 
         if (is_union) {
@@ -552,10 +576,6 @@ struct LLVM_Emitter {
         }
 
         llvm_struct_type->setBody(member_types);
-
-        auto di_struct_type = dbg.create_struct_type(
-            dbg.current_scope(), struct_name, file, 0, data_layout.getTypeAllocSize(llvm_struct_type) * 8,
-            data_layout.getABITypeAlign(llvm_struct_type).value() * 8, llvm::DINode::FlagZero, member_debug_info);
 
         type_pair final_pair = {llvm_struct_type, di_struct_type};
         memoized_types[type] = final_pair;
@@ -584,126 +604,135 @@ struct LLVM_Emitter {
       } break;
       case TYPE_TUPLE: {
         auto info = type->info->as<TupleTypeInfo>();
-
-        // Forward declaration for recursive types
         auto tuple_name = type->basename.str();
         auto llvm_tuple_type = llvm::StructType::create(llvm_ctx, tuple_name);
 
-        // Memoize the forward declaration
         type_pair forward_pair = {llvm_tuple_type, nullptr};
         memoized_types.insert({type, forward_pair});
 
-        // Populate the tuple
         std::vector<llvm::Type *> element_types;
         std::vector<llvm::Metadata *> element_debug_info;
 
+        auto di_tuple_type =
+            dbg.create_struct_type(dbg.current_scope(), tuple_name, file, 0, 0, 0, llvm::DINode::FlagZero, element_debug_info);
+
+        unsigned offset = 0;
         unsigned index = 0;
-        for (const auto &element : info->types) {
-          auto element_type = element;
-          auto [llvm_element_type, di_element_type] = llvm_typeof_impl(element_type);
+        for (const auto &element_type_info : info->types) {
+          auto [llvm_element_type, di_element_type] = llvm_typeof_impl(element_type_info);
           element_types.push_back(llvm_element_type);
-          element_debug_info.push_back(dbg.create_variable(dbg.current_scope(), std::to_string(index), {}, di_element_type));
+
+          auto member_di = dbg.create_type_member(
+              di_tuple_type, file, 0, data_layout.getABITypeAlign(llvm_element_type).value() * 8,
+              data_layout.getTypeAllocSizeInBits(llvm_element_type), offset, di_element_type, std::to_string(index));
+
+          element_debug_info.push_back(member_di);
+          offset += data_layout.getTypeAllocSize(llvm_element_type) * 8;
           ++index;
         }
 
         llvm_tuple_type->setBody(element_types);
 
-        auto di_tuple_type = dbg.create_struct_type(
-            dbg.current_scope(), tuple_name, file, 0, data_layout.getTypeAllocSize(llvm_tuple_type) * 8,
-            data_layout.getABITypeAlign(llvm_tuple_type).value() * 8, llvm::DINode::FlagZero, element_debug_info);
-
         type_pair final_pair = {llvm_tuple_type, di_tuple_type};
         memoized_types[type] = final_pair;
         return final_pair;
-      } break;
+      }
+
       case TYPE_CHOICE: {
         auto info = type->info->as<ChoiceTypeInfo>();
-
-        // Forward declaration for recursive types
         auto choice_name = type->basename.str();
         auto llvm_choice_type = llvm::StructType::create(llvm_ctx, choice_name);
 
-        // Memoize the forward declaration
         type_pair forward_pair = {llvm_choice_type, nullptr};
         memoized_types.insert({type, forward_pair});
 
-        // Populate the choice type
-        std::vector<llvm::Type *> choice_fields = {
-            llvm::Type::getInt32Ty(llvm_ctx)  // Discriminant
-        };
-        std::vector<llvm::Metadata *> variant_debug_info;
+        std::vector<llvm::Type *> fields;
+        std::vector<llvm::Metadata *> field_debug_info;
 
-        size_t largest_member_size = 0;
-        llvm::Type *largest_payload_type = nullptr;
+        auto di_choice_type =
+            dbg.create_struct_type(dbg.current_scope(), choice_name, file, 0, 0, 0, llvm::DINode::FlagZero, field_debug_info);
 
+        // discriminant
+        fields.push_back(llvm::Type::getInt32Ty(llvm_ctx));
+        field_debug_info.push_back(dbg.create_type_member(di_choice_type, file, 0, 32, 32, 0, nullptr, "discriminant"));
+
+        size_t largest_size = 0;
+        llvm::Type *largest_member = nullptr;
+
+        unsigned offset = 32;
         for (const auto &member : info->members) {
-          auto variant_type = member.type;
+          if (member.type == void_type()) continue;
 
-          if (variant_type != void_type()) {
-            auto [llvm_payload_type, di_payload_type] = llvm_typeof_impl(variant_type);
-
-            uint64_t member_size = data_layout.getTypeAllocSize(llvm_payload_type);
-            if (member_size > largest_member_size) {
-              largest_member_size = member_size;
-              largest_payload_type = llvm_payload_type;
-            }
-
-            variant_debug_info.push_back(dbg.create_struct_type(
-                dbg.current_scope(), member.name.str(), file, 0, data_layout.getTypeAllocSize(llvm_payload_type) * 8,
-                data_layout.getABITypeAlign(llvm_payload_type).value() * 8, llvm::DINode::FlagZero, {di_payload_type}));
+          auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member.type);
+          uint64_t member_size = data_layout.getTypeAllocSize(llvm_member_type);
+          if (member_size > largest_size) {
+            largest_size = member_size;
+            largest_member = llvm_member_type;
           }
+
+          auto member_di =
+              dbg.create_type_member(di_choice_type, file, 0, data_layout.getABITypeAlign(llvm_member_type).value() * 8,
+                                     member_size * 8, offset, di_member_type, member.name.str());
+          field_debug_info.push_back(member_di);
         }
 
-        if (largest_payload_type) {
-          choice_fields.push_back(largest_payload_type);
-        }
+        // Push the largest member into the LLVM struct body so it can hold any variant
+        if (largest_member) fields.push_back(largest_member);
 
-        llvm_choice_type->setBody(choice_fields);
-
-        auto di_choice_type = dbg.create_struct_type(
-            dbg.current_scope(), choice_name, file, 0, data_layout.getTypeAllocSize(llvm_choice_type) * 8,
-            data_layout.getABITypeAlign(llvm_choice_type).value() * 8, llvm::DINode::FlagZero, variant_debug_info);
+        llvm_choice_type->setBody(fields);
 
         type_pair final_pair = {llvm_choice_type, di_choice_type};
         memoized_types[type] = final_pair;
         return final_pair;
-      } break;
+      }
+
       case TYPE_DYN: {
         auto info = type->info->as<DynTypeInfo>();
-
-        // Forward declaration for recursive types
         auto dyn_name = type->basename.str();
         auto llvm_dyn_type = llvm::StructType::create(llvm_ctx, dyn_name);
 
-        // Memoize the forward declaration
         type_pair forward_pair = {llvm_dyn_type, nullptr};
         memoized_types.insert({type, forward_pair});
 
-        // Populate the dynamic type
-        std::vector<llvm::Type *> dyn_fields = {
-            llvm::PointerType::get(llvm::Type::getVoidTy(llvm_ctx), 0)  // void* instance
-        };
-        std::vector<llvm::Metadata *> dyn_debug_info = {
-            dbg.create_pointer_type(dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned), 64)};
+        std::vector<llvm::Type *> dyn_fields;
+        std::vector<llvm::Metadata *> dyn_debug_info;
 
-        dyn_fields.push_back(llvm::PointerType::get(llvm::PointerType::getVoidTy(llvm_ctx), 0));
+        auto di_dyn_type =
+            dbg.create_struct_type(dbg.current_scope(), dyn_name, file, 0, 0, 0, llvm::DINode::FlagZero, dyn_debug_info);
 
+        auto void_ptr = llvm::PointerType::get(llvm::Type::getVoidTy(llvm_ctx), 0);
+
+        // instance pointer
+        dyn_fields.push_back(void_ptr);
+        dyn_debug_info.push_back(dbg.create_type_member(
+            di_dyn_type, file, 0, 64, 64, 0,
+            dbg.create_pointer_type(dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned), 64), "instance"));
+
+        // vtable pointer
+        auto void_ptr_ptr = llvm::PointerType::get(void_ptr, 0);
+        dyn_fields.push_back(void_ptr_ptr);
+        dyn_debug_info.push_back(dbg.create_type_member(
+            di_dyn_type, file, 0, 64, 64, 64,
+            dbg.create_pointer_type(dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned), 64), "vtable"));
+
+        unsigned offset = 128;
         for (const auto &[method_name, method_type] : info->methods) {
-          auto [llvm_function_type, di_function_type] = llvm_typeof_impl(method_type);
-          dyn_fields.push_back(llvm::PointerType::get(llvm_function_type, 0));
-          dyn_debug_info.push_back(dbg.create_function_type(di_function_type));
+          auto [llvm_func_type, di_func_type] = llvm_typeof_impl(method_type);
+          dyn_fields.push_back(llvm::PointerType::get(llvm_func_type, 0));
+
+          dyn_debug_info.push_back(
+              dbg.create_type_member(di_dyn_type, file, 0, data_layout.getABITypeAlign(llvm_func_type).value() * 8,
+                                     data_layout.getTypeAllocSize(llvm_func_type) * 8, offset, di_func_type, method_name.str()));
+          offset += data_layout.getTypeAllocSize(llvm_func_type) * 8;
         }
 
         llvm_dyn_type->setBody(dyn_fields);
 
-        auto di_dyn_type = dbg.create_struct_type(
-            dbg.current_scope(), dyn_name, file, 0, data_layout.getTypeAllocSize(llvm_dyn_type) * 8,
-            data_layout.getABITypeAlign(llvm_dyn_type).value() * 8, llvm::DINode::FlagZero, dyn_debug_info);
-
         type_pair final_pair = {llvm_dyn_type, di_dyn_type};
         memoized_types[type] = final_pair;
         return final_pair;
-      } break;
+      }
+
       case TYPE_FUNCTION: {
         auto info = type->info->as<FunctionTypeInfo>();
 

@@ -383,7 +383,7 @@ void LLVM_Emitter::emit_module() {
     emit_function(f, function_table[f]);
   }
 
-  dbg.pop_scope();
+  dbg.pop_scope(DIManager::Kind::CU);
 }
 
 void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
@@ -417,7 +417,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   bb_table.clear();
   builder.ClearInsertionPoint();
   if (!compile_command.has_flag("nl")) {
-    dbg.pop_scope();
+    dbg.pop_scope(DIManager::Kind::Subroutine);
   }
 }
 
@@ -698,38 +698,32 @@ llvm::DISubprogram *DIManager::enter_function_scope(const Type *type, LLVM_Emitt
                                                     const std::string &name, const Span &span) {
   auto [basename, dirpath, line, column] = extract_span(span);
   llvm::DIFile *file = get_file_scope(span);
-  llvm::DIScope *scope = cu;
 
-  const FunctionTypeInfo *fty_info = type->info->as<FunctionTypeInfo>();
+  std::vector<llvm::Metadata *> di_types;
 
-  // Ensure that DI info is built for all of the types used in the function
-  emitter->llvm_fn_typeof(type);
+  auto [ret_llvm_ty, ret_di_ty] = emitter->llvm_typeof_impl(type->info->as<FunctionTypeInfo>()->return_type);
+  di_types.push_back(ret_di_ty);
 
-  std::vector<llvm::Metadata *> param_di_types;
-
+  FunctionTypeInfo *fty_info = type->info->as<FunctionTypeInfo>();
   for (size_t i = 0; i < fty_info->params_len; ++i) {
-    Type *param_ty = fty_info->parameter_types[i];
-    auto di_type_pair = emitter->llvm_typeof_impl(param_ty);
-    param_di_types.push_back(di_type_pair.second);
+    auto [p_llvm_ty, p_di_ty] = emitter->llvm_typeof_impl(fty_info->parameter_types[i]);
+    di_types.push_back(p_di_ty);
   }
 
-  llvm::Metadata *return_di_type = emitter->llvm_typeof_impl(fty_info->return_type).second;
+  llvm::DISubroutineType *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray(di_types));
 
-  param_di_types.insert(param_di_types.begin(), return_di_type);
-
-  llvm::DISubroutineType *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray(param_di_types));
-
-  llvm::DISubprogram *subprogram = di_builder->createFunction(scope,                   // DIScope * Scope
-                                                              name,                    // StringRef Name
-                                                              name,                    // StringRef LinkageName
-                                                              file,                    // DIFile * File
-                                                              line,                    // unsigned LineNo
-                                                              func_type,               // DISubroutineType * Ty
-                                                              line,                    // unsigned ScopeLine
-                                                              llvm::DINode::FlagZero,  // DINode::DIFlags Flags
+  llvm::DIScope *scope = cu;
+  llvm::DISubprogram *subprogram = di_builder->createFunction(scope,                   // scope
+                                                              name,                    // Name
+                                                              name,                    // Linkage name
+                                                              file,                    // File
+                                                              line,                    // LineNo
+                                                              func_type,               // DISubroutineType*
+                                                              line,                    // ScopeLine
+                                                              llvm::DINode::FlagZero,  // Flags
                                                               llvm::DISubprogram::SPFlagDefinition);
 
   function->setSubprogram(subprogram);
-  push_scope(subprogram);
+  push_scope(subprogram, Kind::Subroutine);
   return subprogram;
 }

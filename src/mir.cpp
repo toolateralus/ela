@@ -65,7 +65,11 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   f->span = node->span;
 
   m.enter_function(f);
-  Defer _defer([&] { m.leave_function(); });
+  Defer _defer([&] { 
+    if (m.function_stack.size()) { // we never push the first function
+      m.leave_function(); 
+    }
+  });
 
   if (!node->is_extern) {
     f->create_and_enter_basic_block("entry");
