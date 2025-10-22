@@ -97,7 +97,8 @@ int CompileCommand::compile() {
     if (llvm::verifyModule(*llvm_emitter.llvm_module, &err_stream)) {
       llvm::errs() << "Module verification failed:\n";
       llvm::errs() << err_stream.str() << '\n';
-    } else if (true) {
+    } else if (has_flag("release")) {
+      printf("optimizing the LLVM IR\n");
       using namespace llvm;
       // Create the analysis managers.
       // These must be declared in this order so that they are destroyed in the
@@ -122,7 +123,7 @@ int CompileCommand::compile() {
 
       // Create the pass manager.
       // This one corresponds to a typical -O2 optimization pipeline.
-      ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
+      ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(opt_level);
 
       // Optimize the IR!
       MPM.run(*llvm_emitter.llvm_module, MAM);
@@ -137,16 +138,16 @@ int CompileCommand::compile() {
   }
 
   std::string extra_flags = c_flags;
-  if (has_flag("release")) {
-    extra_flags += " -O3 ";
-  } else {
+  if (!has_flag("release")) {
     extra_flags += " -g ";
   }
 
   const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
   const std::string obj_file = output_path.filename().string() + ".o";
 
-  const auto llc_string = std::format("llc -filetype=obj -relocation-model=pic -O0 {} -o {}", output_path.string(), obj_file);
+  std::string llc_debug_flag = "";
+
+  const auto llc_string = std::format("llc -filetype=obj -relocation-model=pic {} -o {}", output_path.string(), obj_file);
   const auto compilation_string = std::format("clang -fPIE {} {} {}", obj_file, output_flag, extra_flags);
 
   if (compile_command.has_flag("x")) {
@@ -229,6 +230,22 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       input_path = arg;
     } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;
+    } else if (arg.starts_with("-O")) {
+      opt_level_arg = arg;
+      if (arg == "-O0") {
+        opt_level = llvm::OptimizationLevel::O0;
+      } else if (arg == "-O1") {
+        opt_level = llvm::OptimizationLevel::O1;
+      } else if (arg == "-O2") {
+        opt_level = llvm::OptimizationLevel::O2;
+      } else if (arg == "-O3") {
+        opt_level = llvm::OptimizationLevel::O3;
+      } else if (arg == "-Os") {
+        opt_level = llvm::OptimizationLevel::Os;
+      } else if (arg == "-Oz") {
+        opt_level = llvm::OptimizationLevel::Oz;
+      }
+
     } else {
       runtime_args.push_back(arg);
     }

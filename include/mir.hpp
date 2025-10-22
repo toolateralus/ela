@@ -75,6 +75,55 @@ enum Op_Code : uint8_t {
   OP_GEP,  // dest=ptr,    left=base,  right=index
 };
 
+static constexpr inline const char *opcode_to_string(enum Op_Code op) {
+  switch (op) {
+#define X(NAME) \
+  case NAME:    \
+    return #NAME;
+    X(OP_UNREACHABLE)
+    X(OP_ADD)
+    X(OP_SUB)
+    X(OP_MUL)
+    X(OP_DIV)
+    X(OP_MOD)
+    X(OP_AND)
+    X(OP_OR)
+    X(OP_XOR)
+    X(OP_SHL)
+    X(OP_SHR)
+    X(OP_EQ)
+    X(OP_NE)
+    X(OP_LT)
+    X(OP_LE)
+    X(OP_GT)
+    X(OP_GE)
+    X(OP_LOGICAL_AND)
+    X(OP_LOGICAL_OR)
+    X(OP_NEG)
+    X(OP_LOGICAL_NOT)
+    X(OP_NOT)
+    X(OP_LOAD)
+    X(OP_STORE)
+    X(OP_ALLOCA)
+    X(OP_ZERO_INIT)
+    X(OP_LOAD_FN_PTR)
+    X(OP_JMP)
+    X(OP_JMP_TRUE)
+    X(OP_PUSH_ARG)
+    X(OP_CALL)
+    X(OP_CALL_PTR)
+    X(OP_RET)
+    X(OP_RET_VOID)
+    X(OP_CAST)
+    X(OP_BITCAST)
+    X(OP_GEP)
+
+#undef X
+    default:
+      return "UNKNOWN";
+  }
+}
+
 struct Basic_Block;
 
 struct Constant {
@@ -490,7 +539,7 @@ Operand generate_index_addr(const THIRIndex *node, Module &m);
 Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m);
 
 void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
-                     const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer);
+             const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer);
 
 static inline void generate(const THIR *node, Module &m) {
   switch (node->get_node_type()) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <llvm/Passes/OptimizationLevel.h>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -86,6 +87,8 @@ struct CompileCommand {
   std::filesystem::path binary_path;
   std::filesystem::path original_path;  // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
+  llvm::OptimizationLevel opt_level = llvm::OptimizationLevel::O0;
+  std::string opt_level_arg;
   std::string c_flags;
 
   int compile();

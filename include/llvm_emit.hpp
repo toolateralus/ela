@@ -199,7 +199,7 @@ struct DIManager {
 
     auto entry_file = files_by_path[Span::user_entry_file()];
     last_known_file = entry_file;
-    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust, entry_file, "Ela", false, "", 0);
+    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_C, entry_file, "Ela", false, "", 0);
     cu_stack.push(cu);
     file_stack.push(entry_file);
   }

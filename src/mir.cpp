@@ -150,7 +150,7 @@ Operand load_variable(const THIRVariable *node, Module &m) {
     }
     it = m.variables.find(node);
   }
-  
+
   if (it == m.variables.end()) {
     throw_error(std::format("variable '{}' not declared", node->name.str()), node->span);
   }
@@ -769,10 +769,10 @@ void Basic_Block::finalize(Function *f) const {
 
     if (!valid_terminator) {
       printf(
-          "in function: %s, basic block: %s, opcode: %d\n"
+          "in function: %s, basic block: %s, opcode: %s\n"
           "malformed basic block: every basic block must end with one of the following instructions:\n"
           "[OP_JMP, OP_JMP_TRUE, OP_RET, OP_RET_VOID, OP_UNREACHABLE]\n",
-          f->name.c_str(), label.c_str(), last_opcode);
+          f->name.c_str(), label.c_str(), opcode_to_string(last_opcode));
     }
   }
 }
@@ -954,11 +954,19 @@ void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction 
     }
   }
 
-  for (const auto &ctor : constructors) {
-    generate(ctor, m);
+  /*
+    These are disabled because of bugs I can't currently solve.
+    TODO: fixme
+  */
+  if (false) {
+    for (const auto &ctor : constructors) {
+      generate(ctor, m);
+    }
   }
 
-  generate(global_initializer, m);
+  if (false) {
+    generate(global_initializer, m);
+  }
 
   generate(entry_point, m);
 }
