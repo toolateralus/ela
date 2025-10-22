@@ -139,7 +139,7 @@ static std::string format_source_location(const Span &span, ErrorSeverity severi
   }
 
   std::stringstream ss;
-  ss << color << span.ToString() << (terminal_supports_color ? "\033[0m" : "");
+  ss << color << span.to_string() << (terminal_supports_color ? "\033[0m" : "");
   ss << get_text_representation_of_source_range(span, num_lines_of_source_to_show);
 
   if (terminal_supports_color) ss << "\033[0m";

@@ -9,6 +9,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DIBuilder.h"
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DataLayout.h>
@@ -18,6 +19,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Casting.h>
@@ -168,18 +170,37 @@ static inline std::string unescape_string_lit(const std::string &s) {
   return res;
 }
 
+struct LLVM_Emitter;
+
 struct DIManager {
+  DIManager() {};
+
   std::shared_ptr<DIBuilder> di_builder;
   std::stack<DIScope *> scope_stack;
   llvm::DICompileUnit *cu;
+  llvm::DIFile *last_known_file;
+
+  std::vector<llvm::DIFile *> files;
+  std::unordered_map<std::filesystem::path, llvm::DIFile *> files_by_path;
 
   explicit inline DIManager(std::shared_ptr<DIBuilder> &builder) : di_builder(builder) {
-    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust,                                                // Language
-                                       di_builder->createFile("main.ela", "/home/josh/source/temp/ela_source"),  // File
-                                       "Ela",  // Producer string
-                                       false,  // isOptimized
-                                       "",     // Flags
-                                       0       // Runtime version
+    for (std::filesystem::path file : Span::files()) {
+      auto abs = std::filesystem::absolute(file).lexically_normal();
+      auto basename = abs.filename().string();
+      auto dirpath = abs.parent_path().string();
+      auto di_file = di_builder->createFile(basename, dirpath);
+      files.push_back(di_file);
+      files_by_path[abs] = di_file;
+    }
+
+    auto entry_file = files_by_path[Span::user_entry_file()];
+    last_known_file = entry_file;
+    cu = di_builder->createCompileUnit(llvm::dwarf::DW_LANG_Rust,  // Language
+                                       entry_file,                 // File
+                                       "Ela",                      // Producer string
+                                       false,                      // isOptimized
+                                       "",                         // Flags
+                                       0                           // Runtime version
     );
   }
 
@@ -209,7 +230,9 @@ struct DIManager {
     }
   }
 
-  inline DIScope *current_scope() const { return scope_stack.empty() ? nullptr : scope_stack.top(); }
+  inline DIScope *current_scope() const {
+    return scope_stack.empty() ? (last_known_file ? (llvm::DIScope *)cu : last_known_file) : scope_stack.top();
+  }
 
   inline std::tuple<std::string, std::string, unsigned, unsigned> extract_span(Span span) {
     auto location = span;
@@ -221,42 +244,35 @@ struct DIManager {
     return {basename, dirpath, line, column};
   }
 
-  inline llvm::DIFile *enter_file_scope(const Span &span) {
-    auto [basename, dirpath, line, column] = extract_span(span);
-    auto *file = di_builder->createFile(basename, dirpath);
-    push_scope(file);
-    return file;
+  inline llvm::DIFile *get_file_scope(const Span &span) {
+    auto raw = span.filename();
+    std::filesystem::path path = std::filesystem::absolute(raw).lexically_normal();
+
+    auto it = files_by_path.find(path);
+    printf("got path: %s for span: %s\n", path.c_str(), span.to_string().c_str());
+    if (it != files_by_path.end()) {
+      last_known_file = it->second;
+      return it->second;
+    }
+
+    std::string got = path.string();
+    throw_error(std::format("unable to get file from span: {}", got), span);
+    return nullptr;
   }
 
-  inline llvm::DISubprogram *enter_function_scope(DIScope *parent, llvm::Function *function, const std::string &name,
-                                                  const Span &span) {
-    auto [basename, dirpath, line, column] = extract_span(span);
-    auto *file = dyn_cast<llvm::DIFile>(parent);
-    auto *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray({}));
-    auto *subprogram = di_builder->createFunction(cu, name, name, file, line, func_type, line, llvm::DINode::FlagZero,
-                                                  llvm::DISubprogram::SPFlagDefinition);
-    function->setSubprogram(subprogram);
-    push_scope(subprogram);
-    return subprogram;
-  }
+  llvm::DISubprogram *enter_function_scope(const Type *type, LLVM_Emitter *emitter, llvm::Function *function,
+                                           const std::string &name, const Span &span);
 
   inline llvm::DILexicalBlock *enter_lexical_scope(DIScope *parent, const Span &span) {
     auto [basename, dirpath, line, column] = extract_span(span);
-    auto *block = di_builder->createLexicalBlock(parent, di_builder->createFile(basename, dirpath), line, column);
+    auto *block = di_builder->createLexicalBlock(parent, get_file_scope(span), line, column);
     push_scope(block);
     return block;
   }
 
-  inline llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, llvm::DIFile *file, Span span,
-                                           llvm::DIType *type) {
+  inline llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, Span span, llvm::DIType *type) {
     auto [basename, dirpath, line, column] = extract_span(span);
-    return di_builder->createAutoVariable(scope, name, file, line, type, true);
-  }
-
-  inline void attach_debug_info(llvm::Instruction *instruction, Span span) {
-    auto [basename, dirpath, line, column] = extract_span(span);
-    auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, current_scope());
-    instruction->setDebugLoc(debug_loc);
+    return di_builder->createAutoVariable(scope, name, get_file_scope(span), line, type, true);
   }
 
   inline llvm::DIType *create_basic_type(const std::string &name, uint64_t size_in_bits, unsigned encoding) {
@@ -299,6 +315,12 @@ struct DIManager {
     }
     attach_debug_info(v, span);
     return v;
+  }
+
+  inline void attach_debug_info(llvm::Instruction *instruction, Span span) {
+    auto [basename, dirpath, line, column] = extract_span(span);
+    auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, current_scope());
+    instruction->setDebugLoc(debug_loc);
   }
 };
 
@@ -360,14 +382,15 @@ struct LLVM_Emitter {
     temps[idx] = allocation;
   }
 
-  inline LLVM_Emitter(Mir::Module &m)
-      : llvm_ctx(),
-        builder(llvm_ctx),
-        llvm_module(std::make_unique<llvm::Module>(Span::files()[m.functions[0]->span.file], llvm_ctx)),
-        di_builder(std::make_shared<DIBuilder>(*llvm_module)),
-        data_layout(""),
-        dbg(di_builder),
-        m(m) {
+  inline LLVM_Emitter(Mir::Module &m) : llvm_ctx(), builder(llvm_ctx), data_layout(""), m(m) {
+    llvm_module = (std::make_unique<llvm::Module>(Span::files()[m.functions[0]->span.file], llvm_ctx)),
+
+    llvm_module->addModuleFlag(llvm::Module::Warning, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
+    llvm_module->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4);
+
+    di_builder = std::make_shared<DIBuilder>(*llvm_module);
+    new (&dbg) DIManager(di_builder);
+
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
@@ -392,12 +415,11 @@ struct LLVM_Emitter {
 
   using type_pair = std::pair<llvm::Type *, llvm::DIType *>;
 
-  inline llvm::FunctionType *llvm_fn_typeof(Type *type) { return llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(type)); }
-  inline llvm::Type *llvm_typeof(Type *type) { return llvm_typeof_impl(type).first; }
+  inline llvm::FunctionType *llvm_fn_typeof(const Type *type) { return llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(type)); }
+  inline llvm::Type *llvm_typeof(const Type *type) { return llvm_typeof_impl(type).first; }
 
-  inline type_pair llvm_typeof_impl(Type *type) {
-    static std::map<Type *, type_pair> memoized_types;
-
+  inline type_pair llvm_typeof_impl(const Type *type) {
+    static std::map<const Type *, type_pair> memoized_types;
     if (memoized_types.contains(type)) {
       return memoized_types.at(type);
     }
@@ -522,7 +544,7 @@ struct LLVM_Emitter {
             member_types.push_back(llvm_member_type);
           }
 
-          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.str(), file, {}, di_member_type));
+          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.str(), {}, di_member_type));
         }
 
         if (is_union) {
@@ -580,8 +602,7 @@ struct LLVM_Emitter {
           auto element_type = element;
           auto [llvm_element_type, di_element_type] = llvm_typeof_impl(element_type);
           element_types.push_back(llvm_element_type);
-          element_debug_info.push_back(
-              dbg.create_variable(dbg.current_scope(), std::to_string(index), file, {}, di_element_type));
+          element_debug_info.push_back(dbg.create_variable(dbg.current_scope(), std::to_string(index), {}, di_element_type));
           ++index;
         }
 

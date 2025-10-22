@@ -3286,6 +3286,8 @@ void Parser::end_node(ASTNode *node, Span &range) {
 Parser::Parser(const std::string &filename, Context &context) : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed(states.back());
 
+  Span::user_entry_file() = std::filesystem::absolute(filename);
+
   if (states.back().input.empty()) {
     fprintf(stderr, "No code to compile, so exiting.\n");
     exit(1);
@@ -3370,7 +3372,7 @@ ASTForCStyle *Parser::parse_for_c_style() {
   NODE_ALLOC(ASTForCStyle, ast, _, _1, this);
   ast->scope = create_child(ctx.scope);
   ENTER_SCOPE(ast->scope);
-  
+
   NODE_ALLOC(ASTExprStatement, stmt, _2, _3, this);
   expect(TType::For);
   ast->initialization = parse_variable();

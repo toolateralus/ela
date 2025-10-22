@@ -191,7 +191,7 @@ Value *Interpreter::visit_bin_expr(THIRBinExpr *node) {
 
   if (!left || !right) {
     bool left_null = !left, right_null = !right;
-    std::println("left={}, right={}", node->left->span.ToString(), node->right->span.ToString());
+    std::println("left={}, right={}", node->left->span.to_string(), node->right->span.to_string());
     throw_error(std::format("[INTERPRETER] INTERNAL COMPILER ERROR: one or both binary operands null in expression left null?={}, right null?={}", left_null, right_null), node->span);
   }
 

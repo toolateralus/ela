@@ -471,7 +471,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
 
     fprintf(f, "; ");
     std::string source = get_source_line_from_span(span);
-    fprintf(f, "\"%s\" :: '%s'\n", source.c_str(), span.ToString().c_str());
+    fprintf(f, "\"%s\" :: '%s'\n", source.c_str(), span.to_string().c_str());
 
   } else {
     fprintf(f, "  %s\n", line.c_str());

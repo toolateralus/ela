@@ -52,9 +52,7 @@ struct Interpreter {
   Value *visit_aggregate_initializer(THIRAggregateInitializer *);
   Value *visit_collection_initializer(THIRCollectionInitializer *);
 
-  Value *visit_empty_initializer(THIREmptyInitializer *node) {
-    return default_value_of_t(node->type, this);
-  }
+  Value *visit_empty_initializer(THIREmptyInitializer *node) { return default_value_of_t(node->type, this); }
 
   // don't need to declare types.
   Value *visit_type_node(THIRType *) { return null_value(); }
@@ -110,6 +108,8 @@ struct Interpreter {
         return visit_while(static_cast<THIRWhile *>(node));
       case THIRNodeType::Noop:
         return visit_noop(static_cast<THIRNoop *>(node));
+      default:
+        return nullptr;
     }
   }
 };

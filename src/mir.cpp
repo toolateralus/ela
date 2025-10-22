@@ -62,6 +62,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   f->type_info = node->type->info->as<FunctionTypeInfo>();
   f->type = node->type;
   f->index = index;
+  f->span = node->span;
 
   m.enter_function(f);
   Defer _defer([&] { m.leave_function(); });

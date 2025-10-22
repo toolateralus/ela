@@ -64,7 +64,6 @@
       "args": [
         "main.ela",
         "--s",
-        "--nl",
         "--save-mir"
       ],
       "cwd": "${workspaceFolder}/ela_source",

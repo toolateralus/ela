@@ -28,7 +28,6 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-
 #if 0
 #include "vm.hpp"
 #endif
@@ -145,15 +144,23 @@ int CompileCommand::compile() {
   }
 
   const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+  const std::string obj_file = output_path.filename().string() + ".o";
 
-  const auto compilation_string = std::format("clang -x ir {} {} {}", output_path.string(), output_flag, extra_flags);
+  const auto llc_string = std::format("llc -filetype=obj -O0 {} -o {}", output_path.string(), obj_file);
+  const auto compilation_string = std::format("clang {} {} {}", obj_file, output_flag, extra_flags);
 
   if (compile_command.has_flag("x")) {
+    printf("\033[1;36m%s\n\033[0m", llc_string.c_str());
     printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
   }
 
-  int result = clang_invocation_metric.run<int>("invoking 'clang' compiler on llvm ir",
-                                                [&compilation_string] { return system(compilation_string.c_str()); });
+  int result = clang_invocation_metric.run<int>("invoking 'llc' and 'clang' compiler", [&] {
+    int result = 0;
+    if ((result = system(llc_string.c_str()) != 0)) {
+      return result;
+    }
+    return system(compilation_string.c_str());
+  });
 
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
@@ -290,7 +297,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
 }
 void CompileCommand::request_compile_time_code_execution(const Span &range) {
   if (has_flag("ctfe-validate")) {
-    std::cout << "\033[1;33mrequesting ctfe at: " << range.ToString() << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
+    std::cout << "\033[1;33mrequesting ctfe at: " << range.to_string() << "\033[0m\nproceed? [Y(es)/N(o)/S(how source)]: ";
 
     char response;
     std::cin >> response;

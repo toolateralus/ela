@@ -6,8 +6,10 @@
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
+#include "core.hpp"
 #include "mir.hpp"
 #include "type.hpp"
 
@@ -357,7 +359,7 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
 }
 
 void LLVM_Emitter::emit_module() {
-  file = dbg.enter_file_scope(m.functions[0]->span);
+  file = dbg.get_file_scope(m.functions[0]->span);
 
   for (const auto &f : m.functions) {
     llvm::FunctionType *func_type = (llvm::FunctionType *)llvm_typeof(f->type);
@@ -385,8 +387,9 @@ void LLVM_Emitter::emit_module() {
 }
 
 void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
-  auto subprogram = dbg.enter_function_scope(dbg.current_scope(), ir_f, f->name.str(), f->span);
-  ir_f->setSubprogram(subprogram);
+  if (!compile_command.has_flag("nl")) {
+    dbg.enter_function_scope(f->type, this, ir_f, f->name.str(), f->span);
+  }
 
   bb_table.reserve(f->basic_blocks.size());
 
@@ -399,7 +402,7 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   temps.reserve(f->temps.size());
 
   size_t i = 0;
-  for (const auto &param_temp: f->parameter_temps) {
+  for (const auto &param_temp : f->parameter_temps) {
     llvm::Argument *llvm_param = ir_f->getArg(i);
     insert_temp(param_temp.index, f, llvm_param);
     ++i;
@@ -412,8 +415,10 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 
   temps.clear();
   bb_table.clear();
-  dbg.pop_scope();
   builder.ClearInsertionPoint();
+  if (!compile_command.has_flag("nl")) {
+    dbg.pop_scope();
+  }
 }
 
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f) {
@@ -687,4 +692,44 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
       }
       break;
   }
+}
+
+llvm::DISubprogram *DIManager::enter_function_scope(const Type *type, LLVM_Emitter *emitter, llvm::Function *function,
+                                                    const std::string &name, const Span &span) {
+  auto [basename, dirpath, line, column] = extract_span(span);
+  llvm::DIFile *file = get_file_scope(span);
+  llvm::DIScope *scope = cu;
+
+  const FunctionTypeInfo *fty_info = type->info->as<FunctionTypeInfo>();
+
+  // Ensure that DI info is built for all of the types used in the function
+  emitter->llvm_fn_typeof(type);
+
+  std::vector<llvm::Metadata *> param_di_types;
+
+  for (size_t i = 0; i < fty_info->params_len; ++i) {
+    Type *param_ty = fty_info->parameter_types[i];
+    auto di_type_pair = emitter->llvm_typeof_impl(param_ty);
+    param_di_types.push_back(di_type_pair.second);
+  }
+
+  llvm::Metadata *return_di_type = emitter->llvm_typeof_impl(fty_info->return_type).second;
+
+  param_di_types.insert(param_di_types.begin(), return_di_type);
+
+  llvm::DISubroutineType *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray(param_di_types));
+
+  llvm::DISubprogram *subprogram = di_builder->createFunction(scope,                   // DIScope * Scope
+                                                              name,                    // StringRef Name
+                                                              name,                    // StringRef LinkageName
+                                                              file,                    // DIFile * File
+                                                              line,                    // unsigned LineNo
+                                                              func_type,               // DISubroutineType * Ty
+                                                              line,                    // unsigned ScopeLine
+                                                              llvm::DINode::FlagZero,  // DINode::DIFlags Flags
+                                                              llvm::DISubprogram::SPFlagDefinition);
+
+  function->setSubprogram(subprogram);
+  push_scope(subprogram);
+  return subprogram;
 }

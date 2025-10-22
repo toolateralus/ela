@@ -1105,7 +1105,7 @@ void THIRGen::mangle_function_name_for_thir(ASTFunctionDeclaration *&ast, THIRFu
     if (entry_point && entry_point->get_node_type() != THIRNodeType::Program) {
       throw_error(std::format("multiple functions with the @[entry] attribute were found, or multiple 'main()' "
                               "functions were found. previous definition: {}",
-                              entry_point->span.ToString()),
+                              entry_point->span.to_string()),
                   ast->span);
     }
     entry_point = thir;
@@ -2243,7 +2243,7 @@ void THIRGen::format_and_print_deprecated_warning(Span call_site, THIR *node, co
 
   auto string_literal = (ASTLiteral *)(attr.arguments[0]);
 
-  printf("from: %s\n", call_site.ToString().c_str());
+  printf("from: %s\n", call_site.to_string().c_str());
 
   printf("\n %s --- instead, use: ---\n", string_literal->value.c_str());
   auto sl = format_source_location(range, ERROR_WARNING, 5);

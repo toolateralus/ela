@@ -10,7 +10,6 @@
 
 #include "interned_string.hpp"
 
-
 enum struct TType {
   Eof = -1,
   Identifier,
@@ -249,7 +248,7 @@ enum struct TFamily {
 
 struct Span {
   Span() {}
-  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file), valid(true) { }
+  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file), valid(true) {}
 
   size_t line = 0, column = 0;
   size_t file = 0;
@@ -259,12 +258,20 @@ struct Span {
     static std::vector<std::string> files;
     return files;
   }
-  std::string ToString() const { 
+
+  static std::string &user_entry_file() {
+    static std::string path;
+    return path;
+  }
+
+  inline std::string to_string() const {
     if (!valid) {
       return "<no src>";
     }
-    return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); 
+    return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column);
   }
+
+  inline std::string filename() const { return files()[file]; }
 };
 
 static inline bool ttype_is_relational(TType type) {
