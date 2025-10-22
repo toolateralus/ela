@@ -6,19 +6,6 @@ To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
 
-#### THIR
-  - We should definitely have a fully resolved, desugared THIR (Typed High Level Intermediate Representation) instead of just emitting AST.
-  It will make the emitter simpler, and it will make it more reliable. It will also allow us to do an MIR in the future, for even more control. It will also decouple our emitters from our AST, while still being source code dependent, it would be less of a system-shock 
-  to change how the AST is represented.
-
-  The plan at first is to just take our existing typed AST, out of the emitter, and run it through a THIR generator, and then emit that.
-  Eventually, we can convert the typer to emitting the THIR, and reduce some bloat in our AST.
-
-#### MIR
-  - an MIR after the THIR stage would help us get down to a bit-code kind of level. a stack machine, SSA-esque IR that's fully desugared,
-  and allows us to optimize, execute functions and code at compile time, and simplify the lowering process _even more_. It also will decouple
-  the emitter from the THIR, which is still pretty source language dependent.
-
 #### Iterative compilation
   - Having the typer run in an out-of-order fashion will be endlessly beneficial to the langauge. There are already pain points,
   where a `choice` depends on a `trait` and the `trait` depends on a `choice`, and there is literally _no way_ to resolve it. **at all**
@@ -29,15 +16,6 @@ To search for all info comments in the source just use vscodes regex search with
 
   One of the largest challenges in a system like this, is error reporting. I would certainly not want to have to write _another_ visitor just
   to figure out where error(s) occured; instead, we can think of something unique.
-
-#### CTFE
-  - CTFE (Compile Time Function Execution) is an important part of a modern systems language. It allows all sorts of optimizations,
-  utilities, and more. We'd want ours to be capable of performing I/O and syscalls.
-
-  The idea is that once we have a MIR implemented, we can design it in such a way that is is executable in-place. Then, lowering to C or
-  LLVM, would be identical, except the CTFE VM would have evaluated the compile time code, and resolved itself into whatever the result may be. Sort of a constant-folding, but with much more behaviour, loops, pointers, callbacks, etc.
-
-  We can also implement a Jai-like compiler API, where you can use the main file as a build script, in language, and get callbacks on nodes that are done typing, modify code at compile time, and many other things.
 
 ---
 ### Below is a summary of the codebase's comments, made by AI. it may be crap, but it's better than doing it myself :P
@@ -79,17 +57,27 @@ To search for all info comments in the source just use vscodes regex search with
 
 
 #### add variadic generics and value generics.
+
+-- 10/22/2025, 11:22:46 AM
+-- We will not be adding variadic generics in the forseeable future.
+   Instead, we would likely add generic slices, using the type keyword,
+   slice syntax, and a compile time for loop over that slice.
+  
 ```rust
-  format :: fn!<T...>(fmt: str, pack: ...T) -> String {
-    builder: std::String_Builder;
-    builder.set_allocator(std::mem::temp_allocator.{});
-    defer builder.destroy();
-    #for (t, v) in pack {
-      builder.rtti_append(typeof(t), v);
+  fn variadic!<slice: [type]>() {
+    for T in slice {
+      println(T.name);
     }
-    return builder.string();
+  } 
+
+  variadic!<s32, s32>();
+  // would compile to::
+  fn variadic!<s32, s32> {
+    println("s32");
+    println("s32");
   }
 ```
+
 
 ```rust
 Fixed_Array :: struct!<T, N: u32> {
@@ -110,10 +98,11 @@ index :: fn!<T, SIZE: u32, N: u32>(array: T[SIZE]) -> T {
 module main;
 import { println } in std::format;
 
-alias!<_Ok, _Err> Ok  :: Result!<_Ok, _Err>::Ok;
-alias!<_Ok, _Err> Err :: Result!<_Ok, _Err>::Err;
+type!<_Ok, _Err> Ok  :: Result!<_Ok, _Err>::Ok;
+type!<_Ok, _Err> Err :: Result!<_Ok, _Err>::Err;
 
-main :: fn() @entry {
+@[entry]
+fn main()  {
   x : Result!<s32, None> = Ok(100);
 }
 ```
@@ -181,21 +170,25 @@ We are currently unable to do something like this:
 
 As mentioned in the above section, this would be made easier if methods weren't just jammed into the type's symbol table, and if it were more so a pool of available methods.
 
-This still wouldn't be trivial; I am not entirely sure how this would even work. We could run cleanup every time the compiler hit a block like this, retroactively do all the `impl`s, and then moving forward every type would get them?
+Instead, impl's would exist at the scopes level, flattened, and calling methods would trigger a resolution phase, where
+impl's type arguments would effectively act as a pattern we need to match with. I think this is how rust does it,
+and it makes complete sense for things like `From!<T>`, which are also unachievable right now in our current, primitive,
+first-attempt level system.
 
-There's certainly a better way, we can look into how rust even accomplishes such insanely fluid and generic behaviour.
+This ties into the previous feature plan, with where predicates being lazily evaluated and ignored for types that don't match
+their constraints, and errors only triggering on a use of a function that doesn't fit into that predicate+impl pattern.
 
 #### Vtables instead of dyn objects being an aggregate of function pointers
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
 
-#### remove the 'switch' node. replace it with a 'match' node
+#### remove the 'switch is' node. replace it with a 'match' node
 We right now have `switch` and `switch is` nodes. we should replace this with just a `match` since it's not really a switch,
 it does so much more. In my mind, `switch` is just switching over enumeration values, i.e C `enum`. in our case, we will be able to
-do very complex pattern matching, as shown below, and this would be much nicer to not have a `switch`, rather copy rust with just a `match`
+do very complex pattern matching, as shown below, and this would be much nicer to not have a `switch is`, rather copy rust with just a `match`
 
 #### Pattern matching improvements
-recursive pattern stuff like this should work, to any degree:
+recursive, value based, and very complex pattern stuff like this should work, to any degree. we need to get on Rust's level of pattern matching.
 ```rust
   if x is Some(Ok(&mut v)) {
 
@@ -226,15 +219,53 @@ recursive pattern stuff like this should work, to any degree:
 
 ### Example: Advanced Attribute System
 
-Attributes would always be executed at compile time, invoked at the end of typing whatever it's applied to.
-This would be most possible once the THIR mutation API is all stable in the compiler, right now, we still 
-have to finish making the THIR branch stable at runtime, then convert the compile time interpreter to use that
-instead of the AST, as it does now.
+Attributes would always be executed at compile time, invoked at the end of generating MIR for whatever it's applied to.
+
+This change depends most on the CTE working well, which right now we're in the middle of migration to an MIR -> LLVM IR pass,
+from the old THIR -> Transpiled C target.
+
+Of course, this will take a long time (the MIR & LLVM & a new VM), but once we have this
+metaprogramming API even started, this should be more possible.
+
+One gigantic glaring problem here, is that we'll have to refactor the entire the way the compiler works to even make this
+kind of metaprogramming possible. Instead of making direct passes over trees of nodes in a linear fashion,
+we will need to be able to re-submit AST, Type it, generate THIR, lower it to MIR, interpret it, create new MIR or THIR from it's results, (if we create THIR, put that back into MIR), and then output LLVM IR that corresponds to it.
+All of those steps, excluding the last, could also re-trigger, an indeterminate amount of times.
+
+we'd get something like this:
+
+Text -> 
+  AST -> 
+    Typing -> 
+      THIR -> 
+        MIR -> 
+          Execute Metaprogram -> (.. ? unknown, could retrigger any or none of those phases) -> 
+            LLVM IR -> 
+              Object File(s) -> 
+                Executable.
+
+to be clear, when I say any of those phases, i mean from AST to Metaprogram, since of course the LLVM IR
+could only ever be reached once all compilation from previous pipelines has fully completed.
+We could theoretically start lowering LLVM IR as soon as dependencies are ready, but we would have to be careful
+because any metaprogram could touch that, and doing work in LLVM is going to always be the slowest phase of the compiler.
+
+So we need to have a real pipelined queue system, where things can independently move through the phases of the compiler when possible.
+
+This would only really exist for things that are truly position independent, such as type declarations, module declarations,
+and function declarations.
+
+This new pipeline setup would also enable us to do out of order typing, because we would have to design a similar system to an
+order-independent typer, except it would be able to progress through not only typing, but all the way from the AST -> MIR,
+in a way where things can wait on each other, and request dependencies, etc.
+
+I hope that this is achievable within a year from Oct 2025, but it may take even longer.
+
+We've gotten this far in a year, from nothing to where we are today, so I think it's totally doable.
 
 #### Defining custom attributes
 
 ```rust
-attribute(function: compiler::Declaration::Function) Obsolete(reason: str, alternative: str) {
+attribute(function: compiler::Declaration::Function) Obsolete(reason: str, alternative: *compiler::Declaration::Any) {
   warning: compiler::diagnostics::Warning = .{
     message: reason,
     solution: Some(alternative),
@@ -242,7 +273,7 @@ attribute(function: compiler::Declaration::Function) Obsolete(reason: str, alter
   compiler::diagnostics::raise(warning);
 };
 
-@[Obsolete("Old function is obsolete!", "use new_function instead!")]
+@[Obsolete("Old function is obsolete!", new_function)]
 fn old_function() {}
 ```
 
@@ -257,14 +288,14 @@ attribute(T: type) Json() {
 
 ```rust
 attribute(variable: *mut compiler::Declaration::Variable) Clamp!<T>(min: T, max: T) {
-  *variable.initializer = compiler::make_literal(math::clamp(*variable.initializer, min, max));
+  *variable.initializer = compiler::make_literal(math::clamp(variable.initializer.evaluate!<T>(), min, max));
 }
 ```
 
 #### Attribute for auto-deriving traits
 
 ```rust
-attribute(Target: type) Derive!<generics: [Trait]>() #expand {
+attribute(Target: type) Derive!<generics: [type: IsTrait & TraitHasNoRequiredMethods]>() #expand {
   for T in generics {
     #insert {
       impl T for Target {}
@@ -280,8 +311,94 @@ struct Vec2 {}
 
 ```rust
 fn main() {
-  @[Clamp(0, 100)]
+  @[Clamp(0, 100)] // generic inferred.
   value: s32 = 100;
 }
 ```
 
+
+
+
+### Just a random idea here:
+
+say we have a function func, that simply adds two numbers, and is constraint by IsNumeric
+
+(
+  or for the sake of specificity, doesn't depend on the size of type T, but simply operates on it,
+  in a way where integer promotions, mantissas, etc, could be coerced safely.
+)
+```rust
+fn func!<T: IsNumeric>(a: T, b: T) -> T {
+  return a + b;
+}
+```
+
+then, the user calls this with every possible type:
+
+```rust
+func(100 as u8);
+func(100 as u16);
+func(100 as u32);
+func(100 as u64);
+func(100 as s8);
+func(100 as s16);
+func(100 as s32);
+func(100 as s64);
+func(100 as f16);
+func(100 as f32);
+func(100 as f64);
+.. etc.
+```
+
+In one single instance, this is totally negligble amounts of binary size.
+But since many functions do in fact take generic numbers to be more usable and safe,
+this could possibly be a massive point of binary size growth.
+
+We could just promote T to being the largest possible numeric size of correct signedness, and a float etc,
+and then just promote arguments to that size, then truncate back down on return.
+
+of course a function like this:
+
+```rust
+fn func1!<T>(a: T, b: T) -> T {
+  if (sizeof(T) > 4) {
+    return a + b;
+  }
+  return b * a;
+}
+```
+
+could never qualify from this kind of instantiation consolidation, because each instantiation has to know
+exactly what constant to fill in for 'sizeof'.
+
+
+This kind of optimization could also be applied to functions that take a type argument as a pointer,
+but never access a specific field of that pointer. say it only passes this type to other functions (which may also recieve this
+optimization), and never measures the sizeof(T), nor says v.x, etc.
+
+```rust
+
+fn register_some_handler_in_system!<HandlerT>(handler: *HandlerT, slot: u32, kind: Handler_Kind) -> Option!<*mut Registry> {
+  registry := if registry_locator() 
+    .locate(system.registries, kind)
+    .expect(fn () {
+      panic("unable to locate registry for kind!");
+    });
+
+  registry.insert_or_update_at_slot(slot, handler);
+  return Some(registry);
+}
+
+```
+
+This function could simply get type erased down to a void pointer, and used for every handler type, since it never needed to be
+generic in the first place: if insert_or_update_at_slot takes some kind base registry, or is a list that just stores pointers,
+it could be casted out of implicilty by the compiler.
+
+
+This type erasure idea could ALSO extend to predictable types like `List`, where T is a pointer,
+we could completely consolidate every instantiation of the struct definition itself, and keep the impl's generic and instantiated,
+to save on even more code space.
+
+
+This would not only reduce binary size, but DRASTICALLY reduce compile times, and we could have -03 enable complete monomorphization, for max runtime performance (promoting tiny integers to large ones takes time and space)
