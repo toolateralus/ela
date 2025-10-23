@@ -1760,7 +1760,7 @@ void Typer::visit(ASTVariable *node) {
 
   auto variable_type = node->type->resolved_type;
 
-  if (node->mutability != MUT && !variable_type->is_mut_pointer()) {
+  if (node->mutability != MUT && !variable_type->is_mut_pointer() && node->is_uninitialized) {
     throw_error(
         "'---' uninitialized syntax was used, but the variable is immutable, and it's not a mutable pointer, therefore "
         "this variable never could become initialized.",

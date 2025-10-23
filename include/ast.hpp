@@ -1325,6 +1325,7 @@ struct Typer;
   ctx.scope = $scope;
 
 struct Parser {
+  Span current_span;
   Typer *typer;
   Context &ctx;
   Lexer lexer{};
@@ -1359,7 +1360,7 @@ struct Parser {
   ASTProgram *parse_program();
 
   ASTTraitDeclaration *parse_trait_declaration();
-  ASTStructDeclaration *parse_struct_body(InternedString name, Span range, ASTStructDeclaration *node);
+  ASTStructDeclaration *parse_struct_body(InternedString name, ASTStructDeclaration *node);
   ASTStructDeclaration *parse_struct_declaration();
   ASTFunctionDeclaration *parse_function_declaration();
   ASTChoiceDeclaration *parse_choice_declaration();
@@ -1411,8 +1412,8 @@ struct Parser {
   Token peek() const;
   void fill_buffer_if_needed(Lexer::State &state);
 
-  Span begin_node();
-  void end_node(ASTNode *node, Span &range);
+  void begin_node();
+  void end_node(ASTNode *node);
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
@@ -1429,17 +1430,17 @@ static inline T *ast_alloc(size_t n = 1) {
 
 ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args);
 
-#define NODE_ALLOC(type, node, range, defer, parser) \
-  type *node = ast_alloc<type>();                    \
-  node->declaring_scope = parser->ctx.scope;         \
-  auto range = parser->begin_node();                 \
-  Defer defer([&] { parser->end_node(node, range); });
+#define NODE_ALLOC(type, node, defer, parser) \
+  type *node = ast_alloc<type>();             \
+  node->declaring_scope = parser->ctx.scope;  \
+  parser->begin_node();                       \
+  Defer defer([&] { parser->end_node(node); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred) \
-  type *node = ast_alloc<type>();                                          \
-  node->declaring_scope = parser->ctx.scope;                               \
-  auto range = parser->begin_node();                                       \
-  Defer defer([&] {                                                        \
-    parser->end_node(node, range);                                         \
-    deferred;                                                              \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, defer, parser, deferred) \
+  type *node = ast_alloc<type>();                                   \
+  node->declaring_scope = parser->ctx.scope;                        \
+  parser->begin_node();                                             \
+  Defer defer([&] {                                                 \
+    parser->end_node(node);                                         \
+    deferred;                                                       \
   });

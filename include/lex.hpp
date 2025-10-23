@@ -306,11 +306,11 @@ struct Token {
   Token() {}
 
   Token(Span location, InternedString value, TType type, TFamily family)
-      : value(std::move(value)), type(type), family(family), location(location) {}
+      : value(std::move(value)), type(type), family(family), span(location) {}
   InternedString value;
   TType type;
   TFamily family;
-  Span location;
+  Span span;
 
   static Token &Eof() {
     static Token eof = Token(Span(0, 0, 0, 0), {""}, TType::Eof, TFamily::Operator);
