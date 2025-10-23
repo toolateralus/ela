@@ -2416,9 +2416,22 @@ void Typer::visit(ASTBinExpr *node) {
   auto operator_overload_sym = find_operator_overload(CONST, left, node->op, OPERATION_BINARY);
   if (operator_overload_sym) {
     node->is_operator_overload = true;
-    auto ty = operator_overload_sym->resolved_type;
-    node->resolved_type = ty->info->as<FunctionTypeInfo>()->return_type;
-    node->resolved_operator_overload = operator_overload_sym->function.declaration;
+    auto decl = operator_overload_sym->function.declaration;
+    if (!decl) {
+      throw_error("internal compiler error: operator overload resolved but declaration missing", node->span);
+    }
+
+    // Operators are instance methods and therefore always have a 'self'
+    // parameter. Pass the left-hand side as the 'self' nullable so
+    // `type_check_args_from_params` applies the correct semantics and
+    // records implicit conversions on the operand.
+    ASTArguments tmp_args;
+    tmp_args.arguments.clear();
+    tmp_args.arguments.push_back(node->right);
+    type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->left), false);
+
+    node->resolved_type = decl->return_type->resolved_type;
+    node->resolved_operator_overload = decl;
     return;
   }
 
@@ -2501,9 +2514,17 @@ void Typer::visit(ASTUnaryExpr *node) {
   auto operator_overload_sym = find_operator_overload(CONST, type, node->op, OPERATION_UNARY);
   if (operator_overload_sym) {
     node->is_operator_overload = true;
-    auto overload_ty = operator_overload_sym->resolved_type;
-    node->resolved_type = overload_ty->info->as<FunctionTypeInfo>()->return_type;
-    node->resolved_operator_overload = operator_overload_sym->function.declaration;
+    auto decl = operator_overload_sym->function.declaration;
+    if (!decl) {
+      throw_error("internal compiler error: operator overload resolved but declaration missing", node->span);
+    }
+
+    ASTArguments tmp_args;
+    tmp_args.arguments.clear();
+    type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->operand), false);
+
+    node->resolved_type = decl->return_type->resolved_type;
+    node->resolved_operator_overload = decl;
     auto name = get_operator_overload_name(node->op, OPERATION_UNARY);
     if (name == "deref") {
       auto type = node->resolved_type;
@@ -2515,7 +2536,6 @@ void Typer::visit(ASTUnaryExpr *node) {
       }
       node->resolved_type = type->get_element_type();
     }
-
     return;
   }
 
@@ -2702,8 +2722,20 @@ void Typer::visit(ASTIndex *node) {
 
   if (operator_overload_sym) {
     node->is_operator_overload = true;
-    node->resolved_operator_overload = operator_overload_sym->function.declaration;
-    node->resolved_type = operator_overload_sym->resolved_type->info->as<FunctionTypeInfo>()->return_type;
+    auto decl = operator_overload_sym->function.declaration;
+    if (!decl) {
+      throw_error("internal compiler error: operator overload resolved but declaration missing", node->span);
+    }
+
+    // Index operators are instance methods: pass 'base' as self_nullable and
+    // only push index argument(s).
+    ASTArguments tmp_args;
+    tmp_args.arguments.clear();
+    tmp_args.arguments.push_back(node->index);
+    type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->base), false);
+
+    node->resolved_operator_overload = decl;
+    node->resolved_type = decl->return_type->resolved_type;
     auto type = node->resolved_type;
 
     if (!type->is_pointer() && !is_range) {
@@ -2938,6 +2970,7 @@ void Typer::visit(ASTSwitch *node) {
     }
   }
 
+  Symbol *switch_eq_decl_symbol = nullptr;
   if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->is_pointer()) {
     auto operator_overload_symbol = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
 
@@ -2947,6 +2980,8 @@ void Typer::visit(ASTSwitch *node) {
                               "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
                               type->to_string()),
                   node->expression->span);
+    } else {
+      switch_eq_decl_symbol = operator_overload_symbol;
     }
   }
 
@@ -2960,7 +2995,22 @@ void Typer::visit(ASTSwitch *node) {
   int flags = 0;
 
   for (const auto &branch : node->branches) {
-    if (!node->is_pattern_match) branch.expression->accept(this);
+    if (!node->is_pattern_match) {
+      branch.expression->accept(this);
+      if (switch_eq_decl_symbol) {
+        auto decl = switch_eq_decl_symbol->function.declaration;
+        if (!decl) {
+          throw_error("switch equality operator declaration missing", node->span);
+        }
+        // Expect the second parameter to be the 'other' operand.
+        if (decl->params->params.size() < 2) {
+          throw_error("equality operator has insufficient parameters", node->span);
+        }
+        auto other_param = decl->params->params[1];
+        assert_types_can_cast_or_equal(branch.expression, other_param->resolved_type, branch.expression->span,
+                                       "Invalid switch case.");
+      }
+    }
 
     branch.block->accept(this);
     auto &block_cf = branch.block->control_flow;
@@ -2972,8 +3022,6 @@ void Typer::visit(ASTSwitch *node) {
 
     if (type_is_numerical(type)) {
       continue;
-    } else if (branch.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
-      assert_types_can_cast_or_equal(branch.expression, type_id, node->span, "Invalid switch case.");
     }
   }
 
