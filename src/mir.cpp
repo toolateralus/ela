@@ -1,5 +1,6 @@
 #include "mir.hpp"
 #include <cstdio>
+#include <functional>
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
@@ -11,6 +12,13 @@
 namespace Mir {
 static std::vector<Basic_Block *> g_break_targets;
 static std::vector<Basic_Block *> g_continue_targets;
+
+static void emit_into_block(Module &m, Basic_Block *bb, const std::function<void()> &emitter) {
+  Basic_Block *saved = m.get_insert_block();
+  m.current_function->set_insert_block(bb);
+  emitter();
+  m.current_function->set_insert_block(saved);
+}
 
 static bool block_only_contains_noop(const THIRBlock *b) {
   size_t count = 0;
@@ -43,12 +51,20 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
   if (t->is_no_return) {
     flags |= Function::FUNCTION_FLAGS_IS_NO_RETURN;
   }
-  f->flags = flags;
 
   // either CONSTRUCTOR_0 or CONSTRUCTOR_1, which gives it priority for getting called
   // either BEFORE        or AFTER          global initializers run.
   if (t->constructor_index != 0) {
     flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0 + (t->constructor_index - 1);
+  }
+
+  f->flags = flags;
+}
+
+void insert_ret_void_if_missing(const THIRFunction *node, Module &m, Function *f, Basic_Block *end) {
+  if (f->type_info->return_type == void_type() && (end->code.empty() || end->back_opcode() != OP_RET_VOID)) {
+    m.current_function->set_insert_block(end);
+    EMIT_OP(OP_RET_VOID);
   }
 }
 
@@ -108,10 +124,8 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   generate_block(node->block, m);
 
   Basic_Block *end = f->basic_blocks.back();
-  if (f->type_info->return_type == void_type() && (end->code.empty() || end->back_opcode() != OP_RET_VOID)) {
-    m.current_function->set_insert_block(end);
-    EMIT_OP(OP_RET_VOID);
-  }
+  insert_ret_void_if_missing(node, m, f, end);
+  insert_ret_void_if_missing(node, m, f, f->insert_block);
 
   size_t num_blocks_ending_with_non_divergent_terminator = 0;
   for (const auto &bb : f->basic_blocks) {
@@ -193,11 +207,9 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
   switch (node->get_node_type()) {
     case THIRNodeType::Variable: {
       const THIRVariable *var = (const THIRVariable *)node;
-
       if (var->is_global || var->is_static) {
         auto it = m.global_variable_table.find(var);
         if (it == m.global_variable_table.end()) {
-          // lazily visit global variables.
           generate_variable(var, m);
           it = m.global_variable_table.find(var);
           if (it == m.global_variable_table.end()) {
@@ -206,36 +218,47 @@ Operand generate_lvalue_addr(const THIR *node, Module &m) {
         }
         return Operand::Make_Global_Ref(it->second);
       }
-
       auto it = m.variables.find(var);
       if (it == m.variables.end()) {
         throw_error(std::format("variable '{}' not declared", var->name.str()), var->span);
       }
       return it->second;
     }
-    case THIRNodeType::MemberAccess: {
+    case THIRNodeType::MemberAccess:
       return generate_member_access_addr((const THIRMemberAccess *)node, m);
-    }
-    case THIRNodeType::Index: {
+    case THIRNodeType::Index:
       return generate_index_addr((const THIRIndex *)node, m);
-    }
     case THIRNodeType::UnaryExpr: {
       const THIRUnaryExpr *unary = (const THIRUnaryExpr *)node;
       if (unary->op == TType::Mul) {
         return generate_expr(unary->operand, m);
       }
+      break;
     }
     case THIRNodeType::Function: {
-      // we have to assume this is a function pointer, otherwise it wouldn't have made it here.
       Operand temp = m.create_temporary(node->type->take_pointer_to());
       Operand fn_index = generate_function((THIRFunction *)node, m);
       EMIT_LOAD_FN_PTR(temp, fn_index);
       return temp;
     }
+    // Add these cases for rvalues:
+    case THIRNodeType::Call:
+    case THIRNodeType::Cast:
+    case THIRNodeType::Literal:
+    case THIRNodeType::AggregateInitializer:
+    case THIRNodeType::CollectionInitializer:
+    case THIRNodeType::EmptyInitializer:
+    case THIRNodeType::ExpressionBlock:
     default:
-      throw_error(std::format("not an lvalue (node type {})", node_type_to_string(node->get_node_type())), node->span);
-      return Operand::MakeNull();
+      break;
   }
+
+  // Fallback: make an addressable temporary for rvalues.
+  Operand value = generate_expr(node, m);
+  Operand dest = m.create_temporary(node->type->take_pointer_to());
+  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+  EMIT_STORE(dest, value);
+  return dest;
 }
 
 Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
@@ -634,7 +657,7 @@ void generate_break(const THIRBreak *node, Module &m) {
     throw_error("break used outside of loop", node->span);
   }
   Basic_Block *target = g_break_targets.back();
-  m.current_function->get_insert_block()->push(Instruction{OP_JMP, Operand(), Operand ::Make_BB(target), .span = node->span});
+  EMIT_JUMP(target);
 }
 
 void generate_continue(const THIRContinue *node, Module &m) {
@@ -651,36 +674,34 @@ void generate_block(const THIRBlock *node, Module &m) {
   }
   for (const THIR *stmt : node->statements) {
     generate(stmt, m);
-    if (stmt->get_node_type() == THIRNodeType::Return) {
-      // We terminate this basic block on return. to emit intructions after this
-      // point would be illegal.
+    // If the block we are inserting into ended with a terminator, stop
+    // emitting further statements to avoid writing into the wrong block.
+    if (m.current_function->get_insert_block()->ends_with_terminator()) {
       return;
     }
   }
 }
 
 void generate_for(const THIRFor *node, Module &m) {
-  if (node->get_node_type() == THIRNodeType::Variable) {
-    generate_variable((THIRVariable *)node->initialization, m);
-  } else {
-    generate(node->initialization, m);
-  }
+  generate(node->initialization, m);
 
   Basic_Block *orig_bb = m.get_insert_block();
-
-  Basic_Block *cond_bb = m.create_and_enter_basic_block("for");
-  Basic_Block *body_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *for_bb = m.create_and_enter_basic_block("for");
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("for.cond");
+  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
   Basic_Block *incr_bb = m.create_and_enter_basic_block("incr");
   Basic_Block *after_bb = m.create_and_enter_basic_block("done");
 
   m.current_function->set_insert_block(orig_bb);
-  EMIT_JUMP(cond_bb);
+  EMIT_JUMP(for_bb);
+
+  emit_into_block(m, for_bb, [&] { EMIT_JUMP(cond_bb); });
 
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(body_bb, after_bb, cond);
+  EMIT_JUMP_TRUE(do_bb, after_bb, cond);
 
-  m.current_function->set_insert_block(body_bb);
+  m.current_function->set_insert_block(do_bb);
   g_break_targets.push_back(after_bb);
   g_continue_targets.push_back(incr_bb);
 
@@ -688,24 +709,27 @@ void generate_for(const THIRFor *node, Module &m) {
 
   g_break_targets.pop_back();
   g_continue_targets.pop_back();
-  EMIT_JUMP(incr_bb);
+
+  emit_into_block(m, do_bb, [&] { EMIT_JUMP(incr_bb); });
 
   m.current_function->set_insert_block(incr_bb);
   generate(node->increment, m);
 
-  EMIT_JUMP(cond_bb);
+  emit_into_block(m, incr_bb, [&] { EMIT_JUMP(for_bb); });
+
   m.current_function->set_insert_block(after_bb);
 }
 
 void generate_if(const THIRIf *node, Module &m) {
-  Operand cond = generate_expr(node->condition, m);
-
   Basic_Block *if_bb = m.get_insert_block();
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("if.cond");
   Basic_Block *then_bb = m.create_and_enter_basic_block("then");
   Basic_Block *else_bb = node->_else ? m.create_and_enter_basic_block("else") : nullptr;
   Basic_Block *end_bb = m.create_and_enter_basic_block("end");
-  m.current_function->set_insert_block(if_bb);
 
+  emit_into_block(m, if_bb, [&] { EMIT_JUMP(cond_bb); });
+  m.current_function->set_insert_block(cond_bb);
+  Operand cond = generate_expr(node->condition, m);
   if (else_bb) {
     EMIT_JUMP_TRUE(then_bb, else_bb, cond);
   } else {
@@ -716,20 +740,14 @@ void generate_if(const THIRIf *node, Module &m) {
   generate_block(node->block, m);
 
   if (!then_bb->ends_with_terminator()) {
-    auto insert_block = m.get_insert_block();
-    m.current_function->set_insert_block(then_bb);
-    EMIT_JUMP(end_bb);
-    m.current_function->set_insert_block(insert_block);
+    emit_into_block(m, then_bb, [&] { EMIT_JUMP(end_bb); });
   }
 
   if (else_bb) {
     m.current_function->set_insert_block(else_bb);
     generate(node->_else, m);
     if (!else_bb->ends_with_terminator()) {
-      auto insert_block = m.get_insert_block();
-      m.current_function->set_insert_block(else_bb);
-      EMIT_JUMP(end_bb);
-      m.current_function->set_insert_block(insert_block);
+      emit_into_block(m, else_bb, [&] { EMIT_JUMP(end_bb); });
     }
   }
 
@@ -739,25 +757,26 @@ void generate_if(const THIRIf *node, Module &m) {
 void generate_while(const THIRWhile *node, Module &m) {
   Basic_Block *orig_bb = m.get_insert_block();
   Basic_Block *cond_bb = m.create_and_enter_basic_block("while");
-  Basic_Block *body_bb = m.create_and_enter_basic_block("do");
-  Basic_Block *after_bb = m.create_and_enter_basic_block("done");
-
+  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *done_bb = m.create_and_enter_basic_block("done");
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
 
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(body_bb, after_bb, cond);
+  EMIT_JUMP_TRUE(do_bb, done_bb, cond);
 
-  m.current_function->set_insert_block(body_bb);
-  g_break_targets.push_back(after_bb);
+  m.current_function->set_insert_block(do_bb);
+  g_break_targets.push_back(done_bb);
   g_continue_targets.push_back(cond_bb);
   generate(node->block, m);
   g_break_targets.pop_back();
   g_continue_targets.pop_back();
-  EMIT_JUMP(cond_bb);
 
-  m.current_function->set_insert_block(after_bb);
+  // emit the loop-back jump into do_bb even if nested generation changed insert block
+  emit_into_block(m, do_bb, [&] { EMIT_JUMP(cond_bb); });
+
+  m.current_function->set_insert_block(done_bb);
 }
 
 Operand Operand::Make_Global_Ref(Global_Variable *gv_ref) {

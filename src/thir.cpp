@@ -633,7 +633,7 @@ THIR *THIRGen::visit_index(ASTIndex *ast) {
 
     const InternedString name = ast->resolved_operator_overload->name;
 
-    if (name != "slice_index" && name != "slice_index_mut") {
+    if (overload_call->type->is_pointer() && name != "slice_index" && name != "slice_index_mut") {
       THIR_ALLOC(THIRUnaryExpr, deref, ast);
       deref->type = ast->resolved_type;
       deref->op = TType::Mul;

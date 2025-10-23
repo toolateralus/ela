@@ -317,11 +317,19 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
 
   llvm::Type *llvm_to = llvm_typeof(to);
 
-  if (to->is_pointer()) {
-    if (from->is_pointer()) {
-      return builder.CreateBitCast(value, llvm_to, "bitcasttmp");
-    }
+  if (to->is_pointer() && from->is_pointer()) {
+    return builder.CreateBitCast(value, llvm_to, "bitcasttmp");
   }
+
+  if (from->is_pointer() && to->is_integer()) {
+    return builder.CreatePtrToInt(value, llvm_to, "ptr2int_cast");
+  }
+
+  if (from->is_fixed_sized_array() && to->is_pointer()) {
+    return builder.CreateBitCast(value, llvm_to, "array2ptr_cast");
+  }
+
+
 
   ScalarTypeInfo *from_info = from->info->as<ScalarTypeInfo>();
   ScalarTypeInfo *to_info = to->info->as<ScalarTypeInfo>();
