@@ -2323,12 +2323,12 @@ void Typer::visit(ASTType *node) {
 
 void Typer::visit(ASTBinExpr *node) {
   node->left->accept(this);
-  auto left = node->left->resolved_type;
+  Type *left = node->left->resolved_type;
 
   ENTER_EXPECTED_TYPE(left);
 
   node->right->accept(this);
-  auto right = node->right->resolved_type;
+  Type *right = node->right->resolved_type;
 
   if (node->op == TType::Assign || ttype_is_comp_assign(node->op)) {
     if (node->left->get_node_type() == AST_NODE_PATH) {
@@ -2353,8 +2353,6 @@ void Typer::visit(ASTBinExpr *node) {
       }
     }
   }
-
-  auto left_ty = left;
 
   // Do checks for constness.
   if (node->op == TType::Assign) {
@@ -2415,7 +2413,7 @@ void Typer::visit(ASTBinExpr *node) {
     }
   }
 
-  auto operator_overload_sym = find_operator_overload(CONST, left_ty, node->op, OPERATION_BINARY);
+  auto operator_overload_sym = find_operator_overload(CONST, left, node->op, OPERATION_BINARY);
   if (operator_overload_sym) {
     node->is_operator_overload = true;
     auto ty = operator_overload_sym->resolved_type;
@@ -2424,13 +2422,52 @@ void Typer::visit(ASTBinExpr *node) {
     return;
   }
 
-  if (node->op != TType::Assign && !left_ty->is_pointer() && left_ty->kind != TYPE_SCALAR && !operator_overload_sym &&
-      left_ty->kind != TYPE_ENUM) {
+  if (node->op != TType::Assign && !left->is_pointer() && left->kind != TYPE_SCALAR && !operator_overload_sym &&
+      left->kind != TYPE_ENUM) {
     throw_error(
         std::format(
             "unable to use operator {}, it is a non trivial operation and no operator overload was implemented for type {}",
-            TTypeToString(node->op), left_ty->to_string()),
+            TTypeToString(node->op), left->to_string()),
         node->span);
+  }
+
+  const bool is_valid_arithmetic_operator = (node->op == TType::Add || node->op == TType::Sub || node->op == TType::CompAdd || node->op == TType::CompSub);
+
+  const std::unordered_set<TType> permissible_non_arithmetic_pointer_operations = {
+    TType::Assign,
+    TType::EQ,
+    TType::NEQ,
+    TType::LT,
+    TType::LE,
+    TType::GT,
+    TType::GE,
+    TType::LogicalOr,
+    TType::LogicalAnd,
+  };
+
+  if (is_valid_arithmetic_operator) {
+    bool left_is_ptr = left->is_pointer();
+    bool right_is_ptr = right->is_pointer();
+
+    if (!left_is_ptr && right_is_ptr) {
+      throw_error("Pointer must be on the left-hand side.", node->span);
+    }
+
+    if (left_is_ptr) {
+      if (left == void_type()->take_pointer_to() || left == void_type()->take_pointer_to(true)) {
+        throw_error("Cannot perform arithmetic on void pointers.", node->span);
+      }
+      if (right_is_ptr) {
+        throw_error("Pointer arithmetic between two pointers is not allowed.", node->span);
+      }
+      if (!type_is_numerical(right)) {
+        throw_error("Pointer arithmetic requires an integer type on the right-hand side.", node->span);
+      }
+    }
+  } else if (!permissible_non_arithmetic_pointer_operations.contains(node->op)) {
+    if (left->is_pointer() || right->is_pointer()) {
+      throw_error("Operator not allowed with pointers. Only +, -, +=, -= are valid.", node->span);
+    }
   }
 
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have

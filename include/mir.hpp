@@ -11,6 +11,7 @@
 #include "lex.hpp"
 #include "thir.hpp"
 #include "type.hpp"
+#include "value.hpp"
 
 /*
   We should've been namespacing things this entire time but oh well.
@@ -69,8 +70,8 @@ enum Op_Code : uint8_t {
   OP_RET_VOID,  // no operands.
 
   /* Type casting */
-  OP_CAST,               // dest=result, left=value, right=type_index (in global table, type->uid)
-  OP_BITCAST,            // dest=result, left=value, right=type_index (in global table, type->uid)
+  OP_CAST,     // dest=result, left=value, right=type_index (in global table, type->uid)
+  OP_BITCAST,  // dest=result, left=value, right=type_index (in global table, type->uid)
 
   // get element pointer, calculate address of struct field or element in array
   OP_GEP,  // dest=ptr,    left=base,  right=index
@@ -143,7 +144,15 @@ struct Constant {
     CONST_FLOAT,
     CONST_BOOL,
     CONST_CHAR,
+    CONST_NULLPTR,
   } tag = CONST_INVALID;
+
+  static Constant Nullptr(Type *t = void_type()->take_pointer_to()) {
+    Constant c;
+    c.tag = CONST_NULLPTR;
+    c.type = t;
+    return c;
+  }
 
   static Constant Int(int64_t value, Type *t = s32_type()) {
     Constant c;

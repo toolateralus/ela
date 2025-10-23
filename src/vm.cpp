@@ -58,6 +58,9 @@ static inline std::vector<uint64_t> decode_operand_span(const Operand &op, const
         break;
       case Constant::CONST_INVALID:
         assert(false && "Invalid immediate value");
+      case Constant::CONST_NULLPTR:
+        result[0] = 0;
+        break;
     }
     return result;
   } else {

@@ -62,7 +62,8 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
 }
 
 void insert_ret_void_if_missing(const THIRFunction *node, Module &m, Function *f, Basic_Block *end) {
-  if (f->type_info->return_type == void_type() && (end->code.empty() || (end->back_opcode() != OP_RET_VOID && end->back_opcode() != OP_UNREACHABLE))) {
+  if (f->type_info->return_type == void_type() &&
+      (end->code.empty() || (end->back_opcode() != OP_RET_VOID && end->back_opcode() != OP_UNREACHABLE))) {
     m.current_function->set_insert_block(end);
     EMIT_OP(OP_RET_VOID);
   }
@@ -506,7 +507,7 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
       value = Constant::String(node->value);
       break;
     case ASTLiteral::Null:
-      value = Constant::Int(0);
+      value = Constant::Nullptr(node->type);
       break;
   }
   return Operand::Make_Imm(value, node->type);
@@ -660,7 +661,7 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m, 
   }
 
   if (node->type->is_pointer()) {
-    EMIT_STORE(ptr, Operand::Make_Imm(Constant::Int(0), void_type()->take_pointer_to()));
+    EMIT_STORE(ptr, Operand::Make_Imm(Constant::Nullptr(node->type), node->type));
     return ptr;
   }
 

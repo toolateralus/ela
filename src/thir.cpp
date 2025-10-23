@@ -553,6 +553,25 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
         ptr_binary->left = binexpr->left;
         ptr_binary->right = binexpr->right;
         ptr_binary->op = ast->op;
+
+        if (ptr_binary->left->type->is_pointer()) {
+          ptr_binary->type = ptr_binary->left->type;
+        } else if (ptr_binary->right->type->is_pointer()) {
+          ptr_binary->type = ptr_binary->right->type;
+        }
+
+        if (ptr_binary->type == void_type()->take_pointer_to() || ptr_binary->type == void_type()->take_pointer_to(true)) {
+          ptr_binary->type = u8_type()->take_pointer_to();
+          if (ptr_binary->left->type->is_pointer() && (ptr_binary->left->type == void_type()->take_pointer_to() ||
+                                                       ptr_binary->left->type == void_type()->take_pointer_to(true))) {
+            ptr_binary->left = make_cast(ptr_binary->left, u8_type()->take_pointer_to());
+          }
+          if (ptr_binary->right->type->is_pointer() && (ptr_binary->right->type == void_type()->take_pointer_to() ||
+                                                        ptr_binary->right->type == void_type()->take_pointer_to(true))) {
+            ptr_binary->right = make_cast(ptr_binary->right, u8_type()->take_pointer_to());
+          }
+        }
+
         return ptr_binary;
       } else {
         // Cast the right operand since the entire compiler works under the assumption
@@ -2368,7 +2387,7 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
     // Enumeration values get lowered to integer constants here so we have no purpose even visiting this.
     // TODO: remove THIRType, it's useless.
     // We just need to generate thir_value for default values in structs.
-    case AST_NODE_ENUM_DECLARATION: 
+    case AST_NODE_ENUM_DECLARATION:
     case AST_NODE_NOOP:
     case AST_NODE_ALIAS:
     case AST_NODE_TRAIT_DECLARATION:

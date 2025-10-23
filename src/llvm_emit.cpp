@@ -309,103 +309,98 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
       return nullptr;
   }
 }
-
 llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to, Type **new_type) {
   if (from == to) {
+    *new_type = to;
     return value;
   }
 
-  llvm::Type *llvm_to = llvm_typeof(to);
-
-  if (to->is_pointer() && from->is_pointer()) {
-    return builder.CreateBitCast(value, llvm_to, "bitcasttmp");
-  }
-
-  if (from->is_pointer() && to->is_integer()) {
-    return builder.CreatePtrToInt(value, llvm_to, "ptr2int_cast");
-  }
-
-  if (from->kind == TYPE_ENUM) {
-    Type *enum_underlying = from->info->as<EnumTypeInfo>()->underlying_type;
-    value = builder.CreateBitCast(value, llvm_typeof(enum_underlying), "enum2underlying_cast");
-    from = enum_underlying;
-  }
-
-  if (to->kind == TYPE_ENUM) {
-    Type *enum_underlying = to->info->as<EnumTypeInfo>()->underlying_type;
-    llvm::Type *llvm_enum_underlying = llvm_typeof(enum_underlying);
-    value = builder.CreateBitCast(value, llvm_enum_underlying, "to_enum_underlying_cast");
-    to = enum_underlying;
-  }
-
-  if (from->has_no_extensions() && from->kind == TYPE_SCALAR && from->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) {
-    throw_error("Somehow we tried to cast from void", {});
-  }
-
-  if (to->has_no_extensions() && to->kind == TYPE_SCALAR && to->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) {
-    throw_error("Somehow we tried to cast to void", {});
-  }
-
-  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) {
-    fprintf(stderr, "from: %s, to: %s\n", from->to_string().c_str(), to->to_string().c_str());
-    throw_error("unable to cast non scalar type at this point", {});
-  }
-
-  if (from->has_extensions() || to->has_extensions()) {
-    fprintf(stderr, "from: %s, to: %s\n", from->to_string().c_str(), to->to_string().c_str());
-    throw_error("unable to cast non scalar type at this point", {});
-  }
-
-  ScalarTypeInfo *from_info = from->info->as<ScalarTypeInfo>();
-  ScalarTypeInfo *to_info = to->info->as<ScalarTypeInfo>();
-
   *new_type = to;
+  llvm::Type *llvm_to = llvm_typeof(to);
+  
+  const auto cast_integer = [&](llvm::Value *val, llvm::Type *from_ty, llvm::Type *to_ty, bool from_signed) -> llvm::Value * {
+    unsigned from_bits = from_ty->getIntegerBitWidth();
+    unsigned to_bits = to_ty->getIntegerBitWidth();
 
-  if (to_info->scalar_type == TYPE_BOOL) {
-    if (from_info->is_integral) {
-      return builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), "booltmp");
+    if (from_bits == to_bits) {
+      return val;
+    } else if (from_bits < to_bits) {
+      if (from_signed) {
+        return builder.CreateSExt(val, to_ty, "sexttmp");
+      } else {
+        return builder.CreateZExt(val, to_ty, "zexttmp");
+      }
     } else {
-      return builder.CreateFCmpONE(value, llvm::ConstantFP::get(value->getType(), 0.0), "booltmp");
+      return builder.CreateTrunc(val, to_ty, "trunctmp");
     }
-  } else if (to_info->is_integral) {
-    if (from_info->scalar_type == TYPE_BOOL) {
-      return builder.CreateZExt(value, llvm_to, "zexttmp");
-    } else if (from_info->is_integral) {
-      if (value->getType()->getIntegerBitWidth() < llvm_to->getIntegerBitWidth()) {
-        if (from_info->is_signed()) {
-          return builder.CreateSExt(value, llvm_to, "sexttmp");
+  };
+
+  // --- Pointer casting ---
+  if (from->is_pointer() && to->is_pointer()) {
+    value = builder.CreateBitCast(value, llvm_to, "bitcasttmp");
+  } else if (from->is_pointer() && to->is_integer()) {
+    value = builder.CreatePtrToInt(value, llvm_to, "ptr2int_cast");
+  } else {
+    // --- Enum handling ---
+    if (from->kind == TYPE_ENUM) {
+      from = from->info->as<EnumTypeInfo>()->underlying_type;
+    }
+    if (to->kind == TYPE_ENUM) {
+      to = to->info->as<EnumTypeInfo>()->underlying_type;
+    }
+
+    if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) {
+      throw_error("unable to cast non-scalar type at this point", {});
+    }
+
+    ScalarTypeInfo *from_info = from->info->as<ScalarTypeInfo>();
+    ScalarTypeInfo *to_info = to->info->as<ScalarTypeInfo>();
+
+    // Boolean casting block 
+    if (to_info->scalar_type == TYPE_BOOL) {
+      if (from_info->is_integral) {
+        value = builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), "booltmp");
+      } else {
+        value = builder.CreateFCmpONE(value, llvm::ConstantFP::get(value->getType(), 0.0), "booltmp");
+      }
+    }
+    // Integer casting block
+    else if (to_info->is_integral) {
+      if (from_info->scalar_type == TYPE_BOOL) {
+        value = builder.CreateZExt(value, llvm_to, "zexttmp");
+      } else if (from_info->is_integral) {
+        value = cast_integer(value, value->getType(), llvm_to, from_info->is_signed());
+      } else {
+        if (to_info->is_signed()) {
+          value = builder.CreateFPToSI(value, llvm_to, "fptositmp");
         } else {
-          return builder.CreateZExt(value, llvm_to, "zexttmp");
+          value = builder.CreateFPToUI(value, llvm_to, "fptouitmp");
+        }
+      }
+    }
+    // Floating-point casting block
+    else {
+      if (from_info->scalar_type == TYPE_BOOL) {
+        value = builder.CreateUIToFP(value, llvm_to, "uitofptmp");
+      } else if (from_info->is_integral) {
+        if (from_info->is_signed()) {
+          value = builder.CreateSIToFP(value, llvm_to, "sitofptmp");
+        } else {
+          value = builder.CreateUIToFP(value, llvm_to, "uitofptmp");
         }
       } else {
-        return builder.CreateTrunc(value, llvm_to, "trunctmp");
-      }
-    } else {
-      if (to_info->is_signed()) {
-        return builder.CreateFPToSI(value, llvm_to, "fptositmp");
-      } else {
-        return builder.CreateFPToUI(value, llvm_to, "fptouitmp");
-      }
-    }
-  } else {
-    if (from_info->scalar_type == TYPE_BOOL) {
-      return builder.CreateUIToFP(value, llvm_to, "uitofptmp");
-    } else if (from_info->is_integral) {
-      if (from_info->is_signed()) {
-        return builder.CreateSIToFP(value, llvm_to, "sitofptmp");
-      } else {
-        return builder.CreateUIToFP(value, llvm_to, "uitofptmp");
-      }
-    } else {
-      if (value->getType()->getPrimitiveSizeInBits() < llvm_to->getPrimitiveSizeInBits()) {
-        return builder.CreateFPExt(value, llvm_to, "fpexttmp");
-      } else if (value->getType()->getPrimitiveSizeInBits() > llvm_to->getPrimitiveSizeInBits()) {
-        return builder.CreateFPTrunc(value, llvm_to, "fptrunctmp");
+        unsigned from_bits = value->getType()->getPrimitiveSizeInBits();
+        unsigned to_bits = llvm_to->getPrimitiveSizeInBits();
+        if (from_bits < to_bits) {
+          value = builder.CreateFPExt(value, llvm_to, "fpexttmp");
+        } else if (from_bits > to_bits) {
+          value = builder.CreateFPTrunc(value, llvm_to, "fptrunctmp");
+        }
       }
     }
   }
 
-  return nullptr;
+  return value;
 }
 
 void LLVM_Emitter::emit_module() {
@@ -775,7 +770,14 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::Value *base = visit_operand(instr.left, instr.span);
         llvm::Value *index = visit_operand(instr.right, instr.span);
         Temporary &temp = f->temps[instr.dest.temp];
-        llvm::Type *pointee = llvm_typeof(temp.type->get_element_type());
+
+        Type *element_type = temp.type->get_element_type();
+
+        if (element_type == void_type()) {
+          throw_error("tried to GEP into a void", instr.span);
+        }
+
+        llvm::Type *pointee = llvm_typeof(element_type);
         llvm::Value *gep = create_dbg(builder.CreateGEP(pointee, base, index, f->temps[instr.dest.temp].name.str()), instr.span);
         insert_temp(instr.dest.temp, f, gep);
       } break;
@@ -854,8 +856,12 @@ llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
           return llvm::ConstantInt::get(llvm_typeof(o.type), o.imm.char_lit);
         case Mir::Constant::CONST_STRING:
           return builder.CreateGlobalString(unescape_string_lit(o.imm.string_lit.str()));
-        default:
-          return nullptr;
+        case Mir::Constant::CONST_NULLPTR:
+          return llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(llvm_typeof(o.type)));
+        case Mir::Constant::CONST_INVALID:
+          throw_error("invalid constant", {});
+          exit(1);
+          break;
       }
       break;
   }
