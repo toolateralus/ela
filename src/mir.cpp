@@ -32,6 +32,163 @@ static bool block_only_contains_noop(const THIRBlock *b) {
   return count == b->statements.size();
 }
 
+/*
+  TODO: we need to figure out breaks, continues, and nested control flow.
+  it's like one of the primary most broken things about the MIR.
+*/
+
+void generate_return(const THIRReturn *node, Module &m) {
+  if (!node->expression) {
+    EMIT_RET_VOID();
+    return;
+  }
+  Operand val = generate_expr(node->expression, m);
+  EMIT_RET(val);
+}
+
+void generate_break(const THIRBreak *node, Module &m) {
+  if (g_break_targets.empty()) {
+    throw_error("break used outside of loop", node->span);
+  }
+  Basic_Block *target = g_break_targets.back();
+  EMIT_JUMP(target);
+}
+
+void generate_continue(const THIRContinue *node, Module &m) {
+  if (g_continue_targets.empty()) {
+    throw_error("continue used outside of loop", node->span);
+  }
+  Basic_Block *target = g_continue_targets.back();
+  EMIT_JUMP(target);
+}
+
+void generate_block(const THIRBlock *node, Module &m) {
+  if (node->statements.empty() || block_only_contains_noop(node)) {
+    return;
+  }
+  Basic_Block *entry_block = m.get_insert_block();
+  for (const THIR *stmt : node->statements) {
+    m.current_function->set_insert_block(entry_block);
+    generate(stmt, m);
+    if (m.current_function->insert_block->ends_with_terminator()) {
+      return;
+    }
+  }
+}
+
+void generate_for(const THIRFor *node, Module &m) {
+  generate(node->initialization, m);
+
+  Basic_Block *orig_bb = m.get_insert_block();
+  Basic_Block *for_bb = m.create_and_enter_basic_block("for");
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("for.cond");
+  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *incr_bb = m.create_and_enter_basic_block("incr");
+  Basic_Block *after_bb = m.create_and_enter_basic_block("done");
+
+  m.current_function->set_insert_block(orig_bb);
+  EMIT_JUMP(for_bb);
+
+  emit_into_block(m, for_bb, [&] { EMIT_JUMP(cond_bb); });
+
+  m.current_function->set_insert_block(cond_bb);
+  Operand cond = generate_expr(node->condition, m);
+  EMIT_JUMP_TRUE(do_bb, after_bb, cond);
+
+  m.current_function->set_insert_block(do_bb);
+  g_break_targets.push_back(after_bb);
+  g_continue_targets.push_back(incr_bb);
+
+  generate_block((const THIRBlock*)node->block, m);
+
+  g_break_targets.pop_back();
+  g_continue_targets.pop_back();
+
+  if (!do_bb->ends_with_terminator()) {
+    // again, we may have some code like a break or continue
+    // that might already perform a jump right here, and in that case,
+    // this cannot be emitted.
+    emit_into_block(m, do_bb, [&] { EMIT_JUMP(incr_bb); });
+  }
+
+  m.current_function->set_insert_block(incr_bb);
+  generate(node->increment, m);
+
+  if (!incr_bb->ends_with_terminator()) {
+    // This is less possible to ever be something other than false.
+    // Im not sure how youd get a jump in the  increment of a for loop.
+    emit_into_block(m, incr_bb, [&] { EMIT_JUMP(for_bb); });
+  }
+
+  m.current_function->set_insert_block(after_bb);
+}
+
+void generate_if(const THIRIf *node, Module &m) {
+  Basic_Block *if_bb = m.get_insert_block();
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("if.cond");
+  Basic_Block *then_bb = m.create_and_enter_basic_block("then");
+  Basic_Block *else_bb = node->_else ? m.create_and_enter_basic_block("else") : nullptr;
+  Basic_Block *end_bb = m.create_and_enter_basic_block("end");
+
+  emit_into_block(m, if_bb, [&] { EMIT_JUMP(cond_bb); });
+  m.current_function->set_insert_block(cond_bb);
+  Operand cond = generate_expr(node->condition, m);
+  if (else_bb) {
+    EMIT_JUMP_TRUE(then_bb, else_bb, cond);
+  } else {
+    EMIT_JUMP_TRUE(then_bb, end_bb, cond);
+  }
+
+  m.current_function->set_insert_block(then_bb);
+  generate_block(node->block, m);
+
+  if (!then_bb->ends_with_terminator()) {
+    emit_into_block(m, then_bb, [&] { EMIT_JUMP(end_bb); });
+  }
+
+  if (else_bb) {
+    m.current_function->set_insert_block(else_bb);
+    generate(node->_else, m);
+    if (!else_bb->ends_with_terminator()) {
+      emit_into_block(m, else_bb, [&] { EMIT_JUMP(end_bb); });
+    }
+  }
+
+  m.current_function->set_insert_block(end_bb);
+}
+
+void generate_while(const THIRWhile *node, Module &m) {
+  Basic_Block *orig_bb = m.get_insert_block();
+  Basic_Block *cond_bb = m.create_and_enter_basic_block("while");
+  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
+  Basic_Block *done_bb = m.create_and_enter_basic_block("done");
+  m.current_function->set_insert_block(orig_bb);
+  EMIT_JUMP(cond_bb);
+
+  m.current_function->set_insert_block(cond_bb);
+  Operand cond = generate_expr(node->condition, m);
+  EMIT_JUMP_TRUE(do_bb, done_bb, cond);
+
+  m.current_function->set_insert_block(do_bb);
+  g_break_targets.push_back(done_bb);
+  g_continue_targets.push_back(cond_bb);
+  generate(node->block, m);
+  g_break_targets.pop_back();
+  g_continue_targets.pop_back();
+
+  if (!do_bb->ends_with_terminator()) {
+    // We may just have a single break in a loop.
+    // We _should_ optimize this shit out, but for now,
+    // we have to stop doing this.
+
+    // We could also just ignore everything in a basic block past a jump, ret, unreachable, etc
+    // in the LLVM backend, but that's just sloppy ass MIR.
+    emit_into_block(m, do_bb, [&] { EMIT_JUMP(cond_bb); });
+  }
+
+  m.current_function->set_insert_block(done_bb);
+}
+
 void generate_module(const THIRFunction *entry_point, Module &m) { generate_function(entry_point, m); }
 
 void convert_function_flags(const THIRFunction *t, Function *f) {
@@ -490,9 +647,28 @@ Operand generate_expr_block(const THIRExprBlock *node, Module &m) {
 Operand generate_literal(const THIRLiteral *node, Module &) {
   Constant value;
   switch (node->tag) {
-    case ASTLiteral::Integer:
-      value = Constant::Int(atoll(node->value.c_str()));
-      break;
+    case ASTLiteral::Integer: {
+      std::string s = node->value.str();
+      int base = 10;
+      const char *str = s.c_str();
+      if (str[0] == '0') {
+        if (str[1] == 'x' || str[1] == 'X') {
+          base = 16;
+          str += 2;
+        } else if (str[1] == 'b' || str[1] == 'B') {
+          base = 2;
+          str += 2;
+        } else if (str[1] == 'o' || str[1] == 'O') {
+          base = 8;
+          str += 2;
+        } else if (isdigit(str[1])) {
+          base = 8;
+          str += 1;
+        }
+      }
+      unsigned long long val = strtoull(str, nullptr, base);
+      value = Constant::Int(val);
+    } break;
     case ASTLiteral::Float:
       value = Constant::Float(atof(node->value.c_str()));
       break;
@@ -507,7 +683,7 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
       value = Constant::String(node->value);
       break;
     case ASTLiteral::Null:
-      THIRLiteral *literal = (THIRLiteral*)node;
+      THIRLiteral *literal = (THIRLiteral *)node;
       literal->type = u8_ptr_type();
       value = Constant::Nullptr(u8_ptr_type());
       break;
@@ -669,142 +845,6 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m, 
 
   EMIT_ZERO_INIT(ptr, Operand::Make_Type_Ref(node->type));
   return ptr;
-}
-
-void generate_return(const THIRReturn *node, Module &m) {
-  if (!node->expression) {
-    EMIT_RET_VOID();
-    return;
-  }
-  Operand val = generate_expr(node->expression, m);
-  EMIT_RET(val);
-}
-
-void generate_break(const THIRBreak *node, Module &m) {
-  if (g_break_targets.empty()) {
-    throw_error("break used outside of loop", node->span);
-  }
-  Basic_Block *target = g_break_targets.back();
-  EMIT_JUMP(target);
-}
-
-void generate_continue(const THIRContinue *node, Module &m) {
-  if (g_continue_targets.empty()) {
-    throw_error("continue used outside of loop", node->span);
-  }
-  Basic_Block *target = g_continue_targets.back();
-  EMIT_JUMP(target);
-}
-
-void generate_block(const THIRBlock *node, Module &m) {
-  if (node->statements.empty() || block_only_contains_noop(node)) {
-    return;
-  }
-  for (const THIR *stmt : node->statements) {
-    generate(stmt, m);
-    // If the block we are inserting into ended with a terminator, stop
-    // emitting further statements to avoid writing into the wrong block.
-    if (m.current_function->get_insert_block()->ends_with_terminator()) {
-      return;
-    }
-  }
-}
-
-void generate_for(const THIRFor *node, Module &m) {
-  generate(node->initialization, m);
-
-  Basic_Block *orig_bb = m.get_insert_block();
-  Basic_Block *for_bb = m.create_and_enter_basic_block("for");
-  Basic_Block *cond_bb = m.create_and_enter_basic_block("for.cond");
-  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
-  Basic_Block *incr_bb = m.create_and_enter_basic_block("incr");
-  Basic_Block *after_bb = m.create_and_enter_basic_block("done");
-
-  m.current_function->set_insert_block(orig_bb);
-  EMIT_JUMP(for_bb);
-
-  emit_into_block(m, for_bb, [&] { EMIT_JUMP(cond_bb); });
-
-  m.current_function->set_insert_block(cond_bb);
-  Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(do_bb, after_bb, cond);
-
-  m.current_function->set_insert_block(do_bb);
-  g_break_targets.push_back(after_bb);
-  g_continue_targets.push_back(incr_bb);
-
-  generate(node->block, m);
-
-  g_break_targets.pop_back();
-  g_continue_targets.pop_back();
-
-  emit_into_block(m, do_bb, [&] { EMIT_JUMP(incr_bb); });
-
-  m.current_function->set_insert_block(incr_bb);
-  generate(node->increment, m);
-
-  emit_into_block(m, incr_bb, [&] { EMIT_JUMP(for_bb); });
-
-  m.current_function->set_insert_block(after_bb);
-}
-
-void generate_if(const THIRIf *node, Module &m) {
-  Basic_Block *if_bb = m.get_insert_block();
-  Basic_Block *cond_bb = m.create_and_enter_basic_block("if.cond");
-  Basic_Block *then_bb = m.create_and_enter_basic_block("then");
-  Basic_Block *else_bb = node->_else ? m.create_and_enter_basic_block("else") : nullptr;
-  Basic_Block *end_bb = m.create_and_enter_basic_block("end");
-
-  emit_into_block(m, if_bb, [&] { EMIT_JUMP(cond_bb); });
-  m.current_function->set_insert_block(cond_bb);
-  Operand cond = generate_expr(node->condition, m);
-  if (else_bb) {
-    EMIT_JUMP_TRUE(then_bb, else_bb, cond);
-  } else {
-    EMIT_JUMP_TRUE(then_bb, end_bb, cond);
-  }
-
-  m.current_function->set_insert_block(then_bb);
-  generate_block(node->block, m);
-
-  if (!then_bb->ends_with_terminator()) {
-    emit_into_block(m, then_bb, [&] { EMIT_JUMP(end_bb); });
-  }
-
-  if (else_bb) {
-    m.current_function->set_insert_block(else_bb);
-    generate(node->_else, m);
-    if (!else_bb->ends_with_terminator()) {
-      emit_into_block(m, else_bb, [&] { EMIT_JUMP(end_bb); });
-    }
-  }
-
-  m.current_function->set_insert_block(end_bb);
-}
-
-void generate_while(const THIRWhile *node, Module &m) {
-  Basic_Block *orig_bb = m.get_insert_block();
-  Basic_Block *cond_bb = m.create_and_enter_basic_block("while");
-  Basic_Block *do_bb = m.create_and_enter_basic_block("do");
-  Basic_Block *done_bb = m.create_and_enter_basic_block("done");
-  m.current_function->set_insert_block(orig_bb);
-  EMIT_JUMP(cond_bb);
-
-  m.current_function->set_insert_block(cond_bb);
-  Operand cond = generate_expr(node->condition, m);
-  EMIT_JUMP_TRUE(do_bb, done_bb, cond);
-
-  m.current_function->set_insert_block(do_bb);
-  g_break_targets.push_back(done_bb);
-  g_continue_targets.push_back(cond_bb);
-  generate(node->block, m);
-  g_break_targets.pop_back();
-  g_continue_targets.pop_back();
-
-  // emit the loop-back jump into do_bb even if nested generation changed insert block
-  emit_into_block(m, do_bb, [&] { EMIT_JUMP(cond_bb); });
-
-  m.current_function->set_insert_block(done_bb);
 }
 
 Operand Operand::Make_Global_Ref(Global_Variable *gv_ref) {

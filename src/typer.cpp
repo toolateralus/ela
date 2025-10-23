@@ -2426,6 +2426,7 @@ void Typer::visit(ASTBinExpr *node) {
     // `type_check_args_from_params` applies the correct semantics and
     // records implicit conversions on the operand.
     ASTArguments tmp_args;
+    tmp_args.span = node->span;
     tmp_args.arguments.clear();
     tmp_args.arguments.push_back(node->right);
     type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->left), false);
@@ -2520,6 +2521,7 @@ void Typer::visit(ASTUnaryExpr *node) {
     }
 
     ASTArguments tmp_args;
+    tmp_args.span = node->span;
     tmp_args.arguments.clear();
     type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->operand), false);
 
@@ -2732,6 +2734,7 @@ void Typer::visit(ASTIndex *node) {
     ASTArguments tmp_args;
     tmp_args.arguments.clear();
     tmp_args.arguments.push_back(node->index);
+    tmp_args.span = node->span;
     type_check_args_from_params(&tmp_args, decl->params, decl, Nullable<ASTExpr>(node->base), false);
 
     node->resolved_operator_overload = decl;

@@ -312,8 +312,11 @@ struct Basic_Block {
       return false;
     }
     Instruction const &back = code.back();
-    return back.opcode == OP_JMP || back.opcode == OP_JMP_TRUE || back.opcode == OP_RET || back.opcode == OP_RET_VOID ||
-           back.opcode == OP_UNREACHABLE;
+    return back.opcode == OP_JMP || 
+            back.opcode == OP_JMP_TRUE || 
+            back.opcode == OP_RET || 
+            back.opcode == OP_RET_VOID ||
+            back.opcode == OP_UNREACHABLE;
   }
 
   inline bool ends_with_non_divergent_terminator() const {
@@ -449,6 +452,8 @@ struct Module {
   std::vector<Global_Variable *> global_variables;
   std::unordered_map<THIRVariable const *, Global_Variable *> global_variable_table;
   std::unordered_set<Type *> used_types;
+
+  std::function<void()> on_break_or_continue;
 
   std::unordered_map<THIRVariable const *, Operand> variables;  // used for lowering, referencing.
   std::stack<Function *> function_stack;                        // used for lowering only.

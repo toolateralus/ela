@@ -401,3 +401,208 @@ to save on even more code space.
 
 
 This would not only reduce binary size, but DRASTICALLY reduce compile times, and we could have -03 enable complete monomorphization, for max runtime performance (promoting tiny integers to large ones takes time and space)
+
+
+
+
+# Type inference for associated function calls.
+
+We should easily be able to infer the leftmost element of a path based on an expected type.
+
+for example:
+```rust
+
+fn a!<T>(list: List!<T>) {
+  for v in list {
+    println(v); /// some stuff.
+  }
+}
+
+
+// this would be the most extreme example,
+// where we not only infer that List!<T> is the leftmost element of the path,
+// but also we infer that the T type argument is satisfied by the T type argument
+// of the InitList!<T> that's in the initializer list.
+fn main() {
+  a(::init(.[0, 1, 2, 3, 4, 5, 6]));
+  // fully explicit:
+  a!<s32>(List!<u32>::init(u32.[0, 1, 2, 3, 4, 5, 6]));
+}
+```
+
+Or, a more tame and expectable example:
+
+```rust
+struct List!<T> { ... } // implements 'Init!<T>' trait.
+
+fn main() {
+  // this would be pretty simple to implement.
+  list: List!<s32> = ::init(.[0,1,2,3,4]);
+
+  enum Abcd {
+    A,B,C,D
+  }
+
+  a: Abcd = ::A;
+}
+
+```
+
+Also, we could use a similar system to access symbols that are shadowed by the current scope, just like C++.
+
+```rust
+fn get() -> s32 {
+  return 0;
+}
+
+fn main() {
+  fn get() -> f32 {
+    return 0.0;
+  }
+
+  x: s32 = :::get(); // begin searching for the symbol in our parent scope.
+}
+```
+
+
+# We desperately need better switches, and matches.
+
+This is kind of covered earlier in the file, but it's much worse.
+Right now, our switch cases compile down to if-else chains.
+There is no way to fall through, there is no way to match multiple conditions
+in one block.
+
+`switch is` is horrible syntax, and needs to be replaced with `match`
+
+
+Note: 
+  Of course, our `match` node wouldn't be the only statement who benefits from
+  the extremely complex patterns as seen below:
+  `if $expr is ...`
+  `while $expr is ...`
+  would also get these.
+```rust
+
+fn main() {
+  mut value: s32 = get_value();
+
+  // Switch against some integers, these _need_ to be compile time constants.
+  switch value {
+    20 => {
+      io::println("It was twenty.");
+    };
+
+    // match any of these values.
+    30, 40, 50, 60 => {
+      io::printlnf("was a multiple of 10 between 30 and 60. {}", (value,));
+      #fallthrough; // fall through to the next case, and don't check against it's pattern.
+    };
+
+    60, 70, 80, 90 => {
+      io::printlnf("was a multiple of 10 between 30 and 90. {}", (value,));
+    };
+  }
+
+  // Then, our pattern matching node, would do much more complex, non-numeric 
+  // style switching, without fall throughs.
+  // matching tuples (these do not need to be compile time constants.)
+  match (0, 1) {
+    (0, 1) => {
+      io::println("it has matched");
+    };
+    (1, 0) => {
+      io::println("this shouldn't happen -.-");
+    }
+  }
+
+  // value defined before
+  // match against ranges (these do not need to be compile time constants)
+  match value {
+    // match against all positive numbers (s32)
+    0.. => { // We should always use =>
+      io::println("Yep");
+    }; // end every block with a semicolon.
+    
+    // match against all negative numbers (s32)
+    ..0 => {
+      io::println("Negative");
+    };
+
+    // else will still be our default case.
+    // I think it's clear.
+    else => {
+      io::println("No pattern hit");
+    };
+  }
+
+  // match some choice types.
+  match Option!<s32>::Some(100) {
+    Some(10) => { // match explicitly against a Some(10), will not work.
+      io::println("Nope");
+    };
+
+    // again, match against a Some( some value between 101 and 200 ). this will not get hit in this case.
+    Some(101..200) => { 
+      io::println("Nope");
+    };
+
+    // simple matching against discriminant.
+    None => {
+      io::println("Nopers");
+    };
+
+    // extract value from a choice type, or match exactly against 100.
+    // of course, in this demonstration, im just showing this,
+    // both of these conditions are true, but using Some(v)
+    // where we've matching against Some(value:constraint)
+    // would be completely redundant in most cases.
+    Some(v), Some(100) => {
+      io::printlnf("Yeppers, value: {}", v);
+    };
+
+    // else will still be our default case.
+    // I think it's clear.
+    else => {
+      io::println("No pattern hit");
+    };
+  }
+
+  tuple := (Result!<s32, ()>::Ok(100), Option!<s32>::None);
+
+  match tuple {
+    // We can then extend all of these behaviours into nightmarish conditions
+    // that can be incredibly specific.
+    (Err(e), Some(0..10)) => {
+      io::println("wababbebababe");
+    };
+
+    // _ would ignore that part of the pattern, i.e we don't care about that part.
+    (_, None) => {
+      io::println("Yep");
+    };
+
+    else => {
+      io::println("No pattern hit");
+    };
+  }
+
+
+  if tuple is (_, None) {
+    io::println("Woop");
+  } else if tuple is (Err, None) {
+    io::println("Doop");
+  }
+
+  taple := (Some(10), 
+    Result!<s32, ()>::Ok(Some(100)), 
+    Value::Float(Ok((Some(100.0), None)))
+  );
+  // Just making the most nightmarish condition possible,
+  // but this is great because it's compact and expressive, and eliminates so much code
+  // that would have been wasted on checking conditions and pulling variables out.
+  while taple is (Some(v), Ok(Some(a)), Float(Ok((100.0, Some(s))))) {
+    io::printlnf("v={}, a={}, g={} s = {}", v, a, g, s);
+  }
+}
+
+```
