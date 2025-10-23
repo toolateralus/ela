@@ -24,6 +24,8 @@ static inline uint64_t decode_operand(const Operand &op, const Stack_Frame &sf) 
         return (uint64_t)c.string_lit.c_str();
       case Constant::CONST_INVALID:
         goto error;
+      case Constant::CONST_NULLPTR:
+        return 0;
     }
   } else {
   error:
