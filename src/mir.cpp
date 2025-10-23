@@ -507,7 +507,9 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
       value = Constant::String(node->value);
       break;
     case ASTLiteral::Null:
-      value = Constant::Nullptr(node->type);
+      THIRLiteral *literal = (THIRLiteral*)node;
+      literal->type = u8_ptr_type();
+      value = Constant::Nullptr(u8_ptr_type());
       break;
   }
   return Operand::Make_Imm(value, node->type);
@@ -1018,7 +1020,7 @@ void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction 
     }
   }
 
-  if (false) {
+  if (true) {
     generate(global_initializer, m);
   }
 

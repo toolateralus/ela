@@ -8,9 +8,7 @@ const Type *get_base_type(const Type *t) {
   return t;
 }
 
-std::string format_type_ref(const Type *t) {
-  return "(" + t->to_string() + ")";
-}
+std::string format_type_ref(const Type *t) { return "(" + t->to_string() + ")"; }
 
 void collect_dependencies(const Type *t, std::unordered_set<const Type *> &visited, std::vector<const Type *> &ordered_types) {
   if (visited.count(t)) {
@@ -353,6 +351,8 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
         return std::to_string(c.float_lit);
       case Constant::CONST_BOOL:
         return c.bool_lit ? "true" : "false";
+      case Constant::CONST_NULLPTR:
+        return "null" + format_type_ref(c.type);
       case Constant::CONST_CHAR: {
         char buf[8] = {'\'', (char)c.char_lit, '\'', 0};
         return std::string(buf);
@@ -521,6 +521,10 @@ void Mir::Constant::print(FILE *f) const {
       break;
     case CONST_CHAR:
       fprintf(f, "'%c'", (char)char_lit);
+      break;
+    case CONST_NULLPTR:
+      fprintf(stderr, "Eoopwas\n");
+      fprintf(f, "Nullptr%s", format_type_ref(type).c_str());
       break;
   }
 }
