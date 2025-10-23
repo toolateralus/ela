@@ -611,10 +611,13 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
   }
 
   if (new_node->is_expr()) {
-    // ASTExpr *expr = (ASTExpr*)new_node;
+    ASTExpr *expr = (ASTExpr*)new_node;
     // TODO: this needs to happen, but for some reason, if we do this, we randomly get "too few arguments for function call"
     // ! BUG
-    // expr->conversion = {.has_value = false};
+
+    if (expr->conversion.has_value) {
+      expr->conversion = {.has_value = false};
+    }
   }
 
   return new_node;
