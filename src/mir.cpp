@@ -89,7 +89,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     if (!node->is_extern) {
       // We just make allocas and store the initial values of parameters for all parameters,
       // this way we can take the address of a parameter, and mutate them.
-      Operand alloca_temp = m.create_temporary(type->take_pointer_to());
+      Operand alloca_temp = m.create_temporary(type->take_pointer_to(), param.name);
       EMIT_ALLOCA(alloca_temp, Operand ::Make_Type_Ref(type));
       EMIT_STORE(alloca_temp, parameter_temp);
       m.variables[param.associated_variable] = alloca_temp;
@@ -171,7 +171,7 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
     return Operand::MakeNull();
   }
 
-  Operand dest = m.create_temporary(node->type->take_pointer_to());
+  Operand dest = m.create_temporary(node->type->take_pointer_to(), node->name);
   EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
   Operand value_temp = generate_expr(node->value, m);
