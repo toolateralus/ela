@@ -1640,6 +1640,10 @@ void Typer::visit(ASTEnumDeclaration *node) {
     }
 
     info->scope->insert_variable(key, node_ty, value, CONST);
+    auto symbol = info->scope->local_lookup(key);
+    symbol->is_enumeration_value = true;
+    symbol->value = evaluated;
+
     info->members.push_back({key, node_ty, value, nullptr});
     if (underlying_type == Type::INVALID_TYPE) {
       underlying_type = node_ty;

@@ -813,5 +813,5 @@ struct LLVM_Emitter {
   llvm::Value *binary_signed(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_unsigned(llvm::Value *left, llvm::Value *right, Op_Code op);
   llvm::Value *binary_fp(llvm::Value *left, llvm::Value *right, Op_Code op);
-  llvm::Value *cast_scalar(llvm::Value *value, Type *from, Type *to, Type **new_type);
+  llvm::Value *perform_cast(llvm::Value *value, Type *from, Type *to, Type **new_type);
 };

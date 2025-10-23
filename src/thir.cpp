@@ -347,7 +347,6 @@ Symbol *THIRGen::get_symbol(ASTNode *node) {
             // We do this here because it's not neccesarily true that these would have been visited already,
             // duplicates don't matter all that much, and we _need_ the child symbols to be bound otherwise
             // we get null variables in paths.
-
             // There's probably a much better solution than this, but this works.
 
             if (resolved_type->declaring_node) {
@@ -385,6 +384,13 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   }
 
   auto symbol = get_symbol(ast);
+
+  // We just return literals for enumeration values, they have to exist, and
+  // theyre just integer constants anywhere past the typer.
+  if (symbol->is_enumeration_value) {
+    THIR *constant = symbol->value->to_thir();
+    return constant;
+  }
 
   if (!symbol) {
     throw_error("INTERNAL COMPILER ERROR: visiting path yielded no symbol but the typer didn't catch it", ast->span);
@@ -495,7 +501,7 @@ THIR *THIRGen::visit_pattern_match_condition(ASTPatternMatch *ast, THIR *cached_
   THIR_ALLOC(THIRMemberAccess, discriminant_access, ast)
   discriminant_access->base = cached_object;
   discriminant_access->member = CHOICE_TYPE_DISCRIMINANT_KEY;
-  discriminant_access->type = u32_type(); // This depends completely on the size of the choice type...
+  discriminant_access->type = u32_type();  // This depends completely on the size of the choice type...
   THIR_ALLOC(THIRBinExpr, thir, ast);
   thir->left = discriminant_access;
   thir->op = TType::EQ;
@@ -958,17 +964,17 @@ THIR *THIRGen::visit_lambda(ASTLambda *ast) {
     var->name = ast_param->normal.name;
     var->type = ast_param->resolved_type;
     var->is_global = false;
-    
+
     if (ast_param->normal.default_value) {
       thir_param.default_value = visit_node(ast_param->normal.default_value.get());
       var->value = thir_param.default_value;
     }
-    
+
     auto symbol = ast->block->scope->local_lookup(ast_param->normal.name);
-    
+
     bind(symbol, var);
     bind(ast_param, var);
-    
+
     thir_param.associated_variable = var;
     thir->parameters.push_back(thir_param);
   }
@@ -1334,42 +1340,6 @@ THIR *THIRGen::visit_choice_declaration(ASTChoiceDeclaration *ast) {
   bind(ast, thir);
 
   extract_thir_values_for_type_members(thir->type);
-  return thir;
-}
-
-THIR *THIRGen::visit_enum_declaration(ASTEnumDeclaration *ast) {
-  if (ast_map.contains(ast)) {
-    return ast_map[ast];
-  }
-
-  THIR_ALLOC(THIRType, thir, ast);
-  check_deprecated(thir, ast->attributes);
-  bind(ast, thir);
-
-  extract_thir_values_for_type_members(thir->type);
-  for (const auto &member : ast->resolved_type->info->members) {
-    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, var)
-
-    // TODO: instead of even doing this, we should just lower
-    // these directly to integer literals.
-
-    // Also, with the new MIR api, we don't need any THIRType at all.
-    // would save a lot by refactoring this to be even simpler.
-    thir->enum_members.push_back(var);
-    var->is_from_enum_declaration = true;
-
-
-    var->span = ast->span;
-    var->enum_type = thir;
-    var->is_global = false;
-    var->is_statement = true;
-    var->name = ast->resolved_type->basename.str() + '$' + member.name.str();
-    var->value = member.thir_value.get();
-    var->type = member.type;
-    auto symbol = ast->resolved_type->info->scope->local_lookup(member.name);
-    bind(symbol, var);
-  }
-
   return thir;
 }
 
@@ -2382,8 +2352,6 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
       return visit_while((ASTWhile *)ast);
     case AST_NODE_STRUCT_DECLARATION:
       return visit_struct_declaration((ASTStructDeclaration *)ast);
-    case AST_NODE_ENUM_DECLARATION:
-      return visit_enum_declaration((ASTEnumDeclaration *)ast);
     case AST_NODE_CHOICE_DECLARATION:
       return visit_choice_declaration((ASTChoiceDeclaration *)ast);
     case AST_NODE_VARIABLE:
@@ -2397,6 +2365,10 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
     case AST_NODE_FOR_C_STYLE:
       return visit_for_c_style((ASTForCStyle *)ast);
     // Ignored nodes.
+    // Enumeration values get lowered to integer constants here so we have no purpose even visiting this.
+    // TODO: remove THIRType, it's useless.
+    // We just need to generate thir_value for default values in structs.
+    case AST_NODE_ENUM_DECLARATION: 
     case AST_NODE_NOOP:
     case AST_NODE_ALIAS:
     case AST_NODE_TRAIT_DECLARATION:
@@ -2729,7 +2701,7 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
 
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
   global_initializer_function = global_ini;
-  global_ini->constructor_index = 0; // highest priority.
+  global_ini->constructor_index = 0;  // highest priority.
 
   FunctionTypeInfo info;
   info.params_len = 0;

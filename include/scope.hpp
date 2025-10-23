@@ -37,6 +37,7 @@ struct Symbol {
   bool is_type : 1 = false;
   bool is_module : 1 = false;
   bool is_local : 1 = false;
+  bool is_enumeration_value: 1 = false;
 
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }

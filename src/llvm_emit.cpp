@@ -29,7 +29,7 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
   if (!right) {
     if (instr.opcode == Mir::OP_LOGICAL_NOT || instr.opcode == Mir::OP_NOT) {
       Type *unused = nullptr;
-      llvm::Value *v = cast_scalar(left, instr.left.type, bool_type(), &unused);
+      llvm::Value *v = perform_cast(left, instr.left.type, bool_type(), &unused);
       if (!v) throw_error("Pointer logical-not: failed to cast pointer to bool via MIR type system", instr.span);
       if (!v->getType()->isIntegerTy(1)) v = builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv");
       return (instr.opcode == Mir::OP_LOGICAL_NOT) ? builder.CreateNot(v, "ptr_lnot") : builder.CreateNot(v, "ptr_not");
@@ -310,7 +310,7 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
   }
 }
 
-llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to, Type **new_type) {
+llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to, Type **new_type) {
   if (from == to) {
     return value;
   }
@@ -326,10 +326,34 @@ llvm::Value *LLVM_Emitter::cast_scalar(llvm::Value *value, Type *from, Type *to,
   }
 
   if (from->is_fixed_sized_array() && to->is_pointer()) {
-    return builder.CreateBitCast(value, llvm_to, "array2ptr_cast");
+    return builder.CreateGEP(llvm_to, value, builder.getInt32(0), "array2ptr");
   }
 
+  if (from->kind == TYPE_ENUM) {
+    Type *enum_underlying = from->info->as<EnumTypeInfo>()->underlying_type;
+    value = builder.CreateBitCast(value, llvm_typeof(enum_underlying), "enum2underlying_cast");
+    from = enum_underlying;
+  }
 
+  if (to->kind == TYPE_ENUM) {
+    Type *enum_underlying = to->info->as<EnumTypeInfo>()->underlying_type;
+    llvm::Type *llvm_enum_underlying = llvm_typeof(enum_underlying);
+    value = builder.CreateBitCast(value, llvm_enum_underlying, "to_enum_underlying_cast");
+    to = enum_underlying;
+  }
+
+  if (from->has_no_extensions() && from->kind == TYPE_SCALAR && from->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) {
+    throw_error("Somehow we tried to cast from void", {});
+  }
+
+  if (to->has_no_extensions() && to->kind == TYPE_SCALAR && to->info->as<ScalarTypeInfo>()->scalar_type == TYPE_VOID) {
+    throw_error("Somehow we tried to cast to void", {});
+  }
+
+  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) {
+    fprintf(stderr, "from: %s, to: %s\n", from->to_string().c_str(), to->to_string().c_str());
+    throw_error("unable to cast non scalar type at this point", {});
+  }
 
   ScalarTypeInfo *from_info = from->info->as<ScalarTypeInfo>();
   ScalarTypeInfo *to_info = to->info->as<ScalarTypeInfo>();
@@ -530,32 +554,45 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::Value *left = visit_operand(instr.left, instr.span);
         llvm::Value *right = visit_operand(instr.right, instr.span);
 
+        Type *left_ty = instr.left.type;
+        Type *right_ty = instr.right.type;
+
+        if (left_ty->kind == TYPE_ENUM) {
+          Type *enum_underlying = left_ty->info->as<EnumTypeInfo>()->underlying_type;
+          left = perform_cast(left, left_ty, enum_underlying, &left_ty);
+        }
+        if (right_ty->kind == TYPE_ENUM) {
+          Type *enum_underlying = right_ty->info->as<EnumTypeInfo>()->underlying_type;
+          right = perform_cast(right, right_ty, enum_underlying, &right_ty);
+        }
+
         if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
           llvm::Value *result = create_dbg(pointer_binary(left, right, instr), instr.span);
           insert_temp(instr.dest.temp, f, result);
           break;
         }
 
-        ScalarTypeInfo *left_info = instr.left.type->info->as<ScalarTypeInfo>();
-        ScalarTypeInfo *right_info = instr.right.type->info->as<ScalarTypeInfo>();
+        ScalarTypeInfo *left_info = left_ty->info->as<ScalarTypeInfo>();
+        ScalarTypeInfo *right_info = right_ty->info->as<ScalarTypeInfo>();
         Type *new_type = nullptr;
-        right = cast_scalar(right, instr.right.type, instr.left.type, &new_type);
+        right = perform_cast(right, right_ty, left_ty, &new_type);
         if (new_type) {
-          instr.right.type = new_type;
+          right_ty = new_type;
           right_info = new_type->info->as<ScalarTypeInfo>();
         }
 
         llvm::Value *result = nullptr;
-        if (left_info->is_signed() && right_info->is_signed())
+        if (left_info->is_signed() && right_info->is_signed()) {
           result = create_dbg(binary_signed(left, right, instr.opcode), instr.span);
-        else if (left_info->is_integral && right_info->is_integral)
+        } else if (left_info->is_integral && right_info->is_integral) {
           result = create_dbg(binary_unsigned(left, right, instr.opcode), instr.span);
-        else if (left_info->is_float() && right_info->is_float())
+        } else if (left_info->is_float() && right_info->is_float()) {
           result = create_dbg(binary_fp(left, right, instr.opcode), instr.span);
-        else
-          throw_error(std::format("Unsupported operand types for binary op: '{}' '{}'", instr.left.type->to_string(),
-                                  instr.right.type->to_string()),
-                      instr.span);
+        } else {
+          throw_error(
+              std::format("Unsupported operand types for binary op: '{}' '{}'", left_ty->to_string(), right_ty->to_string()),
+              instr.span);
+        }
 
         insert_temp(instr.dest.temp, f, result);
       } break;
@@ -563,7 +600,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
       case Mir::OP_LOGICAL_NOT: {
         llvm::Value *v = visit_operand(instr.left, instr.span);
         Type *unused = nullptr;
-        v = cast_scalar(v, instr.left.type, bool_type(), &unused);
+        v = perform_cast(v, instr.left.type, bool_type(), &unused);
         if (!v->getType()->isIntegerTy(1))
           v = create_dbg(builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv"), instr.span);
         llvm::Value *not_val = create_dbg(builder.CreateNot(v, "nottmp"), instr.span);
@@ -645,7 +682,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
       case Mir::OP_JMP_TRUE: {
         llvm::Value *cond = visit_operand(instr.right, instr.span);
         Type *unused = nullptr;
-        cond = cast_scalar(cond, instr.right.type, bool_type(), &unused);
+        cond = perform_cast(cond, instr.right.type, bool_type(), &unused);
         if (!cond->getType()->isIntegerTy(1))
           cond = create_dbg(builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv"), instr.span);
 
@@ -721,7 +758,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
       case Mir::OP_CAST: {
         llvm::Value *v = visit_operand(instr.left, instr.span);
         Type *new_type = nullptr;
-        llvm::Value *casted = create_dbg(cast_scalar(v, instr.left.type, instr.right.type, &new_type), instr.span);
+        llvm::Value *casted = create_dbg(perform_cast(v, instr.left.type, instr.right.type, &new_type), instr.span);
         if (new_type) instr.right.type = new_type;
         insert_temp(instr.dest.temp, f, casted);
       } break;

@@ -531,7 +531,6 @@ struct THIRGen {
   THIR *visit_if(ASTIf *node);
   THIR *visit_else(ASTElse *node);
   THIR *visit_while(ASTWhile *node);
-  THIR *visit_enum_declaration(ASTEnumDeclaration *node);
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
   THIR *visit_expr_statement(ASTExprStatement *node);
