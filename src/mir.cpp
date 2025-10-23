@@ -13,13 +13,6 @@ namespace Mir {
 static std::vector<Basic_Block *> g_break_targets;
 static std::vector<Basic_Block *> g_continue_targets;
 
-static void emit_into_block(Module &m, Basic_Block *bb, const std::function<void()> &emitter) {
-  Basic_Block *saved = m.get_insert_block();
-  m.current_function->set_insert_block(bb);
-  emitter();
-  m.current_function->set_insert_block(saved);
-}
-
 static bool block_only_contains_noop(const THIRBlock *b) {
   size_t count = 0;
   for (const auto *stmt : b->statements) {
@@ -75,9 +68,7 @@ void generate_block(const THIRBlock *node, Module &m) {
 }
 
 void generate_for(const THIRFor *node, Module &m) {
-  generate(node->initialization, m);
-
-  Basic_Block *orig_bb = m.get_insert_block();
+  Basic_Block *orig_bb = m.current_function->get_insert_block();
   Basic_Block *for_bb = m.create_and_enter_basic_block("for");
   Basic_Block *cond_bb = m.create_and_enter_basic_block("for.cond");
   Basic_Block *do_bb = m.create_and_enter_basic_block("do");
@@ -87,7 +78,9 @@ void generate_for(const THIRFor *node, Module &m) {
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(for_bb);
 
-  emit_into_block(m, for_bb, [&] { EMIT_JUMP(cond_bb); });
+  m.current_function->set_insert_block(for_bb);
+  generate(node->initialization, m);
+  EMIT_JUMP(cond_bb);
 
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
@@ -97,38 +90,40 @@ void generate_for(const THIRFor *node, Module &m) {
   g_break_targets.push_back(after_bb);
   g_continue_targets.push_back(incr_bb);
 
-  generate_block((const THIRBlock*)node->block, m);
+  generate_block((const THIRBlock *)node->block, m);
 
   g_break_targets.pop_back();
   g_continue_targets.pop_back();
 
-  if (!do_bb->ends_with_terminator()) {
+  if (!m.current_function->get_insert_block()->ends_with_terminator()) {
     // again, we may have some code like a break or continue
     // that might already perform a jump right here, and in that case,
     // this cannot be emitted.
-    emit_into_block(m, do_bb, [&] { EMIT_JUMP(incr_bb); });
+    EMIT_JUMP(incr_bb);
   }
 
   m.current_function->set_insert_block(incr_bb);
   generate(node->increment, m);
 
-  if (!incr_bb->ends_with_terminator()) {
+  if (!m.current_function->get_insert_block()->ends_with_terminator()) {
     // This is less possible to ever be something other than false.
-    // Im not sure how youd get a jump in the  increment of a for loop.
-    emit_into_block(m, incr_bb, [&] { EMIT_JUMP(for_bb); });
+    // Im not sure how youd get a jump in the increment of a for loop.
+    EMIT_JUMP(for_bb);
   }
 
   m.current_function->set_insert_block(after_bb);
 }
 
 void generate_if(const THIRIf *node, Module &m) {
-  Basic_Block *if_bb = m.get_insert_block();
+  Basic_Block *if_bb = m.current_function->get_insert_block();
   Basic_Block *cond_bb = m.create_and_enter_basic_block("if.cond");
   Basic_Block *then_bb = m.create_and_enter_basic_block("then");
   Basic_Block *else_bb = node->_else ? m.create_and_enter_basic_block("else") : nullptr;
   Basic_Block *end_bb = m.create_and_enter_basic_block("end");
 
-  emit_into_block(m, if_bb, [&] { EMIT_JUMP(cond_bb); });
+  m.current_function->set_insert_block(if_bb);
+  EMIT_JUMP(cond_bb);
+
   m.current_function->set_insert_block(cond_bb);
   Operand cond = generate_expr(node->condition, m);
   if (else_bb) {
@@ -140,15 +135,15 @@ void generate_if(const THIRIf *node, Module &m) {
   m.current_function->set_insert_block(then_bb);
   generate_block(node->block, m);
 
-  if (!then_bb->ends_with_terminator()) {
-    emit_into_block(m, then_bb, [&] { EMIT_JUMP(end_bb); });
+  if (!m.current_function->get_insert_block()->ends_with_terminator()) {
+    EMIT_JUMP(end_bb);
   }
 
   if (else_bb) {
     m.current_function->set_insert_block(else_bb);
     generate(node->_else, m);
-    if (!else_bb->ends_with_terminator()) {
-      emit_into_block(m, else_bb, [&] { EMIT_JUMP(end_bb); });
+    if (!m.current_function->get_insert_block()->ends_with_terminator()) {
+      EMIT_JUMP(end_bb);
     }
   }
 
@@ -156,10 +151,11 @@ void generate_if(const THIRIf *node, Module &m) {
 }
 
 void generate_while(const THIRWhile *node, Module &m) {
-  Basic_Block *orig_bb = m.get_insert_block();
+  Basic_Block *orig_bb = m.current_function->get_insert_block();
   Basic_Block *cond_bb = m.create_and_enter_basic_block("while");
   Basic_Block *do_bb = m.create_and_enter_basic_block("do");
   Basic_Block *done_bb = m.create_and_enter_basic_block("done");
+
   m.current_function->set_insert_block(orig_bb);
   EMIT_JUMP(cond_bb);
 
@@ -174,14 +170,14 @@ void generate_while(const THIRWhile *node, Module &m) {
   g_break_targets.pop_back();
   g_continue_targets.pop_back();
 
-  if (!do_bb->ends_with_terminator()) {
+  if (!m.current_function->get_insert_block()->ends_with_terminator()) {
     // We may just have a single break in a loop.
     // We _should_ optimize this shit out, but for now,
     // we have to stop doing this.
 
     // We could also just ignore everything in a basic block past a jump, ret, unreachable, etc
     // in the LLVM backend, but that's just sloppy ass MIR.
-    emit_into_block(m, do_bb, [&] { EMIT_JUMP(cond_bb); });
+    EMIT_JUMP(cond_bb);
   }
 
   m.current_function->set_insert_block(done_bb);
@@ -279,8 +275,6 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 
   generate_block(node->block, m);
 
-  Basic_Block *end = f->basic_blocks.back();
-  insert_ret_void_if_missing(node, m, f, end);
   insert_ret_void_if_missing(node, m, f, f->insert_block);
 
   size_t num_blocks_ending_with_non_divergent_terminator = 0;
