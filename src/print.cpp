@@ -9,32 +9,7 @@ const Type *get_base_type(const Type *t) {
 }
 
 std::string format_type_ref(const Type *t) {
-  if (!t) {
-    fprintf(stderr, "got a null type in format_type_ref\n");
-    return "";
-  }
-
-  // If this type has pointer/array extensions, print a compact reference
-  // that encodes the base type uid and the extension. Examples:
-  //   pointer -> [*<base_uid>]
-  //   pointer depth 2 -> [**<base_uid>]
-  //   fixed array -> <[<base_uid>]; <size>>
-  if (t->has_extensions()) {
-    if (type_extensions_is_back_array(t->extensions)) {
-      auto ext = t->extensions.back();
-      const Type *base = get_base_type(t);
-      return "<" + std::to_string(base->uid) + "; " + std::to_string(ext.array_size) + ">";
-    }
-
-    // pointer(s) at the back
-    int depth = t->pointer_depth();
-    if (depth > 0) {
-      const Type *base = get_base_type(t);
-      std::string stars(depth, '*');
-      return "(" + stars + std::to_string(base->uid) + ")";
-    }
-  }
-  return "(" + std::to_string(t->uid) + ")";
+  return "(" + t->to_string() + ")";
 }
 
 void collect_dependencies(const Type *t, std::unordered_set<const Type *> &visited, std::vector<const Type *> &ordered_types) {

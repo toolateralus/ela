@@ -325,10 +325,6 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
     return builder.CreatePtrToInt(value, llvm_to, "ptr2int_cast");
   }
 
-  if (from->is_fixed_sized_array() && to->is_pointer()) {
-    return builder.CreateGEP(llvm_to, value, builder.getInt32(0), "array2ptr");
-  }
-
   if (from->kind == TYPE_ENUM) {
     Type *enum_underlying = from->info->as<EnumTypeInfo>()->underlying_type;
     value = builder.CreateBitCast(value, llvm_typeof(enum_underlying), "enum2underlying_cast");
@@ -351,6 +347,11 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
   }
 
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) {
+    fprintf(stderr, "from: %s, to: %s\n", from->to_string().c_str(), to->to_string().c_str());
+    throw_error("unable to cast non scalar type at this point", {});
+  }
+
+  if (from->has_extensions() || to->has_extensions()) {
     fprintf(stderr, "from: %s, to: %s\n", from->to_string().c_str(), to->to_string().c_str());
     throw_error("unable to cast non scalar type at this point", {});
   }

@@ -24,26 +24,23 @@ Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
 */
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   std::stringstream ss;
-  ss << "fn ";
-  ss << extensions_to_string(ext) << ' ';
-  ss << "(";
 
+  ss << "fn(";
   for (size_t i = 0; i < params_len; ++i) {
     auto t = parameter_types[i];
     ss << get_unmangled_name(t);
-    if (i < params_len - 1) {
-      ss << ", ";
-    }
+    if (i < params_len - 1) ss << ", ";
   }
 
   if (is_varargs)
     ss << ", ...)";
   else
-    ss << ')';
+    ss << ")";
 
   ss << " -> " << get_unmangled_name(return_type);
 
-  return ss.str();
+  // Wrap with pointer/array extensions (outermost → innermost)
+  return extensions_to_string(ext, ss.str());
 }
 
 std::string FunctionTypeInfo::to_string() const {
@@ -437,7 +434,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 */
 std::string Type::to_string() const {
   if (basename.str_ptr->starts_with("__anon_D")) {
-    return extensions_to_string(extensions) + "(anonymous type)";
+    return extensions_to_string(extensions, "(anonymous type)");
   }
 
   switch (kind) {

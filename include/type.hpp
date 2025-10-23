@@ -89,22 +89,24 @@ struct TypeExtension {
 
 using TypeExtensions = std::vector<TypeExtension>;
 
-std::string inline extensions_to_string(const TypeExtensions &extensions) {
-  std::stringstream ss;
-  for (const auto ext : extensions) {
+std::string inline extensions_to_string(const TypeExtensions &extensions, const std::string &inner) {
+  std::string result = inner;
+
+  for (auto &ext : extensions) {
     switch (ext.type) {
       case TYPE_EXT_POINTER_MUT:
-        ss << "*mut";
+        result = "*mut " + result;
         break;
       case TYPE_EXT_POINTER_CONST:
-        ss << "*const";
+        result = "*const " + result;
         break;
       case TYPE_EXT_ARRAY:
-        ss << "[" << ext.array_size << "]";
+        result = "[" + result + "; " + std::to_string(ext.array_size) + "]";
         break;
     }
   }
-  return ss.str();
+
+  return result;
 }
 
 inline bool type_extensions_is_back_pointer(const TypeExtensions &extensions) {
@@ -307,7 +309,6 @@ Type *u32_type();
 Type *u64_type();
 Type *f64_type();
 Type *f32_type();
-
 
 Type *is_fn_trait();
 Type *is_range_trait();
@@ -553,34 +554,21 @@ struct Symbol;
 Symbol *find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
 
 std::string get_operator_overload_name(TType op, OperationKind kind);
-
 static inline std::string get_unmangled_name(const Type *type) {
   std::string base = type->basename.str();
   auto first = base.find("$");
-  if (first != std::string::npos) {
-    base = base.substr(0, first);
-  }
+  if (first != std::string::npos) base = base.substr(0, first);
 
   if (!type->generic_args.empty()) {
     base += "!<";
-    size_t idx = 0;
-    for (auto id : type->generic_args) {
-      base += get_unmangled_name(id);
-      if (idx != type->generic_args.size() - 1) {
-        base += ", ";
-      }
-      idx++;
+    for (size_t i = 0; i < type->generic_args.size(); i++) {
+      base += get_unmangled_name(type->generic_args[i]);
+      if (i + 1 < type->generic_args.size()) base += ", ";
     }
     base += ">";
   }
 
-  auto output = extensions_to_string(type->extensions);
-  if (!output.empty()) {
-    output += " ";
-  }
-  output += base;
-
-  return output;
+  return extensions_to_string(type->extensions, base);
 }
 
 static inline constexpr size_t get_reflection_type_flags(Type *type) {

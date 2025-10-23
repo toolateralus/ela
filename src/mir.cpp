@@ -549,9 +549,19 @@ Operand generate_member_access(const THIRMemberAccess *node, Module &m) {
 }
 
 Operand generate_cast(const THIRCast *node, Module &m) {
+  // Casting an array to a pointer is just a secret &arr[0].
+  if (node->type->is_pointer() && node->operand->type->is_fixed_sized_array()) {
+    Operand result = m.create_temporary(node->type->take_pointer_to());
+    Operand value = generate_lvalue_addr(node->operand, m);
+    EMIT_GEP(result, value, Operand::Make_Imm(Constant::Int(0), u64_type()));
+    Operand loaded = m.create_temporary(node->type);
+    EMIT_LOAD(loaded, result);
+    return result;
+  }
+
   Operand value = generate_expr(node->operand, m);
   // Tiny optimization: avoid redundant casts.
-  // This is a hack-- we shouldn't be doing this
+  // This is a hack-- we shouldn't be doing this in the first place.
   if (node->operand->type == node->type) {
     return value;
   }
@@ -637,6 +647,21 @@ Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m, 
     EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
   } else {
     ptr = *existing_alloca.get();
+  }
+
+  if (node->type->has_no_extensions() && node->type->is_integer()) {
+    EMIT_STORE(ptr, Operand::Make_Imm(Constant::Int(0, node->type), node->type));
+    return ptr;
+  }
+
+  if (node->type->has_no_extensions() && node->type->is_float()) {
+    EMIT_STORE(ptr, Operand::Make_Imm(Constant::Float(0.0f, node->type), node->type));
+    return ptr;
+  }
+  
+  if (node->type->is_pointer()) {
+    EMIT_STORE(ptr, Operand::Make_Imm(Constant::Int(0), void_type()->take_pointer_to()));
+    return ptr;
   }
 
   EMIT_ZERO_INIT(ptr, Operand::Make_Type_Ref(node->type));
