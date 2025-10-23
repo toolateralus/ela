@@ -149,6 +149,7 @@ struct THIRVariable : THIR {
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;
   bool is_extern : 1 = false;
+  bool is_uninitialized: 1 = false;
 
   // We track this so we can emit all the variables the first time this gets used,
   // so dead code gets eliminated,

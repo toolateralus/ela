@@ -1769,18 +1769,6 @@ void Typer::visit(ASTVariable *node) {
   if (variable_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.str()), node->span);
   }
-
-  if (node->is_constexpr) {
-    // TODO: we should probably improve this.
-    // Our interpreter can't handle structs, but we want structs.
-    // auto type = node->type->resolved_type;
-    // if ((!type->is_kind(TYPE_SCALAR) || type->extensions.has_extensions())) {
-    //   throw_error(std::format("Can only use scalar types (integers, floats, "
-    //                           "bools) as constant expressions, got {}",
-    //                           type->to_string()),
-    //               node->value.get()->span);
-    // }
-  }
 }
 
 void Typer::visit(ASTBlock *node) {

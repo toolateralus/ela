@@ -136,7 +136,7 @@ THIR* CharValue::to_thir() const {
   auto literal = thir_alloc<THIRLiteral>();
   literal->value = std::to_string(value);
   literal->tag = ASTLiteral::Char;
-  literal->type = char_type();
+  literal->type = u8_type();
   return literal;
 }
 
@@ -385,7 +385,7 @@ THIR* RawPointerValue::to_thir() const {
       auto literal = thir_alloc<THIRLiteral>();
       literal->tag = ASTLiteral::Char;
       literal->value = std::string(1, *(char*)ptr);
-      literal->type = char_type();
+      literal->type = u8_type();
       return literal;
     }
     if (info->scalar_type == TYPE_BOOL) {

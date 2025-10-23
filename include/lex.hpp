@@ -124,6 +124,8 @@ enum struct TType {
 
   Self,
   Using,
+
+  Uninitialized,
 };
 
 #define TTYPE_CASE(type) \
@@ -235,6 +237,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Is);
     TTYPE_CASE(PtrSubscript);
     TTYPE_CASE(Self);
+    TTYPE_CASE(Uninitialized);
   }
   return "Unknown";
 }
@@ -358,6 +361,7 @@ static std::unordered_map<std::string, TType> keywords{
 };
 
 static std::unordered_map<std::string, TType> operators{
+    {"---", TType::Uninitialized},
     {"=>", TType::ExpressionBody},
     {":", TType::Colon},
     {"@", TType::Attribute},

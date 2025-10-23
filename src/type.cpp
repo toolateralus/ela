@@ -659,16 +659,6 @@ Type *u8_ptr_type() {
   return type;
 }
 
-Type *char_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
-  return type;
-}
-
-Type *char_ptr_type() {
-  static Type *type = global_find_type_id(char_type(), {{TYPE_EXT_POINTER_CONST}});
-  return type;
-}
-
 Type *u8_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
@@ -731,8 +721,6 @@ void init_type_system() {
   {
     bool_type();
     void_type();
-    char_type();
-    char_ptr_type();
   }
 
   {  // initialize trait types.

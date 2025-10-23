@@ -1236,6 +1236,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
 
   THIR_ALLOC(THIRVariable, thir, ast);
   check_deprecated(thir, ast->attributes);
+  thir->is_uninitialized = ast->is_uninitialized;
   thir->is_global = !ast->is_local;
   thir->is_static = ast->is_static;
   thir->is_constexpr = ast->is_constexpr;
@@ -1267,7 +1268,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
   } else {
     if (ast->value) {
       thir->value = visit_node(ast->value.get());
-    } else {
+    } else if (!thir->is_uninitialized) {
       thir->value = initialize(thir->span, ast->type->resolved_type, {});
     }
   }
@@ -1510,6 +1511,7 @@ THIRVariable *THIRGen::make_variable(const InternedString &name, THIR *value, AS
   if (ast) {
     thir->span = ast->span;
   }
+  thir->is_uninitialized = false;
   thir->name = name;
   thir->is_global = is_global;
   thir->is_statement = true;
@@ -2486,7 +2488,7 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
   // TODO: implement global static initializers in the emitter.
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini) { global_ini->name = "ela_run_global_initializers"; }
   const bool is_testing = compile_command.has_flag("test");
-  Type *const_u8_ptr_ptr_type = char_ptr_type()->take_pointer_to(false);  // u8 const* const*;
+  Type *const_u8_ptr_ptr_type = u8_ptr_type()->take_pointer_to(false);  // u8 const* const*;
 
   THIR_ALLOC_NO_SRC_RANGE(THIRVariable, argv_var);
   argv_var->name = "argv";

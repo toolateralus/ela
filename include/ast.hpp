@@ -544,6 +544,8 @@ struct ASTVariable : ASTStatement {
   InternedString name;
   InternedString bitsize;
 
+  bool is_uninitialized = false;
+
   // This isn't nullable, even though it can be null for part of compilation.
   // That's because if it ever was null, when it's done typing it will have been created.
   // It creates too much friction later on down the line if it's not.
@@ -792,7 +794,7 @@ struct ASTRange : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
 
-struct ASTForCStyle: ASTStatement {
+struct ASTForCStyle : ASTStatement {
   Scope *scope;
   ASTVariable *initialization;
   ASTExpr *condition;

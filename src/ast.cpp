@@ -2288,7 +2288,7 @@ ASTDestructure *Parser::parse_destructure() {
 }
 
 ASTVariable *Parser::parse_variable() {
-  NODE_ALLOC(ASTVariable, decl, range, _, this);
+  NODE_ALLOC(ASTVariable, decl, span, _, this);
   if (current_func_decl) {
     decl->is_local = true;
   }
@@ -2304,15 +2304,25 @@ ASTVariable *Parser::parse_variable() {
     decl->type = parse_type();
     if (peek().type == TType::Assign) {
       eat();
-      auto expr = parse_expr();
-      decl->value = expr;
+      if (peek().type == TType::Uninitialized) {
+        eat();
+        decl->is_uninitialized = true;
+      } else {
+        auto expr = parse_expr();
+        decl->value = expr;
+      }
     }
   } else {
     expect(TType::ColonEquals);
+
+    if (peek().type == TType::Uninitialized) {
+      throw_error("cannot use uninitialized syntax (---) with an untyped variable declaration", span);
+    }
+
     decl->value = parse_expr();
   }
 
-  end_node(decl, range);
+  end_node(decl, span);
   return decl;
 }
 
@@ -3384,3 +3394,4 @@ ASTForCStyle *Parser::parse_for_c_style() {
   ast->block = parse_block();
   return ast;
 }
+

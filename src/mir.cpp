@@ -161,7 +161,7 @@ Operand load_variable(const THIRVariable *node, Module &m) {
 }
 
 Operand generate_variable(const THIRVariable *node, Module &m) {
-  // static locals is just syntax sugar for a scoped global
+  // static locals are just syntax sugar for a scoped global.
   if (node->is_global || node->is_static) {
     // we take a pointer to it because we have to load from this.
     Global_Variable global = {.name = node->name, .type = node->type->take_pointer_to(), .has_external_linkage = node->is_global};
@@ -174,12 +174,14 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
   Operand dest = m.create_temporary(node->type->take_pointer_to(), node->name);
   EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
-  Operand value_temp = generate_expr(node->value, m, &dest);
+  if (!node->is_uninitialized) {
+    Operand value_temp = generate_expr(node->value, m, &dest);
 
-  // If we took advantage of the pre-existing alloca thing with m.current alloca,
-  // we wrote directly into the variables storage, so a store here would be redundant
-  if (value_temp.tag != Operand::OPERAND_TEMP || value_temp.temp != dest.temp) {
-    EMIT_STORE(dest, value_temp);
+    // Is this even applicable? it's kind of a leftover from a previous system,
+    // not sure.
+    if (value_temp.tag != Operand::OPERAND_TEMP || value_temp.temp != dest.temp) {
+      EMIT_STORE(dest, value_temp);
+    }
   }
 
   m.variables[node] = dest;

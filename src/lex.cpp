@@ -1,14 +1,8 @@
 #include "lex.hpp"
 #include "error.hpp"
-#include <set>
 
 using std::string;
 using std::stringstream;
-
-static std::set<std::string> reserved = {
-    "auto",  "break",  "case",   "const",  "continue", "default", "do",       "char",     "double",   "else",
-    "enum",  "extern", "float",  "for",    "goto",     "if",      "int",      "long",     "register", "return",
-    "short", "signed", "struct", "switch", "typedef",  "union",   "unsigned", "volatile", "while"};
 
 void Lexer::get_token(State &state) {
   size_t &pos = state.pos;
@@ -301,9 +295,6 @@ void Lexer::get_token(State &state) {
       if (keywords.contains(value)) {
         state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
       } else {
-        if (reserved.contains(value)) {
-          value = "$" + value;
-        }
         state.lookahead_buffer.push_back(Token(location, value, TType::Identifier, TFamily::Identifier));
       }
       return;
