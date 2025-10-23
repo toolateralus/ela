@@ -18,6 +18,7 @@ struct Nullable {
   Nullable(T *ptr) : ptr(ptr) {}
   T *ptr{};
   T *get() const { return ptr; }
+  T &deref() const { return *ptr; }
   void set(T *ptr) { this->ptr = ptr; }
   operator bool() const { return ptr; }
   bool is_null() const { return ptr == nullptr; }

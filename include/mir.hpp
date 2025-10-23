@@ -520,9 +520,15 @@ Operand generate_call(const THIRCall *node, Module &m);
 Operand generate_member_access(const THIRMemberAccess *node, Module &m);
 Operand generate_cast(const THIRCast *node, Module &m);
 Operand generate_index(const THIRIndex *node, Module &m);
-Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m);
-Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m);
-Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m);
+
+Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m,
+                                       Nullable<Operand> existing_alloca = nullptr);
+
+Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m,
+                                        Nullable<Operand> existing_alloca = nullptr);
+
+Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m, Nullable<Operand> existing_alloca = nullptr);
+
 Operand load_variable(const THIRVariable *node, Module &m);
 
 void generate_return(const THIRReturn *node, Module &m);
@@ -618,7 +624,7 @@ static inline void generate(const THIR *node, Module &m) {
   }
 }
 
-static inline Operand generate_expr(const THIR *node, Module &m) {
+static inline Operand generate_expr(const THIR *node, Module &m, Nullable<Operand> existing_alloca = nullptr) {
   switch (node->get_node_type()) {
     case THIRNodeType::PtrBinExpr:
       return generate_ptr_bin_expr((THIRPtrBinExpr *)node, m);
@@ -645,11 +651,11 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
     case THIRNodeType::Index:
       return generate_index((THIRIndex *)node, m);
     case THIRNodeType::AggregateInitializer:
-      return generate_aggregate_initializer((THIRAggregateInitializer *)node, m);
+      return generate_aggregate_initializer((THIRAggregateInitializer *)node, m, existing_alloca);
     case THIRNodeType::CollectionInitializer:
-      return generate_collection_initializer((THIRCollectionInitializer *)node, m);
+      return generate_collection_initializer((THIRCollectionInitializer *)node, m, existing_alloca);
     case THIRNodeType::EmptyInitializer:
-      return generate_empty_initializer((THIREmptyInitializer *)node, m);
+      return generate_empty_initializer((THIREmptyInitializer *)node, m, existing_alloca);
     default:
       return Operand{};
   }
@@ -718,8 +724,8 @@ static inline Operand generate_expr(const THIR *node, Module &m) {
   m.current_function->get_insert_block()->push(          \
       Instruction{OP_JMP_TRUE, Operand(), Operand::Make_BB_Pair(TARGET_BB, FALL_THROUGH_BB), COND, .span = node->span})
 
-#define EMIT_ZERO_INIT(DEST, PTR, TY) \
-  m.current_function->get_insert_block()->push(Instruction{OP_ZERO_INIT, DEST, PTR, TY, .span = node->span})
+#define EMIT_ZERO_INIT(PTR, TY) \
+  m.current_function->get_insert_block()->push(Instruction{OP_ZERO_INIT, Operand(), PTR, TY, .span = node->span})
 
 #define EMIT_UNREACHABLE() m.current_function->get_insert_block()->push(Instruction{OP_UNREACHABLE, .span = node->span})
 

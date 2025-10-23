@@ -616,8 +616,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::AllocaInst *ai = tmp_builder.CreateAlloca(alloc_ty, nullptr, temp.name.str());
 
         if (!compile_command.has_flag("nl")) {
-          dbg.create_variable(dbg.current_scope(DIManager::Scope::Lexical), temp.name.str(), instr.span,
-                                                      alloc_ty_di, ai, builder, llvm_ctx);
+          dbg.create_variable(dbg.current_scope(DIManager::Scope::Lexical), temp.name.str(), instr.span, alloc_ty_di, ai, builder,
+                              llvm_ctx);
         }
 
         insert_temp(index, f, ai);
@@ -741,6 +741,7 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         static llvm::Type *i8_ptr_ty = llvm::PointerType::get(i8_ty, 0);
         static llvm::Type *i1_ty = llvm::Type::getInt1Ty(llvm_ctx);
         static llvm::Type *i64_ty = llvm::Type::getInt64Ty(llvm_ctx);
+
         static llvm::Value *zero = llvm::ConstantInt::get(i8_ty, 0);
         static llvm::Value *is_volatile = llvm::ConstantInt::get(i1_ty, 0);
         static std::vector<llvm::Type *> memset_arg_types = {i8_ptr_ty, i64_ty};
@@ -748,15 +749,16 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::Value *ptr = visit_operand(instr.left, instr.span);
         Type *ty = instr.right.type;
         uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
+
         llvm::Value *cast_ptr =
             create_dbg(builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr"), instr.span);
+
         llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
+
         llvm::Function *memset_fn =
             llvm::Intrinsic::getOrInsertDeclaration(llvm_module.get(), llvm::Intrinsic::memset, memset_arg_types);
 
         create_dbg(builder.CreateCall(memset_fn, {cast_ptr, zero, size_val, is_volatile}), instr.span);
-        llvm::Value *val = create_dbg(builder.CreateLoad(llvm_typeof(ty), ptr), instr.span);
-        insert_temp(instr.dest.temp, f, val);
       } break;
     }
   }

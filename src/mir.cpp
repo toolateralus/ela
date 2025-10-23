@@ -174,7 +174,7 @@ Operand generate_variable(const THIRVariable *node, Module &m) {
   Operand dest = m.create_temporary(node->type->take_pointer_to(), node->name);
   EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
 
-  Operand value_temp = generate_expr(node->value, m);
+  Operand value_temp = generate_expr(node->value, m, &dest);
 
   // If we took advantage of the pre-existing alloca thing with m.current alloca,
   // we wrote directly into the variables storage, so a store here would be redundant
@@ -543,18 +543,16 @@ Operand generate_index(const THIRIndex *node, Module &m) {
   return result;
 }
 
-Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m) {
+Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Module &m, Nullable<Operand> existing_alloca) {
   Operand dest = Operand::MakeNull();
-  // bool used_pre_existing_alloca = false;
-  // if (m.current_alloca_stack.empty()) {
-  dest = m.create_temporary(node->type->take_pointer_to());
-  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
-  // } else {
-  // Reuse a variables alloca so we don't have to double allocate.
-  // used_pre_existing_alloca = true;
-  // dest = m.current_alloca_stack.top();
-  // m.current_alloca_stack.pop();
-  // }
+
+  if (!existing_alloca) {
+    dest = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+  } else {
+    dest = existing_alloca.deref();
+  }
+  EMIT_ZERO_INIT(dest, Operand::Make_Type_Ref(node->type));
 
   for (const auto &[key, value] : node->key_values) {
     Type *base = node->type;
@@ -573,18 +571,24 @@ Operand generate_aggregate_initializer(const THIRAggregateInitializer *node, Mod
     EMIT_STORE(field_addr, field_value);
   }
 
-  // The consumer of the pre existing alloca will load, this prevents an unneccesary double load.
-  // if (!used_pre_existing_alloca) {
   Operand result = m.create_temporary(node->type);
   EMIT_LOAD(result, dest);
   return result;
-  // }
-  // return dest;
 }
 
-Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m) {
-  Operand dest = m.create_temporary(node->type->take_pointer_to());
-  EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+Operand generate_collection_initializer(const THIRCollectionInitializer *node, Module &m, Nullable<Operand> existing_alloca) {
+  Operand dest;
+
+  if (!existing_alloca) {
+    dest = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(dest, Operand::Make_Type_Ref(node->type));
+  } else {
+    dest = existing_alloca.deref();
+  }
+
+  // Zero initialize to ensure every element that we don't emit here is also zeroed.
+  // This may be redundant.
+  EMIT_ZERO_INIT(dest, Operand::Make_Type_Ref(node->type));
 
   for (size_t i = 0; i < node->values.size(); i++) {
     Operand element_addr = m.create_temporary(node->values[i]->type->take_pointer_to());
@@ -600,15 +604,18 @@ Operand generate_collection_initializer(const THIRCollectionInitializer *node, M
   return result;
 }
 
-Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m) {
-  Operand ptr = m.create_temporary(node->type->take_pointer_to());
-  EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
-  auto result = m.create_temporary(node->type);
-  // TODO: this is completely fucking
-  // this reuses a temp for no reason
-  EMIT_ZERO_INIT(result, ptr, Operand::Make_Type_Ref(node->type));
-  EMIT_LOAD(result, ptr);
-  return result;
+Operand generate_empty_initializer(const THIREmptyInitializer *node, Module &m, Nullable<Operand> existing_alloca) {
+  Operand ptr;
+
+  if (!existing_alloca) {
+    ptr = m.create_temporary(node->type->take_pointer_to());
+    EMIT_ALLOCA(ptr, Operand::Make_Type_Ref(node->type));
+  } else {
+    ptr = *existing_alloca.get();
+  }
+
+  EMIT_ZERO_INIT(ptr, Operand::Make_Type_Ref(node->type));
+  return ptr;
 }
 
 void generate_return(const THIRReturn *node, Module &m) {
