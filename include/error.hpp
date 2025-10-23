@@ -79,68 +79,69 @@ static inline std::string get_source_line_from_span(const Span &span) {
   return "<no src>";
 }
 
-static inline std::string get_text_representation_of_source_range(const Span &span,
-                                                                  size_t num_lines_of_source_to_show) {
-  std::stringstream ss;
-  if (num_lines_of_source_to_show > 0) {
-    ss << '\n';
-    auto first = span;
-    std::ifstream src_file(Span::files()[first.file]);
-
-    if (!src_file.is_open()) {
-      return "Error: Unable to open source file\n";
-    }
-
-    std::string line;
-    size_t line_index = 0;
-    size_t start_line = (first.line > num_lines_of_source_to_show) ? first.line - num_lines_of_source_to_show : 0;
-    size_t end_line = first.line + num_lines_of_source_to_show;
-
-    while (std::getline(src_file, line)) {
-      if (line_index >= start_line && line_index <= end_line) {
-        ss << line << '\n';
-        if (line_index == first.line - 1) {
-          std::string caret_indicator = std::string(std::max(1ul, first.column), ' ') + "^^^";
-          if (terminal_supports_color) {
-            ss << "\033[90;3m";
-          }
-          ss << caret_indicator << '\n';
-          if (terminal_supports_color) {
-            ss << "\033[0m";
-          }
-        }
-      }
-      if (line_index > end_line) {
-        break;
-      }
-      line_index++;
-    }
-    src_file.close();
+static inline std::string colorize(const std::string &text, const char *ansi_code) {
+  if (terminal_supports_color) {
+    return std::string(ansi_code) + text + "\033[0m";
   }
+  return text;
+}
+static inline std::string get_text_representation_of_source_range(const Span &span, size_t num_lines_of_source_to_show) {
+  std::stringstream ss;
+  if (num_lines_of_source_to_show == 0) return "";
+
+  std::ifstream src_file(Span::files()[span.file]);
+  if (!src_file.is_open()) return "Error: Unable to open source file\n";
+
+  ss << '\n';
+
+  std::string line;
+  size_t current_line = 1;
+
+  while (std::getline(src_file, line)) {
+    if (current_line >= (span.line > num_lines_of_source_to_show ? span.line - num_lines_of_source_to_show : 1) &&
+        current_line <= span.line + num_lines_of_source_to_show) {
+      ss << line << '\n';
+
+      if (current_line == span.line) {
+        size_t caret_len = std::max<size_t>(1, span.length);
+        std::string caret_line(span.column - 1, ' ');
+        caret_line += std::string(caret_len, '^');
+        ss << colorize(caret_line, "\033[90;3m") << '\n';
+      }
+    }
+
+    if (current_line > span.line + num_lines_of_source_to_show) break;
+    current_line++;
+  }
+
   return ss.str();
 }
 
-static std::string format_source_location(const Span &span, ErrorSeverity severity,
-                                          int num_lines_of_source_to_show = 5) {
+static std::string format_source_location(const Span &span, ErrorSeverity severity, int num_lines_of_source_to_show = 1) {
   const char *color = "";
 
   if (terminal_supports_color) {
     switch (severity) {
       case ERROR_INFO:
-        color = "\033[36m";  // Cyan
+        color = "\033[1;36m";  // Cyan
         break;
       case ERROR_WARNING:
-        color = "\033[33m";  // Yellow
+        color = "\033[1;33m";  // Yellow
         break;
       case ERROR_FAILURE:
-        color = "\033[31m";  // Red
+        color = "\033[1;31m";  // Red
         break;
     }
   }
 
   std::stringstream ss;
-  ss << color << span.to_string() << (terminal_supports_color ? "\033[0m" : "");
+  ss << color << span.to_string() << (terminal_supports_color ? "\033[0m\n" : "\n");
+
+  // if (num_lines_of_source_to_show) {
+  // ss << get_source_line_from_span(span);
+  // } else {
   ss << get_text_representation_of_source_range(span, num_lines_of_source_to_show);
+  // }
 
   if (terminal_supports_color) ss << "\033[0m";
 
@@ -178,21 +179,10 @@ extern PanicHandler panic_handler;
 static PanicHandler get_default_panic_handler() {
   return [] [[noreturn]] (auto message, auto span, [[gnu::unused]] auto unused) {
     std::stringstream ss;
-
-    std::string lower_message = message;
-    std::transform(lower_message.begin(), lower_message.end(), lower_message.begin(), ::tolower);
-
-    if (lower_message.contains("undeclared") ||
-        (lower_message.contains("use of") && compile_command.has_flag("freestanding"))) {
-      lower_message +=
-          "\n You are in a freestanding environment. Many types that are normally built in, are not "
-          "included in this mode";
-    }
-
+    ss << "Error at: " << format_source_location(span, ERROR_FAILURE) << '\n';
     ss << message;
-    ss << "\n\tat: " << format_source_location(span, ERROR_FAILURE);
     const auto err = ss.str();
-    printf("%s\n", err.c_str());
+    fprintf(stderr, "%s\n", err.c_str());
     exit(1);
   };
 }

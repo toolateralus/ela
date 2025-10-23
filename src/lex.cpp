@@ -78,8 +78,8 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
-    Span location{state.line, state.col, state.file_idx};
-
+    Span location{state.line, state.col, state.file_idx, state.pos};
+    
     if (c == '\'') {
       pos++;  // move past '
       col++;
@@ -191,6 +191,7 @@ void Lexer::get_token(State &state) {
 
       std::stringstream ss;
       ss << "0x" << std::hex << codepoint;
+      location.finalize(pos);
       state.lookahead_buffer.push_back(Token(location, ss.str(), TType::Char, TFamily::Literal));
       return;
     }
@@ -226,6 +227,7 @@ void Lexer::get_token(State &state) {
       }
       pos++;
       col++;
+      location.finalize(pos);
       state.lookahead_buffer.push_back(Token(location, token.str(), TType::String, TFamily::Literal));
       return;
     }
@@ -253,6 +255,7 @@ void Lexer::get_token(State &state) {
       }
       pos += 2;  // Skip closing '"#'
       col += 2;
+      location.finalize(pos);
       state.lookahead_buffer.push_back(Token(location, token.str(), TType::MultiLineString, TFamily::Literal));
       return;
     }
@@ -292,6 +295,7 @@ void Lexer::get_token(State &state) {
       }
 
       string value = token.str();
+      location.finalize(pos);
       if (keywords.contains(value)) {
         state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
       } else {
@@ -310,6 +314,7 @@ void Lexer::get_token(State &state) {
           longest_match = current_match;
         } else {
           if (!longest_match.empty()) {
+            location.finalize(pos);
             state.lookahead_buffer.push_back(
                 Token(location, longest_match, operators.at(longest_match), TFamily::Operator));
             return;
@@ -321,6 +326,7 @@ void Lexer::get_token(State &state) {
       }
 
       if (!longest_match.empty()) {
+        location.finalize(pos);
         state.lookahead_buffer.push_back(
             Token(location, longest_match, operators.at(longest_match), TFamily::Operator));
         return;
@@ -370,6 +376,8 @@ void Lexer::get_token(State &state) {
         }
       }
       auto value = token.str();
+
+      location.finalize(pos);
 
       if (is_hex) {
         state.lookahead_buffer.push_back(Token(location, "0x" + value, TType::Integer, TFamily::Literal));

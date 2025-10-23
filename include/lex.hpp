@@ -251,11 +251,14 @@ enum struct TFamily {
 
 struct Span {
   Span() {}
-  Span(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file), valid(true) {}
+  Span(size_t line, size_t column, size_t file, size_t start)
+      : line(line), column(column), start(start), file(file), valid(true) {}
 
-  size_t line = 0, column = 0;
+  size_t line = 0, column = 0, length = 0, start = 0;
   size_t file = 0;
-  bool valid = false;
+  bool valid : 1 = false;
+
+  inline void finalize(size_t pos) { length = pos - start; }
 
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
@@ -308,8 +311,9 @@ struct Token {
   TType type;
   TFamily family;
   Span location;
+
   static Token &Eof() {
-    static Token eof = Token(Span(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
+    static Token eof = Token(Span(0, 0, 0, 0), {""}, TType::Eof, TFamily::Operator);
     return eof;
   }
 
