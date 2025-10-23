@@ -204,39 +204,52 @@ struct DIManager {
     file_stack.push(entry_file);
   }
 
-  enum class Kind { Lexical, Subroutine, File, CU } kind;
+  enum class Scope { Lexical, Subroutine, File, CU } kind;
 
-  inline void push_scope(llvm::DIScope *scope, Kind kind) {
+  inline void push_scope(llvm::DIScope *scope, Scope kind) {
     switch (kind) {
-      case Kind::Lexical:
+      case Scope::Lexical:
         lexical_stack.push(llvm::cast<llvm::DILexicalBlock>(scope));
         break;
-      case Kind::Subroutine:
+      case Scope::Subroutine:
         subprogram_stack.push(llvm::cast<llvm::DISubprogram>(scope));
         break;
-      case Kind::File:
+      case Scope::File:
         file_stack.push(llvm::cast<llvm::DIFile>(scope));
         break;
-      case Kind::CU:
+      case Scope::CU:
         cu_stack.push(llvm::cast<llvm::DICompileUnit>(scope));
         break;
     }
   }
 
-  inline void pop_scope(Kind kind) {
+  inline void pop_scope(Scope kind) {
     switch (kind) {
-      case Kind::Lexical:
+      case Scope::Lexical:
         if (!lexical_stack.empty()) lexical_stack.pop();
         break;
-      case Kind::Subroutine:
+      case Scope::Subroutine:
         if (!subprogram_stack.empty()) subprogram_stack.pop();
         break;
-      case Kind::File:
+      case Scope::File:
         if (!file_stack.empty()) file_stack.pop();
         break;
-      case Kind::CU:
+      case Scope::CU:
         if (!cu_stack.empty()) cu_stack.pop();
         break;
+    }
+  }
+
+  inline llvm::DIScope *current_scope(Scope kind) const {
+    switch (kind) {
+      case Scope::Lexical:
+        return lexical_stack.top();
+      case Scope::Subroutine:
+        return subprogram_stack.top();
+      case Scope::File:
+        return file_stack.top();
+      case Scope::CU:
+        return cu_stack.top();
     }
   }
 
@@ -277,9 +290,17 @@ struct DIManager {
     return block;
   }
 
-  inline llvm::DIVariable *create_variable(llvm::DIScope *scope, const std::string &name, Span span, llvm::DIType *type) {
+  inline llvm::DILocation *get_location(const Span &span, llvm::DIScope *scope, llvm::LLVMContext &ctx) {
+    return llvm::DILocation::get(ctx, span.line, span.column, scope, nullptr);
+  }
+
+  inline llvm::DIVariable *create_variable(llvm::DIScope *scope, const std::string &name, Span span, llvm::DIType *type,
+                                           llvm::Value *alloca, llvm::IRBuilder<> &builder, llvm::LLVMContext &ctx) {
     auto [basename, dirpath, line, column] = extract_span(span);
-    return di_builder->createAutoVariable(scope, name, get_file_scope(span), line, type, true);
+    llvm::DILocalVariable *var = di_builder->createAutoVariable(scope, name, get_file_scope(span), line, type, true);
+    di_builder->insertDeclare(alloca, var, di_builder->createExpression(), get_location(span, scope, ctx),
+                              builder.GetInsertBlock());
+    return var;
   }
 
   inline llvm::DIType *create_basic_type(const std::string &name, uint64_t size_in_bits, unsigned encoding) {
@@ -548,9 +569,9 @@ struct LLVM_Emitter {
         llvm::Type *largest_member_type = nullptr;
         uint64_t largest_member_size = 0;
 
-        auto di_struct_type = dbg.create_struct_type(
-            dbg.current_scope(), struct_name, file, 0, type->size_in_bytes() * 8,
-            data_layout.getABITypeAlign(llvm_struct_type).value() * 8, llvm::DINode::FlagZero, member_debug_info);
+        auto di_struct_type = dbg.create_struct_type(dbg.current_scope(), struct_name, file, 0, type->size_in_bytes() * 8,
+                                                     data_layout.getABITypeAlign(llvm_struct_type).value() * 8,
+                                                     llvm::DINode::FlagZero, member_debug_info);
 
         for (const auto &[name, symbol] : info->scope->symbols) {
           if (!symbol.is_variable) continue;

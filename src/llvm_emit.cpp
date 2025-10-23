@@ -2,6 +2,7 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
+#include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
@@ -399,7 +400,7 @@ void LLVM_Emitter::emit_module() {
     emit_function(f, function_table[f]);
   }
 
-  dbg.pop_scope(DIManager::Kind::CU);
+  dbg.pop_scope(DIManager::Scope::CU);
 }
 
 void LLVM_Emitter::register_constructor(llvm::Function *func, uint32_t priority) {
@@ -479,8 +480,9 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
   temps.clear();
   bb_table.clear();
   builder.ClearInsertionPoint();
+
   if (!compile_command.has_flag("nl")) {
-    dbg.pop_scope(DIManager::Kind::Subroutine);
+    dbg.pop_scope(DIManager::Scope::Subroutine);
   }
 
   if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0)) {
@@ -493,7 +495,9 @@ void LLVM_Emitter::emit_function(Mir::Function *f, llvm::Function *ir_f) {
 }
 
 void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm::BasicBlock *entry_bb) {
-  dbg.enter_lexical_scope(dbg.current_scope(), bb->code.front().span);
+  if (!compile_command.has_flag("nl")) {
+    dbg.enter_lexical_scope(dbg.current_scope(DIManager::Scope::Subroutine), bb->code.front().span);
+  }
 
   for (auto &instr : bb->code) {
     switch (instr.opcode) {
@@ -612,7 +616,8 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         llvm::AllocaInst *ai = tmp_builder.CreateAlloca(alloc_ty, nullptr, temp.name.str());
 
         if (!compile_command.has_flag("nl")) {
-          dbg.create_variable(dbg.current_scope(), temp.name.str(), instr.span, alloc_ty_di);
+          dbg.create_variable(dbg.current_scope(DIManager::Scope::Lexical), temp.name.str(), instr.span,
+                                                      alloc_ty_di, ai, builder, llvm_ctx);
         }
 
         insert_temp(index, f, ai);
@@ -756,7 +761,9 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
     }
   }
 
-  dbg.pop_scope(DIManager::Kind::Lexical);
+  if (!compile_command.has_flag("nl")) {
+    dbg.pop_scope(DIManager::Scope::Lexical);
+  }
 }
 
 llvm::Value *LLVM_Emitter::visit_operand(Operand o, Span span) {
@@ -836,6 +843,6 @@ llvm::DISubprogram *DIManager::enter_function_scope(const Type *type, LLVM_Emitt
                                                               llvm::DISubprogram::SPFlagDefinition);
 
   function->setSubprogram(subprogram);
-  push_scope(subprogram, Kind::Subroutine);
+  push_scope(subprogram, Scope::Subroutine);
   return subprogram;
 }
