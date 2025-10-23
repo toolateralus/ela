@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../ela-stdlib"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.ela": "ela"
+		}
+	}
+}

@@ -66,9 +66,7 @@ void generate_block(const THIRBlock *node, Module &m) {
   if (node->statements.empty() || block_only_contains_noop(node)) {
     return;
   }
-  Basic_Block *entry_block = m.get_insert_block();
   for (const THIR *stmt : node->statements) {
-    m.current_function->set_insert_block(entry_block);
     generate(stmt, m);
     if (m.current_function->insert_block->ends_with_terminator()) {
       return;

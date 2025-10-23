@@ -589,12 +589,20 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
     throw_error("internal compiler error: attempting to visit body of function forward declaration.", node->span);
   }
   block->accept(this);
-  auto control_flow = block->control_flow;
-  if (control_flow.type == Type::INVALID_TYPE) control_flow.type = void_type();
-  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE)) throw_error("Keyword \"continue\" must be in a loop.", node->span);
-  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK)) throw_error("Keyword \"break\" must be in a loop.", node->span);
-  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH) && node->return_type->resolved_type != void_type())
+  ControlFlow control_flow = block->control_flow;
+
+  if (control_flow.type == Type::INVALID_TYPE) {
+    control_flow.type = void_type();
+  }
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE)) {
+    throw_error("\"continue\" can only be used in a loop.", node->span);
+  }
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK)) {
+    throw_error("\"break\" can only be used in a loop.", node->span);
+  }
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH) && node->return_type->resolved_type != void_type()) {
     throw_error("Not all code paths return a value.", node->span);
+  }
 }
 
 Type *Typer::get_self_type() {
@@ -2445,18 +2453,11 @@ void Typer::visit(ASTBinExpr *node) {
         node->span);
   }
 
-  const bool is_valid_arithmetic_operator = (node->op == TType::Add || node->op == TType::Sub || node->op == TType::CompAdd || node->op == TType::CompSub);
+  const bool is_valid_arithmetic_operator =
+      (node->op == TType::Add || node->op == TType::Sub || node->op == TType::CompAdd || node->op == TType::CompSub);
 
   const std::unordered_set<TType> permissible_non_arithmetic_pointer_operations = {
-    TType::Assign,
-    TType::EQ,
-    TType::NEQ,
-    TType::LT,
-    TType::LE,
-    TType::GT,
-    TType::GE,
-    TType::LogicalOr,
-    TType::LogicalAnd,
+      TType::Assign, TType::EQ, TType::NEQ, TType::LT, TType::LE, TType::GT, TType::GE, TType::LogicalOr, TType::LogicalAnd,
   };
 
   if (is_valid_arithmetic_operator) {
