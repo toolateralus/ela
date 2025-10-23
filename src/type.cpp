@@ -1213,67 +1213,65 @@ size_t TupleTypeInfo::size_in_bytes() const {
 }
 
 bool Type::try_get_offset_in_bytes(const InternedString &field, size_t &out_offset) const {
+  // Recurse into base type for pointers/arrays
   if (is_pointer() || is_fixed_sized_array()) {
-    if (!base_type || base_type == Type::INVALID_TYPE) return false;
+    if (!base_type || base_type == Type::INVALID_TYPE) {
+      return false;
+    }
     return base_type->try_get_offset_in_bytes(field, out_offset);
   }
 
-  if (kind == TYPE_STRUCT) {
-    auto info = this->info->as<StructTypeInfo>();
-
-    // Unions — all members at offset 0.
-    if (info->is_union) {
-      for (const auto &member : info->members) {
-        if (member.name == field) {
-          out_offset = 0;
-          return true;
-        }
-
-        // Scan anonymous union members
-        if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-          size_t suboffset = 0;
-          if (member.type->try_get_offset_in_bytes(field, suboffset)) {
-            out_offset = 0;  // all union fields at 0
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    // Regular struct
-    size_t offset = 0;
-    size_t max_align = 1;
-    for (const auto &member : info->members) {
-      size_t member_size = member.type->size_in_bytes();
-      size_t align = member.type->alignment_in_bytes();
-      max_align = std::max(max_align, align);
-      offset = (offset + align - 1) & ~(align - 1);
-
-      if (member.name == field) {
-        out_offset = offset;
-        return true;
-      }
-
-      // Recurse through anonymous members
-      if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-        size_t suboffset = 0;
-        if (member.type->try_get_offset_in_bytes(field, suboffset)) {
-          out_offset = offset + suboffset;
-          return true;
-        }
-      }
-
-      offset += member_size;
-    }
-
+  if (kind == TYPE_ENUM) {
     return false;
   }
 
-  // Handle tuple, choice, enum, dyn, etc. as needed
-  if (kind == TYPE_TUPLE || kind == TYPE_CHOICE || kind == TYPE_ENUM || kind == TYPE_DYN) {
-    // You can add recursive behavior here if needed later
+  bool is_union = false;
+  if (kind == TYPE_STRUCT) {
+    is_union = info->as<StructTypeInfo>()->is_union;
+  } else if (kind == TYPE_CHOICE) {
+    is_union = true;
+  }
+
+  if (is_union) {
+    for (const auto &member : info->members) {
+      if (member.name == field) {
+        out_offset = 0;
+        return true;
+      }
+      if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+        size_t suboffset = 0;
+        if (member.type->try_get_offset_in_bytes(field, suboffset)) {
+          out_offset = 0;
+          return true;
+        }
+      }
+    }
     return false;
+  }
+
+  size_t offset = 0;
+  size_t max_align = 1;
+  for (const auto &member : info->members) {
+    size_t align = member.type->alignment_in_bytes();
+    size_t member_size = member.type->size_in_bytes();
+    max_align = std::max(max_align, align);
+    offset = (offset + align - 1) & ~(align - 1);
+
+    if (member.name == field) {
+      out_offset = offset;
+      return true;
+    }
+
+    // Anonymous members
+    if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+      size_t suboffset = 0;
+      if (member.type->try_get_offset_in_bytes(field, suboffset)) {
+        out_offset = offset + suboffset;
+        return true;
+      }
+    }
+
+    offset += member_size;
   }
 
   return false;
@@ -1281,7 +1279,7 @@ bool Type::try_get_offset_in_bytes(const InternedString &field, size_t &out_offs
 
 size_t Type::offset_in_bytes(const InternedString &field) const {
   size_t offset = 0;
-  
+
   if (try_get_offset_in_bytes(field, offset)) {
     return offset;
   }
