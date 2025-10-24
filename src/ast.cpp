@@ -1053,7 +1053,8 @@ ASTExpr *Parser::parse_postfix() {
 
       if (peeked.type == TType::Integer || peeked.type == TType::Identifier || peeked.type == TType::Mul ||
           peeked.type == TType::LParen || peeked.type == TType::Size_Of || peeked.type == TType::Dyn_Of ||
-          peeked.type == TType::Type_Of || peeked_prec != Precedence::PRECEDENCE_INVALID_OPERATOR) {
+          peeked.type == TType::Type_Of || peeked.type == TType::Bitsize_Of ||
+          peeked_prec != Precedence::PRECEDENCE_INVALID_OPERATOR) {
         node->right = parse_expr();
       }
 
@@ -1159,6 +1160,15 @@ ASTExpr *Parser::parse_primary() {
     }
     case TType::Size_Of: {
       NODE_ALLOC(ASTSize_Of, node, _, this);
+      eat();
+      expect(TType::LParen);
+      node->target_type = parse_type();
+      expect(TType::RParen);
+      return node;
+    }
+    case TType::Bitsize_Of: {
+      NODE_ALLOC(ASTSize_Of, node, _, this);
+      node->asking_for_bits = true;
       eat();
       expect(TType::LParen);
       node->target_type = parse_type();

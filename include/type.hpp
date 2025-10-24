@@ -190,12 +190,12 @@ struct FunctionTypeInfo : TypeInfo {
 struct ScalarTypeInfo : TypeInfo {
   ScalarTypeInfo() {}
   bool is_integral = false;
-  size_t size = 0;
+  size_t size_in_bits = 0;
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
   inline bool is_float() const { return scalar_type == TYPE_FLOATING; }
   inline bool is_signed() const { return scalar_type == TYPE_SIGNED; }
-  size_t size_in_bytes() const override { return size; }
+  size_t size_in_bytes() const override { return size_in_bits * 8; }
 };
 
 struct EnumTypeInfo : TypeInfo {
@@ -469,6 +469,7 @@ struct Type {
   static Type *UNRESOLVED_GENERIC;
   constexpr static Type *INVALID_TYPE = nullptr;
 
+  size_t size_in_bits() const;
   size_t size_in_bytes() const;
   size_t alignment_in_bytes() const;
 

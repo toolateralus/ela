@@ -605,21 +605,12 @@ Token get_unique_identifier() {
   return tok;
 }
 
-ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral) {
+ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size_in_bits, bool is_integral) {
   auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
-  info->size = size;
+  info->size_in_bits = size_in_bits;
   info->is_integral = is_integral;
   return info;
-}
-
-Type *bool_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
-  return type;
-}
-Type *void_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
-  return type;
 }
 
 // an empty tuple type. this is a ZST just like void.
@@ -638,16 +629,24 @@ Type *unit_type() {
   return type;
 }
 
+Type *bool_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
+  return type;
+}
+Type *void_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
+  return type;
+}
 Type *u64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_UNSIGNED, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_UNSIGNED, 64, true));
   return type;
 }
 Type *u32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_UNSIGNED, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_UNSIGNED, 32, true));
   return type;
 }
 Type *u16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_UNSIGNED, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_UNSIGNED, 16, true));
   return type;
 }
 
@@ -657,32 +656,32 @@ Type *u8_ptr_type() {
 }
 
 Type *u8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_UNSIGNED, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_UNSIGNED, 8, true));
   return type;
 }
 
 Type *s64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_SIGNED, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_SIGNED, 64, true));
   return type;
 }
 Type *s32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_SIGNED, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_SIGNED, 32, true));
   return type;
 }
 Type *s16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_SIGNED, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_SIGNED, 16, true));
   return type;
 }
 Type *s8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_SIGNED, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_SIGNED, 8, true));
   return type;
 }
 Type *f32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOATING, 4));
+  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOATING, 32));
   return type;
 }
 Type *f64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_FLOATING, 8));
+  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_FLOATING, 64));
   return type;
 }
 
@@ -758,7 +757,7 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
     return false;
   }
 
-  return from_info->size <= to_info->size;
+  return from_info->size_in_bits <= to_info->size_in_bits;
 }
 
 Type *global_create_tuple_type(const std::vector<Type *> &types) {
@@ -1316,3 +1315,88 @@ bool Type::try_get_index_of_member(const InternedString &name, size_t &index) {
 }
 
 size_t Type::offset_in_bytes(const size_t index) const { return offset_in_bytes(info->members[index].name); }
+
+size_t Type::size_in_bits() const {
+  if (is_pointer()) {
+    return sizeof(void *) * 8;
+  }
+
+  if (is_fixed_sized_array()) {
+    size_t elem_bits = base_type->size_in_bits();
+    size_t len = extensions.back().array_size;
+    return elem_bits * len;
+  }
+
+  if (is_kind(TYPE_SCALAR)) {
+    return info->as<ScalarTypeInfo>()->size_in_bits;
+  }
+
+  if (is_kind(TYPE_STRUCT)) {
+    size_t offset = 0;
+    size_t max_align = 1;
+    auto struct_info = info->as<StructTypeInfo>();
+    if (struct_info->is_union) {
+      size_t max_bits = 0;
+      for (auto &member : struct_info->members) {
+        max_bits = std::max(max_bits, member.type->size_in_bits());
+        max_align = std::max(max_align, member.type->alignment_in_bytes());
+      }
+      max_bits = (max_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
+      return max_bits;
+    } else {
+      for (auto &member : struct_info->members) {
+        size_t align = member.type->alignment_in_bytes();
+        size_t member_bits = member.type->size_in_bits();
+        max_align = std::max(max_align, align);
+        offset = (offset + align * 8 - 1) & ~(align * 8 - 1);
+        offset += member_bits;
+      }
+      offset = (offset + max_align * 8 - 1) & ~(max_align * 8 - 1);
+      return offset;
+    }
+  }
+
+  if (is_kind(TYPE_ENUM)) {
+    return info->as<EnumTypeInfo>()->underlying_type->size_in_bits();
+  }
+
+  if (is_kind(TYPE_TUPLE)) {
+    size_t offset = 0;
+    size_t max_align = 1;
+    auto tuple_info = info->as<TupleTypeInfo>();
+    for (auto &member : tuple_info->members) {
+      size_t align = member.type->alignment_in_bytes();
+      size_t member_bits = member.type->size_in_bits();
+      max_align = std::max(max_align, align);
+      offset = (offset + align * 8 - 1) & ~(align * 8 - 1);
+      offset += member_bits;
+    }
+    offset = (offset + max_align * 8 - 1) & ~(max_align * 8 - 1);
+    return offset;
+  }
+  if (is_kind(TYPE_CHOICE)) {
+    const auto *choice_info = info->as<ChoiceTypeInfo>();
+    size_t max_bits = sizeof(int32_t) * 8;
+    size_t max_variant_bits = 0;
+    size_t max_align = alignof(int32_t);
+
+    for (const auto &member : choice_info->members) {
+      size_t variant_bits = member.type->size_in_bits();
+      size_t align = member.type->alignment_in_bytes();
+      max_variant_bits = std::max(max_variant_bits, variant_bits);
+      max_align = std::max(max_align, align);
+    }
+
+    max_variant_bits = (max_variant_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
+    size_t total_bits = max_bits + max_variant_bits;
+
+    total_bits = (total_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
+    return total_bits;
+  }
+
+  if (is_kind(TYPE_DYN)) {
+    return info->size_in_bytes() * 8;
+  }
+
+  return size_in_bytes() * 8;
+}

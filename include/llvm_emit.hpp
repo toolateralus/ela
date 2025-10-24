@@ -504,21 +504,32 @@ struct LLVM_Emitter {
             di_type = dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned);
             break;
           case TYPE_SIGNED:
-            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size * 8);
-            di_type = dbg.create_basic_type("signed", info->size * 8, llvm::dwarf::DW_ATE_signed);
+            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size_in_bits);
+            di_type = dbg.create_basic_type("signed", info->size_in_bits, llvm::dwarf::DW_ATE_signed);
             break;
           case TYPE_UNSIGNED:
-            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size * 8);
-            di_type = dbg.create_basic_type("unsigned", info->size * 8, llvm::dwarf::DW_ATE_unsigned);
+            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size_in_bits);
+            di_type = dbg.create_basic_type("unsigned", info->size_in_bits, llvm::dwarf::DW_ATE_unsigned);
             break;
           case TYPE_FLOATING:
-            if (info->size == 4)
-              llvm_type = llvm::Type::getFloatTy(llvm_ctx);
-            else if (info->size == 8)
-              llvm_type = llvm::Type::getDoubleTy(llvm_ctx);
-            else
-              llvm_type = llvm::Type::getFP128Ty(llvm_ctx);  // fallback for other sizes
-            di_type = dbg.create_basic_type("float", info->size * 8, llvm::dwarf::DW_ATE_float);
+            switch (info->size_in_bits) {
+              case 16:
+                llvm_type = llvm::Type::getHalfTy(llvm_ctx);
+                break;
+              case 32:
+                llvm_type = llvm::Type::getFloatTy(llvm_ctx);
+                break;
+              case 64:
+                llvm_type = llvm::Type::getDoubleTy(llvm_ctx);
+                break;
+              case 128:
+                llvm_type = llvm::Type::getFP128Ty(llvm_ctx);
+                break;
+              default:
+                throw_error(std::format("unsupported floating point size: {}", info->size_in_bits), {});
+                break;
+            }
+            di_type = dbg.create_basic_type("float", info->size_in_bits, llvm::dwarf::DW_ATE_float);
             break;
           case TYPE_BOOL:
             llvm_type = llvm::Type::getInt1Ty(llvm_ctx);

@@ -925,6 +925,7 @@ struct ASTStructDeclaration : ASTDeclaration {
 };
 
 struct ASTSize_Of : ASTExpr {
+  bool asking_for_bits = false;
   ASTType *target_type;
   ASTNodeType get_node_type() const override { return AST_NODE_SIZE_OF; }
   void accept(VisitorBase *visitor) override;

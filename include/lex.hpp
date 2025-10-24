@@ -108,6 +108,7 @@ enum struct TType {
   Where,
 
   Size_Of,
+  Bitsize_Of,
   Type_Of,
 
   Type,
@@ -214,6 +215,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Else);
 
     TTYPE_CASE(Size_Of);
+    TTYPE_CASE(Bitsize_Of);
     TTYPE_CASE(Type_Of);
 
     TTYPE_CASE(Trait);
@@ -332,6 +334,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"in", TType::In},
     {"where", TType::Where},
     {"sizeof", TType::Size_Of},
+    {"bitsize_of", TType::Bitsize_Of},
     {"typeof", TType::Type_Of},
     {"fn", TType::Fn},
     {"switch", TType::Switch},
@@ -419,7 +422,6 @@ static std::unordered_map<std::string, TType> operators{
     {"!<", TType::GenericBrace},
     {"![", TType::PtrSubscript},
 };
-
 
 extern size_t num_lines_code_processed_by_lexer_excluding_comments;
 extern size_t num_lines_comments_processed_by_lexer;

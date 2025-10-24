@@ -78,8 +78,13 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
   I put some of these super trivial nodes up top here so they stay out of the way
 */
 THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
-  return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->span, u64_type(),
-                      ASTLiteral::Integer);
+  if (ast->asking_for_bits) {
+    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bits()), ast->span, u64_type(),
+                        ASTLiteral::Integer);
+  } else {
+    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->span, u64_type(),
+                        ASTLiteral::Integer);
+  }
 }
 
 THIR *THIRGen::visit_continue(ASTContinue *ast) {
@@ -688,7 +693,7 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
     literal->value = ast->value;
     THIR_ALLOC(THIRCast, cast, ast);
     cast->operand = literal;
-    cast->type = (Type*)ast->conversion.to;
+    cast->type = (Type *)ast->conversion.to;
     return cast;
   }
 

@@ -59,34 +59,34 @@ ffi_type* to_ffi_type(Type* t) {
     switch (info->scalar_type) {
       case TYPE_FLOATING:
         // Use double for floating point by default; adjust if you support f32/f64 distinction
-        if (info->size == sizeof(float)) {
+        if (info->size_in_bits == (sizeof(float) * 8)) {
           return &ffi_type_float;
         } else {
           return &ffi_type_double;
         }
       case TYPE_SIGNED:
-        switch (info->size) {
-          case 1:
-            return &ffi_type_sint8;
-          case 2:
-            return &ffi_type_sint16;
-          case 4:
-            return &ffi_type_sint32;
+        switch (info->size_in_bits) {
           case 8:
+            return &ffi_type_sint8;
+          case 16:
+            return &ffi_type_sint16;
+          case 32:
+            return &ffi_type_sint32;
+          case 64:
             return &ffi_type_sint64;
           default:
             break;
         }
         break;
       case TYPE_UNSIGNED:
-        switch (info->size) {
-          case 1:
-            return &ffi_type_uint8;
-          case 2:
-            return &ffi_type_uint16;
-          case 4:
-            return &ffi_type_uint32;
+        switch (info->size_in_bits) {
           case 8:
+            return &ffi_type_uint8;
+          case 16:
+            return &ffi_type_uint16;
+          case 32:
+            return &ffi_type_uint32;
+          case 64:
             return &ffi_type_uint64;
           default:
             break;
@@ -598,19 +598,19 @@ Value* unmarshal_scalar_return(Type* rtype, ScalarTypeInfo* info, const std::vec
   switch (info->scalar_type) {
     case TYPE_FLOATING: {
       float tmp;
-      memcpy(&tmp, ret_storage.data(), info->size);
+      memcpy(&tmp, ret_storage.data(), (info->size_in_bits / 8));
       return new_float(tmp);
     }
     case TYPE_SIGNED: {
       int64_t tmp = 0;
-      size_t sz = info->size;
-      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof(tmp)));
+      size_t sz = info->size_in_bits;
+      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof tmp));
       return new_int(tmp);
     }
     case TYPE_UNSIGNED: {
       uint64_t tmp = 0;
-      size_t sz = info->size;
-      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof(tmp)));
+      size_t sz = info->size_in_bits;
+      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof tmp));
       return new_int(tmp);
     }
     case TYPE_BOOL: {
