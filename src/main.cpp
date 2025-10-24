@@ -31,7 +31,7 @@ jstl::Arena thir_arena(MB(10));
 jstl::Arena value_arena(MB(10));
 jstl::Arena binding_arena(MB(10));
 
-namespace Mir {
+namespace mir {
   jstl::Arena mir_arena = {MB(10)};
 }
 

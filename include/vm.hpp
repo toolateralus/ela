@@ -8,7 +8,7 @@
 
 #undef alloca
 
-namespace Mir::VM {
+namespace mir::VM {
 
 struct Stack_Frame {
   // All values stored as a blob of words, always 64 bit.
@@ -36,7 +36,7 @@ struct Stack_Frame {
 
   // each function encodes how many bytes it needs to allocate in the MIR,
   // so we pass this in here each time we create a function frame.s
-  inline explicit Stack_Frame(Mir::Function *f) : basic_blocks(f->basic_blocks) {
+  inline explicit Stack_Frame(mir::Function *f) : basic_blocks(f->basic_blocks) {
     assert(f->stack_size_needed_in_bytes % 8 == 0 && "stack size must be 8-byte aligned");
     stack = std::vector<uint64_t>(f->stack_size_needed_in_bytes / 8);
 
@@ -120,6 +120,6 @@ struct Context {
   std::vector<Stack_Frame> call_stack;
 };
 
-void interpret(Context &c, Mir::Module &m, uint32_t entry_point = 0);
+void interpret(Context &c, mir::Module &m, uint32_t entry_point = 0);
 
-}  // namespace Mir::VM
+}  // namespace mir::VM

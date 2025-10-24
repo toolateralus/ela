@@ -9,7 +9,7 @@
 #include "thir.hpp"
 #include "type.hpp"
 
-namespace Mir {
+namespace mir {
 static std::vector<Basic_Block *> g_break_targets;
 static std::vector<Basic_Block *> g_continue_targets;
 
@@ -24,11 +24,6 @@ static bool block_only_contains_noop(const THIRBlock *b) {
   }
   return count == b->statements.size();
 }
-
-/*
-  TODO: we need to figure out breaks, continues, and nested control flow.
-  it's like one of the primary most broken things about the MIR.
-*/
 
 void generate_return(const THIRReturn *node, Module &m) {
   if (!node->expression) {
@@ -691,17 +686,29 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
 }
 
 Operand generate_call(const THIRCall *node, Module &m) {
-  for (const THIR *arg : node->arguments) {
-    Operand arg_operand = generate_expr(arg, m);
-    EMIT_PUSH_ARG(arg_operand);
-  }
-
   Operand result = Operand::MakeNull();
   if (node->type != void_type()) {
     result = m.create_temporary(node->type);
   }
   Operand fn_operand = generate_expr(node->callee, m);
   Operand arg_count = Operand::Make_Imm(Constant::Int(node->arguments.size()), u32_type());
+
+  THIRFunction *callee = nullptr;
+  if (node->callee->get_node_type() == THIRNodeType::Function) {
+    callee = (THIRFunction *)node->callee;
+  }
+
+  for (const THIR *arg : node->arguments) {
+    Operand arg_operand = generate_expr(arg, m);
+    if (callee && callee->is_varargs) {
+      if (arg_operand.type->is_float() && arg_operand.type != f64_type()) {
+        Operand casted = m.create_temporary(f64_type(), "varargs_float_to_f64");
+        EMIT_CAST(casted, arg_operand, Operand::Make_Type_Ref(f64_type()));
+        arg_operand = casted;
+      }
+    }
+    EMIT_PUSH_ARG(arg_operand);
+  }
 
   if (node->callee->type->is_pointer()) {
     EMIT_CALL_PTR(result, fn_operand, arg_count);
@@ -1065,4 +1072,4 @@ void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction 
 
   generate(entry_point, m);
 }
-}  // namespace Mir
+}  // namespace mir

@@ -196,7 +196,7 @@ void print_type(FILE *f, const Type *t, int indent = 0) {
   }
 }
 
-void Mir::Module::print(FILE *f) const {
+void mir::Module::print(FILE *f) const {
   fprintf(f, "Types: {\n");
 
   // Collect all dependencies in proper order
@@ -219,7 +219,7 @@ void Mir::Module::print(FILE *f) const {
   }
 }
 
-void Mir::Instruction::print(FILE *f, Module &m) const {
+void mir::Instruction::print(FILE *f, Module &m) const {
   const char *opcode_name;
 
   switch (opcode) {
@@ -456,7 +456,7 @@ void Mir::Instruction::print(FILE *f, Module &m) const {
   }
 }
 
-void Mir::Basic_Block::print(FILE *f, Module &m) const {
+void mir::Basic_Block::print(FILE *f, Module &m) const {
   fprintf(f, "%s:", label.c_str());
   fprintf(f, "\n");
   for (const auto &instruction : code) {
@@ -464,7 +464,7 @@ void Mir::Basic_Block::print(FILE *f, Module &m) const {
   }
 }
 
-void Mir::Function::print(FILE *f, Module &m) const {
+void mir::Function::print(FILE *f, Module &m) const {
   if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
     fprintf(f, "extern ");
   }
@@ -502,7 +502,7 @@ void Mir::Function::print(FILE *f, Module &m) const {
   fprintf(f, "}\n");
 }
 
-void Mir::Constant::print(FILE *f) const {
+void mir::Constant::print(FILE *f) const {
   switch (tag) {
     case CONST_INVALID:
       fprintf(f, "invalid");

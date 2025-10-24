@@ -68,19 +68,19 @@ int CompileCommand::compile() {
 #elif defined(_WIN32)
   Win64_C_Calling_Convention calling_conv;
 #endif
-  Mir::Module m{&calling_conv};
+  mir::Module m{&calling_conv};
 
   mir_gen_metric.run<void>("Generating MIR", [&] {
     if (entry_point) {
-      Mir::compile(entry_point, m, thir_gen.constructors, thir_gen.test_functions, thir_gen.global_initializer_function);
+      mir::compile(entry_point, m, thir_gen.constructors, thir_gen.test_functions, thir_gen.global_initializer_function);
     } else {
-      Mir::generate(thir_program, m);
+      mir::generate(thir_program, m);
     }
     m.finalize();
 
 #if 0
-    Mir::VM::Context c;
-    Mir::VM::interpret(c, m, 0);
+    mir::VM::Context c;
+    mir::VM::interpret(c, m, 0);
 #endif
     if (compile_command.has_flag("save-mir")) {
       auto path = compile_command.binary_path.string() + std::string{".emir"};

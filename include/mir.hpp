@@ -19,7 +19,7 @@
   it's not too late to start, especially things like this that are kind of end-of-pipeline
   and self contained.
 */
-namespace Mir {
+namespace mir {
 enum Op_Code : uint8_t {
   OP_UNREACHABLE = 0,
   /* Arithmetic */
@@ -341,9 +341,9 @@ struct Temporary {
   uint32_t index;
 };
 
+
 struct Function {
   uint32_t index;  // how to refer to this function.
-
   InternedString name;
   Span span;
 
@@ -457,9 +457,9 @@ struct Module {
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
 
-  Calling_Convention *calling_conv;
+  Calling_Convention *cc;
 
-  Module(Calling_Convention *calling_conv): calling_conv(calling_conv) {}
+  Module(Calling_Convention *calling_conv) : cc(calling_conv) {}
 
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
@@ -745,4 +745,4 @@ static inline Operand generate_expr(const THIR *node, Module &m, Nullable<Operan
 
 #define EMIT_UNREACHABLE() m.current_function->get_insert_block()->push(Instruction{OP_UNREACHABLE, .span = node->span})
 
-}  // namespace Mir
+}  // namespace mir

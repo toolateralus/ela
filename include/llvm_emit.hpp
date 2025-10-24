@@ -36,7 +36,7 @@
 #include <system_error>
 #include <unordered_map>
 
-using namespace Mir;
+using namespace mir;
 
 using llvm::DataLayout;
 using llvm::DIBuilder;
@@ -382,11 +382,11 @@ struct LLVM_Emitter {
 
   Nullable<llvm::Value> sret_destination = nullptr;
 
-  Mir::Module &m;
+  mir::Module &m;
 
   std::unordered_map<const Global_Variable *, llvm::GlobalVariable *> global_variables;
-  std::unordered_map<Mir::Function *, llvm::Function *> function_table;
-  std::unordered_map<Mir::Basic_Block *, llvm::BasicBlock *> bb_table;
+  std::unordered_map<mir::Function *, llvm::Function *> function_table;
+  std::unordered_map<mir::Basic_Block *, llvm::BasicBlock *> bb_table;
   std::vector<llvm::Value *> arg_stack;
 
   struct Allocation {
@@ -404,7 +404,7 @@ struct LLVM_Emitter {
     return stream;
   }
 
-  inline void insert_temp(uint32_t idx, Mir::Function *f, llvm::Value *v) {
+  inline void insert_temp(uint32_t idx, mir::Function *f, llvm::Value *v) {
     Type *type = nullptr;
     InternedString name = "";
 
@@ -424,7 +424,7 @@ struct LLVM_Emitter {
     temps[idx] = allocation;
   }
 
-  inline LLVM_Emitter(Mir::Module &m) : llvm_ctx(), builder(llvm_ctx), data_layout(""), m(m) {
+  inline LLVM_Emitter(mir::Module &m) : llvm_ctx(), builder(llvm_ctx), data_layout(""), m(m) {
     if (m.functions.empty()) {
       fprintf(stderr, "No code to compile. aborting\n");
       exit(1);
@@ -789,8 +789,8 @@ struct LLVM_Emitter {
   }
 
   void emit_module();
-  void emit_function(Mir::Function *f, llvm::Function *ir_f);
-  void emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm::BasicBlock *entry_bb);
+  void emit_function(mir::Function *f, llvm::Function *ir_f);
+  void emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm::BasicBlock *entry_bb);
 
   inline llvm::Value *create_dbg(llvm::Value *v, Span span) {
     return dbg.create_dbg(v, span);  // attaches debug info if v is an instruction

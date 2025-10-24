@@ -1,7 +1,7 @@
 #include "vm.hpp"
 #include "mir.hpp"
 
-namespace Mir::VM {
+namespace mir::VM {
 
 static inline uint64_t decode_operand(const Operand &op, const Stack_Frame &sf) {
   if (op.tag == Operand::OPERAND_TEMP) {
@@ -70,8 +70,8 @@ static inline std::vector<uint64_t> decode_operand_span(const Operand &op, const
   }
 }
 
-void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
-  Mir::Function *entry_point_function = m.functions[entry_point];
+void interpret(Context &c, mir::Module &m, uint32_t entry_point) {
+  mir::Function *entry_point_function = m.functions[entry_point];
   Stack_Frame &sf = c.call_stack.emplace_back(entry_point_function);
 
   while (true) {
@@ -188,7 +188,7 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
         continue;
       }
       case OP_CALL: {
-        Mir::Function *fn = m.functions[instr.left.temp];
+        mir::Function *fn = m.functions[instr.left.temp];
         // TODO: dispatch externs, we need to rewrite the FFI dispatcher to operate on
         // spans of longs, which should actually be easier than the previous marshalling
         // strategy
@@ -257,4 +257,4 @@ void interpret(Context &c, Mir::Module &m, uint32_t entry_point) {
     }
   }
 }
-}  // namespace Mir::VM
+}  // namespace mir::VM
