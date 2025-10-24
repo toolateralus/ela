@@ -22,8 +22,8 @@
 using std::string;
 using std::vector;
 
-size_t num_lines_code_processed_by_lexer_excluding_comments;
-size_t num_lines_comments_processed_by_lexer;
+size_t num_lines_code_processed_by_lexer_excluding_comments = 1;
+size_t num_lines_comments_processed_by_lexer = 1;
 jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};

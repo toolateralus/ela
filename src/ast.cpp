@@ -908,6 +908,12 @@ ASTPath::Segment Parser::parse_path_segment() {
     segment.tag = ASTPath::Segment::IDENTIFIER;
     segment.set_identifier(expect(TType::Identifier).value);
   } else {
+    TType peeked = peek().type;
+
+    if (peeked != TType::LParen && peeked != TType::Mul && peeked != TType::LBrace && peeked != TType::Self) {
+      throw_error("Incomplete path segment. Did you forget the right hand side of a '::'?", current_span);
+    }
+
     segment.tag = ASTPath::Segment::TYPE;
     segment.set_type(parse_type());
   }

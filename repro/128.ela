@@ -1,7 +1,22 @@
-fn main() { 
-  // MIR
-  args := Env::args();
-  for arg in args {
-    printf("arg=%s\n"c, arg.data);
+/*  
+  Fully exhaustive cases such as the one below still end up
+  with an empty basic block in the MIR generator at the exit of the branching,
+  i.e 'end:'
+*/
+
+impl FileOpenFlags {
+  // Used to convert our flag enum to a str for fopen/fclose etc.
+  // this does not ever need to be freed.
+  fn as_str(self) -> c_str {
+    if self == FileOpenFlags::Read {
+      return "r"c;
+    } else if self == FileOpenFlags::Write {
+      return "w"c;
+    } else if self == FileOpenFlags::Read | FileOpenFlags::Write {
+      return "rw"c;
+    } else {
+      panic("unexpected file flags passed to a file api function");
+      return null;
+    }
   }
 }

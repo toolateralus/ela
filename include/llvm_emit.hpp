@@ -425,6 +425,11 @@ struct LLVM_Emitter {
   }
 
   inline LLVM_Emitter(Mir::Module &m) : llvm_ctx(), builder(llvm_ctx), data_layout(""), m(m) {
+    if (m.functions.empty()) {
+      fprintf(stderr, "No code to compile. aborting\n");
+      exit(1);
+    }
+
     llvm_module = (std::make_unique<llvm::Module>(Span::files()[m.functions[0]->span.file], llvm_ctx)),
 
     llvm_module->addModuleFlag(llvm::Module::Warning, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
