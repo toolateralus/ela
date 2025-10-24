@@ -554,7 +554,6 @@ struct LLVM_Emitter {
       case TYPE_STRUCT: {
         auto info = type->info->as<StructTypeInfo>();
 
-        // Forward declaration for recursive types
         auto struct_name = info->scope->full_name();
         auto llvm_struct_type = llvm::StructType::create(llvm_ctx, struct_name);
 
@@ -680,7 +679,7 @@ struct LLVM_Emitter {
             // marker variants have no storage.
             // they're like the one fallible yet zero-sized type in Ela. interesting tidbit.
             // () and struct {} are always 1 byte.
-            continue; 
+            continue;
           }
 
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member.type);

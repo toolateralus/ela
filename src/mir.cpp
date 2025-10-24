@@ -106,9 +106,10 @@ void generate_for(const THIRFor *node, Module &m) {
   generate(node->increment, m);
 
   if (!m.current_function->get_insert_block()->ends_with_terminator()) {
-    // This is less possible to ever be something other than false.
+    // This is less possible to ever be something other than true.
     // Im not sure how youd get a jump in the increment of a for loop.
-    printf("This probably shouldn't happen\n");
+
+    // This will surely ALWAYS get hit.
     EMIT_JUMP(cond_bb);
   }
 

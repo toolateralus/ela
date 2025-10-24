@@ -154,12 +154,17 @@ enum WarningFlags {
   WARNING_IGNORE_ALL = 1 << 3,                     // --Wignore-all
   WARNING_ARRAY_ASSIGNMENT_MEMCPY = 1 << 4,        // --Warray-assignment-memcpy
   WARNING_RETURNING_ARRAY = 1 << 5,                // --Wno-returning-array
-  WARNING_GENERAL = 1 << 6,
-  WARNING_COUNT,
+  WARNING_DEPRECATED = 1 << 6,                     // --Wno-deprecated
+  // Used only in development so for new warnings, you don't have to extend this immediately.
+  WARNING_GENERAL = 1 << 7,
+  WARNING_COUNT = WARNING_GENERAL + 1,
 };
 
 // All of these would be prefixed with -- in the command line.
 // this is just for detecting the flags in the command struct.
+
+// TODO: put this in a hashmap, there is no reason we need to allocate
+// this much memory to store ~8 flags.
 const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
     [WARNING_USE_DOT_NOT_ARROW_OP_OVERLOAD] = "Wno-arrow-operator",
     [WARNING_INACCESSIBLE_DECLARATION] = "Wno-inaccessible-decl",
@@ -167,6 +172,7 @@ const std::string WARNING_FLAG_STRINGS[WARNING_COUNT]{
     [WARNING_IGNORE_ALL] = "Wignore-all",
     [WARNING_ARRAY_ASSIGNMENT_MEMCPY] = "Wno-array-assignment-memcpy",
     [WARNING_RETURNING_ARRAY] = "Wno-returning-array",
+    [WARNING_DEPRECATED] = "Wno-deprecated",
     [WARNING_GENERAL] = "Wno-general",
 };
 

@@ -2224,35 +2224,13 @@ void THIRGen::format_and_print_deprecated_warning(Span call_site, THIR *node, co
     }
   }
 
-  switch (node->get_node_type()) {
-    case THIRNodeType::Variable: {
-      auto var = static_cast<THIRVariable *>(node);
-      fprintf(stderr, "Deprecated variable: %s\n", var->name.c_str());
-      break;
-    }
-    case THIRNodeType::Function: {
-      auto func = static_cast<THIRFunction *>(node);
-      fprintf(stderr, "Deprecated function: %s\n", func->name.c_str());
-      break;
-    }
-    case THIRNodeType::Type: {
-      // Could be struct, enum, choice, etc.
-      auto type = static_cast<THIRType *>(node);
-      fprintf(stderr, "Deprecated type: %s\n", type->type->basename.c_str());
-      break;
-    }
-    default:
-      fprintf(stderr, "Deprecated symbol\n");
-      break;
-  }
-
   auto string_literal = (ASTLiteral *)(attr.arguments[0]);
 
-  printf("from: %s\n", call_site.to_string().c_str());
+  std::stringstream warning_message{};
 
-  printf("\n %s --- instead, use: ---\n", string_literal->value.c_str());
-  auto sl = format_source_location(range, ERROR_WARNING, 5);
-  printf("%s\n", sl.c_str());
+  warning_message << "from: " << call_site.to_string() << '\n';
+  warning_message << "instead, use: " << string_literal->value.str() << '\n';
+  throw_warning(WARNING_DEPRECATED, warning_message.str(), range);
 }
 
 THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
