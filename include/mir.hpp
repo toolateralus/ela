@@ -312,11 +312,8 @@ struct Basic_Block {
       return false;
     }
     Instruction const &back = code.back();
-    return back.opcode == OP_JMP || 
-            back.opcode == OP_JMP_TRUE || 
-            back.opcode == OP_RET || 
-            back.opcode == OP_RET_VOID ||
-            back.opcode == OP_UNREACHABLE;
+    return back.opcode == OP_JMP || back.opcode == OP_JMP_TRUE || back.opcode == OP_RET || back.opcode == OP_RET_VOID ||
+           back.opcode == OP_UNREACHABLE;
   }
 
   inline bool ends_with_non_divergent_terminator() const {
@@ -698,7 +695,9 @@ static inline Operand generate_expr(const THIR *node, Module &m, Nullable<Operan
 #define EMIT_LOAD(DEST, PTR)                                                                           \
   do {                                                                                                 \
     auto p = (PTR);                                                                                    \
-    assert((p).type->is_pointer() && "Got a non pointer type in a load");                              \
+    if (p.tag != Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE) {                                         \
+      assert((p).type->is_pointer() && "Got a non pointer type in a load");                            \
+    }                                                                                                  \
     m.current_function->get_insert_block()->push(Instruction{OP_LOAD, DEST, (p), .span = node->span}); \
   } while (false);
 

@@ -317,7 +317,7 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
 
   *new_type = to;
   llvm::Type *llvm_to = llvm_typeof(to);
-  
+
   const auto cast_integer = [&](llvm::Value *val, llvm::Type *from_ty, llvm::Type *to_ty, bool from_signed) -> llvm::Value * {
     unsigned from_bits = from_ty->getIntegerBitWidth();
     unsigned to_bits = to_ty->getIntegerBitWidth();
@@ -356,7 +356,7 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
     ScalarTypeInfo *from_info = from->info->as<ScalarTypeInfo>();
     ScalarTypeInfo *to_info = to->info->as<ScalarTypeInfo>();
 
-    // Boolean casting block 
+    // Boolean casting block
     if (to_info->scalar_type == TYPE_BOOL) {
       if (from_info->is_integral) {
         value = builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), "booltmp");
@@ -609,14 +609,6 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
         insert_temp(instr.dest.temp, f, res);
       } break;
 
-      case Mir::OP_LOAD: {
-        llvm::Value *val = visit_operand(instr.left, instr.span);
-        llvm::Value *loaded = create_dbg(
-            builder.CreateLoad(llvm_typeof(instr.left.type->get_element_type()), val, f->temps[instr.dest.temp].name.str()),
-            instr.span);
-        insert_temp(instr.dest.temp, f, loaded);
-      } break;
-
       case Mir::OP_NEG: {
         llvm::Value *v = visit_operand(instr.left, instr.span);
         llvm::Value *res;
@@ -648,6 +640,21 @@ void LLVM_Emitter::emit_basic_block(Mir::Basic_Block *bb, Mir::Function *f, llvm
 
         break;
       }
+
+      case Mir::OP_LOAD: {
+        llvm::Value *val = visit_operand(instr.left, instr.span);
+
+        Type *target_type = nullptr;
+        if (instr.left.tag == Mir::Operand::OPERAND_GLOBAL_VARIABLE_REFERENCE) {
+          target_type = instr.left.type;
+        } else {
+          target_type = instr.left.type->get_element_type();
+        }
+
+        llvm::Value *loaded =
+            create_dbg(builder.CreateLoad(llvm_typeof(target_type), val, f->temps[instr.dest.temp].name.str()), instr.span);
+        insert_temp(instr.dest.temp, f, loaded);
+      } break;
 
       case Mir::OP_ALLOCA: {
         uint32_t index = instr.dest.temp;
