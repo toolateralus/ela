@@ -30,6 +30,7 @@ struct Context;
 
 struct CompilationMetric {
   std::string id;
+  bool was_ignored = false;
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   std::chrono::duration<double> duration;
@@ -37,6 +38,11 @@ struct CompilationMetric {
   void end() {
     end_time = std::chrono::high_resolution_clock::now();
     duration = end_time - start_time;
+  }
+
+  void ignore(const std::string &note) {
+    id = note;
+    was_ignored = true;
   }
 
   template <class T>
@@ -69,7 +75,13 @@ struct CompilationMetric {
     }
   }
 
-  inline std::string to_string() { return "\033[1;36m" + id + "\033[0m " + "\033[1;32m" + get_time() + "\033[0m\n"; }
+  inline std::string to_string() { 
+    if (was_ignored) {
+      return "\033[1;36m" + id + "\033[0m " + "\033[1;32m<ignored>\033[0m\n";
+    }
+
+    return "\033[1;36m" + id + "\033[0m " + "\033[1;32m" + get_time() + "\033[0m\n"; 
+  }
 };
 
 struct Span;
@@ -105,7 +117,7 @@ struct CompileCommand {
     };
     for (auto metric : metrics) {
       const std::string string = metric.to_string();
-      fprintf(stdout, "%s\n", string.c_str());
+      fprintf(stdout, "%s", string.c_str());
     }
   }
 

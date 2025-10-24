@@ -19,6 +19,7 @@ void Lexer::get_token(State &state) {
     if (c == '\n') {
       pos++;
       lines++;
+      num_lines_code_processed_by_lexer_excluding_comments++;
       col = 1;  // Reset column position at the start of a new line
       continue;
     }
@@ -36,6 +37,7 @@ void Lexer::get_token(State &state) {
       size_t newlinePos = input.find('\n', pos);
       if (newlinePos != std::string::npos) {
         lines++;
+        num_lines_comments_processed_by_lexer++;
         col = 1;  // Reset column position at the start of a new line
         pos = newlinePos + 1;
       } else {
@@ -65,6 +67,7 @@ void Lexer::get_token(State &state) {
 
         if (input[pos] == '\n') {
           lines++;
+          num_lines_comments_processed_by_lexer++;
           col = 1;
         } else {
           col++;

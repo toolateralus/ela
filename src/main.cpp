@@ -9,6 +9,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 
@@ -21,6 +22,8 @@
 using std::string;
 using std::vector;
 
+size_t num_lines_code_processed_by_lexer_excluding_comments;
+size_t num_lines_comments_processed_by_lexer;
 jstl::Arena type_info_arena{MB(10)};
 jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};

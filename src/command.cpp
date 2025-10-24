@@ -12,6 +12,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "interpreter.hpp"
+#include "lex.hpp"
 #include "llvm_emit.hpp"
 #include "strings.hpp"
 #include "thir.hpp"
@@ -21,6 +22,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <system_error>
 #include "mir.hpp"
 
 bool CompileCommand::has_flag(const std::string &flag) const {
@@ -41,7 +43,7 @@ int CompileCommand::compile() {
     compile_command.flags["nl"] = true;
   }
 
-  ASTProgram *program = parse_metric.run<ASTProgram *>("parser", [&]() -> ASTProgram * {
+  ASTProgram *program = parse_metric.run<ASTProgram *>("Parsing", [&]() -> ASTProgram * {
     Parser parser(input_path.string(), context);
     ASTProgram *root = parser.parse_program();
     return root;
@@ -133,43 +135,49 @@ int CompileCommand::compile() {
     llvm_output_stream.flush();
   });
 
-  if (has_flag("no-compile")) {
-    return 0;
-  }
-
-  std::string extra_flags = c_flags;
-  if (!has_flag("release")) {
-    extra_flags += " -g ";
-  }
-
-  const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
-  const std::string obj_file = output_path.filename().string() + ".o";
-
-  std::string llc_debug_flag = "";
-
-  const auto llc_string = std::format("llc -filetype=obj -relocation-model=pic {} -o {}", output_path.string(), obj_file);
-  const auto compilation_string = std::format("clang -fPIE {} {} {}", obj_file, output_flag, extra_flags);
-
-  if (compile_command.has_flag("x")) {
-    printf("\033[1;36m%s\n\033[0m", llc_string.c_str());
-    printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
-  }
-
-  int result = clang_invocation_metric.run<int>("invoking 'llc' and 'clang' compiler", [&] {
-    int result = 0;
-    if ((result = system(llc_string.c_str()) != 0)) {
-      return result;
+  int result = 0;
+  if (!has_flag("no-compile")) {
+    std::string extra_flags = c_flags;
+    if (!has_flag("release")) {
+      extra_flags += " -g ";
     }
-    return system(compilation_string.c_str());
-  });
 
-  if (!has_flag("s")) {
-    std::filesystem::remove(output_path);
+    const std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+    const std::string obj_file = output_path.filename().string() + ".o";
+
+    std::string llc_debug_flag = "";
+
+    const auto llc_string = std::format("llc -filetype=obj -relocation-model=pic {} -o {}", output_path.string(), obj_file);
+    const auto compilation_string = std::format("clang -fPIE {} {} {}", obj_file, output_flag, extra_flags);
+
+    result = clang_invocation_metric.run<int>("Creating and Linking Object Files", [&] {
+      int result = 0;
+      if ((result = system(llc_string.c_str()) != 0)) {
+        return result;
+      }
+      return system(compilation_string.c_str());
+    });
+
+    if (!has_flag("s")) {
+      std::filesystem::remove(output_path);
+    }
+
+    if (compile_command.has_flag("x")) {
+      printf("\033[1;36m%s\n\033[0m", llc_string.c_str());
+      printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
+    }
+  } else {
+    clang_invocation_metric.ignore("Creating and Linking Object Files");
   }
+
+  std::error_code ec;  // ignored
+  std::filesystem::remove(output_path.string() + ".o", ec);
 
   std::filesystem::current_path(original_path);
 
   if (has_flag("metrics")) {
+    printf("\033[1;37mcompiled: %zu lines of code\033[0m \033[3;90m(excluding comments)\033[0m\n", num_lines_code_processed_by_lexer_excluding_comments);
+    printf("\033[3;90mcomments occupied: %zu lines.\033[0m\n", num_lines_comments_processed_by_lexer);
     print_metrics();
   }
 

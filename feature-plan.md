@@ -606,3 +606,63 @@ fn main() {
 }
 
 ```
+
+# `match where` and `where break`
+
+Sometimes a giant where else chain is unweildy and obnoxious.
+We can just match on types, and this would of couse do the exact same thing as
+`where { .. }` statements, conditional compilation based on types or traits.
+
+```rust
+match where T: {
+  f32: {
+
+  };
+
+  u32: {
+
+  };
+
+  Destroy: {
+
+  };
+
+  u128: {
+    
+  };
+
+  IsBlittable: {
+
+  };
+}
+```
+
+Another thing that we could probably add to `where` statements,
+is some kind of early return mechanism, again, to avoid heavily nested where statements.
+
+The below example isn't great, because it wouldn't be horrible to just use else where.
+I just can't think of a good example right now, but I have certainly thought
+
+`I wish i could just break out of this function when this where condition passes, instead of having a huge branch chain`
+
+```rust
+
+fn default!<T>() {
+  where !T: IsInteger | IsPointer {
+    compiler::intrinsics::Error("You can't do that!", #here);
+  }
+
+  where T: IsInteger {
+    return 0;
+    where break;
+  }
+
+  where T: IsPointer {
+    return null;
+    where break;
+  }
+
+  return .{};
+}
+
+```

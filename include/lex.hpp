@@ -420,6 +420,10 @@ static std::unordered_map<std::string, TType> operators{
     {"![", TType::PtrSubscript},
 };
 
+
+extern size_t num_lines_code_processed_by_lexer_excluding_comments;
+extern size_t num_lines_comments_processed_by_lexer;
+
 void throw_error(const std::string &message, const Span &span);
 
 static inline std::string ttype_get_operator_string(TType type, const Span &range) {
