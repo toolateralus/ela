@@ -49,7 +49,7 @@ LValue* null_lvalue() {
   return null_lval;
 }
 
-ObjectValue* new_object(Type* type, const std::string &loc) {
+ObjectValue* new_object(Type* type, const std::string& loc) {
   assert(type && "type in 'new_object' was null");
   auto object = value_arena_alloc<ObjectValue>(type);
   object->created_at = loc;
@@ -252,23 +252,13 @@ Value* default_value_of_scalar_t(ScalarType type) {
   switch (type) {
     case TYPE_VOID:
       return null_value();
-    case TYPE_S8:
-    case TYPE_S16:
-    case TYPE_S32:
-    case TYPE_S64:
-    case TYPE_U8:
-    case TYPE_U16:
-    case TYPE_U32:
-    case TYPE_U64:
+    case TYPE_SIGNED:
+    case TYPE_UNSIGNED:
       return new_int(0);
-    case TYPE_FLOAT:
-    case TYPE_DOUBLE:
+    case TYPE_FLOATING:
       return new_float(0);
-    case TYPE_CHAR:
-      return new_char(0);
     case TYPE_BOOL:
       return new_bool(false);
-      break;
   }
   return null_value();
 }
@@ -342,7 +332,7 @@ Value* default_value_of_t(Type* t, Interpreter* interpreter) {
     case TYPE_TUPLE:
       return default_value_of_tuple_t(t, t->info->as<TupleTypeInfo>(), interpreter);
     case TYPE_ENUM:
-      return default_value_of_scalar_t(TYPE_S64);
+      return default_value_of_scalar_t(TYPE_SIGNED);
     case TYPE_CHOICE:
       return default_value_of_choice_t(t, t->info->as<ChoiceTypeInfo>(), interpreter);
     case TYPE_DYN:
@@ -377,42 +367,39 @@ THIR* ArrayValue::to_thir() const {
 bool RawPointerValue::is_truthy() const { return ptr != nullptr; }
 
 ValueType RawPointerValue::get_value_type() const { return value_type; }
-
 THIR* RawPointerValue::to_thir() const {
   if (type->is_kind(TYPE_SCALAR)) {
     auto info = type->info->as<ScalarTypeInfo>();
-    if (info->scalar_type == TYPE_CHAR) {
-      auto literal = thir_alloc<THIRLiteral>();
-      literal->tag = ASTLiteral::Char;
-      literal->value = std::string(1, *(char*)ptr);
-      literal->type = u8_type();
-      return literal;
-    }
-    if (info->scalar_type == TYPE_BOOL) {
-      auto literal = thir_alloc<THIRLiteral>();
-      literal->tag = ASTLiteral::Bool;
-      literal->value = (*(bool*)ptr) ? "true" : "false";
-      literal->type = bool_type();
-      return literal;
-    }
-    if (info->scalar_type == TYPE_S64 || info->scalar_type == TYPE_U64) {
-      auto literal = thir_alloc<THIRLiteral>();
-      literal->tag = ASTLiteral::Integer;
-      literal->value = std::to_string(*(size_t*)ptr);
-      literal->type = s64_type();
-      return literal;
-    }
-    if (info->scalar_type == TYPE_FLOAT || info->scalar_type == TYPE_DOUBLE) {
-      auto literal = thir_alloc<THIRLiteral>();
-      literal->tag = ASTLiteral::Float;
-      literal->value = std::to_string(*(double*)ptr);
-      literal->type = f64_type();
-      return literal;
+    switch (info->scalar_type) {
+      case TYPE_BOOL: {
+        auto literal = thir_alloc<THIRLiteral>();
+        literal->tag = ASTLiteral::Bool;
+        literal->value = (*(bool*)ptr) ? "true" : "false";
+        literal->type = bool_type();
+        return literal;
+      }
+      case TYPE_SIGNED:
+      case TYPE_UNSIGNED: {
+        auto literal = thir_alloc<THIRLiteral>();
+        literal->tag = ASTLiteral::Integer;
+        literal->value = std::to_string(*(size_t*)ptr);
+        literal->type = s64_type();
+        return literal;
+      }
+      case TYPE_FLOATING: {
+        auto literal = thir_alloc<THIRLiteral>();
+        literal->tag = ASTLiteral::Float;
+        literal->value = std::to_string(*(double*)ptr);
+        literal->type = f64_type();
+        return literal;
+      }
+      case TYPE_VOID:
+        break;
     }
   }
   throw_error(
       "You cannot pass pointers out of the compile time code into runtime code-- pointers can't exist in a binary. "
-      "Just strings, chars, and scalars can.",
+      "Just scalars and bools can.",
       {});
   return nullptr;
 }
@@ -440,26 +427,15 @@ Value* RawPointerValue::dereference() const {
       switch (sinfo->scalar_type) {
         case TYPE_VOID:
           return (Value*)this;
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
+        case TYPE_SIGNED:
+        case TYPE_UNSIGNED:
           return new_int(*(size_t*)ptr);
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
+        case TYPE_FLOATING:
           return new_float(*(double*)ptr);
-        case TYPE_CHAR:
-          return new_float(*(char*)ptr);
         case TYPE_BOOL:
-          return new_float(*(bool*)ptr);
-          break;
+          return new_bool(*(bool*)ptr);
       }
     } break;
-    // TODO: handle all cases here.
     default:
       break;
   }

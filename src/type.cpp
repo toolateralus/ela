@@ -240,7 +240,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
   if (from->is_kind(TYPE_SCALAR) && from->has_no_extensions() && to->is_kind(TYPE_SCALAR) && to->has_no_extensions()) {
-    if (type_is_numerical(from) && type_is_numerical(to)) {
+    if (type_is_numeric(from) && type_is_numeric(to)) {
       if (numerical_type_safe_to_upcast(from, to)) {
         return CONVERT_IMPLICIT;
       }
@@ -248,8 +248,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span
 
       // !!!! I ADDED THE PARENTHESIS ON THE SECOND EXPRESSION HERE :: !!!!!
       // ! This may cause bugs!
-    } else if ((from == bool_type() && type_is_numerical(to)) ||
-               (to == bool_type() && type_is_numerical(from))) {  // Convert booleans to number types explicitly
+    } else if ((from == bool_type() && type_is_numeric(to)) ||
+               (to == bool_type() && type_is_numeric(from))) {  // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -258,24 +258,24 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span
 
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
   const auto from_is_scalar_ptr = from->is_mut_pointer();
-  const auto to_is_non_ptr_number = type_is_numerical(to) && to->has_no_extensions();
+  const auto to_is_non_ptr_number = type_is_numeric(to) && to->has_no_extensions();
 
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
     return CONVERT_IMPLICIT;
   }
 
   // allow casting from number types to pointers explicitly
-  if (type_is_numerical(from) && to->is_pointer()) {
+  if (type_is_numeric(from) && to->is_pointer()) {
     return CONVERT_EXPLICIT;
   }
 
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow in if (...)
   // cast all numerical types and pointers to booleans implicitly.
-  if ((type_is_numerical(from) || from->is_pointer()) && to == bool_type()) {
+  if ((type_is_numeric(from) || from->is_pointer()) && to == bool_type()) {
     return CONVERT_IMPLICIT;
   }
 
-  if (type_is_numerical(from) && to == bool_type()) {
+  if (type_is_numeric(from) && to == bool_type()) {
     return CONVERT_EXPLICIT;
   }
 
@@ -605,7 +605,7 @@ Token get_unique_identifier() {
   return tok;
 }
 
-ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
+ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral) {
   auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
   info->size = size;
@@ -639,15 +639,15 @@ Type *unit_type() {
 }
 
 Type *u64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_UNSIGNED, 8, true));
   return type;
 }
 Type *u32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_UNSIGNED, 4, true));
   return type;
 }
 Type *u16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_UNSIGNED, 2, true));
   return type;
 }
 
@@ -657,32 +657,32 @@ Type *u8_ptr_type() {
 }
 
 Type *u8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_UNSIGNED, 1, true));
   return type;
 }
 
 Type *s64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_SIGNED, 8, true));
   return type;
 }
 Type *s32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_SIGNED, 4, true));
   return type;
 }
 Type *s16_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_SIGNED, 2, true));
   return type;
 }
 Type *s8_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
+  static Type *type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_SIGNED, 1, true));
   return type;
 }
 Type *f32_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
+  static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOATING, 4));
   return type;
 }
 Type *f64_type() {
-  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
+  static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_FLOATING, 8));
   return type;
 }
 
@@ -739,10 +739,12 @@ void init_type_system() {
   }
 }
 
-bool type_is_numerical(const Type *t) {
-  if (!t->is_kind(TYPE_SCALAR)) return false;
-  return t == s32_type() || t == s8_type() || t == s16_type() || t == s32_type() || t == s64_type() || t == u8_type() ||
-         t == u16_type() || t == u32_type() || t == u64_type() || t == f32_type() || t == f64_type();
+bool type_is_numeric(const Type *t) {
+  if (!t->is_kind(TYPE_SCALAR) || t->has_extensions()) {
+    return false;
+  }
+  ScalarTypeInfo *info = t->info->as<ScalarTypeInfo>();
+  return info->scalar_type == TYPE_SIGNED || info->scalar_type == TYPE_UNSIGNED || info->scalar_type == TYPE_FLOATING;
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
@@ -1125,40 +1127,28 @@ size_t ChoiceTypeInfo::size_in_bytes() const {
 }
 
 size_t Type::alignment_in_bytes() const {
-  if (!info) return alignof(void *);
-
   if (kind == TYPE_SCALAR) {
-    switch (info->as<ScalarTypeInfo>()->scalar_type) {
-      case TYPE_S8:
-      case TYPE_U8:
-      case TYPE_CHAR:
-      case TYPE_BOOL:
-        return 1;
-      case TYPE_S16:
-      case TYPE_U16:
-        return 2;
-      case TYPE_S32:
-      case TYPE_U32:
-        return 4;
-      case TYPE_S64:
-      case TYPE_U64:
-        return 8;
-      case TYPE_FLOAT:
-        return 4;
-      case TYPE_DOUBLE:
-        return 8;
-      default:
-        return alignof(void *);
+    size_t s = info->as<ScalarTypeInfo>()->size_in_bytes();
+    if (s == 0) {
+      return 1;
     }
+    return std::min(s, static_cast<size_t>(alignof(std::max_align_t)));
   }
 
-  if (is_pointer()) return alignof(void *);
-  if (is_fixed_sized_array()) return base_type->alignment_in_bytes();
+  if (is_pointer()) {
+    return alignof(void *);
+  }
+
+  if (is_fixed_sized_array()) {
+    return base_type->alignment_in_bytes();
+  }
 
   if (kind == TYPE_STRUCT) {
     auto struct_info = info->as<StructTypeInfo>();
     size_t max_align = 1;
-    for (auto &member : struct_info->members) max_align = std::max(max_align, member.type->alignment_in_bytes());
+    for (auto &member : struct_info->members) {
+      max_align = std::max(max_align, member.type->alignment_in_bytes());
+    }
     return max_align;
   }
 

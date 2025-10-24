@@ -55,37 +55,52 @@ ffi_type* to_ffi_type(Type* t) {
   }
 
   if (t->is_kind(TYPE_SCALAR)) {
-    switch (t->info->as<ScalarTypeInfo>()->scalar_type) {
-      case TYPE_FLOAT:
-        return &ffi_type_float;
-      case TYPE_DOUBLE:
-        return &ffi_type_double;
-      case TYPE_S8:
-        return &ffi_type_sint8;
-      case TYPE_S16:
-        return &ffi_type_sint16;
-      case TYPE_S32:
-        return &ffi_type_sint32;
-      case TYPE_S64:
-        return &ffi_type_sint64;
-      case TYPE_U8:
-        return &ffi_type_uint8;
-      case TYPE_U16:
-        return &ffi_type_uint16;
-      case TYPE_U32:
-        return &ffi_type_uint32;
-      case TYPE_U64:
-        return &ffi_type_uint64;
+    auto info = t->info->as<ScalarTypeInfo>();
+    switch (info->scalar_type) {
+      case TYPE_FLOATING:
+        // Use double for floating point by default; adjust if you support f32/f64 distinction
+        if (info->size == sizeof(float)) {
+          return &ffi_type_float;
+        } else {
+          return &ffi_type_double;
+        }
+      case TYPE_SIGNED:
+        switch (info->size) {
+          case 1:
+            return &ffi_type_sint8;
+          case 2:
+            return &ffi_type_sint16;
+          case 4:
+            return &ffi_type_sint32;
+          case 8:
+            return &ffi_type_sint64;
+          default:
+            break;
+        }
+        break;
+      case TYPE_UNSIGNED:
+        switch (info->size) {
+          case 1:
+            return &ffi_type_uint8;
+          case 2:
+            return &ffi_type_uint16;
+          case 4:
+            return &ffi_type_uint32;
+          case 8:
+            return &ffi_type_uint64;
+          default:
+            break;
+        }
+        break;
       case TYPE_BOOL:
         return &ffi_type_uint8;
-      case TYPE_CHAR:  // We use 32 bit unsigned chars, UTF8+ support.
-        return &ffi_type_sint32;
       case TYPE_VOID:
         return &ffi_type_void;
       default:
-        throw_error(std::format("unable to get ffi type for {}", t->to_string()), {});
-        return nullptr;
+        break;
     }
+    throw_error(std::format("unable to get ffi type for {}", t->to_string()), {});
+    return nullptr;
   } else {
     throw_error("non scalar types not yet supported by the ffi library", {});
     return nullptr;
@@ -119,16 +134,14 @@ void* try_load_symbol(const std::string& name) {
 
     if (!the_lib) {
       throw_warning(WARNING_GENERAL,
-                    std::format("failed to load dynamic library at compile time. lib='{}', is your path correct?", lib),
-                    {});
+                    std::format("failed to load dynamic library at compile time. lib='{}', is your path correct?", lib), {});
       continue;
     }
 
     void* sym = dlsym(the_lib, name.c_str());
 
     if (!sym) {
-      throw_warning(WARNING_GENERAL, std::format("failed to get sym '{}' from lib '{}' at compile time.", name, lib),
-                    {});
+      throw_warning(WARNING_GENERAL, std::format("failed to get sym '{}' from lib '{}' at compile time.", name, lib), {});
       dlclose(the_lib);
     } else {
       loaded_dl_libraries[lib] = the_lib;
@@ -301,8 +314,7 @@ struct FFIContext {
 
   // marshal_value_into_storage: marshals a Value into out_storage and selects an out_type
   // If the Value is pointer/array, we allocate nested buffers and put a pointer into out_storage.
-  void marshal_value_into_storage(Value* v, std::vector<uint8_t>& out_storage, ffi_type*& out_type,
-                                  size_t arg_index = 0) {
+  void marshal_value_into_storage(Value* v, std::vector<uint8_t>& out_storage, ffi_type*& out_type, size_t arg_index = 0) {
     // Support for objects: map<InternedString, Value*>
     if (v->get_value_type() == ValueType::OBJECT) {
       // Assume ObjectValue has: std::unordered_map<InternedString, Value*> fields;
@@ -321,8 +333,7 @@ struct FFIContext {
             std::vector<uint8_t> field_buf;
             ffi_type* dummy = nullptr;
             marshal_value_into_storage(it->second, field_buf, dummy, arg_index);
-            memcpy(struct_buf.data() + offset, field_buf.data(),
-                   std::min(field_buf.size(), member.type->size_in_bytes()));
+            memcpy(struct_buf.data() + offset, field_buf.data(), std::min(field_buf.size(), member.type->size_in_bytes()));
           }
           offset += member.type->size_in_bytes();
         }
@@ -585,49 +596,27 @@ Value* unmarshal_scalar_return(Type* rtype, ScalarTypeInfo* info, const std::vec
     return unmarshal_pointer_value(rtype, ret_storage);
   }
   switch (info->scalar_type) {
-    case TYPE_FLOAT: {
+    case TYPE_FLOATING: {
       float tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(float));
+      memcpy(&tmp, ret_storage.data(), info->size);
       return new_float(tmp);
     }
-    case TYPE_DOUBLE: {
-      double tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(double));
-      return new_float(tmp);
-    }
-    case TYPE_S8:
-    case TYPE_U8: {
-      uint8_t tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(uint8_t));
+    case TYPE_SIGNED: {
+      int64_t tmp = 0;
+      size_t sz = info->size;
+      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof(tmp)));
       return new_int(tmp);
     }
-    case TYPE_S16:
-    case TYPE_U16: {
-      uint16_t tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(uint16_t));
-      return new_int(tmp);
-    }
-    case TYPE_S32:
-    case TYPE_U32: {
-      uint32_t tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(uint32_t));
-      return new_int(tmp);
-    }
-    case TYPE_S64:
-    case TYPE_U64: {
-      uint64_t tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(uint64_t));
+    case TYPE_UNSIGNED: {
+      uint64_t tmp = 0;
+      size_t sz = info->size;
+      memcpy(&tmp, ret_storage.data(), std::min(sz, sizeof(tmp)));
       return new_int(tmp);
     }
     case TYPE_BOOL: {
       uint8_t tmp;
       memcpy(&tmp, ret_storage.data(), sizeof(uint8_t));
       return new_bool(tmp != 0);
-    }
-    case TYPE_CHAR: {
-      char tmp;
-      memcpy(&tmp, ret_storage.data(), sizeof(char));
-      return new_char(tmp);
     }
     default:
       return null_value();

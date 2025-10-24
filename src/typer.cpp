@@ -6,6 +6,7 @@
 #include <iostream>
 #include <linux/limits.h>
 #include <ranges>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -2475,7 +2476,7 @@ void Typer::visit(ASTBinExpr *node) {
       if (right_is_ptr) {
         throw_error("Pointer arithmetic between two pointers is not allowed.", node->span);
       }
-      if (!type_is_numerical(right)) {
+      if (!type_is_numeric(right)) {
         throw_error("Pointer arithmetic requires an integer type on the right-hand side.", node->span);
       }
     }
@@ -2600,7 +2601,7 @@ void Typer::visit(ASTLiteral *node) {
         }
       }
 
-      if (expected_type != Type::INVALID_TYPE && type_is_numerical(expected_type)) {
+      if (expected_type != Type::INVALID_TYPE && type_is_numeric(expected_type)) {
         node->resolved_type = expected_type;
         return;
       }
@@ -3024,7 +3025,7 @@ void Typer::visit(ASTSwitch *node) {
       return_type = block_cf.type;
     }
 
-    if (type_is_numerical(type)) {
+    if (type_is_numeric(type)) {
       continue;
     }
   }
@@ -3911,6 +3912,35 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
     if (segment.tag == ASTPath::Segment::IDENTIFIER) {
       auto ident = segment.get_identifier();
       symbol = scope->lookup(ident);
+
+      if (!symbol) {
+        // Handle dynamic integer types like s32, u64, etc. at path resolution time.
+        if (segment.tag == ASTPath::Segment::IDENTIFIER && node->segments.size() == 1) {
+          const InternedString ident = segment.get_identifier();
+          std::string name = ident.str();
+          static const std::regex int_re(R"(^([su])(\d+)$)");
+          std::smatch m;
+          if (std::regex_match(name, m, int_re)) {
+            bool is_signed = (m[1].str()[0] == 's');
+            size_t bits = std::stoull(m[2].str().c_str());
+            if (bits > 0) {
+              if (bits > 4096) {
+                throw_error("integer bit-width too large", node->span);
+              }
+              const size_t bytes = (bits + 7) / 8;
+              const ScalarType scalar_kind = is_signed ? TYPE_SIGNED : TYPE_UNSIGNED;
+              auto info = create_scalar_type_info(scalar_kind, bytes, true);
+              Type *created = global_create_type(TYPE_SCALAR, name, info, {});
+              ctx.root_scope->insert_type(created, name, nullptr);
+              segment.resolved_type = created;
+              symbol = ctx.root_scope->lookup(ident);
+            }
+          }
+        }
+      }
+
+      symbol = scope->lookup(ident);
+
       if (!symbol) {
         throw_error(std::format("use of undeclared identifier '{}'", segment.get_identifier()), node->span);
       }

@@ -40,17 +40,9 @@ Token get_unique_identifier();
 
 enum ScalarType {
   TYPE_VOID,
-  TYPE_S8,
-  TYPE_S16,
-  TYPE_S32,
-  TYPE_S64,
-  TYPE_U8,
-  TYPE_U16,
-  TYPE_U32,
-  TYPE_U64,
-  TYPE_FLOAT,
-  TYPE_DOUBLE,
-  TYPE_CHAR,
+  TYPE_SIGNED,
+  TYPE_UNSIGNED,
+  TYPE_FLOATING,
   TYPE_BOOL,
 };
 
@@ -201,55 +193,9 @@ struct ScalarTypeInfo : TypeInfo {
   size_t size = 0;
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
-
-  inline bool is_float() const { return scalar_type == TYPE_FLOAT || scalar_type == TYPE_DOUBLE; }
-
-  inline bool is_signed() const {
-    switch (scalar_type) {
-      case TYPE_S8:
-      case TYPE_S16:
-      case TYPE_S32:
-      case TYPE_S64:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  size_t size_in_bytes() const override {
-    // TODO: why do we even use 'size' when we switch over this anyway?
-    // I'm just afraid that size is wrong xD
-    switch (scalar_type) {
-      case TYPE_S8:
-        return 1;
-      case TYPE_U8:
-        return 1;
-      case TYPE_S16:
-        return 2;
-      case TYPE_U16:
-        return 2;
-      case TYPE_S32:
-        return 4;
-      case TYPE_U32:
-        return 4;
-      case TYPE_S64:
-        return 8;
-      case TYPE_U64:
-        return 8;
-      case TYPE_FLOAT:
-        return 4;
-      case TYPE_DOUBLE:
-        return 8;
-      case TYPE_CHAR:
-        return 1;
-      case TYPE_BOOL:
-        return 1;
-      case TYPE_VOID:
-        return 0;
-      default:
-        return sizeof(void *);
-    }
-  }
+  inline bool is_float() const { return scalar_type == TYPE_FLOATING; }
+  inline bool is_signed() const { return scalar_type == TYPE_SIGNED; }
+  size_t size_in_bytes() const override { return size; }
 };
 
 struct EnumTypeInfo : TypeInfo {
@@ -355,7 +301,7 @@ Type *global_find_function_type_id(const FunctionTypeInfo &, const TypeExtension
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions);
 Type *global_find_type_id(Type *, const TypeExtensions &);
 void init_type_system();
-bool type_is_numerical(const Type *t);
+bool type_is_numeric(const Type *t);
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 // returns false for failure, else true and passed param signature as out.
 
@@ -542,6 +488,8 @@ template <class T>
 static inline T *type_info_alloc() {
   return new (type_info_arena.allocate(sizeof(T))) T();
 }
+
+ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false);
 
 enum OperationKind {
   OPERATION_BINARY,

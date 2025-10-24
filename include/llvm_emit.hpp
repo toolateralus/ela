@@ -496,56 +496,29 @@ struct LLVM_Emitter {
     switch (type->kind) {
       case TYPE_SCALAR: {
         auto info = type->info->as<ScalarTypeInfo>();
-        llvm::Type *llvm_type;
-        llvm::DIType *di_type;
+        llvm::Type *llvm_type = nullptr;
+        llvm::DIType *di_type = nullptr;
         switch (info->scalar_type) {
           case TYPE_VOID:
             llvm_type = llvm::Type::getVoidTy(llvm_ctx);
             di_type = dbg.create_basic_type("void", 0, llvm::dwarf::DW_ATE_unsigned);
             break;
-          case TYPE_S8:
-            llvm_type = llvm::Type::getInt8Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("s8", 8, llvm::dwarf::DW_ATE_signed);
+          case TYPE_SIGNED:
+            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size * 8);
+            di_type = dbg.create_basic_type("signed", info->size * 8, llvm::dwarf::DW_ATE_signed);
             break;
-          case TYPE_S16:
-            llvm_type = llvm::Type::getInt16Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("s16", 16, llvm::dwarf::DW_ATE_signed);
+          case TYPE_UNSIGNED:
+            llvm_type = llvm::Type::getIntNTy(llvm_ctx, info->size * 8);
+            di_type = dbg.create_basic_type("unsigned", info->size * 8, llvm::dwarf::DW_ATE_unsigned);
             break;
-          case TYPE_S32:
-            llvm_type = llvm::Type::getInt32Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("s32", 32, llvm::dwarf::DW_ATE_signed);
-            break;
-          case TYPE_S64:
-            llvm_type = llvm::Type::getInt64Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("s64", 64, llvm::dwarf::DW_ATE_signed);
-            break;
-          case TYPE_U8:
-            llvm_type = llvm::Type::getInt8Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("u8", 8, llvm::dwarf::DW_ATE_unsigned);
-            break;
-          case TYPE_U16:
-            llvm_type = llvm::Type::getInt16Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("u16", 16, llvm::dwarf::DW_ATE_unsigned);
-            break;
-          case TYPE_U32:
-            llvm_type = llvm::Type::getInt32Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("u32", 32, llvm::dwarf::DW_ATE_unsigned);
-            break;
-          case TYPE_U64:
-            llvm_type = llvm::Type::getInt64Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("u64", 64, llvm::dwarf::DW_ATE_unsigned);
-            break;
-          case TYPE_FLOAT:
-            llvm_type = llvm::Type::getFloatTy(llvm_ctx);
-            di_type = dbg.create_basic_type("f32", 32, llvm::dwarf::DW_ATE_float);
-            break;
-          case TYPE_DOUBLE:
-            llvm_type = llvm::Type::getDoubleTy(llvm_ctx);
-            di_type = dbg.create_basic_type("f64", 64, llvm::dwarf::DW_ATE_float);
-            break;
-          case TYPE_CHAR:
-            llvm_type = llvm::Type::getInt8Ty(llvm_ctx);
-            di_type = dbg.create_basic_type("char", 8, llvm::dwarf::DW_ATE_unsigned_char);
+          case TYPE_FLOATING:
+            if (info->size == 4)
+              llvm_type = llvm::Type::getFloatTy(llvm_ctx);
+            else if (info->size == 8)
+              llvm_type = llvm::Type::getDoubleTy(llvm_ctx);
+            else
+              llvm_type = llvm::Type::getFP128Ty(llvm_ctx);  // fallback for other sizes
+            di_type = dbg.create_basic_type("float", info->size * 8, llvm::dwarf::DW_ATE_float);
             break;
           case TYPE_BOOL:
             llvm_type = llvm::Type::getInt1Ty(llvm_ctx);
