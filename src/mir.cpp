@@ -439,7 +439,15 @@ Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m) {
 }
 
 Operand generate_index_addr(const THIRIndex *node, Module &m) {
-  Operand base_addr = generate_lvalue_addr(node->base, m);
+  Operand base_addr;
+  if (node->base->type->is_pointer()) {
+    // base is a pointer value (e.g. a pointer parameter or rvalue pointer) —
+    // evaluate the expression to get the pointer value before GEP.
+    base_addr = generate_expr(node->base, m);
+  } else {
+    // base is an lvalue (array/aggregate/variable) — take its address.
+    base_addr = generate_lvalue_addr(node->base, m);
+  }
   Operand index = generate_expr(node->index, m);
   Operand result = m.create_temporary(node->type->take_pointer_to(true));
   EMIT_GEP(result, base_addr, index);
