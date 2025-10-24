@@ -9,6 +9,7 @@
 #include <llvm/Passes/PassPlugin.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/Verifier.h>
+#include "callconv.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interpreter.hpp"
@@ -61,7 +62,14 @@ int CompileCommand::compile() {
     return thir_gen.emit_runtime_entry_point();
   });
 
-  Mir::Module m;
+#if defined(__linux)
+  // TODO: once we handle windows, actually use this lol.
+  SysV64_C_Calling_Convention calling_conv;
+#elif defined(_WIN32)
+  Win64_C_Calling_Convention calling_conv;
+#endif
+  Mir::Module m{&calling_conv};
+
   mir_gen_metric.run<void>("Generating MIR", [&] {
     if (entry_point) {
       Mir::compile(entry_point, m, thir_gen.constructors, thir_gen.test_functions, thir_gen.global_initializer_function);
@@ -176,7 +184,8 @@ int CompileCommand::compile() {
   std::filesystem::current_path(original_path);
 
   if (has_flag("metrics")) {
-    printf("\033[1;37mcompiled: %zu lines of code\033[0m \033[3;90m(excluding comments)\033[0m\n", num_lines_code_processed_by_lexer_excluding_comments);
+    printf("\033[1;37mcompiled: %zu lines of code\033[0m \033[3;90m(excluding comments)\033[0m\n",
+           num_lines_code_processed_by_lexer_excluding_comments);
     printf("\033[3;90mcomments occupied: %zu lines.\033[0m\n", num_lines_comments_processed_by_lexer);
     print_metrics();
   }

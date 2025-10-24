@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include "arena.hpp"
+#include "callconv.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -456,6 +457,10 @@ struct Module {
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
 
+  Calling_Convention *calling_conv;
+
+  Module(Calling_Convention *calling_conv): calling_conv(calling_conv) {}
+
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;
     assert(type && f);
@@ -505,15 +510,12 @@ struct Module {
     return current_function->create_and_enter_basic_block(label);
   }
 
-  inline Basic_Block *get_insert_block() {
-    assert(current_function && "no current function");
-    return current_function->basic_blocks.back();
-  }
   inline void finalize() {  // compute stack sizes after all code has compiled.
     for (const auto &f : functions) {
       f->finalize();
     }
   }
+
   void print(FILE *) const;
 };
 

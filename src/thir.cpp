@@ -683,6 +683,15 @@ THIR *THIRGen::visit_literal(ASTLiteral *ast) {
     literal->is_c_string = true;
   }
   literal->value = ast->value;
+
+  if (ast->conversion.has_value) {
+    literal->value = ast->value;
+    THIR_ALLOC(THIRCast, cast, ast);
+    cast->operand = literal;
+    cast->type = (Type*)ast->conversion.to;
+    return cast;
+  }
+
   return literal;
 }
 
@@ -1657,7 +1666,7 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
 
 THIR *THIRGen::visit_while(ASTWhile *ast) {
   THIR_ALLOC(THIRWhile, thir, ast)
-  std::vector<THIR *> statements {};
+  std::vector<THIR *> statements{};
   if (ast->condition) {
     ASTExpr *condition = ast->condition.get();
     if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
