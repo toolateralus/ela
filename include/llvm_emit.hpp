@@ -573,10 +573,7 @@ struct LLVM_Emitter {
                                                      data_layout.getABITypeAlign(llvm_struct_type).value() * 8,
                                                      llvm::DINode::FlagZero, member_debug_info);
 
-        for (const auto &[name, symbol] : info->scope->symbols) {
-          if (!symbol.is_variable) continue;
-
-          auto member_type = symbol.resolved_type;
+        for (const auto &[name, member_type, _ast_value, _thir_value] : info->members) {
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member_type);
 
           if (is_union) {
@@ -611,13 +608,6 @@ struct LLVM_Emitter {
         auto info = type->info->as<EnumTypeInfo>();
 
         std::vector<llvm::Metadata *> enumerators;
-        for (const auto &[name, value] : info->scope->symbols) {
-          if (value.is_variable) {
-            // TODO: fix this once our interpreter works on MIR
-            // auto val = interpret(value.variable.initial_value.get(), ctx);
-            // enumerators.push_back(di_builder->createEnumerator(name.get_str(), 0, false));
-          }
-        }
 
         auto [underlying_type, underlying_di_type] = llvm_typeof_impl(info->underlying_type);
         auto enum_name = info->scope->full_name();
@@ -663,7 +653,6 @@ struct LLVM_Emitter {
         memoized_types[type] = final_pair;
         return final_pair;
       }
-
       case TYPE_CHOICE: {
         auto info = type->info->as<ChoiceTypeInfo>();
         auto choice_name = type->basename.str();
@@ -687,7 +676,12 @@ struct LLVM_Emitter {
 
         unsigned offset = 32;
         for (const auto &member : info->members) {
-          if (member.type == void_type()) continue;
+          if (member.type == void_type()) {
+            // marker variants have no storage.
+            // they're like the one fallible yet zero-sized type in Ela. interesting tidbit.
+            // () and struct {} are always 1 byte.
+            continue; 
+          }
 
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member.type);
           uint64_t member_size = data_layout.getTypeAllocSize(llvm_member_type);
@@ -703,7 +697,9 @@ struct LLVM_Emitter {
         }
 
         // Push the largest member into the LLVM struct body so it can hold any variant
-        if (largest_member) fields.push_back(largest_member);
+        if (largest_member) {
+          fields.push_back(largest_member);
+        }
 
         llvm_choice_type->setBody(fields);
 
@@ -711,7 +707,6 @@ struct LLVM_Emitter {
         memoized_types[type] = final_pair;
         return final_pair;
       }
-
       case TYPE_DYN: {
         auto info = type->info->as<DynTypeInfo>();
         auto dyn_name = type->basename.str();
@@ -758,7 +753,6 @@ struct LLVM_Emitter {
         memoized_types[type] = final_pair;
         return final_pair;
       }
-
       case TYPE_FUNCTION: {
         auto info = type->info->as<FunctionTypeInfo>();
 
