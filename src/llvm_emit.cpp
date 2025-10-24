@@ -338,6 +338,8 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
   // --- Pointer casting ---
   if (from->is_pointer() && to->is_pointer()) {
     value = builder.CreateBitCast(value, llvm_to, "bitcasttmp");
+  } else if (from->is_pointer() && to == bool_type()) {
+    value = builder.CreateIsNotNull(value, "is_null");
   } else if (from->is_pointer() && to->is_integer()) {
     value = builder.CreatePtrToInt(value, llvm_to, "ptr2int_cast");
   } else {
