@@ -1655,6 +1655,35 @@ THIR *THIRGen::visit_for(ASTFor *ast) {
   return thir;
 }
 
+THIR *THIRGen::visit_while(ASTWhile *ast) {
+  THIR_ALLOC(THIRWhile, thir, ast)
+  std::vector<THIR *> statements {};
+  if (ast->condition) {
+    ASTExpr *condition = ast->condition.get();
+    if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+      thir->condition = visit_pattern_match((ASTPatternMatch *)condition, ast->block->scope, statements);
+    } else {
+      thir->condition = visit_node(condition);
+    }
+  } else {
+    thir->condition = make_literal("true", ast->span, bool_type(), ASTLiteral::Bool);
+  }
+
+  enter_defer_boundary(DeferBoundary::LOOP);
+  thir->block = (THIRBlock *)visit_node(ast->block);
+  auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
+  exit_defer_boundary();
+
+  for (const auto &stmt : statements) {
+    thir->block->statements.insert(thir->block->statements.begin(), stmt);
+  }
+  for (auto d : loop_defers) {
+    thir->block->statements.push_back(d);
+  }
+
+  return thir;
+}
+
 THIR *THIRGen::visit_if(ASTIf *ast) {
   THIR_ALLOC(THIRIf, thir, ast)
 
@@ -1693,25 +1722,6 @@ THIR *THIRGen::visit_else(ASTElse *ast) {
   } else {
     return visit_node(ast->block.get());
   }
-}
-
-THIR *THIRGen::visit_while(ASTWhile *ast) {
-  THIR_ALLOC(THIRWhile, thir, ast)
-  if (ast->condition) {
-    thir->condition = visit_node(ast->condition.get());
-  } else {
-    thir->condition = make_literal("true", ast->span, bool_type(), ASTLiteral::Bool);
-  }
-
-  enter_defer_boundary(DeferBoundary::LOOP);
-  thir->block = (THIRBlock *)visit_node(ast->block);
-  auto loop_defers = collect_defers_up_to(DeferBoundary::LOOP);
-  exit_defer_boundary();
-  for (auto d : loop_defers) {
-    thir->block->statements.push_back(d);
-  }
-
-  return thir;
 }
 
 THIR *THIRGen::visit_defer(ASTDefer *ast) {
