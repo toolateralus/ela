@@ -130,6 +130,10 @@ Warning Exclusions:
   "--Wno-arrow-operator"            Ignore warnings about overloading -> operator, since it's not used as an operator. for C++ programmers.
   "--Wno-inaccessible-decl"         Ignore warnings about declarations that cannot be used.
   "--Wno-switch-break"              Ignore warnings about not needing break within switch statements.
+  "--Wno-array-assignment-memcpy"   Ignore warnings about assigning an array, which invokes a memcpy call, which may not be available in your environment.
+  "--Wno-returning-array"           Ignore warnings about returning a stack allocated array, which decays to an invalid pointer.
+  "--Wno-deprecated"                Ignore warnings about using deprecated functions and types.
+  "--Wno-general"                   Ignore general warnings. Used mostly for compiler dev -- All warnings will have a specific flag when complete.
 
 In the future, we'll just have a json file to do this configuration in a simpler way (while maintaining this older cmd line version)
 )_";
