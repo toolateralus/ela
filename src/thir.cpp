@@ -2558,24 +2558,6 @@ THIRFunction *THIRGen::emit_runtime_entry_point() {
         entry_call->type = global_find_function_type_id(entry_type, {});
         block->statements.push_back(entry_call);
       }
-
-      if (is_testing) {
-        THIR_ALLOC_NO_SRC_RANGE(THIRCall, _run_all_tests_call) {
-          ASTPath run_all_tests;
-          run_all_tests.push_segment("testing");
-          run_all_tests.push_segment(RUN_ALL_TESTS_GLOBAL_FUNCTION);
-
-          auto _run_all_tests_function = get_symbol(&run_all_tests);
-
-          ASTFunctionDeclaration *ast_func = _run_all_tests_function->function.declaration;
-
-          _run_all_tests_call->callee = visit_node(ast_func);
-          _run_all_tests_call->arguments = {};
-          _run_all_tests_call->type = void_type();
-          _run_all_tests_call->is_statement = true;
-          block->statements.push_back(_run_all_tests_call);
-        }
-      }
     }
 
     // Don't rely on C's weird implicit return 0 behaviour, always return 0.
