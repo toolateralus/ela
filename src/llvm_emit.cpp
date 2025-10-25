@@ -18,6 +18,8 @@
 
 llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr) {
   if (!left->getType()->isPointerTy()) {
+    left->getType()->print(ostream(), true);
+    ostream() << '\n';
     throw_error("[LLVM: PtrBinExpr] Left operand must be a pointer", instr.span);
   }
 
@@ -103,8 +105,15 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
       }
       return builder.CreateIntToPtr(li, elem_ty, "ptr_back");
     }
-    default:
-      throw_error(std::format("[LLVM: PtrBinExpr] Unsupported operation on pointer: op = {}", (uint8_t)instr.opcode), instr.span);
+    default: {
+      ostream() << "left type = ";
+      left->getType()->print(ostream());
+      ostream() << "\nright type = ";
+      right->getType()->print(ostream());
+      ostream() << "\n";
+      throw_error(std::format("[LLVM: PtrBinExpr] Unsupported operation on pointer: op = {}", opcode_to_string(instr.opcode)),
+                  instr.span);
+    } break;
   }
 
   return nullptr;

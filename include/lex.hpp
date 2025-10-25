@@ -282,7 +282,7 @@ struct Span {
   inline std::string filename() const { return files()[file]; }
 };
 
-static inline bool ttype_is_relational(TType type) {
+static inline bool ttype_is_relational_or_equality(TType type) {
   switch (type) {
     case TType::LT:
     case TType::GT:

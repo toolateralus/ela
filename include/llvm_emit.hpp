@@ -365,9 +365,6 @@ struct DIManager {
 };
 
 struct LLVM_Emitter {
-  inline bool is_temporary_valid(uint32_t temp) const { return temps.contains(temp); }
-
-  void register_constructor(llvm::Function *, uint32_t);
 
   LLVMContext llvm_ctx;
   IRBuilder<> builder;
@@ -403,6 +400,10 @@ struct LLVM_Emitter {
     static llvm::raw_fd_ostream stream{"-", ec};
     return stream;
   }
+
+  inline bool is_temporary_valid(uint32_t temp) const { return temps.contains(temp); }
+  void register_constructor(llvm::Function *, uint32_t);
+
 
   inline void insert_temp(uint32_t idx, mir::Function *f, llvm::Value *v) {
     Type *type = nullptr;

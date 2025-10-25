@@ -2456,31 +2456,25 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("Pointer arithmetic requires an integer type on the right-hand side.", node->span);
       }
     }
-  } else if (!permissible_non_arithmetic_pointer_operations.contains(node->op)) {
-    if (left->is_pointer() || right->is_pointer()) {
-      throw_error("Operator not allowed with pointers. Only +, -, +=, -= are valid.", node->span);
-    }
+  } else if ((left->is_pointer() || right->is_pointer()) && !permissible_non_arithmetic_pointer_operations.contains(node->op)) {
+    throw_error("Operator not allowed with pointers. Only +, -, +=, -= are valid.", node->span);
   }
 
-  // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
-  // their operands type checked, but right now that would involve casting
-  // scalars to each other, which makes no sense.
-  // TODO what was i talking about? these need to be checked.
-  if (ttype_is_relational(node->op)) {
+  if (ttype_is_relational_or_equality(node->op)) {
+    printf("relational expression converting to bool\n%s\n", node->span.to_string().c_str());
+    printf("left=%s, right=%s\n", node->left->resolved_type->to_string().c_str(), node->right->resolved_type->to_string().c_str());
     node->resolved_type = bool_type();
   } else {
     auto left_t = left;
     auto right_t = right;
     auto conv_rule_0 = type_conversion_rule(left_t, right_t, node->left->span);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t, node->right->span);
-
     if (((conv_rule_0 == CONVERT_PROHIBITED) && (conv_rule_1 == CONVERT_PROHIBITED)) ||
         ((conv_rule_0 == CONVERT_EXPLICIT) && (conv_rule_1 == CONVERT_EXPLICIT))) {
       throw_error(std::format("Type error in binary expression: cannot convert between {} and {}", left_t->to_string(),
                               right_t->to_string()),
                   node->span);
     }
-    // TODO: is this correct??? do we even need to assign that here?
     node->resolved_type = left;
   }
 }
@@ -2554,6 +2548,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   if (node->op == TType::LogicalNot) {
     assert_types_can_cast_or_equal(node->operand, bool_type(), node->operand->span,
                                    "'!' expression couldn't cast to boolean implicitly");
+    node->resolved_type = bool_type();
     return;
   }
 

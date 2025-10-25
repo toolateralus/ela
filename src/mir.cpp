@@ -895,12 +895,6 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
     Operand lvalue_addr = generate_lvalue_addr(node->left, m);
     Operand rvalue = generate_expr(node->right, m);
 
-    // disallow ptr += ptr
-    if (node->right->type->is_pointer()) {
-      throw_error("pointer compound assign with pointer RHS is not allowed", node->span);
-      return Operand::MakeNull();
-    }
-
     // load current pointer value (or use register value if already a value)
     Operand current_val;
     current_val = m.create_temporary(node->left->type);
@@ -1022,6 +1016,7 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
 }
 
 Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
+  printf("ptr-unary = %s\n", node->span.to_string().c_str());
   switch (node->op) {
     case TType::Increment: {
       Operand addr = generate_lvalue_addr(node->operand, m);

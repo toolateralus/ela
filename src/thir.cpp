@@ -563,16 +563,12 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
       // Pointer arithmetic gets a special node since it has completely
       // different lowering semantics from here on out.
       // this shits so wrong and it goes back to the typer yet the complexity spreads all the way to LLVM
-      if (left->is_pointer() && ast->op != TType::Assign) {
+      if (left->is_pointer() && ast->op != TType::Assign && !ttype_is_relational_or_equality(ast->op)) {
         THIR_ALLOC(THIRPtrBinExpr, ptr_binary, ast);
         ptr_binary->left = binexpr->left;
         ptr_binary->right = binexpr->right;
         ptr_binary->op = ast->op;
-
-        if (ptr_binary->left->type->is_pointer()) {
-          ptr_binary->type = ptr_binary->left->type;
-        }
-
+        ptr_binary->type = ptr_binary->left->type;
         return ptr_binary;
       } else {
         // Cast the right operand since the entire compiler works under the assumption

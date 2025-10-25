@@ -2218,7 +2218,7 @@ Or, for a "C Style" for loop: (You do not need mut in the declaration. it is imp
 
     const bool is_assignment_or_compound = next.type == TType::Assign || next.type == TType::Comma ||
                                            ttype_is_comp_assign(next.type) ||
-                                           (tok.type == TType::Identifier && ttype_is_relational(next.type));
+                                           (tok.type == TType::Identifier && ttype_is_relational_or_equality(next.type));
 
     // .2 != comma for tuple destrucutre.
     const bool is_deref = tok.type == TType::Mul && lookahead_buf()[2].type != TType::Comma;
