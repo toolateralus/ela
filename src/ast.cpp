@@ -277,7 +277,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         compile_command.add_c_flag(string.str());
         return nullptr;
     }},
-    
+
     // #flags, for making an enum declaration auto increment with a flags value.
     // #flags MyEnum :: enum {...};
     {.identifier = "flags",
@@ -296,10 +296,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         parser->current_statement_list->push_back(enum_decl);
 
-        if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) { 
+        if (!compile_command.has_flag("freestanding") && !compile_command.has_flag("nostdlib")) {
           NODE_ALLOC(ASTImpl, impl, defer, parser);
           impl->scope = create_child(parser->ctx.scope);
-          
+
           { // create the path & type for the std::util::Flags trait impl.
             NODE_ALLOC(ASTPath, path, defer1, parser);
             path->push_segment("std");
@@ -321,7 +321,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
             type->normal.path = path;
             impl->target = type;
           }
-          
+
           parser->current_statement_list->push_back(impl);
         }
 
@@ -465,8 +465,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           old->value = parser->context_identifier();
           old->is_local = true;
         }
-        
-        
+
+
         // set up dynof(&mut object, compiler::Context)
         NODE_ALLOC(ASTDyn_Of, dynof, dynof_defer, parser)
         {
@@ -474,11 +474,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           expr->operand = object;
           expr->mutability = MUT;
           expr->op = TType::And;
-          
+
           dynof->object = expr;
           dynof->trait_type = parser->context_trait_ast_type();
         }
-        
+
         // setup the assignemnt of the new context
         NODE_ALLOC(ASTBinExpr, context_assignment, assign_defer, parser)
         {
@@ -496,7 +496,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           stmt->expression = context_assignment;
           parser->current_statement_list->push_back(stmt);
         }
-        
+
         return nullptr;
       }
     },
@@ -512,12 +512,12 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
 
         ASTFunctionDeclaration* function = parser->current_func_decl.get();
-        
+
         function->context_push_count--;
         if (function->context_push_count < 0) {
           throw_error("context stack underflow, no contexts to pop.", function->span);
         }
-        
+
         NODE_ALLOC(ASTPath, path, path_defer, parser)
         path->push_segment("$ctx" + std::to_string(function->context_push_count));
 
@@ -2838,6 +2838,11 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, ASTStructDe
       const bool is_anonymous = peeked == TType::Struct || peeked == TType::Union;
       if (is_anonymous) {
         ASTStructDeclaration *decl = parse_struct_declaration();
+
+        if (!decl->is_union) {
+          throw_error("We do not support sub-struct that aren't anonymous sub-unions", decl->span);
+        }
+
         decl->is_anonymous = true;
         decl->is_structural = false;
         node->subtypes.push_back(decl);
@@ -2901,12 +2906,14 @@ ASTStructDeclaration *Parser::parse_struct_declaration() {
     expect(TType::Union);
   }
   InternedString name;
+
   if (peek().type == TType::Identifier) {
     name = expect(TType::Identifier).value;
   } else {
     name = get_unique_identifier().value;
     node->is_structural = true;
   };
+
   parse_struct_body(name, node);
   return node;
 }

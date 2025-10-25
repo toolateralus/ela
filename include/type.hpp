@@ -452,13 +452,11 @@ struct Type {
   size_t size_in_bits() const;
   size_t alignment_in_bits() const;
 
-  bool try_get_index_of_member(const InternedString &name, size_t &index) const;
+  bool try_get_index_of_member(const InternedString &name, size_t &path) const;
   bool try_get_offset_in_bits(size_t member_index, size_t &out_offset) const;
-
 
   bool try_get_offset_in_bits(const InternedString &name, size_t &out_offset) const {
     out_offset = 0;
-
     size_t index;
     if (this->try_get_index_of_member(name, index)) {
       return try_get_offset_in_bits(index, out_offset);

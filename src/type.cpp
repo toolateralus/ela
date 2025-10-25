@@ -1230,18 +1230,46 @@ bool Type::try_get_offset_in_bits(size_t target_index, size_t &bit_offset) const
       return false;
   }
 }
-
 bool Type::try_get_index_of_member(const InternedString &name, size_t &index) const {
-  index = static_cast<size_t>(-1);
-  for (const Type *t = this; t; t = (t->has_extensions() ? t->base_type : nullptr)) {
-    const TypeInfo *info = t->info;
-    for (size_t i = 0; i < info->members.size(); ++i) {
-      if (info->members[i].name == name) {
-        index = i;
-        return true;
-      }
+  const TypeInfo *info = this->info;
+  if (!info) {
+    return false;
+  }
+
+  // 1. Check direct members
+  for (size_t i = 0; i < info->members.size(); ++i) {
+    const auto &m = info->members[i];
+    if (m.name == name) {
+      index = i;
+      return true;
     }
   }
+
+  // 2. Recurse into anonymous subtypes
+  for (size_t i = 0; i < info->members.size(); ++i) {
+    const auto &m = info->members[i];
+    const Type *member_type = m.type;
+
+    if (!m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+      continue;
+    }
+
+    size_t subindex = 0;
+    if (member_type->try_get_index_of_member(name, subindex)) {
+      index = i;  // return the index of the containing anonymous member
+      return true;
+    }
+  }
+
+  // 3. Climb up extensions if any
+  if (has_extensions() && base_type) {
+    size_t base_index = 0;
+    if (base_type->try_get_index_of_member(name, base_index)) {
+      index = base_index;
+      return true;
+    }
+  }
+
   return false;
 }
 

@@ -586,6 +586,7 @@ struct LLVM_Emitter {
               dbg.create_type_member(di_struct_type, file, 0, member_type->alignment_in_bits(), member_type->size_in_bits(),
                                      member_offset_in_bits, di_member_type, name);
 
+          printf("member %s is %zu bits long.\n", name.c_str(), member->getSizeInBits());
           member_debug_info.push_back(member);
         }
 
@@ -594,6 +595,10 @@ struct LLVM_Emitter {
         }
 
         llvm_struct_type->setBody(member_types);
+
+        size_t alloc_size = data_layout.getTypeAllocSizeInBits(llvm_struct_type);
+
+        printf("for type: %s, alloc_size=%zu\n", type->to_string().c_str(), alloc_size);
 
         type_pair final_pair = {llvm_struct_type, di_struct_type};
         memoized_types[type] = final_pair;
@@ -679,7 +684,7 @@ struct LLVM_Emitter {
           }
 
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member.type);
-          uint64_t member_size = data_layout.getTypeAllocSize(llvm_member_type);
+          uint64_t member_size = member.type->size_in_bits();
           if (member_size > largest_size) {
             largest_size = member_size;
             largest_member = llvm_member_type;
@@ -687,7 +692,7 @@ struct LLVM_Emitter {
 
           auto member_di =
               dbg.create_type_member(di_choice_type, file, 0, data_layout.getABITypeAlign(llvm_member_type).value() * 8,
-                                     member_size * 8, offset, di_member_type, member.name.str());
+                                     member_size, offset, di_member_type, member.name.str());
           field_debug_info.push_back(member_di);
         }
 

@@ -805,11 +805,11 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
 
         llvm::Value *ptr = visit_operand(instr.left, instr.span);
         Type *ty = instr.right.type;
-        uint64_t size = data_layout.getTypeAllocSize(llvm_typeof(ty));
 
         llvm::Value *cast_ptr =
             create_dbg(builder.CreateBitCast(ptr, llvm::PointerType::get(i8_ty, 0), "memset_ptr"), instr.span);
 
+        uint64_t size = ty->size_in_bits() / 8;
         llvm::Value *size_val = llvm::ConstantInt::get(i64_ty, size);
 
         llvm::Function *memset_fn =
