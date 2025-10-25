@@ -12,140 +12,101 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 #include "core.hpp"
+#include "lex.hpp"
 #include "mir.hpp"
 #include "type.hpp"
 
 llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right, const Instruction &instr) {
-  llvm::Value *result = nullptr;
-  llvm::Type *elem_ty = nullptr;
-
-  if (instr.left.type && instr.left.type->is_pointer()) {
-    elem_ty = llvm_typeof(instr.left.type->get_element_type());
-  } else if (instr.right.type && instr.right.type->is_pointer()) {
-    elem_ty = llvm_typeof(instr.right.type->get_element_type());
+  if (!left->getType()->isPointerTy()) {
+    throw_error("[LLVM: PtrBinExpr] Left operand must be a pointer", instr.span);
   }
 
-  // Unary NOT handled separately
-  if (!right) {
-    if (instr.opcode == mir::OP_LOGICAL_NOT || instr.opcode == mir::OP_NOT) {
-      Type *unused = nullptr;
-      llvm::Value *v = perform_cast(left, instr.left.type, bool_type(), &unused);
-      if (!v) throw_error("Pointer logical-not: failed to cast pointer to bool via MIR type system", instr.span);
-      if (!v->getType()->isIntegerTy(1)) v = builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv");
-      return (instr.opcode == mir::OP_LOGICAL_NOT) ? builder.CreateNot(v, "ptr_lnot") : builder.CreateNot(v, "ptr_not");
-    }
-    throw_error("Pointer arithmetic: missing right operand", instr.span);
-    return nullptr;
-  }
+  llvm::Type *elem_ty = llvm_typeof(instr.left.type->get_element_type());
 
   // Pointer comparisons
-  if (instr.opcode == mir::OP_EQ || instr.opcode == mir::OP_NE || instr.opcode == mir::OP_LT || instr.opcode == mir::OP_LE ||
-      instr.opcode == mir::OP_GT || instr.opcode == mir::OP_GE) {
+  if (right->getType()->isPointerTy()) {
     llvm::Value *l = left;
     llvm::Value *r = right;
 
-    if (l->getType() != r->getType()) {
-      llvm::Type *i8ptr = llvm::PointerType::get(llvm::Type::getInt8Ty(llvm_ctx), 0);
-      l = builder.CreateBitCast(left, i8ptr, "ptrcmp_lcast");
-      r = builder.CreateBitCast(right, i8ptr, "ptrcmp_rcast");
-    }
-
     if (instr.opcode == mir::OP_EQ || instr.opcode == mir::OP_NE) {
-      result = builder.CreateICmp(instr.opcode == mir::OP_EQ ? llvm::CmpInst::ICMP_EQ : llvm::CmpInst::ICMP_NE, l, r, "ptrcmp");
-    } else {
-      unsigned bits = data_layout.getPointerSizeInBits(0);
-      llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
-      llvm::Value *li = builder.CreatePtrToInt(l, intptr_ty, "ptr2int_l");
-      llvm::Value *ri = builder.CreatePtrToInt(r, intptr_ty, "ptr2int_r");
-      llvm::CmpInst::Predicate pred;
-      switch (instr.opcode) {
-        case mir::OP_LT:
-          pred = llvm::CmpInst::ICMP_ULT;
-          break;
-        case mir::OP_LE:
-          pred = llvm::CmpInst::ICMP_ULE;
-          break;
-        case mir::OP_GT:
-          pred = llvm::CmpInst::ICMP_UGT;
-          break;
-        case mir::OP_GE:
-          pred = llvm::CmpInst::ICMP_UGE;
-          break;
-        default:
-          throw_error("Invalid pointer comparison", instr.span);
-          exit(1);
-      }
-      result = builder.CreateICmp(pred, li, ri, "ptrcmp");
+      const auto cmp = instr.opcode == mir::OP_EQ ? llvm::CmpInst::ICMP_EQ : llvm::CmpInst::ICMP_NE;
+      return builder.CreateICmp(cmp, l, r, "ptr_eqcmp");
     }
-    return result;
-  }
 
-  // Pointer subtraction (ptr - ptr) or (ptr - int)
-  if (instr.opcode == mir::OP_SUB) {
-    if (!elem_ty) throw_error("Pointer subtraction: missing pointee type in MIR", instr.span);
-
-    if (left->getType()->isPointerTy() && right->getType()->isPointerTy()) {
-      return builder.CreatePtrDiff(elem_ty, left, right, "ptrsub");
-    } else if (left->getType()->isPointerTy()) {
-      return builder.CreateGEP(elem_ty, left, builder.CreateNeg(right, "neg_offset"), "ptr_sub_int");
-    } else if (right->getType()->isPointerTy()) {
-      return builder.CreateGEP(elem_ty, right, left, "ptr_add_int");  // swap for int - ptr
-    } else {
-      throw_error("Pointer subtraction requires at least one pointer", instr.span);
-    }
-  }
-
-  // Pointer addition (ptr + int or int + ptr)
-  if (instr.opcode == mir::OP_ADD) {
-    if (!elem_ty) throw_error("Pointer addition: missing pointee type in MIR", instr.span);
-
-    if (left->getType()->isPointerTy()) {
-      result = builder.CreateGEP(elem_ty, left, right, "ptradd");
-    } else if (right->getType()->isPointerTy()) {
-      result = builder.CreateGEP(elem_ty, right, left, "ptradd");
-    } else {
-      throw_error("Pointer addition requires at least one pointer", instr.span);
-    }
-    return result;
-  }
-
-  // Logical AND / OR (for pointer truthiness)
-  if (instr.opcode == mir::OP_LOGICAL_AND || instr.opcode == mir::OP_LOGICAL_OR) {
-    llvm::Value *l =
-        builder.CreateICmpNE(left, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(left->getType())), "ptr_truth_l");
-    llvm::Value *r = builder.CreateICmpNE(right, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(right->getType())),
-                                          "ptr_truth_r");
-    return (instr.opcode == mir::OP_LOGICAL_AND) ? builder.CreateAnd(l, r, "ptr_land") : builder.CreateOr(l, r, "ptr_lor");
-  }
-
-  // MUL, DIV, MOD (pointer → integer)
-  if (instr.opcode == mir::OP_MUL || instr.opcode == mir::OP_DIV || instr.opcode == mir::OP_MOD) {
     unsigned bits = data_layout.getPointerSizeInBits(0);
     llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
-    llvm::Value *li = left->getType()->isPointerTy() ? builder.CreatePtrToInt(left, intptr_ty, "ptr2int_l") : left;
-    llvm::Value *ri = right->getType()->isPointerTy() ? builder.CreatePtrToInt(right, intptr_ty, "ptr2int_r") : right;
+    llvm::Value *li = builder.CreatePtrToInt(l, intptr_ty, "ptr2int_l");
+    llvm::Value *ri = builder.CreatePtrToInt(r, intptr_ty, "ptr2int_r");
 
+    llvm::CmpInst::Predicate pred;
     switch (instr.opcode) {
-      case mir::OP_MUL:
-        result = builder.CreateMul(li, ri, "ptr_mul");
+      case mir::OP_LT:
+        pred = llvm::CmpInst::ICMP_ULT;
         break;
-      case mir::OP_DIV:
-        result = builder.CreateUDiv(li, ri, "ptr_div");
+      case mir::OP_LE:
+        pred = llvm::CmpInst::ICMP_ULE;
         break;
-      case mir::OP_MOD:
-        result = builder.CreateURem(li, ri, "ptr_mod");
+      case mir::OP_GT:
+        pred = llvm::CmpInst::ICMP_UGT;
+        break;
+      case mir::OP_GE:
+        pred = llvm::CmpInst::ICMP_UGE;
         break;
       default:
-        break;
+        throw_error("[LLVM: PtrBinExpr] Invalid pointer relational comparison", instr.span);
+        exit(1);
     }
-
-    if (left->getType()->isPointerTy() || right->getType()->isPointerTy())
-      result = builder.CreateIntToPtr(result, elem_ty, "ptr_back");
-
-    return result;
+    return builder.CreateICmp(pred, li, ri, "ptr_relcmp");
   }
 
-  throw_error(std::format("Unsupported operation on pointer: op = {}", (uint8_t)instr.opcode), instr.span);
+  // Pointer arithmetic
+  if (right->getType()->isPointerTy()) {
+    throw_error("[LLVM: PtrBinExpr] Right operand cannot be a pointer in arithmetic", instr.span);
+  }
+
+  switch (instr.opcode) {
+    case mir::OP_ADD:
+      return builder.CreateGEP(elem_ty, left, right, "ptr_add");
+    case mir::OP_SUB:
+      return builder.CreateGEP(elem_ty, left, builder.CreateNeg(right, "neg_offset"), "ptr_sub");
+    case mir::OP_LOGICAL_AND: {
+      llvm::Value *l_bool = builder.CreateIsNotNull(left, "ptr_truth_l");
+      llvm::Value *r_bool = builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "r_truth");
+      return builder.CreateAnd(l_bool, r_bool, "ptr_land");
+    }
+    case mir::OP_LOGICAL_OR: {
+      llvm::Value *l_bool = builder.CreateIsNotNull(left, "ptr_truth_l");
+      llvm::Value *r_bool = builder.CreateICmpNE(right, llvm::ConstantInt::get(right->getType(), 0), "r_truth");
+      return builder.CreateOr(l_bool, r_bool, "ptr_lor");
+    }
+    case mir::OP_MUL:
+    case mir::OP_DIV:
+    case mir::OP_MOD: {
+      unsigned bits = data_layout.getPointerSizeInBits(0);
+      llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
+      llvm::Value *li = builder.CreatePtrToInt(left, intptr_ty, "ptr2int_l");
+      // guaranteed to be integer type
+      llvm::Value *ri = right;
+
+      switch (instr.opcode) {
+        case mir::OP_MUL:
+          li = builder.CreateMul(li, ri, "ptr_mul");
+          break;
+        case mir::OP_DIV:
+          li = builder.CreateUDiv(li, ri, "ptr_div");
+          break;
+        case mir::OP_MOD:
+          li = builder.CreateURem(li, ri, "ptr_mod");
+          break;
+        default:
+          return nullptr;  // TODO: fixme
+      }
+      return builder.CreateIntToPtr(li, elem_ty, "ptr_back");
+    }
+    default:
+      throw_error(std::format("[LLVM: PtrBinExpr] Unsupported operation on pointer: op = {}", (uint8_t)instr.opcode), instr.span);
+  }
+
   return nullptr;
 }
 
@@ -309,7 +270,8 @@ llvm::Value *LLVM_Emitter::binary_fp(llvm::Value *left, llvm::Value *right, Op_C
       return nullptr;
   }
 }
-llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to, Type **new_type) {
+
+llvm::Value *LLVM_Emitter::perform_cast(Span span, llvm::Value *value, Type *from, Type *to, Type **new_type) {
   if (from == to) {
     *new_type = to;
     return value;
@@ -349,6 +311,15 @@ llvm::Value *LLVM_Emitter::perform_cast(llvm::Value *value, Type *from, Type *to
     }
     if (to->kind == TYPE_ENUM) {
       to = to->info->as<EnumTypeInfo>()->underlying_type;
+    }
+
+    if (from->has_extensions() || to->has_extensions()) {
+      const std::string error = std::format(
+          "unable to cast because 'from' or 'to' had extensions. "
+          "from={}, to={}",
+          from->to_string(), to->to_string());
+
+      throw_error(error, span);
     }
 
     if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR) {
@@ -555,28 +526,25 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
         llvm::Value *left = visit_operand(instr.left, instr.span);
         llvm::Value *right = visit_operand(instr.right, instr.span);
 
-        Type *left_ty = instr.left.type;
-        Type *right_ty = instr.right.type;
+        Type *left_ty = instr.left.type, *right_ty = instr.right.type;
 
-        if (left_ty->kind == TYPE_ENUM) {
-          Type *enum_underlying = left_ty->info->as<EnumTypeInfo>()->underlying_type;
-          left = perform_cast(left, left_ty, enum_underlying, &left_ty);
-        }
-        if (right_ty->kind == TYPE_ENUM) {
-          Type *enum_underlying = right_ty->info->as<EnumTypeInfo>()->underlying_type;
-          right = perform_cast(right, right_ty, enum_underlying, &right_ty);
-        }
-
-        if (instr.left.type->is_pointer() || instr.right.type->is_pointer()) {
-          llvm::Value *result = create_dbg(pointer_binary(left, right, instr), instr.span);
+        if (left_ty->is_pointer()) {
+          llvm::Value *result = pointer_binary(left, right, instr);
           insert_temp(instr.dest.temp, f, result);
-          break;
+          continue;
+        }
+
+        if (!left_ty->is_kind(TYPE_SCALAR) || !right_ty->is_kind(TYPE_SCALAR)) {
+          throw_error(std::format("[LLVM, BinExpr]: Somehow we got a non-scalar, type in a binary operation. left={}, right={}",
+                                  left_ty->to_string(), right_ty->to_string()),
+                      instr.span);
         }
 
         ScalarTypeInfo *left_info = left_ty->info->as<ScalarTypeInfo>();
         ScalarTypeInfo *right_info = right_ty->info->as<ScalarTypeInfo>();
         Type *new_type = nullptr;
-        right = perform_cast(right, right_ty, left_ty, &new_type);
+
+        right = perform_cast(instr.span, right, right_ty, left_ty, &new_type);
         if (new_type) {
           right_ty = new_type;
           right_info = new_type->info->as<ScalarTypeInfo>();
@@ -601,7 +569,7 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
       case mir::OP_LOGICAL_NOT: {
         llvm::Value *v = visit_operand(instr.left, instr.span);
         Type *unused = nullptr;
-        v = perform_cast(v, instr.left.type, bool_type(), &unused);
+        v = perform_cast(instr.span, v, instr.left.type, bool_type(), &unused);
         if (!v->getType()->isIntegerTy(1))
           v = create_dbg(builder.CreateICmpNE(v, llvm::ConstantInt::get(v->getType(), 0), "boolconv"), instr.span);
         llvm::Value *not_val = create_dbg(builder.CreateNot(v, "nottmp"), instr.span);
@@ -690,7 +658,7 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
       case mir::OP_JMP_TRUE: {
         llvm::Value *cond = visit_operand(instr.right, instr.span);
         Type *unused = nullptr;
-        cond = perform_cast(cond, instr.right.type, bool_type(), &unused);
+        cond = perform_cast(instr.span, cond, instr.right.type, bool_type(), &unused);
         if (!cond->getType()->isIntegerTy(1))
           cond = create_dbg(builder.CreateICmpEQ(cond, llvm::ConstantInt::get(cond->getType(), 1), "boolconv"), instr.span);
 
@@ -766,7 +734,7 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
       case mir::OP_CAST: {
         llvm::Value *v = visit_operand(instr.left, instr.span);
         Type *new_type = nullptr;
-        llvm::Value *casted = create_dbg(perform_cast(v, instr.left.type, instr.right.type, &new_type), instr.span);
+        llvm::Value *casted = create_dbg(perform_cast(instr.span, v, instr.left.type, instr.right.type, &new_type), instr.span);
         if (new_type) instr.right.type = new_type;
         insert_temp(instr.dest.temp, f, casted);
       } break;

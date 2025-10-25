@@ -133,7 +133,7 @@ enum struct TType {
   case TType::type:      \
     return #type
 
-static inline std::string TTypeToString(TType type) {
+static inline std::string ttype_to_string(TType type) {
   switch (type) {
     TTYPE_CASE(MultiLineString);
     TTYPE_CASE(Using);

@@ -559,7 +559,8 @@ Operand generate_index_addr(const THIRIndex *node, Module &m);
 Operand generate_member_access_addr(const THIRMemberAccess *node, Module &m);
 
 void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
-             const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer);
+             const THIRFunction *global_initializer, const THIRVariable *__all_tests_slice_variable,
+             const std::vector<THIRVariable *> reflection_variables);
 
 static inline void generate(const THIR *node, Module &m) {
   switch (node->get_node_type()) {

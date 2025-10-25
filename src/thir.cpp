@@ -558,11 +558,12 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
     // Even for permissible conversions, we should explicitly cast.
     // As well as having special pointer arithmetic nodes.
     if (binexpr->left->type != binexpr->right->type) {
-      Type *left = binexpr->left->type, *right = binexpr->right->type;
+      Type *left = binexpr->left->type;
 
       // Pointer arithmetic gets a special node since it has completely
       // different lowering semantics from here on out.
-      if ((left->is_pointer() || right->is_pointer()) && ast->op != TType::Assign) {
+      // this shits so wrong and it goes back to the typer yet the complexity spreads all the way to LLVM
+      if (left->is_pointer() && ast->op != TType::Assign) {
         THIR_ALLOC(THIRPtrBinExpr, ptr_binary, ast);
         ptr_binary->left = binexpr->left;
         ptr_binary->right = binexpr->right;
@@ -570,20 +571,6 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
 
         if (ptr_binary->left->type->is_pointer()) {
           ptr_binary->type = ptr_binary->left->type;
-        } else if (ptr_binary->right->type->is_pointer()) {
-          ptr_binary->type = ptr_binary->right->type;
-        }
-
-        if (ptr_binary->type == void_type()->take_pointer_to() || ptr_binary->type == void_type()->take_pointer_to(true)) {
-          ptr_binary->type = u8_type()->take_pointer_to();
-          if (ptr_binary->left->type->is_pointer() && (ptr_binary->left->type == void_type()->take_pointer_to() ||
-                                                       ptr_binary->left->type == void_type()->take_pointer_to(true))) {
-            ptr_binary->left = make_cast(ptr_binary->left, u8_type()->take_pointer_to());
-          }
-          if (ptr_binary->right->type->is_pointer() && (ptr_binary->right->type == void_type()->take_pointer_to() ||
-                                                        ptr_binary->right->type == void_type()->take_pointer_to(true))) {
-            ptr_binary->right = make_cast(ptr_binary->right, u8_type()->take_pointer_to());
-          }
         }
 
         return ptr_binary;
@@ -627,6 +614,11 @@ THIR *THIRGen::visit_unary_expr(ASTUnaryExpr *ast) {
       THIR_ALLOC(THIRPtrUnaryExpr, ptr_unary, ast);
       ptr_unary->operand = unary->operand;
       ptr_unary->op = ast->op;
+
+      if (ast->op == TType::LogicalNot) {
+        ptr_unary->type = bool_type();
+      }
+
       return ptr_unary;
     }
 
@@ -1500,7 +1492,7 @@ THIR *THIRGen::visit_program(ASTProgram *ast) {
 
   // set the initializer for _all_tests before we finish writing this out (main is compiled after this already has been
   // written out to a string)
-  setup__all_tests();
+  generate_all_tests_slice_variable();
 
   return thir;
 }
@@ -2006,7 +1998,8 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
     size_t offset_in_bits = 0;
 
     if (!parent_type->try_get_offset_in_bits(name, offset_in_bits)) {
-      throw_error(std::format("[THIR, Reflection]: Unable to get offset of member {} in type {}", name, parent_type->to_string()), {});
+      throw_error(std::format("[THIR, Reflection]: Unable to get offset of member {} in type {}", name, parent_type->to_string()),
+                  {});
     }
 
     // TODO: We should not be passing offset as a byte value only.
@@ -2444,11 +2437,11 @@ THIR *THIRGen::make_cast(THIR *operand, Type *type) {
   return cast;
 }
 
-void THIRGen::setup__all_tests() {
+THIRVariable *THIRGen::generate_all_tests_slice_variable() {
   const bool is_testing = compile_command.has_flag("test");
+  THIRVariable *all_tests_slice_thir = nullptr;
   if (is_testing) {
     Type *test_struct_type;
-    THIRVariable *all_tests_slice_thir;
     ASTPath test_path;
     test_struct_type = g_testing_Test_type;
     all_tests_slice_thir = (THIRVariable *)visit_node(g_testing_tests_declaration);
@@ -2492,6 +2485,7 @@ void THIRGen::setup__all_tests() {
 
     all_tests_slice_thir->global_initializer_assignment->right = ini;
   }
+  return all_tests_slice_thir;
 }
 
 THIRFunction *THIRGen::emit_runtime_entry_point() {
@@ -2670,7 +2664,6 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
       // This just wont work with compile time, which is annoying
       global_initializer_function->block->statements.push_back(temp);
       global_initializer_function->block->statements.push_back(memcpy_call);
-
       return;
     }
   }
@@ -2739,7 +2732,7 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
 
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
   global_initializer_function = global_ini;
-  global_ini->constructor_index = 0;  // highest priority.
+  global_ini->constructor_index = 1;
 
   FunctionTypeInfo info;
   info.params_len = 0;

@@ -10,9 +10,7 @@
       "name": "Debug current file compilation",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
-      "args": [
-        "${file}"
-      ],
+      "args": ["${file}"]
     },
     {
       "type": "lldb",
@@ -20,10 +18,7 @@
       "name": "Debug current file compilation (nostdlib)",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
-      "args": [
-        "${file}",
-        "--nostdlib"
-      ],
+      "args": ["${file}", "--nostdlib"]
     },
     {
       "type": "lldb",
@@ -31,12 +26,7 @@
       "name": "Debug current file compilation (tests)",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
-      "args": [
-        "${file}",
-        "--test",
-        "--s",
-        "--nl"
-      ],
+      "args": ["${file}", "--test", "--s", "--nl"]
     },
     {
       "preLaunchTask": "compile_current",
@@ -44,7 +34,7 @@
       "request": "launch",
       "name": "Debug current file",
       "program": "${fileDirname}/${fileBasenameNoExtension}",
-      "cwd": "${fileDirname}",
+      "cwd": "${fileDirname}"
     },
     {
       "preLaunchTask": "compile_current_test",
@@ -53,6 +43,9 @@
       "name": "Debug current file (tests)",
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
+      }
     },
     // If you have an ela_source/main.ela you can use these configurations to test
     // miscellaneous problems you may have.
@@ -61,11 +54,7 @@
       "request": "launch",
       "name": "Debug ela_source/main",
       "program": "${workspaceFolder}/bin/ela",
-      "args": [
-        "main.ela",
-        "--s",
-        "--save-mir"
-      ],
+      "args": ["main.ela", "--s", "--save-mir"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
         "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
@@ -76,21 +65,15 @@
       "request": "launch",
       "name": "Debug ela_source/main, nostdlib",
       "program": "${workspaceFolder}/bin/ela",
-      "args": [
-        "main.ela",
-        "--s",
-        "--nostdlib"
-      ],
-      "cwd": "${workspaceFolder}/ela_source",
+      "args": ["main.ela", "--s", "--nostdlib"],
+      "cwd": "${workspaceFolder}/ela_source"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug ela_source/main compilation, stop on entry",
       "program": "${workspaceFolder}/bin/ela",
-      "args": [
-        "main.ela"
-      ],
+      "args": ["main.ela"],
       "cwd": "${workspaceFolder}/ela_source",
       "stopOnEntry": true
     },
@@ -107,15 +90,11 @@
       "request": "launch",
       "name": "Debug ela_source/main tests",
       "program": "${workspaceFolder}/bin/ela",
-      "args": [
-        "main.ela",
-        "--s",
-        "--test"
-      ],
+      "args": ["main.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
+        "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
       }
-    },
+    }
   ]
 }

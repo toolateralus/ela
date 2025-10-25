@@ -877,7 +877,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     // via trait Inc/Dec
     case TType::Increment:
     case TType::Decrement:
-      output = TTypeToString(op);
+      output = ttype_to_string(op);
       break;
     // via traits CompArith/CompBitwise/CompLogical etc.
     case TType::CompAdd:
@@ -890,7 +890,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::CompXor:
     case TType::CompSHL:
     case TType::CompSHR:
-      output = TTypeToString(op);
+      output = ttype_to_string(op);
       output.replace(0, 4, "comp_");
     default:
       break;

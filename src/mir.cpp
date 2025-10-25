@@ -203,12 +203,10 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
   // either CONSTRUCTOR_0 or CONSTRUCTOR_1, which gives it priority for getting called
   // either BEFORE        or AFTER          global initializers run.
   if (t->constructor_index == 1) {
-    printf("CONSTRUCTOR_0\n");
     flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0;
   }
 
   if (t->constructor_index == 2) {
-    printf("CONSTRUCTOR_1\n");
     flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1;
   }
 
@@ -970,15 +968,23 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
       }
     }
 
-    // pointer comparisons (==, !=, <, <=, >, >=)
+    // pointer comparisons (==, !=, <, <=, >, >=, ||, &&)
     case TType::EQ:
     case TType::NEQ:
     case TType::LT:
     case TType::LE:
+    case TType::LogicalAnd:
+    case TType::LogicalOr:
     case TType::GT:
     case TType::GE: {
       Op_Code cmp_op;
       switch (node->op) {
+        case TType::LogicalOr:
+          cmp_op = OP_LOGICAL_OR;
+          break;
+        case TType::LogicalAnd:
+          cmp_op = OP_LOGICAL_AND;
+          break;
         case TType::EQ:
           cmp_op = OP_EQ;
           break;
@@ -1008,7 +1014,7 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
     }
 
     default:
-      throw_error(std::format("unsupported pointer operator {}", (int)node->op), node->span);
+      throw_error(std::format("unsupported pointer operator {}", ttype_to_string(node->op)), node->span);
       return Operand::MakeNull();
   }
 
@@ -1055,28 +1061,26 @@ Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
 }
 
 void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
-             const std::vector<THIRFunction *> &test_functions, const THIRFunction *global_initializer) {
-  if (compile_command.has_flag("test")) {
-    for (const auto &f : test_functions) {
-      generate(f, m);
-    }
-  }
-
+             const THIRFunction *global_initializer, const THIRVariable *__all_tests_slice_variable,
+             const std::vector<THIRVariable *> reflection_variables) {
   /*
     These are disabled because of bugs I can't currently solve.
     TODO: fixme
   */
-  if (true) {
-    for (const auto &ctor : constructors) {
-      generate(ctor, m);
-    }
+  for (const auto &ctor : constructors) {
+    generate(ctor, m);
   }
 
-  if (true) {
-    ((THIRFunction *)global_initializer)->constructor_index = 1;
-    generate(global_initializer, m);
-  }
+  generate(global_initializer, m);
 
   generate(entry_point, m);
+
+  if (compile_command.has_flag("test")) {
+    generate(__all_tests_slice_variable, m);
+  }
+
+  for (const auto &v : reflection_variables) {
+    generate(v, m);
+  }
 }
 }  // namespace mir

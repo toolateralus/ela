@@ -1400,7 +1400,7 @@ ASTExpr *Parser::parse_primary() {
       return parse_path();
     default: {
       begin_node();
-      throw_error(std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
+      throw_error(std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, ttype_to_string(tok.type)),
                   current_span);
       return nullptr;
     }
@@ -2243,12 +2243,12 @@ Or, for a "C Style" for loop: (You do not need mut in the declaration. it is imp
 
   {
     if (tok.family == TFamily::Operator) {
-      throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), current_span);
+      throw_error(std::format("Unexpected operator: {} '{}'", ttype_to_string(tok.type), tok.value), current_span);
     }
 
     if (tok.family == TFamily::Literal) {
       eat();
-      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), current_span);
+      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, ttype_to_string(tok.type)), current_span);
     }
 
     if (tok.family == TFamily::Keyword) {
@@ -3179,7 +3179,7 @@ inline Token Parser::expect(TType type) {
   fill_buffer_if_needed(states.back());
   if (peek().type != type) {
     Span range = peek().span;
-    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value), range);
+    throw_error(std::format("Expected {}, got {} : {}", ttype_to_string(type), ttype_to_string(peek().type), peek().value), range);
   }
   return eat();
 }

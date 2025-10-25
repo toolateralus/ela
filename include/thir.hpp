@@ -1,5 +1,6 @@
 #pragma once
 
+#include <llvm/IR/DebugInfoMetadata.h>
 #include "arena.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
@@ -149,7 +150,7 @@ struct THIRVariable : THIR {
   bool is_global : 1 = false;
   bool is_constexpr : 1 = false;
   bool is_extern : 1 = false;
-  bool is_uninitialized: 1 = false;
+  bool is_uninitialized : 1 = false;
 
   // We track this so we can emit all the variables the first time this gets used,
   // so dead code gets eliminated,
@@ -443,6 +444,23 @@ struct THIRGen {
 
   std::unordered_map<const Type *, ReflectionInfo> reflected_upon_types;
 
+  std::vector<THIRVariable *> get_all_reflection_variables() {
+    std::vector<THIRVariable *> variables;
+    for (const auto &[_, info] : reflected_upon_types) {
+      (void)_;
+      variables.push_back(info.definition);
+      auto statements = global_initializer_function->block->statements;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, assign);
+      assign->type = info.definition->type;
+      assign->left = info.definition;
+      assign->right = info.definition->value;
+      assign->is_statement = true;
+      statements.insert(statements.begin(), assign);
+    }
+    return variables;
+  }
+
   Type *type_ptr_list = nullptr;
   Type *method_list = nullptr;
   Type *field_list = nullptr;
@@ -570,5 +588,5 @@ struct THIRGen {
   THIRFunction *emit_runtime_entry_point();
 
   void make_global_initializer(const Type *, THIRVariable *thir, Nullable<ASTExpr> value);
-  void setup__all_tests();
+  THIRVariable *generate_all_tests_slice_variable();
 };

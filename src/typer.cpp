@@ -440,10 +440,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     ctx.scope->insert_local_variable(member.name, member.type->resolved_type, nullptr, MUT);
 
     if (member.default_value) {
-      auto old_expected_type = expected_type;
-      expected_type = member.type->resolved_type;
+      ENTER_EXPECTED_TYPE(member.type->resolved_type);
       member.default_value.get()->accept(this);
-      expected_type = old_expected_type;
     }
 
     info->members.push_back({
@@ -1127,10 +1125,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
       if (param_index < params_ct) {
         auto &param = params->params[param_index];
 
+        ENTER_EXPECTED_TYPE(param->resolved_type);
         if (arg_index < node->arguments.size()) {
-          // Argument provided, type-check it
-          expected_type = param->resolved_type;
-
           ASTExpr *arg = node->arguments[arg_index];
           if (arg->get_node_type() == AST_NODE_UNPACK) {
             node->arguments.erase(node->arguments.begin() + arg_index);
@@ -1146,12 +1142,9 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
               arg, param->resolved_type, arg->span,
               std::format("unexpected argument type.. parameter #{} of function",
                           arg_index + 1));  // +1 here to make it 1-based indexing for user. more intuitive
-
         } else if (param->normal.default_value) {
           auto old_scope = ctx.scope;
           ctx.scope = function->scope;
-          // No argument provided, use the default value
-          expected_type = param->resolved_type;
           param->normal.default_value.get()->accept(this);  // Type-check the default value
           ctx.scope = old_scope;
         } else {
@@ -1210,7 +1203,6 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           continue;
         }
 
-        expected_type = Type::INVALID_TYPE;
         node->arguments[arg_index]->accept(this);
       }
     }
@@ -1339,10 +1331,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
         ! at least unset the expected type here? that will be a temporary fix.
       */
       {
-        auto old_expected = expected_type;
-        expected_type = Type::INVALID_TYPE;
+        ENTER_EXPECTED_TYPE(Type::INVALID_TYPE);
         arguments->accept(this);
-        expected_type = old_expected;
       }
 
       auto args = arguments->resolved_argument_types;
@@ -1717,7 +1707,6 @@ void Typer::visit(ASTVariable *node) {
     if (value_ty == void_type()) {
       throw_error("Cannot assign a variable with value type of 'void'", node->span);
     }
-    auto type = value_ty;
 
     // CLEANUP: This is nonsense.
     node->type = ast_alloc<ASTType>();
@@ -1726,12 +1715,8 @@ void Typer::visit(ASTVariable *node) {
     node->resolved_type = value_ty;
 
     // TODO: so, we just don't set the type if it can't be assigned to int??? what?
-    if (type->is_kind(TYPE_SCALAR) && type->has_no_extensions() && expr_is_literal(node->value.get())) {
-      auto info = (type->info->as<ScalarTypeInfo>());
-      auto rule = type_conversion_rule(type, s32_type(), node->span);
-      if (info->is_integral && rule != CONVERT_PROHIBITED && rule != CONVERT_EXPLICIT) {
-        node->type->resolved_type = s32_type();
-      }
+    if (type_is_numeric(value_ty) && expr_is_literal(node->value.get())) {
+      assert_types_can_cast_or_equal(node->value.get(), s32_type(), node->span, "invalid literal type.");
     }
   }
 
@@ -1861,10 +1846,8 @@ void Typer::visit(ASTParamDecl *node) {
     }
 
     if (node->normal.default_value) {
-      auto old_type = expected_type;
-      expected_type = param_type;
+      ENTER_EXPECTED_TYPE(param_type);
       node->normal.default_value.get()->accept(this);
-      expected_type = old_type;
     }
   }
 }
@@ -2020,14 +2003,7 @@ void Typer::visit(ASTIf *node) {
     condition->accept(this);
   }
 
-  auto cond_ty = node->condition->resolved_type;
-  auto conversion_rule = type_conversion_rule(cond_ty, bool_type());
-
-  if (conversion_rule == CONVERT_PROHIBITED) {
-    throw_error(std::format("cannot convert 'if' condition to a boolean, implicitly nor explicitly. got type \"{}\"",
-                            cond_ty->to_string()),
-                node->span);
-  }
+  assert_types_can_cast_or_equal(condition, bool_type(), node->span, "unable to convert 'if' condition to a bool");
 
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
@@ -2450,7 +2426,7 @@ void Typer::visit(ASTBinExpr *node) {
     throw_error(
         std::format(
             "unable to use operator {}, it is a non trivial operation and no operator overload was implemented for type {}",
-            TTypeToString(node->op), left->to_string()),
+            ttype_to_string(node->op), left->to_string()),
         node->span);
   }
 
@@ -2488,7 +2464,8 @@ void Typer::visit(ASTBinExpr *node) {
 
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
   // their operands type checked, but right now that would involve casting
-  // scalars to each other, which makes no  sense.
+  // scalars to each other, which makes no sense.
+  // TODO what was i talking about? these need to be checked.
   if (ttype_is_relational(node->op)) {
     node->resolved_type = bool_type();
   } else {
@@ -2571,18 +2548,15 @@ void Typer::visit(ASTUnaryExpr *node) {
     }
   }
 
-  // Convert to boolean if implicitly possible, for ! expressions
-  {
-    auto conversion_rule = type_conversion_rule(operand_ty, bool_type(), node->operand->span);
-    auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
+  node->resolved_type = operand_ty;
 
-    if (node->op == TType::LogicalNot && can_convert) {
-      node->resolved_type = bool_type();
-      return;
-    }
+  // Convert to boolean if implicitly possible, for ! expressions
+  if (node->op == TType::LogicalNot) {
+    assert_types_can_cast_or_equal(node->operand, bool_type(), node->operand->span,
+                                   "'!' expression couldn't cast to boolean implicitly");
+    return;
   }
 
-  node->resolved_type = operand_ty;
   return;
 }
 
@@ -2782,8 +2756,8 @@ void Typer::visit(ASTInitializerList *node) {
       auto expected = expected_type;
       if (expected && expected->is_fixed_sized_array()) {
         auto elem = expected->get_element_type();
-
         auto rule = type_conversion_rule(target_type, elem);
+
         if (rule == CONVERT_PROHIBITED) {
           throw_error("invalid initializer list element type", node->span);
         }
@@ -2885,8 +2859,7 @@ void Typer::visit(ASTInitializerList *node) {
       }
 
       for (size_t i = 0; i < values.size(); ++i) {
-        const auto old = expected_type;
-        expected_type = target_element_type;
+        ENTER_EXPECTED_TYPE(target_element_type);
         auto value = values[i];
 
         if (value->get_node_type() == AST_NODE_UNPACK) {
@@ -2900,7 +2873,7 @@ void Typer::visit(ASTInitializerList *node) {
         }
 
         value->accept(this);
-        expected_type = old;
+
         assert_types_can_cast_or_equal(
             value, target_element_type, value->span,
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
@@ -2998,6 +2971,7 @@ void Typer::visit(ASTSwitch *node) {
   if (!node->is_statement) {
     expected_type = Type::INVALID_TYPE;
   }
+
   Defer _([&] { expected_type = old_expected_type; });
 
   Type *return_type = void_type();
