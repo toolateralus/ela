@@ -557,7 +557,7 @@ struct LLVM_Emitter {
         llvm::Type *largest_member_type = nullptr;
         uint64_t largest_member_size = 0;
 
-        auto di_struct_type = dbg.create_struct_type(dbg.current_scope(), struct_name, file, 0, type->size_in_bytes() * 8,
+        auto di_struct_type = dbg.create_struct_type(dbg.current_scope(), struct_name, file, 0, type->size_in_bits(),
                                                      data_layout.getABITypeAlign(llvm_struct_type).value() * 8,
                                                      llvm::DINode::FlagZero, member_debug_info);
 
@@ -565,7 +565,7 @@ struct LLVM_Emitter {
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member_type);
 
           if (is_union) {
-            uint64_t member_size = member_type->size_in_bytes();
+            uint64_t member_size = member_type->size_in_bits();
             if (member_size > largest_member_size) {
               largest_member_size = member_size;
               largest_member_type = llvm_member_type;
@@ -575,9 +575,16 @@ struct LLVM_Emitter {
             member_types.push_back(llvm_member_type);
           }
 
+          size_t member_offset_in_bits;
+          if (!type->try_get_offset_in_bits(name, member_offset_in_bits)) {
+            std::string formatted = std::format("[LLVM]: Unable to get offset of member {} in type {}", name, type->to_string());
+            throw_error(formatted, {});
+            exit(1);
+          }
+
           llvm::DIDerivedType *member =
-              dbg.create_type_member(di_struct_type, file, 0, member_type->alignment_in_bytes() * 8,
-                                     member_type->size_in_bytes() * 8, type->offset_in_bytes(name) * 8, di_member_type, name);
+              dbg.create_type_member(di_struct_type, file, 0, member_type->alignment_in_bits(), member_type->size_in_bits(),
+                                     member_offset_in_bits, di_member_type, name);
 
           member_debug_info.push_back(member);
         }

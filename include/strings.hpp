@@ -55,7 +55,7 @@ constexpr bool compiler_feature_exists(const char *s) {
 }
 
 
-// TODO: reorder these, they're crappy and it's not that hard. 
+// TODO: reorder these, they're crappy and it's not that hard.
 // would just be nice if they were in a neat logical order.
 constexpr size_t TYPE_FLAGS_INTEGER = 1 << 0;
 constexpr size_t TYPE_FLAGS_FLOAT = 1 << 1;
@@ -105,12 +105,21 @@ Available 'init' args:
   raylib -- a boilerplate raylib program.
 
 Available flags:
-  --release          Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
+  --release          Compile with LLVM optimizations and with no debug information from Ela. defaults to false, which is a debug build.
+    -On   Optimization levels (used with --release). Available options:
+      -O0 - No optimizations.
+      -O1 - Basic.
+      -O2 - More aggressive.
+      -O3 - The most aggressive setting.
+      -Os - Optimize for size.
+      -Oz - Extremely aggresive size optimization, often sacrificing runtime performance.
+
   --no-compile       Transpile to C but don't invoke the clang compiler automatically.
   --nl               Compile in debug mode, but with no 'line info'. this, often paired with --s, will allow you to debug the output C code.
   --freestanding     Compile without the C Standard Library. equivalent to '--nostdlib & --ffreestanding' for GCC/Clang.
   --nostdlib         Compile without Ela's standard library. Note, this includes many types such as List!<T>,Slice!<T>,str/String, etc. We don't have a "Core" seperated from the stdlib.
   --s                "Save" and don't delete the `.c` file used to transpile
+  --save-mir         Write out the '.emir' file (An approximation of the MIR used to compile, right now our printer doesn't produce compileable-from-file MIR)
   --metrics          Write performance metrics to stdout.
   --x                Print the command used to compile the outputted C code.
   --test             Only emit functions marked `#test` and bootstrap the default test runner. You still have to run the binary to run the tests.
@@ -122,7 +131,7 @@ Warning Exclusions:
   "--Wno-inaccessible-decl"         Ignore warnings about declarations that cannot be used.
   "--Wno-switch-break"              Ignore warnings about not needing break within switch statements.
 
-In the future, we'll just have a json file to do this configuration in a simpler way (while maintaining this older version)
+In the future, we'll just have a json file to do this configuration in a simpler way (while maintaining this older cmd line version)
 )_";
 
 constexpr auto RAYLIB_INIT_CODE = R"__(
@@ -207,10 +216,10 @@ typedef float f32;
 typedef signed short int s16;
 typedef unsigned short int u16;
 
-/* 
+/*
   TODO: replace the 'signed' attribute on s8.
-  * We did this because we can't use main() in 
-  * freestanding with a signed char, because of 
+  * We did this because we can't use main() in
+  * freestanding with a signed char, because of
   * command line args, and C restrictions.
   * I think most platforms default char to signed char. but it's not great to not explicitly state it
 */

@@ -120,7 +120,7 @@ LValue *Interpreter::get_index_lvalue(THIRIndex *node) {
     return new_lvalue(p);
   } else if (base->get_value_type() == ValueType::RAW_POINTER) {
     RawPointerValue *raw = base->as<RawPointerValue>();
-    const size_t sz = raw->type->base_type->size_in_bytes();
+    const size_t sz = raw->type->base_type->size_in_bits() / 8;
     char *p = raw->ptr + (sz * index);
     // TODO: see the RawPointerValue::dereference() to see why this happens, and why it shouldnt happen.
     return new_lvalue(new_raw_pointer(raw->type->base_type, p));
@@ -128,7 +128,7 @@ LValue *Interpreter::get_index_lvalue(THIRIndex *node) {
 
   if (base->get_value_type() == ValueType::RAW_POINTER) {
     RawPointerValue *raw = base->as<RawPointerValue>();
-    const size_t sz = raw->type->base_type->size_in_bytes();
+    const size_t sz = raw->type->base_type->size_in_bits() / 8;
     char *p = raw->ptr + (sz * index);
     return new_lvalue(new_raw_pointer(raw->type->base_type, p));
   } else if (base->get_value_type() == ValueType::POINTER) {

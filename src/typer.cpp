@@ -2610,8 +2610,12 @@ void Typer::visit(ASTLiteral *node) {
       return;
     }
     case ASTLiteral::Float:
-      if (expected_type == f64_type()) {
+      if (expected_type == f128_type()) {
+        node->resolved_type = f128_type();
+      } else if (expected_type == f64_type()) {
         node->resolved_type = f64_type();
+      } else if (expected_type == f16_type()) {
+        node->resolved_type = f16_type();
       } else {
         node->resolved_type = f32_type();
       }

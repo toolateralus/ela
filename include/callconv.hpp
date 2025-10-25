@@ -80,7 +80,7 @@ struct Calling_Convention {
   // This works the same on SysV and ARM (in a practical sense) so it's a base virtual,
   // but you'd probably want to override this if you end up using it for anything but SysV
   virtual bool type_is_scalarizable(const Type *t, uint8_t limit) const {
-    if (t->size_in_bytes() > limit) {
+    if (t->size_in_bits() / 8 > limit) {
       return false;
     }
 
@@ -110,7 +110,7 @@ struct SysV64_C_Calling_Convention : Calling_Convention {
     Argument_Convention cc;
 
     // Large structs → pass via memory (byval)
-    if (t->size_in_bytes() > direct_arg_size_in_bytes_limit()) {
+    if (t->size_in_bits() / 8 > direct_arg_size_in_bytes_limit()) {
       cc.pass_via_memory = true;
       return cc;
     }
@@ -137,7 +137,7 @@ struct SysV64_C_Calling_Convention : Calling_Convention {
     Return_Convention cc;
 
     // Large or non-scalarizable structs → sret
-    if (t->size_in_bytes() > direct_return_size_in_bytes_limit() ||
+    if (t->size_in_bits() / 8 > direct_return_size_in_bytes_limit() ||
         !type_is_scalarizable(t, direct_return_size_in_bytes_limit())) {
       cc.indirect = true;
       return cc;
@@ -195,7 +195,7 @@ struct Win64_C_Calling_Convention : Calling_Convention {
   Argument_Convention get_argument_convention(const Type *t) const override {
     Argument_Convention ac;
 
-    if (t->size_in_bytes() > direct_arg_size_in_bytes_limit()) {
+    if (t->size_in_bits() / 8 > direct_arg_size_in_bytes_limit()) {
       // Large structs -> pass via memory (byval)
       ac.pass_via_memory = true;
     }
@@ -206,7 +206,7 @@ struct Win64_C_Calling_Convention : Calling_Convention {
   Return_Convention get_return_convention(const Type *t) const override {
     Return_Convention rc;
 
-    if (t->size_in_bytes() > direct_return_size_in_bytes_limit()) {
+    if (t->size_in_bits() / 8 > direct_return_size_in_bytes_limit()) {
       // Large return -> use sret
       rc.indirect = true;
     }

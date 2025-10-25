@@ -48,13 +48,15 @@ enum ScalarType {
 
 enum TypeKind {
   TYPE_SCALAR,
-  TYPE_FUNCTION,
   TYPE_STRUCT,
   TYPE_ENUM,
   TYPE_TUPLE,
   TYPE_CHOICE,
-  TYPE_TRAIT,
   TYPE_DYN,
+
+  // ZST
+  TYPE_FUNCTION,
+  TYPE_TRAIT,
 };
 
 enum TypeExtEnum {
@@ -143,8 +145,6 @@ struct TypeInfo {
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 
-  virtual size_t size_in_bytes() const = 0;
-
   inline TypeMember const *find_member(const InternedString &name) const {
     for (auto member = members.begin(); member != members.end(); ++member) {
       if (member->name == name) {
@@ -153,23 +153,16 @@ struct TypeInfo {
     }
     return nullptr;
   }
-
-  bool try_get_index_of_member(const InternedString &name, size_t &index) const;
 };
 
 struct TraitTypeInfo : TypeInfo {
   InternedString name;
   bool is_forward_declared = false;
-
-  // Zero size type.
-  size_t size_in_bytes() const override { return 0; }
 };
 
 struct ChoiceTypeInfo : TypeInfo {
   int get_variant_discriminant(const InternedString &variant_name) const;
   Type *get_variant_type(const InternedString &variant_name) const;
-
-  size_t size_in_bytes() const override;
 };
 
 struct ASTFunctionDeclaration;
@@ -182,9 +175,6 @@ struct FunctionTypeInfo : TypeInfo {
   bool is_varargs = false;
   virtual std::string to_string() const override;
   std::string to_string(const TypeExtensions &ext) const;
-  size_t size_in_bytes() const override {
-    return sizeof(void *);  // This is only ever sized as a function pointer.
-  }
 };
 
 struct ScalarTypeInfo : TypeInfo {
@@ -195,14 +185,12 @@ struct ScalarTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
   inline bool is_float() const { return scalar_type == TYPE_FLOATING; }
   inline bool is_signed() const { return scalar_type == TYPE_SIGNED; }
-  size_t size_in_bytes() const override { return size_in_bits * 8; }
 };
 
 struct EnumTypeInfo : TypeInfo {
   Type *underlying_type = nullptr;
   bool is_flags = false;
   EnumTypeInfo() {};
-  size_t size_in_bytes() const override;
 };
 
 struct StructTypeInfo : TypeInfo {
@@ -212,7 +200,6 @@ struct StructTypeInfo : TypeInfo {
   bool is_union : 1 = false;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
-  size_t size_in_bytes() const override;
   inline bool structural_match(std::vector<Type *> types) const {
     if (types.size() != members.size()) return false;
     for (size_t i = 0; i < types.size(); ++i) {
@@ -226,18 +213,11 @@ struct StructTypeInfo : TypeInfo {
 
 struct TupleTypeInfo : TypeInfo {
   std::vector<Type *> types;
-  size_t size_in_bytes() const override;
 };
 
 struct DynTypeInfo : TypeInfo {
   Type *trait_type;
   std::vector<std::pair<InternedString, Type *>> methods;
-
-  size_t size_in_bytes() const override {
-    size_t method_ptrs_size = methods.size() * sizeof(void *);
-    size_t instance_size = sizeof(void *);
-    return method_ptrs_size + instance_size;
-  }
 };
 
 // helpers to get scalar types for fast comparison
@@ -253,8 +233,10 @@ Type *u8_ptr_type();
 Type *u16_type();
 Type *u32_type();
 Type *u64_type();
-Type *f64_type();
+Type *f16_type();
 Type *f32_type();
+Type *f64_type();
+Type *f128_type();
 
 Type *is_fn_trait();
 Type *is_range_trait();
@@ -353,8 +335,6 @@ struct Type {
       return extensions.back().type;
     }
   }
-
-  bool try_get_index_of_member(const InternedString &name, size_t &index);
 
   inline bool is_fixed_sized_array() const { return back_ext_type() == TYPE_EXT_ARRAY; }
 
@@ -470,12 +450,22 @@ struct Type {
   constexpr static Type *INVALID_TYPE = nullptr;
 
   size_t size_in_bits() const;
-  size_t size_in_bytes() const;
-  size_t alignment_in_bytes() const;
+  size_t alignment_in_bits() const;
 
-  size_t offset_in_bytes(const InternedString &field) const;
-  size_t offset_in_bytes(const size_t index) const;
-  bool try_get_offset_in_bytes(const InternedString &field, size_t &out_offset) const;
+  bool try_get_index_of_member(const InternedString &name, size_t &index) const;
+  bool try_get_offset_in_bits(size_t member_index, size_t &out_offset) const;
+
+
+  bool try_get_offset_in_bits(const InternedString &name, size_t &out_offset) const {
+    out_offset = 0;
+
+    size_t index;
+    if (this->try_get_index_of_member(name, index)) {
+      return try_get_offset_in_bits(index, out_offset);
+    }
+
+    return false;
+  }
 
   inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integral; }
   inline bool is_float() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_float(); }

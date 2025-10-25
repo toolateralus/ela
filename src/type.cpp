@@ -680,6 +680,17 @@ Type *f32_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOATING, 32));
   return type;
 }
+
+Type *f16_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "f16", create_scalar_type_info(TYPE_FLOATING, 16));
+  return type;
+}
+
+Type *f128_type() {
+  static Type *type = global_create_type(TYPE_SCALAR, "f128", create_scalar_type_info(TYPE_FLOATING, 128));
+  return type;
+}
+
 Type *f64_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_FLOATING, 64));
   return type;
@@ -709,8 +720,10 @@ void init_type_system() {
 
   // Floats
   {
-    f64_type();
+    f16_type();
     f32_type();
+    f64_type();
+    f128_type();
   }
 
   // Other
@@ -1027,6 +1040,19 @@ Type *blittable_trait() {
   return id;
 }
 
+bool Type::implements(const Type *trait) {
+  auto found = std::ranges::find(traits, trait);
+  if (found != traits.end()) {
+    return true;
+  }
+  for (auto &the_trait : traits) {
+    if (the_trait->generic_base_type == trait) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const {
   for (size_t i = 0; i < members.size(); ++i) {
     if (members[i].name == variant_name) {
@@ -1044,19 +1070,6 @@ int ChoiceTypeInfo::get_variant_discriminant(const InternedString &variant_name)
     }
   }
   return -1;
-}
-
-bool Type::implements(const Type *trait) {
-  auto found = std::ranges::find(traits, trait);
-  if (found != traits.end()) {
-    return true;
-  }
-  for (auto &the_trait : traits) {
-    if (the_trait->generic_base_type == trait) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void assess_and_try_add_blittable_trait(Type *type) {
@@ -1085,240 +1098,156 @@ void assess_and_try_add_blittable_trait(Type *type) {
   type->traits.push_back(blittable_trait());
 }
 
-// TODO: make sizing more platform dependent, and maybe we should make cross compilation a bit more
-// simple by using static definitions for these.
-size_t Type::size_in_bytes() const {
-  if (!info) {
-    throw_error("INTERNAL COMPILER ERROR: called 'size_in_bytes' on a type with no info", {});
-  }
+size_t Type::alignment_in_bits() const {
+  const size_t max_align_bits = alignof(std::max_align_t) * CHAR_BIT;
+  auto at_least_one = [](size_t v) { return v == 0 ? 1 : v; };
 
-  if (is_pointer()) {
-    return sizeof(void *);
-  }
-
-  if (is_fixed_sized_array()) {
-    size_t elem_size = base_type->size_in_bytes();
-    size_t len = extensions.back().array_size;
-    return elem_size * len;
-  }
-
-  return info->size_in_bytes();
-}
-
-size_t ChoiceTypeInfo::size_in_bytes() const {
-  if (members.empty()) {
-    return sizeof(int32_t);
-  }
-
-  size_t max_size = 0;
-  size_t max_align = alignof(int32_t);
-
-  for (const auto &member : members) {
-    max_size = std::max(max_size, member.type->size_in_bytes());
-    max_align = std::max(max_align, member.type->alignment_in_bytes());
-  }
-
-  max_size = (max_size + max_align - 1) & ~(max_align - 1);
-  size_t total_size = sizeof(int32_t) + max_size;
-  total_size = (total_size + max_align - 1) & ~(max_align - 1);
-
-  return total_size;
-}
-
-size_t Type::alignment_in_bytes() const {
   if (kind == TYPE_SCALAR) {
-    size_t s = info->as<ScalarTypeInfo>()->size_in_bytes();
-    if (s == 0) {
-      return 1;
-    }
-    return std::min(s, static_cast<size_t>(alignof(std::max_align_t)));
+    size_t bits = info->as<ScalarTypeInfo>()->size_in_bits;
+    bits = at_least_one(bits);
+    return std::min(bits, max_align_bits);
   }
 
   if (is_pointer()) {
-    return alignof(void *);
+    return alignof(void *) * CHAR_BIT;
   }
 
   if (is_fixed_sized_array()) {
-    return base_type->alignment_in_bytes();
+    return base_type->alignment_in_bits();
   }
 
   if (kind == TYPE_STRUCT) {
     auto struct_info = info->as<StructTypeInfo>();
     size_t max_align = 1;
+    // For both structs and unions we want the max member alignment
     for (auto &member : struct_info->members) {
-      max_align = std::max(max_align, member.type->alignment_in_bytes());
+      max_align = std::max(max_align, member.type->alignment_in_bits());
     }
-    return max_align;
+    return at_least_one(max_align);
   }
 
-  return alignof(void *);
-}
-
-size_t StructTypeInfo::size_in_bytes() const {
-  if (is_union) {
-    size_t max_size = 0;
+  if (kind == TYPE_TUPLE) {
+    auto tuple_info = info->as<TupleTypeInfo>();
     size_t max_align = 1;
-
-    for (auto &member : members) {
-      max_size = std::max(max_size, member.type->size_in_bytes());
-      max_align = std::max(max_align, member.type->alignment_in_bytes());
+    for (auto &member : tuple_info->members) {
+      max_align = std::max(max_align, member.type->alignment_in_bits());
     }
-
-    // round up to max alignment
-    max_size = (max_size + max_align - 1) & ~(max_align - 1);
-    return max_size;
+    return at_least_one(max_align);
   }
 
-  size_t offset = 0;
-  size_t max_align = 1;
-  for (auto &member : members) {
-    size_t member_size = member.type->size_in_bytes();
-    size_t align = member.type->alignment_in_bytes();
-    max_align = std::max(max_align, align);
-    offset = (offset + align - 1) & ~(align - 1);
-    offset += member_size;
-  }
-  offset = (offset + max_align - 1) & ~(max_align - 1);
-  return offset;
-}
-
-size_t EnumTypeInfo::size_in_bytes() const { return underlying_type->size_in_bytes(); }
-
-size_t TupleTypeInfo::size_in_bytes() const {
-  size_t offset = 0;
-  size_t max_align = 1;
-  for (auto &member : members) {
-    size_t member_size = member.type->size_in_bytes();
-    size_t align = member.type->alignment_in_bytes();
-    max_align = std::max(max_align, align);
-    offset = (offset + align - 1) & ~(align - 1);
-    offset += member_size;
-  }
-  offset = (offset + max_align - 1) & ~(max_align - 1);
-  return offset;
-}
-
-bool Type::try_get_offset_in_bytes(const InternedString &field, size_t &out_offset) const {
-  // Recurse into base type for pointers/arrays
-  if (is_pointer() || is_fixed_sized_array()) {
-    if (!base_type || base_type == Type::INVALID_TYPE) {
-      return false;
+  if (kind == TYPE_CHOICE) {
+    const auto *choice_info = info->as<ChoiceTypeInfo>();
+    size_t tag_align = alignof(int32_t) * CHAR_BIT;
+    size_t max_align = tag_align;
+    for (const auto &member : choice_info->members) {
+      max_align = std::max(max_align, member.type->alignment_in_bits());
     }
-    return base_type->try_get_offset_in_bytes(field, out_offset);
+    return at_least_one(max_align);
   }
 
   if (kind == TYPE_ENUM) {
-    return false;
+    return info->as<EnumTypeInfo>()->underlying_type->alignment_in_bits();
   }
 
-  bool is_union = false;
-  if (kind == TYPE_STRUCT) {
-    is_union = info->as<StructTypeInfo>()->is_union;
-  } else if (kind == TYPE_CHOICE) {
-    is_union = true;
+  if (kind == TYPE_DYN) {
+    return alignof(void *) * CHAR_BIT;
   }
 
-  if (is_union) {
-    for (const auto &member : info->members) {
-      if (member.name == field) {
-        out_offset = 0;
-        return true;
-      }
-      if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-        size_t suboffset = 0;
-        if (member.type->try_get_offset_in_bytes(field, suboffset)) {
-          out_offset = 0;
+  return alignof(void *) * CHAR_BIT;
+}
+
+inline size_t align_to_bits(size_t value, size_t alignment_bits) {
+  return (value + alignment_bits - 1) / alignment_bits * alignment_bits;
+}
+
+bool Type::try_get_offset_in_bits(size_t target_index, size_t &bit_offset) const {
+  bit_offset = 0;
+  size_t index = 0;
+
+  std::function<bool(const TypeInfo *, size_t)> walk = [&](const TypeInfo *tinfo, size_t base_bits) -> bool {
+    // ---- union ----
+    if (const StructTypeInfo *sti = dynamic_cast<StructTypeInfo *>((TypeInfo *)tinfo); sti->is_union) {
+      for (const auto &m : tinfo->members) {
+        const Type *mt = m.type;
+
+        if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+          if (walk(mt->info, base_bits)) {
+            return true;
+          }
+        } else if (index++ == target_index) {
+          bit_offset = base_bits;
           return true;
         }
       }
+      return false;
+    }
+
+    // ---- struct / tuple ----
+    size_t offset = 0;
+    for (const auto &m : tinfo->members) {
+      const Type *mt = m.type;
+      offset = align_to_bits(offset, mt->alignment_in_bits());
+
+      if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+        if (walk(mt->info, base_bits + offset)) {
+          return true;
+        }
+      } else if (index++ == target_index) {
+        bit_offset = base_bits + offset;
+        return true;
+      }
+
+      offset += mt->size_in_bits();
     }
     return false;
-  }
+  };
 
-  size_t offset = 0;
-  size_t max_align = 1;
-  for (const auto &member : info->members) {
-    size_t align = member.type->alignment_in_bytes();
-    size_t member_size = member.type->size_in_bytes();
-    max_align = std::max(max_align, align);
-    offset = (offset + align - 1) & ~(align - 1);
+  switch (kind) {
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+      return walk(info, 0);
 
-    if (member.name == field) {
-      out_offset = offset;
-      return true;
-    }
+    case TYPE_CHOICE: {
+      const auto *choice = info->as<ChoiceTypeInfo>();
+      const size_t tag_bits = sizeof(int32_t) * CHAR_BIT;
 
-    // Anonymous members
-    if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-      size_t suboffset = 0;
-      if (member.type->try_get_offset_in_bytes(field, suboffset)) {
-        out_offset = offset + suboffset;
-        return true;
+      for (const auto &m : choice->members) {
+        const Type *mt = m.type;
+        size_t payload_off = align_to_bits(tag_bits, mt->alignment_in_bits());
+
+        if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+          if (walk(mt->info, payload_off)) {
+            return true;
+          }
+        } else if (index++ == target_index) {
+          bit_offset = payload_off;
+          return true;
+        }
       }
+      return false;
     }
-
-    offset += member_size;
+    default:
+      return false;
   }
-
-  return false;
 }
 
-size_t Type::offset_in_bytes(const InternedString &field) const {
-  size_t offset = 0;
-
-  if (try_get_offset_in_bytes(field, offset)) {
-    return offset;
-  }
-
-  throw_error("type has no field \"" + field.str() + "\"", {});
-  return 0;
-}
-
-bool TypeInfo::try_get_index_of_member(const InternedString &name, size_t &index) const {
-  for (size_t i = 0; i < members.size(); ++i) {
-    const auto &member = members[i];
-
-    // Direct match
-    if (member.name == name) {
-      index = i;
-      return true;
-    }
-
-    // Recurse into anonymous members
-    if (member.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-      const TypeInfo *subinfo = member.type->info;
-      if (subinfo && subinfo->try_get_index_of_member(name, index)) {
+bool Type::try_get_index_of_member(const InternedString &name, size_t &index) const {
+  index = static_cast<size_t>(-1);
+  for (const Type *t = this; t; t = (t->has_extensions() ? t->base_type : nullptr)) {
+    const TypeInfo *info = t->info;
+    for (size_t i = 0; i < info->members.size(); ++i) {
+      if (info->members[i].name == name) {
+        index = i;
         return true;
       }
     }
   }
-
   return false;
 }
-
-bool Type::try_get_index_of_member(const InternedString &name, size_t &index) {
-  Type *t = this;
-
-  while (t && t->has_extensions()) {
-    if (t->info->try_get_index_of_member(name, index)) {
-      return true;
-    }
-    t = t->base_type;
-  }
-
-  if (t->info->try_get_index_of_member(name, index)) {
-    return true;
-  }
-
-  index = -1;
-  return false;
-}
-
-size_t Type::offset_in_bytes(const size_t index) const { return offset_in_bytes(info->members[index].name); }
 
 size_t Type::size_in_bits() const {
   if (is_pointer()) {
-    return sizeof(void *) * 8;
+    return sizeof(void *) * CHAR_BIT;
   }
 
   if (is_fixed_sized_array()) {
@@ -1332,27 +1261,28 @@ size_t Type::size_in_bits() const {
   }
 
   if (is_kind(TYPE_STRUCT)) {
-    size_t offset = 0;
-    size_t max_align = 1;
     auto struct_info = info->as<StructTypeInfo>();
+    size_t offset = 0;
+    size_t max_align_bits = 1;
+
     if (struct_info->is_union) {
       size_t max_bits = 0;
       for (auto &member : struct_info->members) {
-        max_bits = std::max(max_bits, member.type->size_in_bits());
-        max_align = std::max(max_align, member.type->alignment_in_bytes());
+        size_t member_bits = member.type->size_in_bits();
+        size_t align_bits = member.type->alignment_in_bits();
+        max_bits = std::max(max_bits, member_bits);
+        max_align_bits = std::max(max_align_bits, align_bits);
       }
-      max_bits = (max_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
-      return max_bits;
+      return align_to_bits(max_bits, max_align_bits);
     } else {
       for (auto &member : struct_info->members) {
-        size_t align = member.type->alignment_in_bytes();
+        size_t align_bits = member.type->alignment_in_bits();
         size_t member_bits = member.type->size_in_bits();
-        max_align = std::max(max_align, align);
-        offset = (offset + align * 8 - 1) & ~(align * 8 - 1);
+        max_align_bits = std::max(max_align_bits, align_bits);
+        offset = align_to_bits(offset, align_bits);
         offset += member_bits;
       }
-      offset = (offset + max_align * 8 - 1) & ~(max_align * 8 - 1);
-      return offset;
+      return align_to_bits(offset, max_align_bits);
     }
   }
 
@@ -1361,42 +1291,41 @@ size_t Type::size_in_bits() const {
   }
 
   if (is_kind(TYPE_TUPLE)) {
-    size_t offset = 0;
-    size_t max_align = 1;
     auto tuple_info = info->as<TupleTypeInfo>();
+    size_t offset = 0;
+    size_t max_align_bits = 1;
     for (auto &member : tuple_info->members) {
-      size_t align = member.type->alignment_in_bytes();
+      size_t align_bits = member.type->alignment_in_bits();
       size_t member_bits = member.type->size_in_bits();
-      max_align = std::max(max_align, align);
-      offset = (offset + align * 8 - 1) & ~(align * 8 - 1);
+      max_align_bits = std::max(max_align_bits, align_bits);
+      offset = align_to_bits(offset, align_bits);
       offset += member_bits;
     }
-    offset = (offset + max_align * 8 - 1) & ~(max_align * 8 - 1);
-    return offset;
+    return align_to_bits(offset, max_align_bits);
   }
+
   if (is_kind(TYPE_CHOICE)) {
     const auto *choice_info = info->as<ChoiceTypeInfo>();
-    size_t max_bits = sizeof(int32_t) * 8;
+    size_t tag_bits = sizeof(int32_t) * CHAR_BIT;
     size_t max_variant_bits = 0;
-    size_t max_align = alignof(int32_t);
+    size_t max_align_bits = alignof(int32_t) * CHAR_BIT;
 
     for (const auto &member : choice_info->members) {
       size_t variant_bits = member.type->size_in_bits();
-      size_t align = member.type->alignment_in_bytes();
+      size_t align_bits = member.type->alignment_in_bits();
       max_variant_bits = std::max(max_variant_bits, variant_bits);
-      max_align = std::max(max_align, align);
+      max_align_bits = std::max(max_align_bits, align_bits);
     }
 
-    max_variant_bits = (max_variant_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
-    size_t total_bits = max_bits + max_variant_bits;
-
-    total_bits = (total_bits + max_align * 8 - 1) & ~(max_align * 8 - 1);
-    return total_bits;
+    size_t total_bits = tag_bits + align_to_bits(max_variant_bits, max_align_bits);
+    return align_to_bits(total_bits, max_align_bits);
   }
 
   if (is_kind(TYPE_DYN)) {
-    return info->size_in_bytes() * 8;
+    const DynTypeInfo *dyn = info->as<DynTypeInfo>();
+    return (dyn->methods.size() + 1) * sizeof(void *) * CHAR_BIT;
   }
 
-  return size_in_bytes() * 8;
+  // zero-sized types (e.g. fn, trait)
+  return 0;
 }

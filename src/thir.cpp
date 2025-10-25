@@ -82,7 +82,7 @@ THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
     return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bits()), ast->span, u64_type(),
                         ASTLiteral::Integer);
   } else {
-    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bytes()), ast->span, u64_type(),
+    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bits() / 8), ast->span, u64_type(),
                         ASTLiteral::Integer);
   }
 }
@@ -1980,7 +1980,7 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
 
   thir->key_values.push_back({
       "size",
-      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type(), ASTLiteral::Integer),
+      make_literal(std::to_string(type->size_in_bits() / 8), {}, u64_type(), ASTLiteral::Integer),
   });
 
   if (parent_type->is_kind(TYPE_ENUM)) {
@@ -1994,9 +1994,17 @@ THIR *THIRGen::get_field_struct(const std::string &name, Type *type, Type *paren
     const auto discriminant = info->get_variant_discriminant(name);
     thir->key_values.push_back({"discriminant", make_literal(std::to_string(discriminant), {}, u32_type(), ASTLiteral::Integer)});
   } else if (parent_type->has_no_extensions()) {
+    size_t offset_in_bits = 0;
+
+    if (!parent_type->try_get_offset_in_bits(name, offset_in_bits)) {
+      throw_error(std::format("[THIR, Reflection]: Unable to get offset of member {} in type {}", name, parent_type->to_string()), {});
+    }
+
+    // TODO: We should not be passing offset as a byte value only.
+    // We should store both bitsize, bytesize, bitoff, bitalign, bytealign, byteoff. etc.
     thir->key_values.push_back({
         "offset",
-        make_literal(std::to_string(parent_type->offset_in_bytes(name)), {}, u64_type(), ASTLiteral::Integer),
+        make_literal(std::to_string(offset_in_bits / 8), {}, u64_type(), ASTLiteral::Integer),
     });
   }
 
@@ -2133,7 +2141,7 @@ ReflectionInfo THIRGen::create_reflection_type_struct(Type *type) {
 
   thir->key_values.push_back({
       "size",
-      make_literal(std::to_string(type->size_in_bytes()), {}, u64_type(), ASTLiteral::Integer),
+      make_literal(std::to_string(type->size_in_bits() / 8), {}, u64_type(), ASTLiteral::Integer),
   });
 
   thir->key_values.push_back(
@@ -2646,7 +2654,7 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
       memcpy_call->arguments = {
           thir, temp,
-          make_literal(std::to_string(temp->type->get_element_type()->size_in_bytes() * init->values.size()), {}, u64_type(),
+          make_literal(std::to_string(temp->type->get_element_type()->size_in_bits() / 8 * init->values.size()), {}, u64_type(),
                        ASTLiteral::Integer)};
       memcpy_call->is_statement = true;
 

@@ -290,7 +290,7 @@ struct FFIContext {
       case ValueType::ARRAY: {
         // nested array inside an array: allocate nested buffer and copy pointer into target
         ArrayValue* nested = sv->as<ArrayValue>();
-        size_t n_elem_size = nested->type->base_type->size_in_bytes();
+        size_t n_elem_size = nested->type->base_type->size_in_bits() / 8;
         size_t n_count = nested->values.size();
         size_t total = n_elem_size * (n_count == 0 ? 1 : n_count);
         size_t nested_idx = create_nested_alloc(arg_index, total, n_elem_size, n_count);
@@ -324,7 +324,7 @@ struct FFIContext {
         StructTypeInfo* stinfo = obj->type->info->as<StructTypeInfo>();
         size_t n = stinfo->members.size();
         std::vector<uint8_t> struct_buf;
-        struct_buf.resize(obj->type->size_in_bytes(), 0);
+        struct_buf.resize(obj->type->size_in_bits() / 8, 0);
         size_t offset = 0;
         for (size_t i = 0; i < n; ++i) {
           const auto& member = stinfo->members[i];
@@ -333,9 +333,9 @@ struct FFIContext {
             std::vector<uint8_t> field_buf;
             ffi_type* dummy = nullptr;
             marshal_value_into_storage(it->second, field_buf, dummy, arg_index);
-            memcpy(struct_buf.data() + offset, field_buf.data(), std::min(field_buf.size(), member.type->size_in_bytes()));
+            memcpy(struct_buf.data() + offset, field_buf.data(), std::min(field_buf.size(), member.type->size_in_bits() / 8));
           }
-          offset += member.type->size_in_bytes();
+          offset += member.type->size_in_bits() / 8;
         }
         out_type = to_ffi_type(obj->type);
         out_storage = std::move(struct_buf);
@@ -405,7 +405,7 @@ struct FFIContext {
           Value* pointee = *pv->ptr;
           if (pointee->get_value_type() == ValueType::ARRAY) {
             ArrayValue* aval = pointee->as<ArrayValue>();
-            size_t elem_size = aval->type->base_type->size_in_bytes();
+            size_t elem_size = aval->type->base_type->size_in_bits() / 8;
             size_t count = aval->values.size();
             size_t total = elem_size * (count == 0 ? 1 : count);
             size_t nested_idx = create_nested_alloc(arg_index, total, elem_size, count);
@@ -434,7 +434,7 @@ struct FFIContext {
       }
       case ValueType::ARRAY: {
         ArrayValue* arr = v->as<ArrayValue>();
-        size_t elem_size = arr->type->base_type->size_in_bytes();
+        size_t elem_size = arr->type->base_type->size_in_bits() / 8;
         size_t count = arr->values.size();
         size_t total = elem_size * (count == 0 ? 1 : count);
         size_t nested_idx = create_nested_alloc(arg_index, total, elem_size, count);
@@ -523,7 +523,7 @@ struct FFIContext {
       }
       case ValueType::ARRAY: {
         ArrayValue* arr = v->as<ArrayValue>();
-        size_t sz = arr->type->base_type->size_in_bytes();
+        size_t sz = arr->type->base_type->size_in_bits() / 8;
         uint8_t* ptr = reinterpret_cast<uint8_t*>(storage_ptr);
         size_t offset = 0;
         for (auto& elem : arr->values) {
@@ -638,7 +638,7 @@ Value* compile_time_ffi_dispatch(InternedString& name, FunctionTypeInfo* fti, co
   size_t ret_size = sizeof(void*);
 
   if (ret_type) {
-    ret_size = ret_type->size_in_bytes();
+    ret_size = ret_type->size_in_bits() / 8;
   }
 
   if (ret_type) {

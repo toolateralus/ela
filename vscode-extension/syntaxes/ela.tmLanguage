@@ -236,7 +236,7 @@
 				<!-- Basic Types -->
 				<dict>
 					<key>match</key>
-					<string>\b(s8|s16|s32|context|s64)\b</string>
+					<string>\b(context|u[1-9]\d{0,4}|s[1-9]\d{0,4})\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -248,7 +248,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(f32|f64)\b</string>
+					<string>\b(f16|f32|f64|f128)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -278,7 +278,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(sizeof|кегль|typeof|dynof)\b\s*\(</string>
+					<string>\b(sizeof|bitsize_of|typeof|dynof)\b\s*\(</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>

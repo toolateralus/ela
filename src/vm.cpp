@@ -227,7 +227,15 @@ void interpret(Context &c, mir::Module &m, uint32_t entry_point) {
         const Type *type = instr.left.type->get_element_type();
         // don't use the literal, may be an index expression;
         const uint64_t index_of_member = decode_operand(instr.right, sf);
-        const size_t offset_in_words = sf.bytes_to_words(type->offset_in_bytes(index_of_member));
+
+        size_t offset_in_bits = 0;
+        if (!type->try_get_offset_in_bits(index_of_member, offset_in_bits)) {
+          throw_error(std::format("[VM, GEP]: Unable to get offset of member {} in type {}", index_of_member, type->to_string()),
+                      {});
+          exit(1);
+        }
+
+        const size_t offset_in_words = sf.bytes_to_words(offset_in_bits);
         sf.write(instr.dest.temp, ptr + offset_in_words);
         continue;
       }

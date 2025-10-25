@@ -49,7 +49,7 @@ struct Stack_Frame {
     uint64_t word_offset{};
     for (const auto &temp : f->temps) {
       temp_to_stack_address_table[temp.index] = word_offset;
-      const size_t size = temp.type->size_in_bytes();
+      const size_t size = temp.type->size_in_bits() / 8;
       if (size < 8 || size % 8 != 0) {
         word_offset += 8;
       } else {
@@ -103,7 +103,7 @@ struct Stack_Frame {
 
   inline size_t get_address_of_temp(uint32_t temp) const { return temp_to_stack_address_table.at(temp); }
 
-  inline size_t size_in_words(const Type *type) const { return bytes_to_words(type->size_in_bytes()); }
+  inline size_t size_in_words(const Type *type) const { return bytes_to_words(type->size_in_bits() / 8); }
 
   inline size_t bytes_to_words(size_t size) const {
     if (size < 8) {

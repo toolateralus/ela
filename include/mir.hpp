@@ -412,12 +412,12 @@ struct Function {
   inline void finalize() {
     stack_size_needed_in_bytes = 0;
     for (const auto &temp : temps) {
-      if (temp.type && temp.type->size_in_bytes() > 0) {
-        size_t align = temp.type->alignment_in_bytes();
+      if (temp.type && (temp.type->size_in_bits() / 8) > 0) {
+        size_t align = temp.type->alignment_in_bits() * 8;
         if (align && stack_size_needed_in_bytes % align != 0) {
           stack_size_needed_in_bytes += align - (stack_size_needed_in_bytes % align);
         }
-        stack_size_needed_in_bytes += temp.type->size_in_bytes();
+        stack_size_needed_in_bytes += temp.type->size_in_bits() / 8;
       }
     }
     if (stack_size_needed_in_bytes % 16 != 0) {
