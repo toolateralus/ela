@@ -1,0 +1,21 @@
+fn printf(_: *u8, ...);
+
+fn main() {
+  // If we use the stdlib, this will cause an error in the LLVM backend because somehow
+  // the MIR has selected the wrong extern definition, and it chooses the previously-defined
+  // std::c::printf which declares itself as having a -> s32 return value, which is correct.
+
+  // But when we call this, the MIR selected the void returning version (again somehow this gets mixed up)
+  // and then doesn't allocate a return temporary for it, but since LLVM thinks it has a return value,
+  // it tries to put it in a slot.
+
+  // Then, of course we get an out of bounds access into the vector of temporaries.
+
+  // While it's true that this is the fault of the LLVM backend, Why are we even allowing redefinitions of externs in other scopes,
+  // When ultimately those names get lifted up to the global scope because that's how external linkage works, and those names have to be
+  // 100% unique.
+
+  // I'm going to try to add the feature of aliased externs with varying linkage names versus the identifier defined in the language.
+  // Then, if we try to re-define an extern, with a varying signature, we'll error, because that's nonsense.
+  printf("Hello, World!\n"c);
+}

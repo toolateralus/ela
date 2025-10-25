@@ -3326,12 +3326,12 @@ void Typer::visit(ASTModule *node) {
 // TODO: we need to remove all the symbol table insertions from the parser to make this work.
 // otherwise we just get constant fake redefinitions.
 // For now, redefinitions from module "appends" are untracked.
-#if 0 
+#if 0
   {
     if (auto mod = ctx.scope->lookup(node->module_name)) {
       for (const auto &stmt : node->statements) {
         InternedString offender = {};
-  
+
         if (auto struct_decl = dynamic_cast<ASTStructDeclaration *>(stmt)) {
           if (mod->scope->symbols.contains(struct_decl->name)) {
             offender = struct_decl->name;
@@ -3352,16 +3352,16 @@ void Typer::visit(ASTModule *node) {
         }
         if (auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
           auto sym = mod->scope->local_lookup(func_decl->name);
-  
+
           if (!sym) {
             continue;
           }
-          
+
           const ASTFunctionDeclaration *decl = sym->function.declaration;
-  
+
           const bool new_declaration_is_fwd_or_extern = func_decl->is_forward_declared || func_decl->is_extern;
           const bool existing_declaration_is_fwd_or_extern = decl->is_extern || decl->is_forward_declared;
-  
+
           if (!new_declaration_is_fwd_or_extern && existing_declaration_is_fwd_or_extern) {
             offender = func_decl->name;
             goto err;
@@ -3385,7 +3385,7 @@ void Typer::visit(ASTModule *node) {
             goto err;
           }
         }
-  
+
         continue;
       err:
         throw_error(std::format("redefinition of '{}'", offender), stmt->span);

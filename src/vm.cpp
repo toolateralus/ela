@@ -1,4 +1,5 @@
 #include "vm.hpp"
+#include <cstdint>
 #include "mir.hpp"
 
 namespace mir::VM {
@@ -31,6 +32,7 @@ static inline uint64_t decode_operand(const Operand &op, const Stack_Frame &sf) 
   error:
     assert(false && "Unsupported operand or immediate value type for value read");
   }
+
 }
 
 // for LOAD and PUSH_ARG where we may need the entire sized value read.

@@ -5,70 +5,81 @@ Mainly focusing on big big ideas here. as an over-arching idea; The entire compi
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
-
 #### Iterative compilation
-  - Having the typer run in an out-of-order fashion will be endlessly beneficial to the langauge. There are already pain points,
+
+- Having the typer run in an out-of-order fashion will be endlessly beneficial to the langauge. There are already pain points,
   where a `choice` depends on a `trait` and the `trait` depends on a `choice`, and there is literally _no way_ to resolve it. **at all**
 
-  Also, this would allow us to do a kind of 'exclusionary hot code path dead code elimination', where we start at the `main()` function (only for non-library programs) and branch out, using the symbol table to only type what's needed/used by the program, with some exceptions (extern, exports, volatile, etc)
-  
-  The key would be to make it performant, and simple. I'd prefer we not use a query/pipeline/threading system, instead just a 'retry typing until it's done or a threshold of errors shows up'
+Also, this would allow us to do a kind of 'exclusionary hot code path dead code elimination', where we start at the `main()` function (only for non-library programs) and branch out, using the symbol table to only type what's needed/used by the program, with some exceptions (extern, exports, volatile, etc)
 
-  One of the largest challenges in a system like this, is error reporting. I would certainly not want to have to write _another_ visitor just
-  to figure out where error(s) occured; instead, we can think of something unique.
+The key would be to make it performant, and simple. I'd prefer we not use a query/pipeline/threading system, instead just a 'retry typing until it's done or a threshold of errors shows up'
+
+One of the largest challenges in a system like this, is error reporting. I would certainly not want to have to write _another_ visitor just
+to figure out where error(s) occured; instead, we can think of something unique.
 
 ---
+
 ### Below is a summary of the codebase's comments, made by AI. it may be crap, but it's better than doing it myself :P
 
 #### Attribute system and statement attributes
-  - The current `#`-prefixed directives are pretty limiting and kind of ugly. We should move to a more flexible attribute system, like `@const`, `@entry`, `@foreign`, `@impl[Clone, Debug]`, etc. Attributes should be stackable and usable on any declaration, not just at the start of statements.
 
-  >> This is already implemented, but it's not as used as it needs to be. we should be constantly working to completely remove any `#` directives.
+- The current `#`-prefixed directives are pretty limiting and kind of ugly. We should move to a more flexible attribute system, like `@const`, `@entry`, `@foreign`, `@impl[Clone, Debug]`, etc. Attributes should be stackable and usable on any declaration, not just at the start of statements.
+
+> > This is already implemented, but it's not as used as it needs to be. we should be constantly working to completely remove any `#` directives.
 
 #### Improved alias system
-  - Aliasing should work for functions and symbols, not just types. Would be nice to have something like Rust's `use` or C++'s `using`, so you can alias almost anything, and in various capacities.
+
+- Aliasing should work for functions and symbols, not just types. Would be nice to have something like Rust's `use` or C++'s `using`, so you can alias almost anything, and in various capacities.
 
 #### Better error reporting and diagnostics
-  - Error reporting is always a pain point, especially with iterative or out-of-order compilation. We need to make it easier for users to understand and fix type errors and dependency cycles, without writing a million visitors.
+
+- Error reporting is always a pain point, especially with iterative or out-of-order compilation. We need to make it easier for users to understand and fix type errors and dependency cycles, without writing a million visitors.
 
 #### Project/config file support
-  - At some point, we'll want a project configuration system for managing submodules, library paths, and compilation commands. This would make bigger projects and dependency management way easier.
+
+- At some point, we'll want a project configuration system for managing submodules, library paths, and compilation commands. This would make bigger projects and dependency management way easier.
 
 #### Parser and AST cleanup
-  - There's a lot of unnecessary complexity and inefficiency in the parser and AST. Needs a cleanup pass for performance and sanity.
+
+- There's a lot of unnecessary complexity and inefficiency in the parser and AST. Needs a cleanup pass for performance and sanity.
 
 #### Better macro/directive system
-  - Macros (NYI) and directives should be more powerful and integrated, maybe even first-class language features instead of just parser hacks.
+
+- Macros (NYI) and directives should be more powerful and integrated, maybe even first-class language features instead of just parser hacks.
 
 #### Improved type extensions and querying
-  - The way type extensions (pointers, arrays, etc.) are handled is kind of clunky. Needs a refactor to make querying and manipulation more ergonomic.
+
+- The way type extensions (pointers, arrays, etc.) are handled is kind of clunky. Needs a refactor to make querying and manipulation more ergonomic.
 
 #### Testing infrastructure
-  - The test runner could use some love. Easier grouping/filtering, maybe even integrate testing more deeply into the language.
+
+- The test runner could use some love. Easier grouping/filtering, maybe even integrate testing more deeply into the language.
 
 #### FFI improvements
-  - FFI should be more robust, with better handling of calling conventions, attributes, and cross-language type mapping.
+
+- FFI should be more robust, with better handling of calling conventions, attributes, and cross-language type mapping.
 
 #### Better symbol/scope management
-  - Scope/context management should be more lexical and less manual. Would make symbol resolution and incremental compilation easier and less error-prone.
+
+- Scope/context management should be more lexical and less manual. Would make symbol resolution and incremental compilation easier and less error-prone.
 
 #### Documentation and examples
-  - Docs and examples are always lagging behind. Need to keep them up to date and practical, so users can actually learn and contribute.
 
+- Docs and examples are always lagging behind. Need to keep them up to date and practical, so users can actually learn and contribute.
 
 #### add variadic generics and value generics.
 
 -- 10/22/2025, 11:22:46 AM
 -- We will not be adding variadic generics in the forseeable future.
-   Instead, we would likely add generic slices, using the type keyword,
-   slice syntax, and a compile time for loop over that slice.
-  
+Instead, we would likely add generic slices, using the type keyword,
+slice syntax, and a compile time for loop over that slice.
+
 ```rust
   fn variadic!<types: [type]>() {
     for T in types {
       println(T.name);
     }
-  } 
+  }
 
   variadic!<s32, s32>();
   // would compile to::
@@ -77,7 +88,6 @@ To search for all info comments in the source just use vscodes regex search with
     println("s32");
   }
 ```
-
 
 ```rust
 Fixed_Array :: struct!<T, N: u32> {
@@ -107,8 +117,6 @@ fn main()  {
 }
 ```
 
-
-
 #### Method trait bounds (Reimplementing 'impl')
 
 Right now, if I did:
@@ -119,9 +127,9 @@ impl!<T> List!<T> {
 }
 ```
 
-This would ***never*** compile, because any `T` that isn't `u32` would trigger an error, and our standard library alone will break this assumption 10 times over.
+This would **_never_** compile, because any `T` that isn't `u32` would trigger an error, and our standard library alone will break this assumption 10 times over.
 
-Instead, we need to look at _`T`_ in that **trait bounds**, and if the condition fails, we _exclude_ that function from being added to 
+Instead, we need to look at _`T`_ in that **trait bounds**, and if the condition fails, we _exclude_ that function from being added to
 the types symbol table. However, if and when that function gets called by the user, we need to _then_ throw the error for the trait bounds
 not being satisified.
 
@@ -129,7 +137,7 @@ This raises a need to rewrite how methods are even added to types, we need them 
 
 > See the next section for another reason we might want to do something like this, storing methods outside of the symbol table entirely in the c++ `Type *`.
 
-This is a very important part of having generics that are truly extremely flexible, right now everything is very rigid, and hard to use 
+This is a very important part of having generics that are truly extremely flexible, right now everything is very rigid, and hard to use
 when doing very very generalized generics, such as a `List!<T>`
 
 Another plain example, is somethning like `fn contains()`, for any container:
@@ -150,7 +158,6 @@ impl!<T> List!<T> {
 ```
 
 The above example is very simple and performant, yet we are completely unable to do this, because we have to assume that **every single type that is used in a list** would _have an equality operator implemented_ which is completely unreasonable.
-
 
 #### Extremely arbitrary and imprecise impl's.
 
@@ -179,16 +186,20 @@ This ties into the previous feature plan, with where predicates being lazily eva
 their constraints, and errors only triggering on a use of a function that doesn't fit into that predicate+impl pattern.
 
 #### Vtables instead of dyn objects being an aggregate of function pointers
+
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
 
 #### remove the 'switch is' node. replace it with a 'match' node
+
 We right now have `switch` and `switch is` nodes. we should replace this with just a `match` since it's not really a switch,
 it does so much more. In my mind, `switch` is just switching over enumeration values, i.e C `enum`. in our case, we will be able to
 do very complex pattern matching, as shown below, and this would be much nicer to not have a `switch is`, rather copy rust with just a `match`
 
 #### Pattern matching improvements
+
 recursive, value based, and very complex pattern stuff like this should work, to any degree. we need to get on Rust's level of pattern matching.
+
 ```rust
   if x is Some(Ok(&mut v)) {
 
@@ -234,15 +245,15 @@ All of those steps, excluding the last, could also re-trigger, an indeterminate 
 
 we'd get something like this:
 
-Text -> 
-  AST -> 
-    Typing -> 
-      THIR -> 
-        MIR -> 
-          Execute Metaprogram -> (.. ? unknown, could retrigger any or none of those phases) -> 
-            LLVM IR -> 
-              Object File(s) -> 
-                Executable.
+Text ->
+AST ->
+Typing ->
+THIR ->
+MIR ->
+Execute Metaprogram -> (.. ? unknown, could retrigger any or none of those phases) ->
+LLVM IR ->
+Object File(s) ->
+Executable.
 
 to be clear, when I say any of those phases, i mean from AST to Metaprogram, since of course the LLVM IR
 could only ever be reached once all compilation from previous pipelines has fully completed.
@@ -277,7 +288,8 @@ attribute(function: compiler::Declaration::Function) Obsolete(reason: str, alter
 fn old_function() {}
 ```
 
-### Registering JSON serializer 
+### Registering JSON serializer
+
 ```
 attribute(T: type) Json() {
   json::generate_and_register_serializer!<T>();
@@ -316,17 +328,15 @@ fn main() {
 }
 ```
 
-
-
-
 ### Just a random idea here:
 
 say we have a function func, that simply adds two numbers, and is constraint by IsNumeric
 
 (
-  or for the sake of specificity, doesn't depend on the size of type T, but simply operates on it,
-  in a way where integer promotions, mantissas, etc, could be coerced safely.
+or for the sake of specificity, doesn't depend on the size of type T, but simply operates on it,
+in a way where integer promotions, mantissas, etc, could be coerced safely.
 )
+
 ```rust
 fn func!<T: IsNumeric>(a: T, b: T) -> T {
   return a + b;
@@ -371,7 +381,6 @@ fn func1!<T>(a: T, b: T) -> T {
 could never qualify from this kind of instantiation consolidation, because each instantiation has to know
 exactly what constant to fill in for 'sizeof'.
 
-
 This kind of optimization could also be applied to functions that take a type argument as a pointer,
 but never access a specific field of that pointer. say it only passes this type to other functions (which may also recieve this
 optimization), and never measures the sizeof(T), nor says v.x, etc.
@@ -379,7 +388,7 @@ optimization), and never measures the sizeof(T), nor says v.x, etc.
 ```rust
 
 fn register_some_handler_in_system!<HandlerT>(handler: *HandlerT, slot: u32, kind: Handler_Kind) -> Option!<*mut Registry> {
-  registry := if registry_locator() 
+  registry := if registry_locator()
     .locate(system.registries, kind)
     .expect(fn () {
       panic("unable to locate registry for kind!");
@@ -394,22 +403,18 @@ This function could simply get type erased down to a void pointer, and used for 
 generic in the first place: if insert_or_update_at_slot takes some kind base registry, or is a list that just stores pointers,
 it could be casted out of implicilty by the compiler.
 
-
 This type erasure idea could ALSO extend to predictable types like `List`, where T is a pointer,
 we could completely consolidate every instantiation of the struct definition itself, and keep the impl's generic and instantiated,
 to save on even more code space.
 
-
 This would not only reduce binary size, but DRASTICALLY reduce compile times, and we could have -03 enable complete monomorphization, for max runtime performance (promoting tiny integers to large ones takes time and space)
-
-
-
 
 # Type inference for associated function calls.
 
 We should easily be able to infer the leftmost element of a path based on an expected type.
 
 for example:
+
 ```rust
 
 fn a!<T>(list: List!<T>) {
@@ -464,7 +469,6 @@ fn main() {
 }
 ```
 
-
 # We desperately need better switches, and matches.
 
 This is kind of covered earlier in the file, but it's much worse.
@@ -474,13 +478,13 @@ in one block.
 
 `switch is` is horrible syntax, and needs to be replaced with `match`
 
+Note:
+Of course, our `match` node wouldn't be the only statement who benefits from
+the extremely complex patterns as seen below:
+`if $expr is ...`
+`while $expr is ...`
+would also get these.
 
-Note: 
-  Of course, our `match` node wouldn't be the only statement who benefits from
-  the extremely complex patterns as seen below:
-  `if $expr is ...`
-  `while $expr is ...`
-  would also get these.
 ```rust
 
 fn main() {
@@ -503,7 +507,7 @@ fn main() {
     };
   }
 
-  // Then, our pattern matching node, would do much more complex, non-numeric 
+  // Then, our pattern matching node, would do much more complex, non-numeric
   // style switching, without fall throughs.
   // matching tuples (these do not need to be compile time constants.)
   match (0, 1) {
@@ -522,7 +526,7 @@ fn main() {
     0.. => { // We should always use =>
       io::println("Yep");
     }; // end every block with a semicolon.
-    
+
     // match against all negative numbers (s32)
     ..0 => {
       io::println("Negative");
@@ -542,7 +546,7 @@ fn main() {
     };
 
     // again, match against a Some( some value between 101 and 200 ). this will not get hit in this case.
-    Some(101..200) => { 
+    Some(101..200) => {
       io::println("Nope");
     };
 
@@ -593,8 +597,8 @@ fn main() {
     io::println("Doop");
   }
 
-  taple := (Some(10), 
-    Result!<s32, ()>::Ok(Some(100)), 
+  taple := (Some(10),
+    Result!<s32, ()>::Ok(Some(100)),
     Value::Float(Ok((Some(100.0), None)))
   );
   // Just making the most nightmarish condition possible,
@@ -628,7 +632,7 @@ match where T: {
   };
 
   u128: {
-    
+
   };
 
   IsBlittable: {
@@ -663,6 +667,55 @@ fn default!<T>() {
   }
 
   return .{};
+}
+
+```
+
+# Redoing extern
+
+```rust
+// Specify source library (for compile time execution) and a linkage name that varies from
+// the identifier we fed it.
+extern(lib: "libc", linkage: "printf") fn c_printf(*u8, ...) -> s32;
+
+// Specify (redundantly) a linkage name that matches our signature's name.
+extern(linkage: "printf") fn printf(*u8, ...) -> s32;
+
+// A normal definition still works, this just assumes your program is linking against it, or is available via
+// #load_library("/absolute/path/to/some_library.so"), and that nowhere else in the program, we redefine this symbol.
+// this is different than C, which allows you to declare many duplicate externs, because of how their .o
+// compilation model works.
+extern fn printf(*u8, ...) -> s32;
+
+// Here we can specify a block of externs from a certain library, and if we want to alias them,
+// we pass another extern arg, linkage.
+extern module(lib: "libc") {
+  extern(linkage: "printf") fn c_printf(*u8, ...) -> s32;
+  extern(linkage: "malloc") fn c_malloc(u32) -> *void;
+}
+
+// This still works, under the same assumptions as defined before with the other "normal" extern.
+extern {
+  fn printf(*u8, ...) -> s32;
+  fn malloc(u32) -> *void;
+}
+
+// or this new extern module syntax:
+// this would NOT assume that lib 'c' is what's being linked against, it will just wrap this in a module for convenience
+// when you want these namespaced.
+extern module c {
+  fn printf(*u8, ...) -> s32;
+  fn malloc(u32) -> *void;
+}
+
+extern(lib: "libc", linkage: "stdout") libc_stdout: *std::c::FILE;
+
+// the old style still works, but the identifier must match the linkage target, and this symbol has to be available
+// at link time. Also, this may or may not be callable at compile time, as we only default-load libc in the VM.
+extern stdout: *std::c::FILE;
+
+fn main () {
+  printf("%d\n"c, sizeof(Type));
 }
 
 ```
