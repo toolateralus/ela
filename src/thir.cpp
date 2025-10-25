@@ -579,7 +579,7 @@ THIR *THIRGen::visit_bin_expr(ASTBinExpr *ast) {
         // This isn't always great, so we should re-think this.
         THIR_ALLOC(THIRCast, cast, ast);
         cast->operand = binexpr->right;
-        cast->type = ast->resolved_type;
+        cast->type = binexpr->left->type;
         binexpr->right = cast;
       }
     }

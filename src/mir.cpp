@@ -1016,7 +1016,6 @@ Operand generate_ptr_bin_expr(const THIRPtrBinExpr *node, Module &m) {
 }
 
 Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
-  printf("ptr-unary = %s\n", node->span.to_string().c_str());
   switch (node->op) {
     case TType::Increment: {
       Operand addr = generate_lvalue_addr(node->operand, m);

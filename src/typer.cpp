@@ -2461,8 +2461,6 @@ void Typer::visit(ASTBinExpr *node) {
   }
 
   if (ttype_is_relational_or_equality(node->op)) {
-    printf("relational expression converting to bool\n%s\n", node->span.to_string().c_str());
-    printf("left=%s, right=%s\n", node->left->resolved_type->to_string().c_str(), node->right->resolved_type->to_string().c_str());
     node->resolved_type = bool_type();
   } else {
     auto left_t = left;
