@@ -394,6 +394,15 @@ THIR *THIRGen::visit_path(ASTPath *ast) {
   // theyre just integer constants anywhere past the typer.
   if (symbol->is_enumeration_value) {
     THIR *constant = symbol->value->to_thir();
+    if (ast->resolved_type != constant->type) {
+      // We shouldn't really need to do this. :(
+      THIR_ALLOC(THIRCast, cast, ast);
+      cast->type = ast->resolved_type;
+      cast->operand = constant;
+      cast->is_statement = true;
+      return cast;
+    }
+
     return constant;
   }
 

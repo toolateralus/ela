@@ -434,31 +434,34 @@ void LLVM_Emitter::emit_module() {
 }
 
 void LLVM_Emitter::register_constructor(llvm::Function *func, uint32_t priority) {
-  llvm::LLVMContext &ctx = llvm_module->getContext();
+  llvm::Type *i32_ty = llvm::Type::getInt32Ty(llvm_ctx);
+  llvm::PointerType *opaque_ptr_ty = llvm::PointerType::get(llvm_ctx, 0);  // opaque ptr
+  llvm::PointerType *fn_ptr_ty = llvm::PointerType::get(llvm_ctx, 0);      // function pointer (opaque)
 
-  // Type of ctor entry: { i32, void ()*, i8* } (i8* for stupid C++ legacy ABI stuff)
-  llvm::StructType *ctor_struct_ty =
-      llvm::StructType::get(llvm::Type::getInt32Ty(ctx), func->getType(), llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0));
+  // { i32, void()*, ptr }
+  llvm::StructType *ctor_struct_ty = llvm::StructType::get(llvm_ctx, {i32_ty, fn_ptr_ty, opaque_ptr_ty});
 
-  llvm::Constant *ctor_entry =
-      llvm::ConstantStruct::get(ctor_struct_ty, llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), priority), func,
-                                llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm::Type::getInt8Ty(ctx), 0)));
+  llvm::Constant *ctor_entry = llvm::ConstantStruct::get(ctor_struct_ty, llvm::ConstantInt::get(i32_ty, priority), func,
+                                                         llvm::ConstantPointerNull::get(opaque_ptr_ty));
 
-  llvm::GlobalVariable *global_ctors = llvm_module->getNamedGlobal("llvm.global_ctors");
-  if (!global_ctors) {
-    llvm::ArrayType *array_ty = llvm::ArrayType::get(ctor_struct_ty, 1);
-    global_ctors = new llvm::GlobalVariable(*llvm_module, array_ty, false, llvm::GlobalValue::AppendingLinkage,
-                                            llvm::ConstantArray::get(array_ty, {ctor_entry}), "llvm.global_ctors");
-  } else {
-    auto *old_array = llvm::cast<llvm::ConstantArray>(global_ctors->getInitializer());
-    std::vector<llvm::Constant *> new_elems;
-    for (unsigned i = 0, e = old_array->getNumOperands(); i != e; ++i) {
-      new_elems.push_back(llvm::cast<llvm::Constant>(old_array->getOperand(i)));
+  // Check for existing llvm.global_ctors
+  llvm::GlobalVariable *global_ctors = llvm_module->getGlobalVariable("llvm.global_ctors");
+  std::vector<llvm::Constant *> new_entries;
+
+  if (global_ctors) {
+    if (auto *arr = llvm::dyn_cast<llvm::ConstantArray>(global_ctors->getInitializer())) {
+      for (unsigned i = 0; i < arr->getNumOperands(); ++i) new_entries.push_back(llvm::cast<llvm::Constant>(arr->getOperand(i)));
     }
-    new_elems.push_back(ctor_entry);
-    llvm::ArrayType *new_array_ty = llvm::ArrayType::get(ctor_struct_ty, new_elems.size());
-    global_ctors->setInitializer(llvm::ConstantArray::get(new_array_ty, new_elems));
+    global_ctors->eraseFromParent();  // replace the old one
   }
+
+  new_entries.push_back(ctor_entry);
+
+  llvm::ArrayType *new_array_ty = llvm::ArrayType::get(ctor_struct_ty, new_entries.size());
+
+  new llvm::GlobalVariable(*llvm_module, new_array_ty,
+                           /*isConstant=*/true, llvm::GlobalValue::AppendingLinkage,
+                           llvm::ConstantArray::get(new_array_ty, new_entries), "llvm.global_ctors");
 }
 
 void convert_function_flags(mir::Function *f, llvm::Function *ir_f) {

@@ -202,8 +202,14 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
 
   // either CONSTRUCTOR_0 or CONSTRUCTOR_1, which gives it priority for getting called
   // either BEFORE        or AFTER          global initializers run.
-  if (t->constructor_index != 0) {
-    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0 + (t->constructor_index - 1);
+  if (t->constructor_index == 1) {
+    printf("CONSTRUCTOR_0\n");
+    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0;
+  }
+
+  if (t->constructor_index == 2) {
+    printf("CONSTRUCTOR_1\n");
+    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1;
   }
 
   f->flags = flags;
@@ -1060,13 +1066,14 @@ void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction 
     These are disabled because of bugs I can't currently solve.
     TODO: fixme
   */
-  if (false) {
+  if (true) {
     for (const auto &ctor : constructors) {
       generate(ctor, m);
     }
   }
 
   if (true) {
+    ((THIRFunction *)global_initializer)->constructor_index = 1;
     generate(global_initializer, m);
   }
 
