@@ -93,7 +93,7 @@
       "args": ["main.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
+        // "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
       }
     }
   ]
