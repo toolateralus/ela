@@ -121,26 +121,8 @@ llvm::Value *LLVM_Emitter::pointer_binary(llvm::Value *left, llvm::Value *right,
 
 llvm::Value *LLVM_Emitter::pointer_unary(llvm::Value *operand, const Instruction &instr) {
   if (instr.opcode == mir::OP_LOGICAL_NOT) {
-    llvm::Value *cmp = builder.CreateICmpEQ(
-        operand, llvm::ConstantPointerNull::get(llvm::cast<llvm::PointerType>(operand->getType())), "ptr_is_null");
-    return builder.CreateZExt(cmp, llvm::Type::getInt1Ty(llvm_ctx), "ptr_lnot");
-  }
-
-  if (instr.opcode == mir::OP_NOT) {
-    unsigned bits = data_layout.getPointerSizeInBits(0);
-    llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
-    llvm::Value *i = builder.CreatePtrToInt(operand, intptr_ty, "ptr2int");
-    llvm::Value *noti = builder.CreateNot(i, "ptr_not_int");
-    return builder.CreateIntToPtr(noti, operand->getType(), "ptr_not");
-  }
-
-  if (instr.opcode == mir::OP_NEG) {
-    unsigned bits = data_layout.getPointerSizeInBits(0);
-    llvm::Type *intptr_ty = llvm::Type::getIntNTy(llvm_ctx, bits);
-    llvm::Value *i = builder.CreatePtrToInt(operand, intptr_ty, "ptr2int");
-    llvm::Value *zero = llvm::ConstantInt::get(intptr_ty, 0);
-    llvm::Value *neg = builder.CreateSub(zero, i, "ptr_neg_int");
-    return builder.CreateIntToPtr(neg, operand->getType(), "ptr_neg");
+    printf("not on pointer\n");
+    return builder.CreateIsNull(operand, "ptr_not_null");
   }
 
   throw_error("Unsupported unary operation on pointer", instr.span);

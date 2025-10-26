@@ -106,15 +106,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
   }
 
   if (conv_rule == CONVERT_IMPLICIT) {
-    if (expr->conversion.has_value) {
-      // printf("a conversion was done twice on a single expression.\n");
-      // return;
-    }
     expr->resolved_type = to;
-    // TODO: would a single expression ever go through multiple implicit conversions? -- the answer is yes via monomorphization
-    // !BUG and this is a bug.
-    // See the copier as to why, I have no idea what's going on there.
-    // primarily its calls in default trait methods that seem to fail.
     expr->conversion = {
         .has_value = true,
         .from = from_t,
@@ -2000,7 +1992,10 @@ void Typer::visit(ASTIf *node) {
     condition->accept(this);
   }
 
-  assert_types_can_cast_or_equal(condition, bool_type(), node->span, "unable to convert 'if' condition to a bool");
+  if (!condition->resolved_type->is_pointer()) {
+    assert_types_can_cast_or_equal(condition, bool_type(), node->span, "unable to convert 'if' condition to a bool");
+  }
+
 
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
