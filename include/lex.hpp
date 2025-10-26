@@ -127,6 +127,7 @@ enum struct TType {
   Using,
 
   Uninitialized,
+  Static,
 };
 
 #define TTYPE_CASE(type) \
@@ -136,6 +137,7 @@ enum struct TType {
 static inline std::string ttype_to_string(TType type) {
   switch (type) {
     TTYPE_CASE(MultiLineString);
+    TTYPE_CASE(Static);
     TTYPE_CASE(Using);
     TTYPE_CASE(Extern);
     TTYPE_CASE(Char);
@@ -323,6 +325,7 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"static", TType::Static,},
     {"using", TType::Using},
     {"const", TType::Const},
     {"mut", TType::Mut},

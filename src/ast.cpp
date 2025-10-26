@@ -370,14 +370,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "static",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto statement = parser->parse_statement();
-        if (auto decl = dynamic_cast<ASTVariable *>(statement)) {
-          decl->is_static = true;
-        } else {
-          throw_error("static is only valid for variables, global or local.", statement->span);
-        }
-        return statement;
-    }},
+        throw_error("#static is deprecated. We now have a 'static' keyword.", parser->current_span);
+        exit(1);
+        return nullptr;
+      }
+    },
 
     // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
@@ -2164,7 +2161,7 @@ Or, for a "C Style" for loop: (You do not need mut in the declaration. it is imp
     bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
                        (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
 
-    if (is_mut_decl || is_colon_or_colon_equals) {
+    if (is_mut_decl || is_colon_or_colon_equals || tok.type == TType::Static) {
       auto decl = parse_variable();
       return decl;
     }
@@ -2280,6 +2277,12 @@ ASTDestructure *Parser::parse_destructure() {
 
 ASTVariable *Parser::parse_variable() {
   NODE_ALLOC(ASTVariable, decl, _, this);
+
+  if (peek().type == TType::Static) {
+    eat();
+    decl->is_static = true;
+  }
+
   if (current_func_decl) {
     decl->is_local = true;
   }
@@ -3179,7 +3182,8 @@ inline Token Parser::expect(TType type) {
   fill_buffer_if_needed(states.back());
   if (peek().type != type) {
     Span range = peek().span;
-    throw_error(std::format("Expected {}, got {} : {}", ttype_to_string(type), ttype_to_string(peek().type), peek().value), range);
+    throw_error(std::format("Expected {}, got {} : {}", ttype_to_string(type), ttype_to_string(peek().type), peek().value),
+                range);
   }
   return eat();
 }

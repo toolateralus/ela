@@ -82,7 +82,7 @@ void Lexer::get_token(State &state) {
     }
 
     Span location{state.line, state.col, state.file_idx, state.pos};
-    
+
     if (c == '\'') {
       pos++;  // move past '
       col++;
