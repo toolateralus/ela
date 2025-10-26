@@ -292,7 +292,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
 }
 
 Operand load_variable(const THIRVariable *node, Module &m) {
-  if (node->is_global || node->is_static) {
+  if (node->is_global || node->is_static || node->is_extern) {
     Operand result = m.create_temporary(node->type);
 
     auto it = m.global_variable_table.find(node);
@@ -327,21 +327,22 @@ Operand load_variable(const THIRVariable *node, Module &m) {
 
 Operand generate_variable(const THIRVariable *node, Module &m) {
   // static locals are just syntax sugar for a scoped global.
-  if (node->is_global || node->is_static) {
+  if (node->is_global || node->is_static || node->is_extern) {
     auto it = m.global_variable_table.find(node);
 
     // Don't doubly initialize these mfs
     if (it != m.global_variable_table.end()) {
       return Operand::MakeNull();
     }
-
     // we take a pointer to it because we have to load from this.
     Global_Variable global = {
         .name = node->name,
         .type = node->type,
-        .has_external_linkage = node->is_global,
+        .has_external_linkage = node->is_extern,
     };
+
     Global_Variable *gv = mir_arena.construct<Global_Variable>(global);
+
     m.global_variables.push_back(gv);
     m.global_variable_table[node] = gv;
     return Operand::MakeNull();

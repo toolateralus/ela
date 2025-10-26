@@ -19,32 +19,17 @@ to figure out where error(s) occured; instead, we can think of something unique.
 
 ---
 
-### Below is a summary of the codebase's comments, made by AI. it may be crap, but it's better than doing it myself :P
-
 #### Attribute system and statement attributes
 
 - The current `#`-prefixed directives are pretty limiting and kind of ugly. We should move to a more flexible attribute system, like `@const`, `@entry`, `@foreign`, `@impl[Clone, Debug]`, etc. Attributes should be stackable and usable on any declaration, not just at the start of statements.
 
 > > This is already implemented, but it's not as used as it needs to be. we should be constantly working to completely remove any `#` directives.
 
-#### Improved alias system
-
-- Aliasing should work for functions and symbols, not just types. Would be nice to have something like Rust's `use` or C++'s `using`, so you can alias almost anything, and in various capacities.
-
-#### Better error reporting and diagnostics
-
-- Error reporting is always a pain point, especially with iterative or out-of-order compilation. We need to make it easier for users to understand and fix type errors and dependency cycles, without writing a million visitors.
 
 #### Project/config file support
-
 - At some point, we'll want a project configuration system for managing submodules, library paths, and compilation commands. This would make bigger projects and dependency management way easier.
 
-#### Parser and AST cleanup
-
-- There's a lot of unnecessary complexity and inefficiency in the parser and AST. Needs a cleanup pass for performance and sanity.
-
 #### Better macro/directive system
-
 - Macros (NYI) and directives should be more powerful and integrated, maybe even first-class language features instead of just parser hacks.
 
 #### Improved type extensions and querying
@@ -52,20 +37,11 @@ to figure out where error(s) occured; instead, we can think of something unique.
 - The way type extensions (pointers, arrays, etc.) are handled is kind of clunky. Needs a refactor to make querying and manipulation more ergonomic.
 
 #### Testing infrastructure
-
 - The test runner could use some love. Easier grouping/filtering, maybe even integrate testing more deeply into the language.
 
 #### FFI improvements
-
 - FFI should be more robust, with better handling of calling conventions, attributes, and cross-language type mapping.
 
-#### Better symbol/scope management
-
-- Scope/context management should be more lexical and less manual. Would make symbol resolution and incremental compilation easier and less error-prone.
-
-#### Documentation and examples
-
-- Docs and examples are always lagging behind. Need to keep them up to date and practical, so users can actually learn and contribute.
 
 #### add variadic generics and value generics.
 
@@ -190,43 +166,6 @@ their constraints, and errors only triggering on a use of a function that doesn'
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
 
-#### remove the 'switch is' node. replace it with a 'match' node
-
-We right now have `switch` and `switch is` nodes. we should replace this with just a `match` since it's not really a switch,
-it does so much more. In my mind, `switch` is just switching over enumeration values, i.e C `enum`. in our case, we will be able to
-do very complex pattern matching, as shown below, and this would be much nicer to not have a `switch is`, rather copy rust with just a `match`
-
-#### Pattern matching improvements
-
-recursive, value based, and very complex pattern stuff like this should work, to any degree. we need to get on Rust's level of pattern matching.
-
-```rust
-  if x is Some(Ok(&mut v)) {
-
-  }
-
-  switch is (1, 2) {
-    (1, 2): {
-
-    }
-    (2, 3): {
-
-    }
-  }
-
-  switch is 50 {
-    0..100: {
-
-    }
-  }
-
-  switch is (Some(10), None) {
-    (Some(v), None): {
-
-    }
-  }
-
-```
 
 ### Example: Advanced Attribute System
 
@@ -327,87 +266,6 @@ fn main() {
   value: s32 = 100;
 }
 ```
-
-### Just a random idea here:
-
-say we have a function func, that simply adds two numbers, and is constraint by IsNumeric
-
-(
-or for the sake of specificity, doesn't depend on the size of type T, but simply operates on it,
-in a way where integer promotions, mantissas, etc, could be coerced safely.
-)
-
-```rust
-fn func!<T: IsNumeric>(a: T, b: T) -> T {
-  return a + b;
-}
-```
-
-then, the user calls this with every possible type:
-
-```rust
-func(100 as u8);
-func(100 as u16);
-func(100 as u32);
-func(100 as u64);
-func(100 as s8);
-func(100 as s16);
-func(100 as s32);
-func(100 as s64);
-func(100 as f16);
-func(100 as f32);
-func(100 as f64);
-.. etc.
-```
-
-In one single instance, this is totally negligble amounts of binary size.
-But since many functions do in fact take generic numbers to be more usable and safe,
-this could possibly be a massive point of binary size growth.
-
-We could just promote T to being the largest possible numeric size of correct signedness, and a float etc,
-and then just promote arguments to that size, then truncate back down on return.
-
-of course a function like this:
-
-```rust
-fn func1!<T>(a: T, b: T) -> T {
-  if (sizeof(T) > 4) {
-    return a + b;
-  }
-  return b * a;
-}
-```
-
-could never qualify from this kind of instantiation consolidation, because each instantiation has to know
-exactly what constant to fill in for 'sizeof'.
-
-This kind of optimization could also be applied to functions that take a type argument as a pointer,
-but never access a specific field of that pointer. say it only passes this type to other functions (which may also recieve this
-optimization), and never measures the sizeof(T), nor says v.x, etc.
-
-```rust
-
-fn register_some_handler_in_system!<HandlerT>(handler: *HandlerT, slot: u32, kind: Handler_Kind) -> Option!<*mut Registry> {
-  registry := if registry_locator()
-    .locate(system.registries, kind)
-    .expect(fn () {
-      panic("unable to locate registry for kind!");
-    });
-
-  registry.insert_or_update_at_slot(slot, handler);
-  return Some(registry);
-}
-```
-
-This function could simply get type erased down to a void pointer, and used for every handler type, since it never needed to be
-generic in the first place: if insert_or_update_at_slot takes some kind base registry, or is a list that just stores pointers,
-it could be casted out of implicilty by the compiler.
-
-This type erasure idea could ALSO extend to predictable types like `List`, where T is a pointer,
-we could completely consolidate every instantiation of the struct definition itself, and keep the impl's generic and instantiated,
-to save on even more code space.
-
-This would not only reduce binary size, but DRASTICALLY reduce compile times, and we could have -03 enable complete monomorphization, for max runtime performance (promoting tiny integers to large ones takes time and space)
 
 # Type inference for associated function calls.
 
@@ -716,6 +574,64 @@ extern stdout: *std::c::FILE;
 
 fn main () {
   printf("%d\n"c, sizeof(Type));
+}
+
+```
+
+# Composing where clauses.
+We should have a unique syntax for declaring named where clauses, so we can compose behaviours or properties of types,
+kind of like trait bounds but useable without direct implementation.
+
+```rust
+type IsNumber where IsFloat | IsInteger | IsComplex;
+
+fn floored_plus_one!<T: IsNumber>(number: T) -> T {
+  return math::floor(number) + T::one();
+}
+```
+
+
+# Structural constraints in where clauses
+In addition to our structural typing syntax allowing implicit bitcasts between structs
+declared as such:
+
+```rust
+type SomeStructuralType :: struct { ... };
+```
+
+`where` constraints should be able enforce structural attributes,
+such as shown below:
+
+`Collection` has to be a `struct` with a `data` member that's either a pointer or array,
+and have a `length` member that's some kind of number.
+
+```rust
+type Collection where struct {
+  data: IsPointer | IsArray,
+  length: IsNumber,
+};
+```
+
+
+# Actual Macros
+
+right now we have macros, but they're totally broken, and don't do what I want them to do.
+
+```rust
+// #expand turns a function into a macro
+fn some_macro(a: s32, b: s32) -> s32 #expand {
+  // here we can do some computations or whatever at compile time before inserting.
+  mut result: s32;
+  #run {
+    result = a + b;
+  }
+  // insert will insert the code within it's block into the call site.
+  //
+  #insert {
+    // #return will return the result only, instead of returning this block as a group of statements,
+    // effectively making this an expression macro.
+    #return result;
+  }
 }
 
 ```

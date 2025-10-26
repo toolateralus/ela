@@ -1159,67 +1159,64 @@ size_t Type::alignment_in_bits() const {
 inline size_t align_to_bits(size_t value, size_t alignment_bits) {
   return (value + alignment_bits - 1) / alignment_bits * alignment_bits;
 }
-
 bool Type::try_get_offset_in_bits(size_t target_index, size_t &bit_offset) const {
   bit_offset = 0;
   size_t index = 0;
 
-  std::function<bool(const TypeInfo *, size_t)> walk = [&](const TypeInfo *tinfo, size_t base_bits) -> bool {
-    // ---- union ----
-    if (const StructTypeInfo *sti = dynamic_cast<StructTypeInfo *>((TypeInfo *)tinfo); sti->is_union) {
-      for (const auto &m : tinfo->members) {
-        const Type *mt = m.type;
-
-        if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-          if (walk(mt->info, base_bits)) {
+  switch (kind) {
+    case TYPE_STRUCT: {
+      const auto *sti = info->as<StructTypeInfo>();
+      if (sti->is_union) {
+        for (const auto &m : sti->members) {
+          if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+            for (size_t i = 0; i < info->members.size(); ++i) {
+              if (index++ == target_index) {
+                bit_offset = 0;
+                return true;
+              }
+            }
+          } else if (index++ == target_index) {
+            bit_offset = 0;
             return true;
           }
+        }
+        return false;
+      }
+    }
+    // This handles tuples, structs and dyn's falls through past struct since structs may be unions.
+    case TYPE_TUPLE:
+    case TYPE_DYN: {
+      size_t offset = 0;
+      for (const auto &m : info->members) {
+        const Type *mt = m.type;
+        offset = align_to_bits(offset, mt->alignment_in_bits());
+        if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
+          // flatten one level
+          size_t inner_off = offset;
+          for (const auto &im : mt->info->members) {
+            size_t aligned_off = align_to_bits(inner_off, im.type->alignment_in_bits());
+            if (index++ == target_index) {
+              bit_offset = aligned_off;
+              return true;
+            }
+            inner_off += im.type->size_in_bits();
+          }
         } else if (index++ == target_index) {
-          bit_offset = base_bits;
+          bit_offset = offset;
           return true;
         }
+
+        offset += mt->size_in_bits();
       }
       return false;
     }
-
-    // ---- struct / tuple ----
-    size_t offset = 0;
-    for (const auto &m : tinfo->members) {
-      const Type *mt = m.type;
-      offset = align_to_bits(offset, mt->alignment_in_bits());
-
-      if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-        if (walk(mt->info, base_bits + offset)) {
-          return true;
-        }
-      } else if (index++ == target_index) {
-        bit_offset = base_bits + offset;
-        return true;
-      }
-
-      offset += mt->size_in_bits();
-    }
-    return false;
-  };
-
-  switch (kind) {
-    case TYPE_STRUCT:
-    case TYPE_TUPLE:
-      return walk(info, 0);
-
     case TYPE_CHOICE: {
       const auto *choice = info->as<ChoiceTypeInfo>();
       const size_t tag_bits = sizeof(int32_t) * CHAR_BIT;
-
       for (const auto &m : choice->members) {
         const Type *mt = m.type;
         size_t payload_off = align_to_bits(tag_bits, mt->alignment_in_bits());
-
-        if (m.name.str().starts_with(ANONYMOUS_TYPE_PREFIX)) {
-          if (walk(mt->info, payload_off)) {
-            return true;
-          }
-        } else if (index++ == target_index) {
+        if (index++ == target_index) {
           bit_offset = payload_off;
           return true;
         }
@@ -1230,6 +1227,7 @@ bool Type::try_get_offset_in_bits(size_t target_index, size_t &bit_offset) const
       return false;
   }
 }
+
 bool Type::try_get_index_of_member(const InternedString &name, size_t &index) const {
   const TypeInfo *info = this->info;
   if (!info) {

@@ -2437,16 +2437,35 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
   const bool is_testing = compile_command.has_flag("test");
   THIRVariable *all_tests_slice_thir = nullptr;
   if (is_testing) {
-    Type *test_struct_type;
+    Type *test_struct_type = g_testing_Test_type;
     ASTPath test_path;
-    test_struct_type = g_testing_Test_type;
     all_tests_slice_thir = (THIRVariable *)visit_node(g_testing_tests_declaration);
+    Type *test_ptr_type = g_testing_Test_type->take_pointer_to();
 
-    THIR_ALLOC_NO_SRC_RANGE(THIRCollectionInitializer, slice_data);
-    slice_data->is_variable_length_array = true;
-    slice_data->type = g_testing_Test_type->make_array_of(test_functions.size());
+    THIR_ALLOC_NO_SRC_RANGE(THIRCall, malloc_call);
 
-    for (const auto &function : test_functions) {
+    ASTPath path;
+    path.segments.push_back(ASTPath::Segment::Identifier("std"));
+    path.segments.push_back(ASTPath::Segment::Identifier("c"));
+    path.segments.push_back(ASTPath::Segment::Identifier("malloc"));
+
+    Symbol *malloc_sym = get_symbol(&path);
+
+    if (!malloc_sym) {
+      throw_error("[INTERNAL COMPILER ERROR]: Unable to construct test apparatus bootstrapper: couldn't find 'malloc'", {});
+    }
+    malloc_call->callee = visit_node(malloc_sym->function.declaration);
+    THIR *size_argument = make_literal(std::to_string(test_struct_type->size_in_bits() / 8 * test_functions.size()), {},
+                                       u64_type(), ASTLiteral::Integer);
+    malloc_call->arguments = {size_argument};
+    malloc_call->type = u8_ptr_type();
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRCast, malloc_result_cast)
+    malloc_result_cast->operand = malloc_call;
+    malloc_result_cast->type = test_ptr_type;
+
+    size_t index = 0;
+    for (THIRFunction *function : test_functions) {
       auto fn_ptr = take_address_of(function, {});
       auto function_name = function->name.str();
 
@@ -2460,27 +2479,36 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
       THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, test_struct_init);
       test_struct_init->key_values = {{"function", fn_ptr}, {"name", make_str(function_name, function->span)}};
       test_struct_init->type = test_struct_type;
-      slice_data->values.push_back(test_struct_init);
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRIndex, thir_index);
+      thir_index->base = malloc_result_cast;
+      thir_index->type = test_ptr_type;
+      thir_index->index = make_literal(std::to_string(index++), {}, u64_type(), ASTLiteral::Integer);
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, assignment);
+      assignment->type = test_ptr_type;
+      assignment->left = thir_index;
+      assignment->right = test_struct_init;
+      assignment->op = TType::Assign;
     }
 
-    THIR_ALLOC_NO_SRC_RANGE(THIRVariable, static_variable);
-    static_variable->is_static = true;
-    static_variable->is_global = false;
-    static_variable->name = get_temporary_variable();
-    static_variable->value = slice_data;
-    static_variable->type = slice_data->type;
-
     THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, ini);
-    ini->is_statement = false;
     ini->type = all_tests_slice_thir->type;
-    ini->key_values = {{"data", static_variable},
-                       {"length", make_literal(std::to_string(slice_data->values.size()), {}, u64_type(), ASTLiteral::Integer)}};
+    ini->key_values = {{"data", malloc_result_cast},
+                       {"length", make_literal(std::to_string(test_functions.size()), {}, u64_type(), ASTLiteral::Integer)}};
+
+    THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, slice_assignment);
+    slice_assignment->left = all_tests_slice_thir;
+    slice_assignment->right = ini;
+    slice_assignment->op = TType::Assign;
+    slice_assignment->type = ini->type;
 
     auto &statements = global_initializer_function->block->statements;
-    statements.insert(statements.begin(), static_variable);
+    statements.insert(statements.begin(), slice_assignment);
 
     all_tests_slice_thir->global_initializer_assignment->right = ini;
   }
+
   return all_tests_slice_thir;
 }
 

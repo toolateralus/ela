@@ -398,8 +398,10 @@ void LLVM_Emitter::emit_module() {
   for (const Global_Variable *gv : m.global_variables) {
     llvm::Type *gv_type = llvm_typeof(gv->type);
     llvm::Constant *initializer = llvm::Constant::getNullValue(gv_type);
-    llvm::GlobalVariable *llvm_gv =
-        new llvm::GlobalVariable(*llvm_module, gv_type, false, llvm::GlobalValue::InternalLinkage, initializer, gv->name.str());
+    llvm::GlobalVariable *llvm_gv = new llvm::GlobalVariable(
+        *llvm_module, gv_type, false,
+        gv->has_external_linkage ? llvm::GlobalValue::ExternalLinkage : llvm::GlobalValue::InternalLinkage,
+        gv->has_external_linkage ? nullptr : initializer, gv->name.str());
     global_variables[gv] = llvm_gv;
   }
 

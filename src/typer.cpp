@@ -1714,10 +1714,7 @@ void Typer::visit(ASTVariable *node) {
     node->type->resolved_type = value_ty;
     node->resolved_type = value_ty;
 
-    // TODO: so, we just don't set the type if it can't be assigned to int??? what?
-    if (type_is_numeric(value_ty) && expr_is_literal(node->value.get())) {
-      assert_types_can_cast_or_equal(node->value.get(), s32_type(), node->span, "invalid literal type.");
-    }
+    // I don't think we need to make any assertions about type here, since it's inferred.
   }
 
   if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE || keywords.contains(node->name.str())) {
