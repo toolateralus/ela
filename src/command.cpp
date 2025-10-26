@@ -73,10 +73,10 @@ int CompileCommand::compile() {
   mir_gen_metric.run<void>("Generating MIR", [&] {
     if (entry_point) {
       mir::compile(entry_point, m, thir_gen.constructors, thir_gen.global_initializer_function,
-                   thir_gen.generate_all_tests_slice_variable(), thir_gen.get_all_reflection_variables());
+                   thir_gen.get_all_reflection_variables());
     } else {
       mir::compile(thir_program, m, thir_gen.constructors, thir_gen.global_initializer_function,
-                   thir_gen.generate_all_tests_slice_variable(), thir_gen.get_all_reflection_variables());
+                   thir_gen.get_all_reflection_variables());
     }
     m.finalize();
 

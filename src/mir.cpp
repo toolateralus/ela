@@ -1067,8 +1067,7 @@ Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
 }
 
 void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
-             const THIRFunction *global_initializer, const THIRVariable *__all_tests_slice_variable,
-             const std::vector<THIRVariable *> reflection_variables) {
+             const THIRFunction *global_initializer, const std::vector<THIRVariable *> reflection_variables) {
   /*
     These are disabled because of bugs I can't currently solve.
     TODO: fixme
@@ -1080,10 +1079,6 @@ void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction 
   generate(global_initializer, m);
 
   generate(entry_point, m);
-
-  if (compile_command.has_flag("test")) {
-    generate(__all_tests_slice_variable, m);
-  }
 
   for (const auto &v : reflection_variables) {
     generate(v, m);

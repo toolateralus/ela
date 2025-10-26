@@ -2438,7 +2438,6 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
   THIRVariable *all_tests_slice_thir = nullptr;
   if (is_testing) {
     Type *test_struct_type = g_testing_Test_type;
-    ASTPath test_path;
     all_tests_slice_thir = (THIRVariable *)visit_node(g_testing_tests_declaration);
     Type *test_ptr_type = g_testing_Test_type->take_pointer_to();
 
@@ -2496,15 +2495,6 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
     ini->type = all_tests_slice_thir->type;
     ini->key_values = {{"data", malloc_result_cast},
                        {"length", make_literal(std::to_string(test_functions.size()), {}, u64_type(), ASTLiteral::Integer)}};
-
-    THIR_ALLOC_NO_SRC_RANGE(THIRBinExpr, slice_assignment);
-    slice_assignment->left = all_tests_slice_thir;
-    slice_assignment->right = ini;
-    slice_assignment->op = TType::Assign;
-    slice_assignment->type = ini->type;
-
-    auto &statements = global_initializer_function->block->statements;
-    statements.insert(statements.begin(), slice_assignment);
 
     all_tests_slice_thir->global_initializer_assignment->right = ini;
   }
