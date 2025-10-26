@@ -2514,7 +2514,7 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
       assignment->right = test_struct_init;
       assignment->op = TType::Assign;
 
-      auto statements = global_initializer_function->block->statements;
+      auto &statements = global_initializer_function->block->statements;
       statements.insert(statements.begin() + index_of_assignment, assignment);
     }
 
