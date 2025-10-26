@@ -118,17 +118,17 @@ enum AttributeTag {
   /*
     CONSTRUCTOR is used to declare that a function should automatically run before main.
 
-    @[constructor(true)]
+    @[constructor(2 .. 255)]
        will always place this code after the global initializers have run.
        this is absolutely the reccomended way to use this attribute.
        accessing global variables is completely safe here
        (remember, external library code could be using globals too, we have no idea at this point what is safe or not).
 
-    @[constructor(false)]
-       means that it will run as soon as C decides to run it, in no specified order.
+    @[constructor(1)]
+       means that it will run as soon as llvm decides to run it, in no specified order.
 
     ** IMPORTANT:
-      a function declared as @[constructor(false)] is very likely to run before global initializers.
+      a function declared as @[constructor(1)] is very likely to run before global initializers.
       Reading global variables at this point is completely undefined behaviour.
       Only use this when you absolutely have to, for some reason.
   */
