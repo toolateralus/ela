@@ -106,7 +106,6 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
   }
 
   if (conv_rule == CONVERT_IMPLICIT) {
-    expr->resolved_type = to;
     expr->conversion = {
         .has_value = true,
         .from = from_t,
@@ -117,7 +116,6 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
 
 void implicit_cast(ASTExpr *expr, Type *to) {
   expr->conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
-  expr->resolved_type = to;
 }
 
 bool expr_is_literal(const ASTExpr *expr) {
