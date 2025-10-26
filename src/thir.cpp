@@ -1072,7 +1072,8 @@ void THIRGen::convert_function_attributes(THIRFunction *reciever, const std::vec
               "@[constructor($priority)] attribute expects exactly one argument, a byte between 1-255, which determines "
               "at which priority this function will run. priority 1 == global initializer priority, so it's reccomended if "
               "there's any chance you're reading from global variables, directly or indirectly, that you always start at atleast "
-              "2 unless you are absolutely certain you need to run as soon as physically possible",
+              "2 unless you are absolutely certain you need to run as soon as physically possible "
+              "A lower value means a higher priority of initialization",
               reciever->span);
         }
 
@@ -2477,6 +2478,15 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
     malloc_result_cast->operand = malloc_call;
     malloc_result_cast->type = test_ptr_type;
 
+    size_t index_of_assignment = 0;
+
+    for (const THIR *stmt: global_initializer_function->block->statements) {
+      if (stmt == all_tests_slice_thir->global_initializer_assignment) {
+        break;
+      }
+      index_of_assignment++;
+    }
+
     size_t index = 0;
     for (THIRFunction *function : test_functions) {
       auto fn_ptr = take_address_of(function, {});
@@ -2503,6 +2513,9 @@ THIRVariable *THIRGen::generate_all_tests_slice_variable() {
       assignment->left = thir_index;
       assignment->right = test_struct_init;
       assignment->op = TType::Assign;
+
+      auto statements = global_initializer_function->block->statements;
+      statements.insert(statements.begin() + index_of_assignment, assignment);
     }
 
     THIR_ALLOC_NO_SRC_RANGE(THIRAggregateInitializer, ini);
