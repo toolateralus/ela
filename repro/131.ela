@@ -1,0 +1,23 @@
+fn main() {
+  type Vector2 :: struct {
+    X: s32,
+    Y: s32
+  };
+
+  type Vec2 :: struct {
+    x: s32,
+    y: s32
+  }
+
+
+  /*
+   Error at: /home/josh/source/temp/ela/ela_source/main.ela:27:31
+     b: Vec2 = .{ x: 200, y: 200 };
+                                 ^^
+   Invalid named initializer list: couldn't find x
+  */
+
+  mut a: Vector2 = .{ X: 100, Y: 100 };
+
+  b: Vec2 = .{ x: 200, y: 200 };
+}

@@ -1296,7 +1296,7 @@ THIR *THIRGen::visit_variable(ASTVariable *ast) {
     thir->name = ast->name;
   }
 
-  if (thir->is_global && !ast->is_constexpr && !ast->is_extern) {
+  if ((thir->is_global || thir->is_static) && !ast->is_constexpr && !ast->is_extern) {
     // global variables don't get directly assigned, we will always use a static global initializer.
     // TODO: make some kind of analyzer that will actually figure this out for us, simple assignments dont
     // need to work like this for compile time constant friendly values.
@@ -2657,14 +2657,20 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
       temp->is_global = false;
       temp->type = value->type;
       temp->name = get_temporary_variable();
-      temp->is_statement = true;
 
       auto init = (THIRCollectionInitializer *)value;
 
+      THIR_ALLOC_NO_SRC_RANGE(THIRCast, dest_cast);
+      dest_cast->type = u8_ptr_type();
+      dest_cast->operand = thir;
+
+      THIR_ALLOC_NO_SRC_RANGE(THIRCast, src_cast);
+      src_cast->type = u8_ptr_type();
+      src_cast->operand = temp;
+
       memcpy_call->arguments = {
-          thir, temp,
-          make_literal(std::to_string(temp->type->get_element_type()->size_in_bits() / 8 * init->values.size()), {}, u64_type(),
-                       ASTLiteral::Integer)};
+          dest_cast, src_cast,
+          make_literal(std::to_string(temp->type->get_element_type()->size_in_bits() / 8 * init->values.size()), {}, u64_type(), ASTLiteral::Integer)};
       memcpy_call->is_statement = true;
 
       // This just wont work with compile time, which is annoying

@@ -1,0 +1,13 @@
+fn main() {
+  // VLA's from initializer lists somehow are completely invalid.
+  init_list := s32.[0, 1, 2, 3];
+  printf("length=%d\n"c, init_list.length);
+  printf("data=%p\n"c, init_list.data);
+  mut iterator := init_list.iter();
+  if !iterator.ptr {
+    printf("Nullptr\n"c);
+  }
+  for i in init_list {
+    printf("i=%d\n"c, i);
+  }
+}

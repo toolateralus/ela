@@ -1,0 +1,4 @@
+fn main() {
+  // Need to handle structural type things in expression tree and parse it as a type.
+  mut a := struct { x: s32, y: s32 }.{ x: 100, y: 100 };
+}

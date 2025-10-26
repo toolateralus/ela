@@ -25,11 +25,12 @@ to figure out where error(s) occured; instead, we can think of something unique.
 
 > > This is already implemented, but it's not as used as it needs to be. we should be constantly working to completely remove any `#` directives.
 
-
 #### Project/config file support
+
 - At some point, we'll want a project configuration system for managing submodules, library paths, and compilation commands. This would make bigger projects and dependency management way easier.
 
 #### Better macro/directive system
+
 - Macros (NYI) and directives should be more powerful and integrated, maybe even first-class language features instead of just parser hacks.
 
 #### Improved type extensions and querying
@@ -37,11 +38,12 @@ to figure out where error(s) occured; instead, we can think of something unique.
 - The way type extensions (pointers, arrays, etc.) are handled is kind of clunky. Needs a refactor to make querying and manipulation more ergonomic.
 
 #### Testing infrastructure
+
 - The test runner could use some love. Easier grouping/filtering, maybe even integrate testing more deeply into the language.
 
 #### FFI improvements
-- FFI should be more robust, with better handling of calling conventions, attributes, and cross-language type mapping.
 
+- FFI should be more robust, with better handling of calling conventions, attributes, and cross-language type mapping.
 
 #### add variadic generics and value generics.
 
@@ -51,7 +53,7 @@ Instead, we would likely add generic slices, using the type keyword,
 slice syntax, and a compile time for loop over that slice.
 
 ```rust
-  fn variadic!<types: [type]>() {
+  fn variadic(types: [type]) {
     for T in types {
       println(T.name);
     }
@@ -66,14 +68,14 @@ slice syntax, and a compile time for loop over that slice.
 ```
 
 ```rust
-Fixed_Array :: struct!<T, N: u32> {
-  data: T[N],
+Fixed_Array :: struct!<T, const N: u32> {
+  data: [T; N],
   length: N
 }
 ```
 
 ```rust
-index :: fn!<T, SIZE: u32, N: u32>(array: T[SIZE]) -> T {
+index :: fn!<T, SIZE: u32, const N: u32>(array: T[SIZE]) -> T {
   return array[N];
 }
 ```
@@ -165,7 +167,6 @@ their constraints, and errors only triggering on a use of a function that doesn'
 
 `const static vtable_dynof_something` instead of using a struct full of pointer methods.
 Harder to call, but much much cheaper to construct, and the static shared memory is much hotter in terms of cache hits.
-
 
 ### Example: Advanced Attribute System
 
@@ -579,19 +580,20 @@ fn main () {
 ```
 
 # Composing where clauses.
+
 We should have a unique syntax for declaring named where clauses, so we can compose behaviours or properties of types,
 kind of like trait bounds but useable without direct implementation.
 
 ```rust
-type IsNumber where IsFloat | IsInteger | IsComplex;
+type IsNumber where IsFloat | IsInteger;
 
 fn floored_plus_one!<T: IsNumber>(number: T) -> T {
   return math::floor(number) + T::one();
 }
 ```
 
-
 # Structural constraints in where clauses
+
 In addition to our structural typing syntax allowing implicit bitcasts between structs
 declared as such:
 
@@ -606,12 +608,28 @@ such as shown below:
 and have a `length` member that's some kind of number.
 
 ```rust
+
+fn take_collection!<T>(t: T)
+  where T: struct {
+    data: IsPointer | IsArray,
+    length: IsNumber,
+  }
+{
+
+}
+
+// or
 type Collection where struct {
   data: IsPointer | IsArray,
   length: IsNumber,
 };
-```
 
+fn take_collection!<T: Collection>(collection: T) {
+
+}
+
+
+```
 
 # Actual Macros
 
@@ -635,3 +653,32 @@ fn some_macro(a: s32, b: s32) -> s32 #expand {
 }
 
 ```
+
+# Lambdas need inferred argument and return types
+
+right now lambdas have to be explicitly typed, instead of:
+
+```rust
+  my_lambda := fn(a: s32, b: s32) -> bool {
+    return a == b;
+  }
+```
+
+we could do
+
+```rust
+  my_lambda : fn(s32, s32) -> bool = fn(a, b) {
+    return a == b;
+  }
+  // or
+  my_lambda : fn(s32, s32) -> bool = fn(a, b) {
+    return a == b;
+  }
+```
+
+# Seperating 'mut' traits for indexing and iterating
+
+right now you can call `iter_mut()` or `index_mut()` on a slice and mutate it's internal buffer which is meant to
+be guaranteed immutable.
+
+need `IndexMut` and `IterMut` (etc) traits

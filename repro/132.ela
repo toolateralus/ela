@@ -1,0 +1,11 @@
+fn main() {
+  struct Struct { x: f16, y: f16 }
+
+  #run {
+    std::c::printf("%d\n"c, bitsize_of(Struct));
+  }
+
+  // This segfaults on run.
+  // seems to have something to do with using halves
+  st: Struct;
+}
