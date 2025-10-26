@@ -7,19 +7,19 @@
 -------- (toolateralus): 6/13/2025, 11:27 AM: ----------------------------------------------------------------------
 - Added `[T]` slice type syntax. mutable slices are `mut [T]`
 
-- Added `[T; N]` array syntax. clears up a lot of ambiguity that had 
+- Added `[T; N]` array syntax. clears up a lot of ambiguity that had
     existed between pointers, fn ptrs, and array types.
 
-- Deprecated the `*` from the old `fn * ()` syntax. any time you refer to a function as an annotated type, 
+- Deprecated the `*` from the old `fn * ()` syntax. any time you refer to a function as an annotated type,
     such as a field, parameter, etc, it's automatically a function pointer.
 
-- Added the `![idx]` pointer arithmetic operator. clears up a ton of surface for subtle, hard to detect bugs when indexing self, and accidentaly a self *. or many of 
+- Added the `![idx]` pointer arithmetic operator. clears up a ton of surface for subtle, hard to detect bugs when indexing self, and accidentaly a self *. or many of
     the other areas where you can have index overloads, and also pointer arithmetic on many implicitly declared things.
     also, it's just much more clear for an operation that can be so unsafe.
 --------------------------------------------------------------------------------------------------------------------
 
 -------- (toolateralus): 6/13/2025, 5:25:20 PM ---------------------------------------------------------------------
-- Added the ability for enumerators to reference other enumerators in an enum declaration. 
+- Added the ability for enumerators to reference other enumerators in an enum declaration.
     useful for making an 'All' flag, or what have  you.
 --------------------------------------------------------------------------------------------------------------------
 
@@ -63,18 +63,18 @@
 
     If you choose to start using this feature, do not be surprised when stuff goes awry. It also has some very strange bugs
     regarding changing the default values of variables and things it touches at compile time, and it does not get reverted.
-    this is not something you are likely to encounter, but beware that it is possible to change the meaning of your program in 
+    this is not something you are likely to encounter, but beware that it is possible to change the meaning of your program in
     unintended ways when running runtime code at compile time.
 
     However, it's a fairly good start, and you can in fact make syscalls at compile time. A fun exercise to witness this,
     is using a for loop in a run directive, and using `std::c::printf("%d\n"c, i);` within the loop. Neat!
 
-    This will eventually get a total overhaul, fixing the odd state leaking and fully supporting every single operation that's 
+    This will eventually get a total overhaul, fixing the odd state leaking and fully supporting every single operation that's
     possible at runtime. there are just a few hurdles preventing this, it's closer than it seems when using it.
 
     use 'ela init' with an updated version of the compiler, and it contains a tiny '#run' example.
 
-- added '@[deprecated("Reason", Alternative)]' and '@[constructor(run_after_global_init: bool)]' attributes, 
+- added '@[deprecated("Reason", Alternative)]' and '@[constructor(priority: u8)]' attributes,
     as well as implemented a nicer signal handler in the standard library for a stack trace on segfaults.
     as of right now, the 'signal' lib must be imported (that's all) to get this signal handler.
 
@@ -91,19 +91,19 @@
     list: List!<s32> = .[ 0, 1 ];
     list[0..2] => [s32] { 0, 1 }
 
-    a note to implementors of this trait: 
+    a note to implementors of this trait:
       it's ultimately up to you, how to handle when the slice is missing one of its operands. such as the user
       passes ..10 or 10.. etc.
 
       However, it's strongly reccomended, that when there is no 'end' operand, you use .length as your end,
       and when there is no begin, you use 0 as the default.
 
-      range does now have get_begin_or_default() and get_end_or_default() methods, but there's a caveat -- 
+      range does now have get_begin_or_default() and get_end_or_default() methods, but there's a caveat --
       get_end_or_default() (where T is a numeric type) will return Number::max_value(), which is obviouisly not
       realistic for any container type.
 
       For now, Slice_Index!<T> is limited to only taking Range!<s32>, but in the future, with symbol table improvements
-      and the allowance of generic operator overloads, and better trait bounds composition, 
+      and the allowance of generic operator overloads, and better trait bounds composition,
       this will change to become more flexible.
 
 I know i'm forgetting loads of things. the commit history is a nightmare so beware, that may not be a good source of info here.

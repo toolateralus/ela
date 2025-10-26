@@ -368,9 +368,10 @@ struct Function {
     FUNCTION_FLAGS_IS_EXTERN = 1 << 2,
     FUNCTION_FLAGS_IS_EXPORTED = 1 << 3,
     FUNCTION_FLAGS_IS_NO_RETURN = 1 << 4,
-    FUNCTION_FLAGS_IS_CONSTRUCTOR_0 = 1 << 5,
-    FUNCTION_FLAGS_IS_CONSTRUCTOR_1 = 1 << 6,
+    FUNCTION_FLAGS_IS_CONSTRUCTOR = 1 << 5,
   };
+
+  uint8_t constructor_priority = 0;
 
   uint8_t flags = FUNCTION_FLAGS_NONE;
 

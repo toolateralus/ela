@@ -210,12 +210,9 @@ struct THIRFunction : THIR {
   bool is_no_mangle : 1 = false;
   bool is_macro : 1 = false;
 
-  /*
-    0 == not a constructor.
-    1 == run in the global initializer function, after all globals have run.
-    2 == use clang __attribute__(constructor) (or an equivalent)
-  */
-  uint8_t constructor_index : 2 = 0;
+  // 0 == not a constructor.
+  // 1 - 255 priority. higher - run sooner.
+  uint8_t constructor_priority;
 
   InternedString name;
   std::vector<THIRParameter> parameters;
