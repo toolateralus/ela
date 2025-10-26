@@ -200,14 +200,9 @@ void convert_function_flags(const THIRFunction *t, Function *f) {
     flags |= Function::FUNCTION_FLAGS_IS_NO_RETURN;
   }
 
-  // either CONSTRUCTOR_0 or CONSTRUCTOR_1, which gives it priority for getting called
-  // either BEFORE        or AFTER          global initializers run.
-  if (t->constructor_index == 1) {
-    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0;
-  }
-
-  if (t->constructor_index == 2) {
-    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1;
+  if (t->constructor_priority > 0) {
+    flags |= Function::FUNCTION_FLAGS_IS_CONSTRUCTOR;
+    f->constructor_priority = t->constructor_priority;
   }
 
   f->flags = flags;

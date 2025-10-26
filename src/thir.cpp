@@ -1,6 +1,7 @@
 #include "thir.hpp"
 #include <deque>
 #include <string>
+#include <system_error>
 #include "ast.hpp"
 #include "error.hpp"
 #include "interpreter.hpp"
@@ -1065,23 +1066,36 @@ static inline void convert_function_flags(THIRFunction *reciever, ASTFunctionDec
 void THIRGen::convert_function_attributes(THIRFunction *reciever, const std::vector<Attribute> &attrs) {
   for (const auto &attr : attrs) {
     switch (attr.tag) {
-      case ATTRIBUTE_CONSTRUCTOR:
+      case ATTRIBUTE_CONSTRUCTOR: {
         if (attr.arguments.size() != 1) {
           throw_error(
-              "@[constructor($degree)] attribute expects exactly one argument, true or false, which determines "
-              "whether this will run before or after global initializers. 'false' is not reccomended, as accessing global "
-              "data is undefined behaviour from within them, since it runs at an indeterminate time, possibly before "
-              "global initializers. 'true' is absolutely reccomended, as it runs after global initializers with certainty.",
+              "@[constructor($priority)] attribute expects exactly one argument, a byte between 1-255, which determines "
+              "at which priority this function will run. priority 1 == global initializer priority, so it's reccomended if "
+              "there's any chance you're reading from global variables, directly or indirectly, that you always start at atleast "
+              "2 unless you are absolutely certain you need to run as soon as physically possible",
               reciever->span);
         }
-        // see THIRFunction::constructor_index for info on what the value means.
-        reciever->constructor_index = 1 + (((ASTLiteral *)attr.arguments[0])->value == "false");
+
+        ASTLiteral *argument = (ASTLiteral *)attr.arguments[0];
+
+        try {
+          signed value = std::stoi(argument->value.c_str());
+          if (value > 255 || value < 1) {
+            throw_error("invalid constructor index. must be greater than one, and less than 255", argument->span);
+          }
+          reciever->constructor_priority = (uint8_t)value;
+        } catch (...) {
+          throw_error(
+              "recieved a non-integer value for a constructor parameter. this must be an integer literal between 1 and 255.",
+              argument->span);
+        }
+
         constructors.push_back(reciever);
         if (reciever->parameters.size()) {
           throw_error("@[constructor] functions cannot take parameters, as they're called by the runtime automatically.",
                       reciever->span);
         }
-        break;
+      } break;
       case ATTRIBUTE_DEPRECATED:
         reciever->deprecated_attr = attr;
         reciever->deprecated = true;
@@ -2670,7 +2684,8 @@ void THIRGen::make_global_initializer(const Type *type, THIRVariable *thir, Null
 
       memcpy_call->arguments = {
           dest_cast, src_cast,
-          make_literal(std::to_string(temp->type->get_element_type()->size_in_bits() / 8 * init->values.size()), {}, u64_type(), ASTLiteral::Integer)};
+          make_literal(std::to_string(temp->type->get_element_type()->size_in_bits() / 8 * init->values.size()), {}, u64_type(),
+                       ASTLiteral::Integer)};
       memcpy_call->is_statement = true;
 
       // This just wont work with compile time, which is annoying
@@ -2744,7 +2759,7 @@ THIRGen::THIRGen(Context &ctx, bool for_emitter) : ctx(ctx) {
 
   THIR_ALLOC_NO_SRC_RANGE(THIRFunction, global_ini);
   global_initializer_function = global_ini;
-  global_ini->constructor_index = 1;
+  global_ini->constructor_priority = 1;
 
   FunctionTypeInfo info;
   info.params_len = 0;

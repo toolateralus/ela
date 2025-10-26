@@ -435,10 +435,6 @@ void convert_function_flags(mir::Function *f, llvm::Function *ir_f) {
   if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_INLINE)) {
     ir_f->addFnAttr(llvm::Attribute::AlwaysInline);
   }
-  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0)) {
-  }
-  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1)) {
-  }
 }
 
 void LLVM_Emitter::emit_function(mir::Function *f, llvm::Function *ir_f) {
@@ -482,12 +478,8 @@ void LLVM_Emitter::emit_function(mir::Function *f, llvm::Function *ir_f) {
     dbg.pop_scope(DIManager::Scope::Subroutine);
   }
 
-  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_0)) {
-    register_constructor(ir_f, 0);
-  }
-
-  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR_1)) {
-    register_constructor(ir_f, 1);
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_CONSTRUCTOR)) {
+    register_constructor(ir_f, f->constructor_priority);
   }
 }
 
