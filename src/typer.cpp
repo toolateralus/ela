@@ -3922,11 +3922,8 @@ void Typer::visit_path(ASTPath *node, bool from_call) {
               if (bits > 4096) {
                 throw_error("integer bit-width too large", node->span);
               }
-              const ScalarType scalar_kind = is_signed ? TYPE_SIGNED : TYPE_UNSIGNED;
-              auto info = create_scalar_type_info(scalar_kind, bits, true);
-              Type *created = global_create_type(TYPE_SCALAR, name, info, {});
-              ctx.root_scope->insert_type(created, name, nullptr);
-              segment.resolved_type = created;
+              segment.resolved_type = find_or_create_arbitrary_integer_type(is_signed, bits);
+              ctx.root_scope->insert_type(segment.resolved_type, segment.resolved_type->basename, nullptr);
               symbol = ctx.root_scope->lookup(ident);
             }
           }

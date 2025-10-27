@@ -1126,10 +1126,6 @@ Operand generate_ptr_unary_expr(const THIRPtrUnaryExpr *node, Module &m) {
 
 void compile(const THIR *entry_point, Module &m, const std::vector<THIRFunction *> &constructors,
              const THIRFunction *global_initializer, const std::vector<THIRVariable *> reflection_variables) {
-  /*
-    These are disabled because of bugs I can't currently solve.
-    TODO: fixme
-  */
   for (const auto &ctor : constructors) {
     generate(ctor, m);
   }

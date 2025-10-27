@@ -577,3 +577,5 @@ static inline constexpr size_t get_reflection_type_flags(Type *type) {
 
   return kind_flags;
 }
+
+Type *find_or_create_arbitrary_integer_type(bool is_signed, size_t n_bits);

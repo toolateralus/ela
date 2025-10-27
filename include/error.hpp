@@ -1,5 +1,6 @@
 #pragma once
 
+#include <format>
 #include <iostream>
 #include <sstream>
 
@@ -226,4 +227,16 @@ inline void throw_error(const std::string &message, const Span &span) {
     get_default_panic_handler()(message, span, error_user_data);
   }
   panic_handler(message, span, error_user_data);
+}
+
+template <typename... Args>
+void throw_errorf(std::format_string<Args...> format, Args &&...args) {
+  std::string error = std::format(format, std::forward<Args>(args)...);
+  throw_error(error, {});
+}
+
+template <typename... Args>
+inline static void throw_error(const std::format_string<Args...> format, const Span &span, const Args &&...args) {
+  std::string error = std::format(format, std::forward(args)...);
+  throw_error(error, span);
 }

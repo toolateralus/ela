@@ -1355,3 +1355,22 @@ size_t Type::size_in_bits() const {
   // zero-sized types (e.g. fn, trait)
   return 0;
 }
+
+Type *find_or_create_arbitrary_integer_type(bool is_signed, size_t bits) {
+  const ScalarType scalar_kind = is_signed ? TYPE_SIGNED : TYPE_UNSIGNED;
+  auto info = create_scalar_type_info(scalar_kind, bits, true);
+  std::string name = (is_signed ? "s" : "u") + std::to_string(bits);
+
+  // @Performance: get rid of this stupid linear search.
+  // It's not the only place we do it -- it's really the only option
+  // with how the data is structured.
+  //
+  // Fixing this will be huge performance gains, restructuring types to be stored by hashed keys of { name, extensions }
+  for (const auto &type : type_table) {
+    if (type->is_kind(TYPE_SCALAR) && type->basename == name && type->has_no_extensions()) {
+      return type;
+    }
+  }
+
+  return global_create_type(TYPE_SCALAR, name, info, {});
+}
