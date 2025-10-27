@@ -247,11 +247,10 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     info.return_type = void_type();
 
     // shift right.
-    memmove(&info.parameter_types[1], &info.parameter_types[0], info.params_len * sizeof(Type *));
-
     // sret is the first parameter.
+    // of course, this adds a parameter.
+    memmove(&info.parameter_types[1], &info.parameter_types[0], info.params_len * sizeof(Type *));
     info.parameter_types[0] = fti->return_type->take_pointer_to();
-
     info.params_len++;
 
     adjusted_type = global_find_function_type_id(info, {});

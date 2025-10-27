@@ -392,7 +392,15 @@ void LLVM_Emitter::emit_module() {
     if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_IS_EXTERN)) {
       continue;
     }
-    emit_function(f, function_table[f]);
+
+    llvm::Function *ir_f = function_table[f];
+    if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_HAS_SRET)) {
+      llvm::AttrBuilder attr_builder(this->llvm_ctx);
+      attr_builder.addStructRetAttr(llvm_typeof(f->parameter_temps[0].type->get_element_type()));
+      ir_f->addParamAttrs(0, attr_builder);
+    }
+
+    emit_function(f, ir_f);
   }
 
   dbg.pop_scope(DIManager::Scope::CU);
@@ -663,6 +671,7 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
 
       case mir::OP_CALL: {
         mir::Function *mir_fn = m.functions[instr.left.temp];
+
         llvm::Value *fnval = function_table[mir_fn];
         uint32_t nargs = instr.right.imm.int_lit;
 
@@ -677,6 +686,8 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
                          instr.span);
           insert_temp(instr.dest.temp, f, call);
         } else {
+          if (HAS_FLAG(mir_fn->flags, Function::FUNCTION_FLAGS_HAS_SRET)) {
+          }
           call = create_dbg(builder.CreateCall(llvm_fn_typeof(mir_fn->type), fnval, call_args), instr.span);
         }
 
