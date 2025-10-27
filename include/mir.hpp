@@ -369,6 +369,8 @@ struct Function {
     FUNCTION_FLAGS_IS_EXPORTED = 1 << 3,
     FUNCTION_FLAGS_IS_NO_RETURN = 1 << 4,
     FUNCTION_FLAGS_IS_CONSTRUCTOR = 1 << 5,
+    FUNCTION_FLAGS_HAS_SRET = 1 << 6,
+    // FUNCTION_FLAGS_HAS_SCALARIZED_RETURN = 1 << 7,
   };
 
   uint8_t constructor_priority = 0;
@@ -458,6 +460,11 @@ struct Module {
   Function *current_function;
 
   Calling_Convention *cc;
+
+  // used for lowering only, this is a register that returns will write into
+  // if a function requires an sret, i.e a large struct it would've returned, that
+  // now it's passing by pointer when allocated by caller.
+  Operand sret_register;
 
   Module(Calling_Convention *calling_conv) : cc(calling_conv) {}
 

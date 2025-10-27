@@ -3345,6 +3345,7 @@ ASTExpr *Parser::parse_intrinsic() {
   switch (tok.type) {
     default:
       throw_error("invalid intrinsic", current_span);
+      exit(1);
       break;
     case TType::Dyn_Of: {
       expect(TType::Dyn_Of);

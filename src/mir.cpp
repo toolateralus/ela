@@ -1,6 +1,7 @@
 #include "mir.hpp"
 #include <cstdio>
 #include <functional>
+#include "callconv.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
@@ -30,8 +31,14 @@ void generate_return(const THIRReturn *node, Module &m) {
     EMIT_RET_VOID();
     return;
   }
-  Operand val = generate_expr(node->expression, m);
-  EMIT_RET(val);
+
+  if (HAS_FLAG(m.current_function->flags, Function::FUNCTION_FLAGS_HAS_SRET)) {
+    EMIT_STORE(m.sret_register, generate_expr(node->expression, m));
+    EMIT_RET_VOID();
+  } else {
+    Operand val = generate_expr(node->expression, m);
+    EMIT_RET(val);
+  }
 }
 
 void generate_break(const THIRBreak *node, Module &m) {
@@ -227,11 +234,33 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   Function *f = mir_arena.construct<Function>();
   index = (uint32_t)m.functions.size();
   f->name = node->name;
-  f->type_info = node->type->info->as<FunctionTypeInfo>();
-  f->type = node->type;
+  const FunctionTypeInfo *fti = f->type_info = node->type->info->as<FunctionTypeInfo>();
   f->index = index;
   f->span = node->span;
   convert_function_flags(node, f);
+
+  Type *adjusted_type = node->type;
+  Return_Convention ret_conv = m.cc->get_return_convention(fti->return_type);
+  if (ret_conv.indirect) {  // Use an sret.
+    FunctionTypeInfo info;
+    info = *fti;
+    info.return_type = void_type();
+
+    // shift right.
+    memmove(&info.parameter_types[1], &info.parameter_types[0], info.params_len * sizeof(Type *));
+
+    // sret is the first parameter.
+    info.parameter_types[0] = fti->return_type->take_pointer_to();
+
+    info.params_len++;
+
+    adjusted_type = global_find_function_type_id(info, {});
+    f->type_info = adjusted_type->info->as<FunctionTypeInfo>();
+
+    f->flags |= Function::FUNCTION_FLAGS_HAS_SRET;
+  }
+
+  f->type = adjusted_type;
 
   m.enter_function(f);
   Defer _defer([&] {
@@ -244,12 +273,22 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     f->create_and_enter_basic_block("entry");
   }
 
+  if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_HAS_SRET)) {
+    Type *sret_type = node->type->info->as<FunctionTypeInfo>()->return_type->take_pointer_to();
+    Operand parameter_temp = m.create_temporary(sret_type);
+    m.sret_register = parameter_temp;
+    f->parameter_temps.push_back({.name = std::format("t{}: {}", parameter_temp.temp, "sret"),
+                                  .type = parameter_temp.type,
+                                  .index = parameter_temp.temp});
+  }
+
   for (const auto &param : node->parameters) {
     Operand parameter_temp = m.create_temporary(param.associated_variable->type);
     f->parameter_temps.push_back({.name = std::format("t{}: {}", parameter_temp.temp, param.name),
                                   .type = parameter_temp.type,
                                   .index = parameter_temp.temp});
     Type *type = param.associated_variable->type;
+
     if (!node->is_extern) {
       // We just make allocas and store the initial values of parameters for all parameters,
       // this way we can take the address of a parameter, and mutate them.
@@ -697,16 +736,35 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
 }
 
 Operand generate_call(const THIRCall *node, Module &m) {
-  Operand result = Operand::MakeNull();
-  if (node->type != void_type()) {
-    result = m.create_temporary(node->type);
-  }
+
   Operand fn_operand = generate_expr(node->callee, m);
   Operand arg_count = Operand::Make_Imm(Constant::Int(node->arguments.size()), u32_type());
+
+  bool has_sret = false;
+  Operand sret_slot;
+  if (!node->callee->type->is_pointer()) {
+    Function *f = m.functions[fn_operand.temp];
+    if (HAS_FLAG(f->flags, Function::FUNCTION_FLAGS_HAS_SRET)) {
+      sret_slot = m.create_temporary(node->type->take_pointer_to(), "sret_slot");
+      EMIT_ALLOCA(sret_slot, Operand::Make_Type_Ref(node->type->take_pointer_to()));
+      has_sret = true;
+      arg_count.imm.int_lit++;
+    }
+  }
+
+  Operand result = Operand::MakeNull();
+  if (node->type != void_type() && !has_sret) {
+    result = m.create_temporary(node->type);
+  }
+
 
   THIRFunction *callee = nullptr;
   if (node->callee->get_node_type() == THIRNodeType::Function) {
     callee = (THIRFunction *)node->callee;
+  }
+
+  if (has_sret) {
+    EMIT_PUSH_ARG(sret_slot);
   }
 
   for (const THIR *arg : node->arguments) {
@@ -732,6 +790,12 @@ Operand generate_call(const THIRCall *node, Module &m) {
     if (f->is_no_return) {
       EMIT_UNREACHABLE();
     }
+  }
+
+  if (has_sret) {
+    Operand loaded_sret_value = m.create_temporary(node->type, "load_sret");
+    EMIT_LOAD(loaded_sret_value, sret_slot);
+    return loaded_sret_value;
   }
 
   return result;
