@@ -609,7 +609,7 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size_in_bits, bo
   auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
   info->size_in_bits = size_in_bits;
-  info->is_integral = is_integral;
+  info->is_integer = is_integral;
   return info;
 }
 
@@ -766,7 +766,7 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   auto to_info = (to->info->as<ScalarTypeInfo>());
 
   // do not allow casting of float to integer implicitly
-  if (!from_info->is_integral && to_info->is_integral) {
+  if (!from_info->is_integer && to_info->is_integer) {
     return false;
   }
 

@@ -184,7 +184,7 @@ struct FunctionTypeInfo : TypeInfo {
 
 struct ScalarTypeInfo : TypeInfo {
   ScalarTypeInfo() {}
-  bool is_integral = false;
+  bool is_integer = false;
   size_t size_in_bits = 0;
   ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
@@ -470,7 +470,7 @@ struct Type {
     return false;
   }
 
-  inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integral; }
+  inline bool is_integer() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_integer; }
   inline bool is_float() { return extensions.empty() && kind == TYPE_SCALAR && info->as<ScalarTypeInfo>()->is_float(); }
 };
 

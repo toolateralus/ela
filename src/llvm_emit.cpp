@@ -323,17 +323,17 @@ llvm::Value *LLVM_Emitter::perform_cast(Span span, llvm::Value *value, Type *fro
 
     // Boolean casting block
     if (to_info->scalar_type == TYPE_BOOL) {
-      if (from_info->is_integral) {
+      if (from_info->is_integer) {
         value = builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), "booltmp");
       } else {
         value = builder.CreateFCmpONE(value, llvm::ConstantFP::get(value->getType(), 0.0), "booltmp");
       }
     }
     // Integer casting block
-    else if (to_info->is_integral) {
+    else if (to_info->is_integer) {
       if (from_info->scalar_type == TYPE_BOOL) {
         value = builder.CreateZExt(value, llvm_to, "zexttmp");
-      } else if (from_info->is_integral) {
+      } else if (from_info->is_integer) {
         value = cast_integer(value, value->getType(), llvm_to, from_info->is_signed());
       } else {
         if (to_info->is_signed()) {
@@ -347,7 +347,7 @@ llvm::Value *LLVM_Emitter::perform_cast(Span span, llvm::Value *value, Type *fro
     else {
       if (from_info->scalar_type == TYPE_BOOL) {
         value = builder.CreateUIToFP(value, llvm_to, "uitofptmp");
-      } else if (from_info->is_integral) {
+      } else if (from_info->is_integer) {
         if (from_info->is_signed()) {
           value = builder.CreateSIToFP(value, llvm_to, "sitofptmp");
         } else {
@@ -549,7 +549,7 @@ void LLVM_Emitter::emit_basic_block(mir::Basic_Block *bb, mir::Function *f, llvm
         llvm::Value *result = nullptr;
         if (left_info->is_signed() && right_info->is_signed()) {
           result = create_dbg(binary_signed(left, right, instr.opcode), instr.span);
-        } else if (left_info->is_integral && right_info->is_integral) {
+        } else if (left_info->is_integer && right_info->is_integer) {
           result = create_dbg(binary_unsigned(left, right, instr.opcode), instr.span);
         } else if (left_info->is_float() && right_info->is_float()) {
           result = create_dbg(binary_fp(left, right, instr.opcode), instr.span);

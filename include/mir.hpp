@@ -373,6 +373,46 @@ struct Function {
     // FUNCTION_FLAGS_HAS_SCALARIZED_RETURN = 1 << 7,
   };
 
+  inline std::string function_flags_to_string(uint8_t f) const  {
+    if (f == FUNCTION_FLAGS_NONE) return "";
+
+    std::vector<std::string> parts;
+
+    if (f & FUNCTION_FLAGS_IS_INLINE) {
+      parts.emplace_back("inline");
+    }
+    if (f & FUNCTION_FLAGS_IS_VAR_ARGS) {
+      parts.emplace_back("varargs");
+    }
+    if (f & FUNCTION_FLAGS_IS_EXTERN) {
+      parts.emplace_back("extern");
+    }
+    if (f & FUNCTION_FLAGS_IS_EXPORTED) {
+      parts.emplace_back("exported");
+    }
+    if (f & FUNCTION_FLAGS_IS_NO_RETURN) {
+      parts.emplace_back("no_return");
+    }
+    if (f & FUNCTION_FLAGS_IS_CONSTRUCTOR) {
+      parts.emplace_back(std::format("constructor({})", constructor_priority));
+    }
+    if (f & FUNCTION_FLAGS_HAS_SRET) {
+      parts.emplace_back("has_sret");
+    }
+    /*
+      if (f & FUNCTION_FLAGS_HAS_SCALARIZED_RETURN) {
+        parts.emplace_back("HAS_SCALARIZED_RETURN");
+      }
+    */
+
+    std::string out;
+    for (size_t i = 0; i < parts.size(); ++i) {
+      out += parts[i];
+      if (i + 1 < parts.size()) out += ", ";
+    }
+    return out;
+  }
+
   uint8_t constructor_priority = 0;
 
   uint8_t flags = FUNCTION_FLAGS_NONE;
@@ -459,14 +499,14 @@ struct Module {
   std::stack<Function *> function_stack;                        // used for lowering only.
   Function *current_function;
 
-  Calling_Convention *cc;
+  Call_Conv *cc;
 
   // used for lowering only, this is a register that returns will write into
   // if a function requires an sret, i.e a large struct it would've returned, that
   // now it's passing by pointer when allocated by caller.
   Operand sret_register;
 
-  Module(Calling_Convention *calling_conv) : cc(calling_conv) {}
+  Module(Call_Conv *calling_conv) : cc(calling_conv) {}
 
   inline Operand create_temporary(Type *type, std::optional<InternedString> label = std::nullopt) {
     Function *f = current_function;

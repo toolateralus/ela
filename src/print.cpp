@@ -465,6 +465,10 @@ void mir::Basic_Block::print(FILE *f, Module &m) const {
 }
 
 void mir::Function::print(FILE *f, Module &m) const {
+  std::string flags_string = function_flags_to_string(flags);
+  if (flags_string.size()) {
+    fprintf(f, "@[%s]\n", flags_string.c_str());
+  }
   if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
     fprintf(f, "extern ");
   }
@@ -486,14 +490,11 @@ void mir::Function::print(FILE *f, Module &m) const {
     fprintf(f, " -> %s", format_type_ref(type_info->return_type).c_str());
   }
 
-  if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXPORTED) || HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
-    fprintf(f, " :: [flags: 0x%02x]", flags);
-    fprintf(f, ";\n");
+  if (HAS_FLAG(flags, FUNCTION_FLAGS_IS_EXTERN)) {
     return;
-  } else {
-    fprintf(f, " :: [flags: 0x%02x, stack: %zu bytes]", flags, stack_size_needed_in_bytes);
-    fprintf(f, " {\n");
   }
+
+  fprintf(f, " {\n");
 
   for (const auto &bb : basic_blocks) {
     bb->print(f, m);

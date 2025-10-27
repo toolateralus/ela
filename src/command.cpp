@@ -64,7 +64,7 @@ int CompileCommand::compile() {
 
 #if defined(__linux)
   // TODO: once we handle windows, actually use this lol.
-  SysV64_C_Calling_Convention calling_conv;
+  SysV64_C calling_conv;
 #elif defined(_WIN32)
   Win64_C_Calling_Convention calling_conv;
 #endif

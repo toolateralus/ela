@@ -16,7 +16,7 @@ include_directories(include)
 
 
 # Source files
-file(GLOB SRCS "src/*.cpp")
+file(GLOB_RECURSE SRCS "src/*.cpp")
 
 # Output directories
 set(OBJ_DIR ${CMAKE_BINARY_DIR}/../objs)

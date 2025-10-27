@@ -240,7 +240,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
   convert_function_flags(node, f);
 
   Type *adjusted_type = node->type;
-  Return_Convention ret_conv = m.cc->get_return_convention(fti->return_type);
+  Return_Convention ret_conv = m.cc->get_return(fti->return_type);
   if (ret_conv.indirect) {  // Use an sret.
     FunctionTypeInfo info;
     info = *fti;
@@ -276,17 +276,40 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     Type *sret_type = node->type->info->as<FunctionTypeInfo>()->return_type->take_pointer_to();
     Operand parameter_temp = m.create_temporary(sret_type);
     m.sret_register = parameter_temp;
-    f->parameter_temps.push_back({.name = std::format("t{}: {}", parameter_temp.temp, "sret"),
-                                  .type = parameter_temp.type,
-                                  .index = parameter_temp.temp});
+    f->parameter_temps.push_back(
+        {.name = std::format("t{}: {}", parameter_temp.temp, "sret"), .type = parameter_temp.type, .index = parameter_temp.temp});
   }
 
+
+  size_t parameter_index = 0;
   for (const auto &param : node->parameters) {
+    Type *type = param.associated_variable->type;
+    Argument_Convention arg_conv = m.cc->get_argument(type);
+
+    if (arg_conv.scalarization_descriptor.length != 0) {
+      Type *adjusted_type = f->type;
+      FunctionTypeInfo *fti = adjusted_type->info->as<FunctionTypeInfo>();
+      FunctionTypeInfo info = *fti;
+
+      for (const Scalarization_Group &group : arg_conv.scalarization_descriptor.groups) {
+        const Type *type = info.parameter_types[parameter_index];
+        for (const auto &src_element: group.source_elements) {
+
+        }
+      }
+
+      // if we add a parameter instead of just replacing one,
+      // we need to make the parameter list longer :O
+      // we do it after we shift stuff around so indices stay correct.
+      info.params_len += 1 - arg_conv.scalarization_descriptor.length;
+    }
+    parameter_index++;
+
+
     Operand parameter_temp = m.create_temporary(param.associated_variable->type);
     f->parameter_temps.push_back({.name = std::format("t{}: {}", parameter_temp.temp, param.name),
                                   .type = parameter_temp.type,
                                   .index = parameter_temp.temp});
-    Type *type = param.associated_variable->type;
 
     if (!node->is_extern) {
       // We just make allocas and store the initial values of parameters for all parameters,
@@ -298,6 +321,7 @@ Operand generate_function(const THIRFunction *node, Module &m) {
     } else {
       m.variables[param.associated_variable] = parameter_temp;
     }
+
   }
 
   m.functions.push_back(f);
@@ -735,7 +759,6 @@ Operand generate_literal(const THIRLiteral *node, Module &) {
 }
 
 Operand generate_call(const THIRCall *node, Module &m) {
-
   Operand fn_operand = generate_expr(node->callee, m);
   Operand arg_count = Operand::Make_Imm(Constant::Int(node->arguments.size()), u32_type());
 
@@ -755,7 +778,6 @@ Operand generate_call(const THIRCall *node, Module &m) {
   if (node->type != void_type() && !has_sret) {
     result = m.create_temporary(node->type);
   }
-
 
   THIRFunction *callee = nullptr;
   if (node->callee->get_node_type() == THIRNodeType::Function) {
