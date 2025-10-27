@@ -73,7 +73,7 @@ void ASTImpl::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTDefer::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTStatementList::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTTraitDeclaration::accept(VisitorBase *visitor) { NODE_VISIT() }
-void ASTSize_Of::accept(VisitorBase *visitor) { NODE_VISIT() }
+void ASTIntrinsic::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTPatternMatch::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTPath::accept(VisitorBase *visitor) { NODE_VISIT() }
 void ASTRun::accept(VisitorBase *visitor) { NODE_VISIT() }

@@ -10,7 +10,7 @@ struct ASTCopier {
     auto new_node = new (ast_alloc<T>()) T(*node);
     new_node->control_flow.type = Type::INVALID_TYPE;
     new_node->declaring_scope = current_scope;
-    
+
     if constexpr (std::is_base_of<ASTStatement, T>::value) {
       new_node->attributes = node->attributes;
     }
@@ -53,7 +53,7 @@ struct ASTCopier {
   ASTDestructure *copy_destructure(ASTDestructure *node);
   ASTTraitDeclaration *copy_trait_declaration(ASTTraitDeclaration *node);
   ASTAlias *copy_alias(ASTAlias *node);
-  ASTSize_Of *copy_sizeof(ASTSize_Of *node);
+  ASTIntrinsic *copy_intrinsic(ASTIntrinsic *node);
   ASTDefer *copy_defer(ASTDefer *node);
   ASTLambda *copy_lambda(ASTLambda *node);
   ASTChoiceDeclaration *copy_choice_declaration(ASTChoiceDeclaration *node);

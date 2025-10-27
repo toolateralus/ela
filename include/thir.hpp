@@ -532,7 +532,7 @@ struct THIRGen {
   THIR *visit_tuple(ASTTuple *node);
   THIR *visit_cast(ASTCast *node);
   THIR *visit_lambda(ASTLambda *node);
-  THIR *visit_size_of(ASTSize_Of *node);
+  THIR *visit_size_of(ASTIntrinsic *node);
   THIR *visit_struct_declaration(ASTStructDeclaration *node);
   THIR *initialize(const Span &span, Type *type, std::vector<std::pair<InternedString, ASTExpr *>> key_values);
   THIR *visit_program(ASTProgram *node);

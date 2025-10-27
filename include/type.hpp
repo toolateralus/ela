@@ -161,6 +161,11 @@ struct TraitTypeInfo : TypeInfo {
 };
 
 struct ChoiceTypeInfo : TypeInfo {
+  // This returns the discriminant already offset by 1 to match the
+  // one-based indexing.
+
+  // TOOD: make this a try_get_variant_discriminant with an out parameter so it's a bit more robust.
+  // Same with get_variant_type.
   int get_variant_discriminant(const InternedString &variant_name) const;
   Type *get_variant_type(const InternedString &variant_name) const;
 };

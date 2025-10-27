@@ -1133,45 +1133,15 @@ ASTExpr *Parser::parse_primary() {
     case TType::If: {
       return parse_if();
     }
-    case TType::Dyn_Of: {
-      expect(TType::Dyn_Of);
-      NODE_ALLOC(ASTDyn_Of, dyn_of, _, this)
-      expect(TType::LParen);
-      dyn_of->object = parse_expr();
 
-      if (peek().type == TType::Comma) {
-        expect(TType::Comma);
-        dyn_of->trait_type = parse_type();
-      }
+    case TType::Offset_Of:
+    case TType::Dyn_Of:
+    case TType::Type_Of:
+    case TType::Size_Of:
+    case TType::Bitsize_Of:
+    case TType::Discriminant_Of:
+      return parse_intrinsic();
 
-      expect(TType::RParen);
-      return dyn_of;
-    }
-    case TType::Type_Of: {
-      expect(TType::Type_Of);
-      NODE_ALLOC(ASTType_Of, type_of, _, this)
-      expect(TType::LParen);
-      type_of->target = parse_type();
-      expect(TType::RParen);
-      return type_of;
-    }
-    case TType::Size_Of: {
-      NODE_ALLOC(ASTSize_Of, node, _, this);
-      eat();
-      expect(TType::LParen);
-      node->target_type = parse_type();
-      expect(TType::RParen);
-      return node;
-    }
-    case TType::Bitsize_Of: {
-      NODE_ALLOC(ASTSize_Of, node, _, this);
-      node->asking_for_bits = true;
-      eat();
-      expect(TType::LParen);
-      node->target_type = parse_type();
-      expect(TType::RParen);
-      return node;
-    }
     case TType::Fn: {
       return parse_lambda();
     }
@@ -3365,4 +3335,80 @@ ASTForCStyle *Parser::parse_for_c_style() {
   ast->increment = stmt;
   ast->block = parse_block();
   return ast;
+}
+
+/*
+ * TODO: consolidate the dynof, typeof, all of that into the intrinsic node.
+ */
+ASTExpr *Parser::parse_intrinsic() {
+  Token tok = peek();
+  switch (tok.type) {
+    default:
+      throw_error("invalid intrinsic", current_span);
+      break;
+    case TType::Dyn_Of: {
+      expect(TType::Dyn_Of);
+      NODE_ALLOC(ASTDyn_Of, dyn_of, _, this)
+      expect(TType::LParen);
+      dyn_of->object = parse_expr();
+
+      if (peek().type == TType::Comma) {
+        expect(TType::Comma);
+        dyn_of->trait_type = parse_type();
+      }
+
+      expect(TType::RParen);
+      return dyn_of;
+    }
+    case TType::Type_Of: {
+      expect(TType::Type_Of);
+      NODE_ALLOC(ASTType_Of, type_of, _, this)
+      expect(TType::LParen);
+      type_of->target = parse_type();
+      expect(TType::RParen);
+      return type_of;
+    }
+    case TType::Size_Of: {
+      NODE_ALLOC(ASTIntrinsic, intrinsic, _, this);
+      intrinsic->tag = ASTIntrinsic::INTRINSIC_SIZE_OF;
+      eat();
+      expect(TType::LParen);
+      intrinsic->size_of_and_bitsize_of.target_type = parse_type();
+      expect(TType::RParen);
+      return intrinsic;
+    }
+    case TType::Bitsize_Of: {
+      NODE_ALLOC(ASTIntrinsic, intrinsic, _, this);
+      intrinsic->tag = ASTIntrinsic::INTRINSIC_BITSIZE_OF;
+      eat();
+      expect(TType::LParen);
+      intrinsic->size_of_and_bitsize_of.target_type = parse_type();
+      expect(TType::RParen);
+      return intrinsic;
+    }
+    case TType::Offset_Of: {
+      NODE_ALLOC(ASTIntrinsic, intrinsic, _, this);
+      intrinsic->tag = ASTIntrinsic::INTRINSIC_OFFSET_OF;
+      eat();
+      expect(TType::LParen);
+      intrinsic->offset_of.target_type = parse_type();
+      expect(TType::Comma);
+      Token field = expect(TType::Identifier);
+      intrinsic->offset_of.field = field.value;
+      expect(TType::RParen);
+      return intrinsic;
+    }
+    case TType::Discriminant_Of: {
+      NODE_ALLOC(ASTIntrinsic, intrinsic, _, this);
+      intrinsic->tag = ASTIntrinsic::INTRINSIC_DISCRIMINANT_OF;
+      eat();
+      expect(TType::LParen);
+      intrinsic->discriminant_of.target_type = parse_type();
+      expect(TType::Comma);
+      Token field = expect(TType::Identifier);
+      intrinsic->discriminant_of.variant = field.value;
+      expect(TType::RParen);
+      return intrinsic;
+    }
+  }
 }

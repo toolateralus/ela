@@ -114,9 +114,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, Type *to, const Span &span, c
   }
 }
 
-void implicit_cast(ASTExpr *expr, Type *to) {
-  expr->conversion = {.has_value = true, .from = expr->resolved_type, .to = to};
-}
+void implicit_cast(ASTExpr *expr, Type *to) { expr->conversion = {.has_value = true, .from = expr->resolved_type, .to = to}; }
 
 bool expr_is_literal(const ASTExpr *expr) {
   switch (expr->get_node_type()) {
@@ -1994,7 +1992,6 @@ void Typer::visit(ASTIf *node) {
     assert_types_can_cast_or_equal(condition, bool_type(), node->span, "unable to convert 'if' condition to a bool");
   }
 
-
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
 
@@ -3183,8 +3180,45 @@ void Typer::visit(ASTTraitDeclaration *node) {
   return;
 }
 
-void Typer::visit(ASTSize_Of *node) {
-  node->target_type->accept(this);
+void Typer::visit(ASTIntrinsic *node) {
+  switch (node->tag) {
+    case ASTIntrinsic::INTRINSIC_SIZE_OF:
+    case ASTIntrinsic::INTRINSIC_BITSIZE_OF: {
+      node->size_of_and_bitsize_of.target_type->accept(this);
+      node->resolved_type = u64_type();
+    } break;
+    case ASTIntrinsic::INTRINSIC_OFFSET_OF: {
+      node->offset_of.target_type->accept(this);
+      const Type *type = node->offset_of.target_type->resolved_type;
+      size_t offset_in_bits;
+      if (!type->try_get_offset_in_bits(node->offset_of.field, offset_in_bits)) {
+        std::string error = std::format("Unable to get offset of undeclared field '{}'", node->offset_of.field);
+        throw_error(error, node->span);
+      }
+      node->offset_of.offset_in_bits = offset_in_bits;
+    } break;
+    case ASTIntrinsic::INTRINSIC_DISCRIMINANT_OF: {
+      node->discriminant_of.target_type->accept(this);
+      const Type *type = node->discriminant_of.target_type->resolved_type;
+
+      if (!type->is_kind(TYPE_CHOICE) && type->has_extensions()) {
+        std::string error = std::format(
+            "invalid type passed to 'discriminant_of' ('{}'). Must be a 'choice' type, and not be a pointer, array, etc.",
+            type->to_string());
+        throw_error(error, node->span);
+      }
+
+      const ChoiceTypeInfo *info = type->info->as<ChoiceTypeInfo>();
+
+      int discriminant = info->get_variant_discriminant(node->discriminant_of.variant);
+      if (discriminant == -1) {
+        std::string error = std::format("Unable to get discriminant of undeclared choice variant '{}'", node->offset_of.field);
+        throw_error(error, node->span);
+      }
+      node->discriminant_of.discriminant = discriminant;  // discriminants are one-based indices.
+
+    } break;
+  }
   node->resolved_type = u64_type();
 }
 

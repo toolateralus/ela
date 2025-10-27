@@ -63,7 +63,7 @@ enum ASTNodeType {
   AST_NODE_DOT_EXPR,
   AST_NODE_INDEX,
   AST_NODE_INITIALIZER_LIST,
-  AST_NODE_SIZE_OF,
+  AST_NODE_INTRINSIC,
   AST_NODE_TYPE_OF,
   AST_NODE_DYN_OF,
   AST_NODE_DEFER,
@@ -161,7 +161,7 @@ struct ASTNode {
       case AST_NODE_CALL:
       case AST_NODE_METHOD_CALL:
       case AST_NODE_CAST:
-      case AST_NODE_SIZE_OF:
+      case AST_NODE_INTRINSIC:
         return true;
       default:
         return false;
@@ -924,10 +924,34 @@ struct ASTStructDeclaration : ASTDeclaration {
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };
 
-struct ASTSize_Of : ASTExpr {
-  bool asking_for_bits = false;
-  ASTType *target_type;
-  ASTNodeType get_node_type() const override { return AST_NODE_SIZE_OF; }
+struct ASTIntrinsic : ASTExpr {
+  enum {
+    INTRINSIC_OFFSET_OF,
+    INTRINSIC_SIZE_OF,
+    INTRINSIC_BITSIZE_OF,
+    INTRINSIC_DISCRIMINANT_OF,
+  } tag = INTRINSIC_SIZE_OF;
+
+  // sizeof, bitsizeof
+  struct {
+    ASTType *target_type;
+    bool asking_for_bits = false;
+  } size_of_and_bitsize_of;
+
+  // offset_of
+  struct {
+    ASTType *target_type;
+    InternedString field;
+    size_t offset_in_bits; // Set in the typer, when we assert that it exists.
+  } offset_of;
+
+  struct {
+    ASTType *target_type;
+    InternedString variant;
+    size_t discriminant; // Also cached in the typer.
+  } discriminant_of;
+
+  ASTNodeType get_node_type() const override { return AST_NODE_INTRINSIC; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -1383,6 +1407,7 @@ struct Parser {
   ASTExpr *parse_postfix();
   ASTPath *parse_path(bool parsing_import_group = false);
   ASTExpr *parse_primary();
+  ASTExpr *parse_intrinsic();
   ASTImpl *parse_impl();
 
   ASTWhere *parse_where_clause();

@@ -1,6 +1,7 @@
 #include "llvm_emit.hpp"
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -442,6 +443,8 @@ void LLVM_Emitter::emit_function(mir::Function *f, llvm::Function *ir_f) {
   if (!compile_command.has_flag("nl")) {
     dbg.enter_function_scope(f->type, this, ir_f, f->name.str(), f->span);
   }
+
+  ir_f->setCallingConv(llvm::CallingConv::C);
 
   bb_table.reserve(f->basic_blocks.size());
 

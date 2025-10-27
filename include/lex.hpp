@@ -107,9 +107,13 @@ enum struct TType {
   Trait,  // trait
   Where,
 
+  // Intrinsics.
   Size_Of,
   Bitsize_Of,
   Type_Of,
+  Dyn_Of,
+  Offset_Of,
+  Discriminant_Of,
 
   Type,
   Import,
@@ -118,7 +122,6 @@ enum struct TType {
   Mut,
   Const,
   Dyn,
-  Dyn_Of,
   Choice,
   Is,
   Extern,
@@ -219,6 +222,8 @@ static inline std::string ttype_to_string(TType type) {
     TTYPE_CASE(Size_Of);
     TTYPE_CASE(Bitsize_Of);
     TTYPE_CASE(Type_Of);
+    TTYPE_CASE(Offset_Of);
+    TTYPE_CASE(Discriminant_Of);
 
     TTYPE_CASE(Trait);
     TTYPE_CASE(Where);
@@ -325,7 +330,10 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
-    {"static", TType::Static,},
+    {
+        "static",
+        TType::Static,
+    },
     {"using", TType::Using},
     {"const", TType::Const},
     {"mut", TType::Mut},
@@ -336,9 +344,15 @@ static std::unordered_map<std::string, TType> keywords{
     // control flow
     {"in", TType::In},
     {"where", TType::Where},
-    {"sizeof", TType::Size_Of},
+
+    // intrinsics.
+    {"size_of", TType::Size_Of},
     {"bitsize_of", TType::Bitsize_Of},
-    {"typeof", TType::Type_Of},
+    {"type_of", TType::Type_Of},
+    {"dyn_of", TType::Dyn_Of},
+    {"offset_of", TType::Offset_Of},
+    {"discriminant_of", TType::Discriminant_Of},
+
     {"fn", TType::Fn},
     {"switch", TType::Switch},
     {"then", TType::Then},
@@ -363,7 +377,6 @@ static std::unordered_map<std::string, TType> keywords{
     {"defer", TType::Defer},
     {"trait", TType::Trait},
     {"dyn", TType::Dyn},
-    {"dynof", TType::Dyn_Of},
     {"choice", TType::Choice},
     // for pattern matching
     {"is", TType::Is},

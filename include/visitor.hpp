@@ -23,7 +23,7 @@ struct VisitorBase {
   virtual void visit(ASTMethodCall *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
   virtual void visit(ASTPatternMatch *node) = 0;
-  virtual void visit(ASTSize_Of *node) = 0;
+  virtual void visit(ASTIntrinsic *node) = 0;
   virtual void visit(ASTImport *node) = 0;
   virtual void visit(ASTCast *node) = 0;
   virtual void visit(ASTWhere *node) = 0;
@@ -136,7 +136,7 @@ struct Typer : VisitorBase {
   void visit(ASTCast *node) override;
   void visit(ASTType *node) override;
   void visit(ASTTraitDeclaration *node) override;
-  void visit(ASTSize_Of *node) override;
+  void visit(ASTIntrinsic *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTUnpackElement *node) override;
   void visit(ASTRun *) override;

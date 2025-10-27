@@ -569,8 +569,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_ALIAS:
       new_node = copy_alias(static_cast<ASTAlias *>(node));
       break;
-    case AST_NODE_SIZE_OF:
-      new_node = copy_sizeof(static_cast<ASTSize_Of *>(node));
+    case AST_NODE_INTRINSIC:
+      new_node = copy_intrinsic(static_cast<ASTIntrinsic *>(node));
       break;
     case AST_NODE_DEFER:
       new_node = copy_defer(static_cast<ASTDefer *>(node));
@@ -642,9 +642,20 @@ ASTAlias *ASTCopier::copy_alias(ASTAlias *node) {
   return new_node;
 }
 
-ASTSize_Of *ASTCopier::copy_sizeof(ASTSize_Of *node) {
-  auto new_node = make_copy(node);
-  new_node->target_type = static_cast<ASTType *>(copy_node(node->target_type));
+ASTIntrinsic *ASTCopier::copy_intrinsic(ASTIntrinsic *node) {
+  ASTIntrinsic * new_node = make_copy(node);
+  switch (node->tag) {
+    case ASTIntrinsic::INTRINSIC_BITSIZE_OF:
+    case ASTIntrinsic::INTRINSIC_SIZE_OF:
+      new_node->size_of_and_bitsize_of.target_type = (ASTType *)copy_node(node->size_of_and_bitsize_of.target_type);
+      break;
+    case ASTIntrinsic::INTRINSIC_OFFSET_OF:
+      new_node->offset_of.target_type = (ASTType *)copy_node(node->offset_of.target_type);
+      break;
+    case ASTIntrinsic::INTRINSIC_DISCRIMINANT_OF:
+      new_node->discriminant_of.target_type = (ASTType *)copy_node(node->discriminant_of.target_type);
+      break;
+  }
   return new_node;
 }
 

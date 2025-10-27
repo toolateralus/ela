@@ -77,13 +77,18 @@ static inline THIRAggregateInitializer *get_choice_type_instantiation_boilerplat
 /*
   I put some of these super trivial nodes up top here so they stay out of the way
 */
-THIR *THIRGen::visit_size_of(ASTSize_Of *ast) {
-  if (ast->asking_for_bits) {
-    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bits()), ast->span, u64_type(),
-                        ASTLiteral::Integer);
-  } else {
-    return make_literal(std::to_string(ast->target_type->resolved_type->size_in_bits() / 8), ast->span, u64_type(),
-                        ASTLiteral::Integer);
+THIR *THIRGen::visit_size_of(ASTIntrinsic *ast) {
+  switch (ast->tag) {
+    case ASTIntrinsic::INTRINSIC_SIZE_OF:
+      return make_literal(std::to_string(ast->size_of_and_bitsize_of.target_type->resolved_type->size_in_bits() / 8), ast->span,
+                          u64_type(), ASTLiteral::Integer);
+    case ASTIntrinsic::INTRINSIC_BITSIZE_OF:
+      return make_literal(std::to_string(ast->size_of_and_bitsize_of.target_type->resolved_type->size_in_bits()), ast->span,
+                          u64_type(), ASTLiteral::Integer);
+    case ASTIntrinsic::INTRINSIC_OFFSET_OF:
+      return make_literal(std::to_string(ast->offset_of.offset_in_bits / 8), ast->span, u64_type(), ASTLiteral::Integer);
+    case ASTIntrinsic::INTRINSIC_DISCRIMINANT_OF:
+      return make_literal(std::to_string(ast->discriminant_of.discriminant), ast->span, u64_type(), ASTLiteral::Integer);
   }
 }
 
@@ -2353,8 +2358,8 @@ THIR *THIRGen::visit_node(ASTNode *ast, bool instantiate_conversions) {
       return visit_index((ASTIndex *)ast);
     case AST_NODE_INITIALIZER_LIST:
       return visit_initializer_list((ASTInitializerList *)ast);
-    case AST_NODE_SIZE_OF:
-      return visit_size_of((ASTSize_Of *)ast);
+    case AST_NODE_INTRINSIC:
+      return visit_size_of((ASTIntrinsic *)ast);
     case AST_NODE_TYPE_OF:
       return visit_type_of((ASTType_Of *)ast);
     case AST_NODE_DYN_OF:
