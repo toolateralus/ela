@@ -2687,10 +2687,16 @@ ASTWhere *Parser::parse_where_clause() {
 
   // Used to reduce repitition of this large(ish) function
   expect(TType::Where);
-  constraints.push_back(parse_constraint());
-  while (peek().type == TType::Comma) {
-    eat();
+
+  while (true) {
+    // ! BUG! when you have trailing commas here we just keep infinitely parsing a type
+    // ! since there's no logical end to this sequence.
     constraints.push_back(parse_constraint());
+    if (peek().type == TType::Comma) {
+      eat();
+    } else {
+      break;
+    }
   }
   return node;
 }

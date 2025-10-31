@@ -1,0 +1,23 @@
+
+/* 
+  Apparently, where clauses are very fragile in the sense of trailing commas, which should be 100% acceptable
+
+  It's not actually the 'where' clause, it's the fact that there's an infinite recursion waiting to
+  happen under the right conditions
+
+  in ast.cpp:
+  |-------<-----infinite loop ------<-----------------<----------<----|
+  |                                                                   |
+  |->-parse_type-->-parse_path-->-parse_path_segment-->-parse_type-->-|
+*/
+
+fn takes_slice!<T>(t: T) -> s32 
+  // ! Segfault.  remove the comma and it doesn't crash.
+  where T: AsSlice!<T>, 
+{
+
+}
+
+
+
+fn main() { }
