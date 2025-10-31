@@ -42,10 +42,10 @@ struct My_Struct {
 }
 
 fn default_generic!<T = s32>() -> f32 {
-  return 1234.56 as T;
+  return 1234.56 as T; // ! making return types more strict has made this fail
 }
 
 #test fn test_default_generics() {
-  assert_eq(default_generic(), 1234.0, "default generic error");
+  assert_eq(default_generic() as f32, 1234.0, "default generic error");
   assert_eq(default_generic!<f32>(), 1234.56, "default generic error");
 }
