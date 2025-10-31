@@ -586,19 +586,14 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, bool macro_expansi
 
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE)) throw_error("Keyword \"continue\" must be in a loop.", node->span);
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK)) throw_error("Keyword \"break\" must be in a loop.", node->span);
-  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH)) {
-    if (node->return_type->resolved_type != void_type()) {
-      throw_error("Not all code paths return a value.", node->span);
-    }
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH) && node->return_type->resolved_type != void_type()) {
+    throw_error("Not all code paths return a value.", node->span);
   }
   if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_RETURN)) {
     ASTUnaryExpr junk;
     junk.resolved_type = node->return_type->resolved_type;
     assert_types_can_cast_or_equal(&junk, control_flow.type, node->span, "unexpected return type");
   }
-
-
-
 }
 
 Type *Typer::get_self_type() {

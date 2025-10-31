@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "scope.hpp"
+#include <cstring>
 #include "core.hpp"
 #include "type.hpp"
 
@@ -20,6 +21,19 @@ void get_varargs_handlers(Context *c) {
   scope->insert_function("va_start", va_func_type, nullptr);
   scope->insert_function("va_end", va_func_type, nullptr);
   scope->insert_function("va_copy", va_func_type, nullptr);
+
+  // ! For some reason, if we try to find a pointer type here, the entire
+  // ! system just blows up.
+  // Atomic primitives hacked in for now
+  FunctionTypeInfo atomic_load_fti;
+  atomic_load_fti.is_varargs = true;
+  atomic_load_fti.return_type = u64_type();
+  scope->insert_function("__atomic_load_n", global_find_function_type_id(atomic_load_fti, {}), nullptr);
+
+  FunctionTypeInfo atomic_store_fti;
+  atomic_store_fti.is_varargs = true;
+  atomic_store_fti.return_type = void_type();
+  scope->insert_function("__atomic_store_n", global_find_function_type_id(atomic_store_fti, {}), nullptr);
 }
 
 Context::Context() {
@@ -40,8 +54,8 @@ Context::Context() {
   scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
-// TODO: we need a more formal way to do release mode.
-// we used to have a --release and --debug
+  // TODO: we need a more formal way to do release mode.
+  // we used to have a --release and --debug
   if (compile_command.has_flag("release")) {
     scope->defines().insert("RELEASE");
   } else {
@@ -124,7 +138,7 @@ size_t Scope::methods_count() const {
 
 void Scope::create_reference(SymbolScopePair pair) {
   references.insert({
-    .scope=pair.scope,
-    .original_name=pair.symbol->name,
+      .scope = pair.scope,
+      .original_name = pair.symbol->name,
   });
 }

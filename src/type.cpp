@@ -291,8 +291,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Span
     auto from_elem = from->get_element_type();
     auto to_elem = to->get_element_type();
     auto conversion = type_conversion_rule(from_elem, to_elem);
-    if (conversion == CONVERT_NONE_NEEDED ||
-        (conversion == CONVERT_IMPLICIT && (from->pointer_depth() == to->pointer_depth()))) {
+    if (conversion == CONVERT_NONE_NEEDED || (conversion == CONVERT_IMPLICIT && (from->pointer_depth() == to->pointer_depth()))) {
       elements_cast = true;
     }
   }
@@ -429,8 +428,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
     return false;
   }
 
-  return std::memcmp(finder_info->parameter_types, self_info->parameter_types,
-                     finder_info->params_len * sizeof(Type *)) == 0;
+  return std::memcmp(finder_info->parameter_types, self_info->parameter_types, finder_info->params_len * sizeof(Type *)) == 0;
 }
 
 /*
@@ -568,8 +566,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
   type->set_info(info);
 
-  if (type_extensions_is_back_pointer(extensions) &&
-      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (type_extensions_is_back_pointer(extensions) && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
 
     if (type_extensions_is_back_const_pointer(extensions)) {
@@ -591,10 +588,9 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
 
 Type *Type::get_element_type() const {
   if (!is_pointer() && !is_fixed_sized_array()) {
-    throw_error(
-        std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
-                    to_string()),
-        {});
+    throw_error(std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
+                            to_string()),
+                {});
   }
   auto extensions = extensions_without_back();
   if (is_kind(TYPE_TUPLE)) {
@@ -823,7 +819,11 @@ InternedString get_tuple_type_name(const std::vector<Type *> &types) {
 Type *Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
   ext.push_back({.type = is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST, .array_size = 0});
-  return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type *)this : base_type, ext);
+  if (type_is_valid(base_type)) {
+    return global_find_type_id(base_type, ext);
+  } else {
+    return global_find_type_id((Type *)this, ext);
+  }
 }
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
@@ -1397,8 +1397,6 @@ bool Type::has_dependencies() const {
     case TYPE_DYN: {
       // this doesn't depend on any other type, rather function declarations, but that's not relevant.
       return false;
-    }
-    break;
+    } break;
   }
 }
-
