@@ -21,19 +21,6 @@ void get_varargs_handlers(Context *c) {
   scope->insert_function("va_start", va_func_type, nullptr);
   scope->insert_function("va_end", va_func_type, nullptr);
   scope->insert_function("va_copy", va_func_type, nullptr);
-
-  // ! For some reason, if we try to find a pointer type here, the entire
-  // ! system just blows up.
-  // Atomic primitives hacked in for now
-  FunctionTypeInfo atomic_load_fti;
-  atomic_load_fti.is_varargs = true;
-  atomic_load_fti.return_type = u64_type();
-  scope->insert_function("__atomic_load_n", global_find_function_type_id(atomic_load_fti, {}), nullptr);
-
-  FunctionTypeInfo atomic_store_fti;
-  atomic_store_fti.is_varargs = true;
-  atomic_store_fti.return_type = void_type();
-  scope->insert_function("__atomic_store_n", global_find_function_type_id(atomic_store_fti, {}), nullptr);
 }
 
 Context::Context() {

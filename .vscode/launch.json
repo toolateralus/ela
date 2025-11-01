@@ -10,6 +10,9 @@
       "name": "Debug current file compilation",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      },
       "args": [
         "${file}"
       ],
@@ -20,6 +23,9 @@
       "name": "Debug current file compilation (nostdlib)",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      },
       "args": [
         "${file}",
         "--nostdlib"
@@ -31,6 +37,9 @@
       "name": "Debug current file compilation (tests)",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      },
       "args": [
         "${file}",
         "--test",
@@ -45,6 +54,9 @@
       "name": "Debug current file",
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      }
     },
     {
       "preLaunchTask": "compile_current_test",
@@ -53,6 +65,9 @@
       "name": "Debug current file (tests)",
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      }
     },
     // If you have an ela_source/main.ela you can use these configurations to test
     // miscellaneous problems you may have.
@@ -68,7 +83,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
       }
     },
     {
@@ -82,6 +97,9 @@
         "--nostdlib"
       ],
       "cwd": "${workspaceFolder}/ela_source",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      }
     },
     {
       "type": "lldb",
@@ -92,6 +110,9 @@
         "main.ela"
       ],
       "cwd": "${workspaceFolder}/ela_source",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      },
       "stopOnEntry": true
     },
     {
@@ -100,7 +121,10 @@
       "name": "Debug ela_source/main executable",
       "program": "${workspaceFolder}/ela_source/main",
       "args": [],
-      "cwd": "${workspaceFolder}/ela_source/"
+      "cwd": "${workspaceFolder}/ela_source/",
+      "env": {
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
+      }
     },
     {
       "type": "lldb",
@@ -114,7 +138,7 @@
       ],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh/source/temp/ela-stdlib/"
+        "ELA_LIB_PATH": "${workspaceFolder}/lib/"
       }
     },
   ]
