@@ -1,5 +1,5 @@
 NOTE: The compiler does not compile on windows currently! it is primarily developed on Arch and Linux Mint.
-Most linux distributions, it should work. You just need CMake and Ninja to compile it, as far as I know.
+Most linux distributions, it should work. You just need CMake, Ninja and libffi to compile it, as far as I know.
 
 The Ela language is very immature (~1 year of daily development, with a few months of hiatus), but has a few key features:
 
