@@ -285,3 +285,182 @@ fn main() {
 }
 ```
 
+#### Builtins for Result and Option
+ 
+Up to this point the expectation was that we could make ADT's so strong that Result and Option could be seamlessly
+implemented in the language itself, and there wouldn't be much friction, but after using V lang, I realize that having an integrated
+way to propogate errors, and a simple syntax like 'or' for handling errors and none's is much more elegant and useable than
+having pattern matching and unwrapping on said types. 
+
+Having something like `!Type` as return types makes it so the user does not have to reason about how to propogate error types,
+and we can pass error or non-error payloads back with ease and handling them is much more trivial.
+
+In fact, the `or` expression could be used to handle any boolean-convertible expression not evaluating to true.
+
+As for the result type, there's a few ways we could go about this.
+
+One way would be to use a 'dyn Error' trait that has some methods like `fn err(*self) -> String` and `fn code(*self) -> s32`,
+which is approximately how V does this. However, I think that's quite restrictive, and we could try to find some middle ground between how Zig and V does this.
+I'm not sure what that would look like though.
+
+
+Some ideas for one approach:
+
+```rust
+// in some File api
+impl File {
+  // this example would effectively compile to
+  // the method shown below it.
+  fn open(path: Path) -> !File {
+    stat := fs::stat(path)! // propagate if error
+
+    if !stat.exists {
+      // stdlib `error` function
+      return error("Error!")
+    } else if stat.is_bad {
+      return MyError.{..}
+    }
+    return File.{} // actual file opening mechanism here, return file.
+  }
+
+  fn open(path: Path) -> choice File_open_Result { error(any), File(File) } {
+    stat_result := fs::stat(path);
+
+    if stat_result.is_err() {
+      return File_open_Result::error(stat.unwrap_err())
+    }
+
+    stat := stat_result.unwrap()
+
+    // the 'any()' construction syntax is just for demonstration.
+    if !stat.exists {
+      return File_open_Result::error(any(new("Error!")))
+    } else if stat.is_bad {
+      return File_open_Result::error(any(new(MyError.{..})))
+    }
+
+    return File_open_Result::File(File.{}) // actual file opening mechanism here, return file.
+  }
+}
+
+// And this would effectively compile to what's shown below as well
+fn main() -> ! {
+  file := File::open("my_path") or { 
+    File::some_file_value()
+  }
+  io::println("file is valid? %", (file.is_valid(),));
+}
+
+
+fn main() {
+  file_result := File::open("my_path");
+  mut file: File;
+  if file_result.is_err() {
+    err: any = file.unwrap_err();
+    defer {
+      delete(err.ptr)
+    }
+    file = File::some_file_value()
+  }
+  io::println("file is valid? %", (file.is_valid(),));
+}
+
+
+```
+
+### Fix any type, fix typeof, stop using pointer comparisons and non-determinsitic ID's for comparing types at runtime
+
+We need some kind of deterministic hash code where two translation units that include the same code can refer to a type by the typeof()
+and get a result that's valid to compare, right now we use pointer comparisons for `typeof(T) == typeof(T)` and also the `any` type,
+so if a .dll or .so returned an `any`, the comparison would at worst be two pointers that obviously don't point to the same memory, and at best,
+be two integer indices into the compilation unit index of the type, which if the two programs don't contain the exact same code, would never be equivalent.
+
+We should hash the contents of each type (and also the parent scope hierarchy by name) so that two translation units that include the same types
+can safely compare `typeof(T) == typeof(T)` and get a valid result, using that hashcode.
+
+Additionally the `any` type should be more builtin to the compiler, allowing implicit conversions to the any type for scoped anys, and a simple way to hoist
+a value into an any on the heap so it can be returned if we choose to use that route for the error handling mechanism. Determining when something would or wouldn't get
+hoisted up onto the heap would be weird so maybe we either only do that for errors, or we just always do it. I would rather have clear explicit semantics so doing it only
+when required (for errors) and allowing the user to allocate if they wanna propagate some any type up the call stack after their value may have gone out of scope seems 
+to make more sense.
+
+Also, we can add some pattern matching syntax for ease of use when handling any types, pretty much identical to the choice type pattern matching, except
+instead of comparing a discriminant and accessing a field, we would compare the hashcode of the two any types, and cast the void pointer  into a useable value
+within the block of whatever pattern match statement.
+
+```rust
+  a : any = 10; 
+  if a is s32(int) {
+
+  } else if a is std::ErrorCode(ec) {
+
+  }
+```
+
+
+### Some attribute that can prevent zero initialization of certain types
+
+right now anything can be zero initialized, which is great until you look at the internals of our collection types
+which have to handle default lazy initialization everywhere, and in places that doesn't make sense as well.
+
+specifically, in the allocators, we have to have some global variable representing an allocator useable at any time by anyone
+and it takes away from the entire allocator system because specifying an allocator becomes much harder with nested collection types
+and things passed in certain ways.
+
+for example if you wrote this:
+```rust
+  mut list: List!<s32>;
+  for i in ..100 {
+    list.push(10)
+  }
+```
+
+What's actually happening on that first push is we're checking if the `allocator` field in the list type has a pointer instance that's valid,
+and if not, we're assigning it to `get_global_allocator()`. it makes the code for the container types less maintainable and more importantly
+less predictable and transparent, there's just weird magical behaviour happening in the background.
+Also, for nested collections, we need some kind of trait like `HasAllocator` which has a getter and setter so that when we do construct
+items to store in that list, and the list says in some flag to pass allocators recursively, we can propogate our allocator to our child items
+
+
+for example if you wrote this,
+you would then have to iterate over the list any time it changes length
+and make certain that the children all have a field that point to `my_allocator`
+```rust
+  my_allocator := dynof(alloc, Allocator)
+  my_list: List!<List!<s32>> = List::with_allocator(my_allocator)
+```
+
+So we could have some trait like this:
+```rust
+trait HasAllocator {
+  fn get_allocator(*self) -> dyn Allocator;
+  fn set_allocator(*mut self, allocator: dyn Allocator);
+}
+```
+
+or even like this, with some compile time stuff:
+```rust
+trait HasAllocator {
+  fn get_allocator(*self) -> dyn Allocator {
+    return self.allocator; // Convention would mandate that this field is just called `allocator`.
+  }
+  fn set_allocator(*mut self, allocator: dyn Allocator, flags: SetAllocatorFlags = ::propagate) {
+    if propagate {
+      // compile time for loop that just gets unrolled.
+      $for field in Self::fields {
+        where field.ty: HasAllocator {
+          field.value.set_allocator(allocator, flags);
+        }
+      }
+    } else {
+      self.allocator = allocator;
+    }
+  }
+}
+```
+
+```rust
+  my_allocator := dynof(alloc, Allocator)
+  mut my_list: List!<List!<s32>> = List::with_length_with_allocator(150, my_allocator, ::PropagateAllocatorToChildren)
+  // now my_list has 150 other lists within it that all point to my_allocator.
+```

@@ -33,3 +33,9 @@
 - compxor
 - compshl
 - compshr
+
+- deref
+- index
+- index_mut
+- slice_index
+- slice_index_mut
